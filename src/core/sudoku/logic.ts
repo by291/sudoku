@@ -1,9 +1,16 @@
-import { calculateCandidates, digitsIn, isComplete, maskOf, PEERS, UNITS } from './board'
-import type { SudokuUnit } from './board'
-import { DIGITS } from './types'
-import type { Board, CellValue, Difficulty, Digit, NoteMask } from './types'
-import { TECHNIQUES } from './techniques'
-import type { LogicalState, LogicalStep, Technique } from './techniques'
+import {
+  calculateCandidates,
+  digitsIn,
+  isComplete,
+  maskOf,
+  PEERS,
+  UNITS,
+} from '@/core/sudoku/board'
+import type { SudokuUnit } from '@/core/sudoku/board'
+import { DIGITS } from '@/core/sudoku/types'
+import type { Board, CellValue, Difficulty, Digit, NoteMask } from '@/core/sudoku/types'
+import { TECHNIQUES } from '@/core/sudoku/techniques'
+import type { LogicalState, LogicalStep, Technique } from '@/core/sudoku/techniques'
 
 export type LogicalWorkspace = { board: CellValue[]; candidates: NoteMask[] }
 export function createLogicalWorkspace(board: Board): LogicalWorkspace {

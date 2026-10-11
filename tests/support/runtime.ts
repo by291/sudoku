@@ -1,12 +1,12 @@
 import 'fake-indexeddb/auto'
 import { createApp } from 'vue'
 import { createPinia, disposePinia } from 'pinia'
-import { openSudokuDatabase } from '../../src/infrastructure/storage/database'
-import { createGameRepository } from '../../src/infrastructure/storage/repository'
-import { createOwnershipCoordinator } from '../../src/infrastructure/ownership'
-import { createSaveQueue } from '../../src/infrastructure/storage/saveQueue'
-import { gameRuntimeKey } from '../../src/app/runtime'
-import type { GameRuntime } from '../../src/app/runtime'
+import { openSudokuDatabase } from '@/storage/database'
+import { createGameRepository } from '@/storage/repository'
+import { createOwnershipCoordinator } from '@/infrastructure/ownership'
+import { createSaveQueue } from '@/storage/saveQueue'
+import { gameRuntimeKey } from '@/infrastructure/runtime'
+import type { GameRuntime } from '@/infrastructure/runtime'
 export async function createTestRuntime() {
   const database = await openSudokuDatabase(crypto.randomUUID())
   const provider = () => Promise.resolve(database)

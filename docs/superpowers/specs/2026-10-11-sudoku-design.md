@@ -144,16 +144,26 @@ Organize around complete workflows. Avoid creating separate feature modules for 
 
 ```text
 src/
-  app/                   Application entry, routing, global theme, and page shell
+  main.ts, App.vue       Bootstrap, root providers, and application resource lifetime
+  layouts/               Visual application shell and navigation
+  router/                Hash route composition
+  theme/                 Effective theme synchronization and UI palette adapter
+  shared/components/     Controlled board, digit input, and confirmation dialog
   core/sudoku/           Board rules, search, logical strategies, generation, and types
-  features/game/         Shared board, controls, hints, session state, and timing
+  features/home/         Resume entries and mode selection
+  features/game/         Game/daily views, controls, hints, session state, and timing
   features/learning/     Lessons, examples, exercises, and progress pages
   features/records/      Result aggregation and presentation
-  infrastructure/        Worker communication, persistence, and tab coordination
+  features/settings/     Preference types, defaults, and persistence actions
+  storage/               Persisted-data validation, IndexedDB, and ordered saves
+  worker/                Computation execution, messages, and cancellation
+  infrastructure/        Runtime services and tab coordination
   styles/                Theme variables and global styles
 ```
 
 Dependencies point from the interface and session state toward the core. The core must not depend on those layers. Infrastructure handles computation execution and persistence without implementing Sudoku rules. Pinia coordinates session actions, worker requests, and saving. Pages obtain presentation data from session state and do not write directly to the database.
+
+The structure refinement requested on 2026-10-11 learns from `sctv-dl`'s application composition and cohesive workflow organization. Features contain only the responsibility groups they need: `views/`, `components/`, `composables/`, `model/`, and `stores/`. Shared presentation is independent of feature state and infrastructure. Infrastructure may consume persisted feature models for validation. See [Web Architecture](../../architecture.md) for the current ownership map and import boundaries; the original implementation plan records historical paths.
 
 Keyboard input, touch input, and hint application use the same session actions. Those actions consistently protect givens, record undo history, mark assistance, detect completion, and save changes.
 

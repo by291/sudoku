@@ -9,6 +9,7 @@ These instructions apply to the entire repository.
 - Write player-facing interface copy in Chinese, as specified in the product design.
 - The selected stack is Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI for common controls, Web Workers, IndexedDB with idb, and native CSS. Use pnpm, ESLint, Prettier, Vitest, and Playwright for tooling.
 - Read the applicable design document in `docs/superpowers/specs/` before changing product behavior.
+- Read [Web Architecture](docs/architecture.md) before moving modules or changing their dependencies.
 
 ## Learn and follow the stack's conventions
 
@@ -45,6 +46,8 @@ Primary references:
 - Prefer straightforward control flow and explicit data flow to clever shortcuts.
 - Use descriptive domain names. Avoid unexplained abbreviations, unrelated responsibilities in one function, and deeply nested branches.
 - Keep functions and components focused on a coherent responsibility. Extract a unit when it improves understanding or reuse, rather than enforcing an arbitrary line count or splitting every small operation into its own file.
+- Keep complete workflows under their feature. Place route views in `views/`, business components in `components/`, and logic in the applicable `model/`, `stores/`, or `composables/` directory; omit unused directories and colocate tests.
+- Use `@/` for source imports. Keep worker asset URLs literal and relative, and allow relative imports for test fixtures outside `src/`.
 - Keep templates easy to scan. Move substantial calculations and branching into named functions or computed values.
 - Name domain constants instead of repeating magic values. Document the meaning of bit masks, seeded generation, timing rules, and other non-obvious invariants.
 - Comments should explain reasoning, constraints, and trade-offs. Do not narrate obvious statements or leave misleading comments after a change.
@@ -63,7 +66,7 @@ Primary references:
 ## Vue and Pinia
 
 - Use Vue single-file components with `<script setup lang="ts">` and Composition API.
-- Use PascalCase for component filenames, camelCase for functions and variables, and descriptive `use...` names for composables and `use...Store` names for Pinia stores.
+- Use PascalCase for component filenames, a `View` suffix for route views, camelCase for functions and variables, and descriptive `use...` names for composables and `use...Store` names for Pinia stores.
 - Declare typed props and emits. Do not mutate props.
 - Use computed values for derived state; reserve watchers for necessary side effects.
 - Keep temporary component-local state local. Put shared session state in Pinia, with named actions for meaningful game operations.
@@ -71,6 +74,7 @@ Primary references:
 - Preserve reactivity when reading stores; use `storeToRefs` when destructuring reactive state or getters.
 - Clean up event listeners, timers, subscriptions, and worker resources when their owning scope is disposed.
 - Keep Sudoku rules out of templates and components. Keep database writes behind the persistence module.
+- Keep root providers and resource lifetime in App, visual navigation in AppLayout, and shared components independent of features, storage, workers, and infrastructure. Follow the enforced dependency rules described in Web Architecture.
 
 ## Styles and interaction
 

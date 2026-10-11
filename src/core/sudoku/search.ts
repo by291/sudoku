@@ -1,5 +1,5 @@
-import { calculateCandidates, digitsIn, findConflicts, parseBoard } from './board'
-import type { Board, SearchResult } from './types'
+import { calculateCandidates, digitsIn, findConflicts, parseBoard } from '@/core/sudoku/board'
+import type { Board, SearchResult } from '@/core/sudoku/types'
 
 export function countSolutions(
   board: Board,

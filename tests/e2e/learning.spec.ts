@@ -1,5 +1,5 @@
 import { test, expect, cellName, readSessions } from './support'
-import { LESSONS } from '../../src/features/learning/lessons'
+import { LESSONS } from '@/features/learning/model/lessons'
 test('completes the rules exercise using only keyboard navigation', async ({ page }) => {
   await page.goto('/#/learn/rules')
   const first = page.getByRole('button', { name: cellName(0) })

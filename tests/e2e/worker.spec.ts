@@ -1,11 +1,11 @@
 import { readdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { test, expect } from './support'
-import type { WorkerRequest } from '../../src/infrastructure/worker/protocol'
-import { parseWorkerResponse } from '../../src/infrastructure/worker/protocol'
+import type { WorkerRequest } from '@/worker/protocol'
+import { parseWorkerResponse } from '@/worker/protocol'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 import { countReferenceSolutions } from '../support/referenceSudoku'
-import { rateDifficulty } from '../../src/core/sudoku/logic'
+import { rateDifficulty } from '@/core/sudoku/logic'
 const asset = readdirSync('dist/assets').find(
   (file) => file.startsWith('sudoku.worker-') && file.endsWith('.js'),
 )

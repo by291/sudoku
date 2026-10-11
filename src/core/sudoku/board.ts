@@ -1,5 +1,12 @@
-import { ALL_DIGITS_MASK, BOARD_SIZE, BOX_SIZE, DIGITS, UNIT_SIZE, isDigit } from './types'
-import type { Board, CellValue, Digit, NoteMask, ParseResult } from './types'
+import {
+  ALL_DIGITS_MASK,
+  BOARD_SIZE,
+  BOX_SIZE,
+  DIGITS,
+  UNIT_SIZE,
+  isDigit,
+} from '@/core/sudoku/types'
+import type { Board, CellValue, Digit, NoteMask, ParseResult } from '@/core/sudoku/types'
 
 export type Unit = { kind: 'row' | 'column' | 'box'; index: number }
 export type SudokuUnit = Unit & { cells: readonly number[] }

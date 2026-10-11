@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest'
-import { generatePuzzle, PUZZLE_VERSION } from './generation'
-import { TEMPLATES } from './templates'
-import { rateDifficulty, analyzeLogic } from './logic'
-import { TECHNIQUES } from './techniques'
+import { generatePuzzle, PUZZLE_VERSION } from '@/core/sudoku/generation'
+import { TEMPLATES } from '@/core/sudoku/templates'
+import { rateDifficulty, analyzeLogic } from '@/core/sudoku/logic'
+import { TECHNIQUES } from '@/core/sudoku/techniques'
 import { countReferenceSolutions } from '../../../tests/support/referenceSudoku'
-import { isComplete } from './board'
-import type { Difficulty } from './types'
+import { isComplete } from '@/core/sudoku/board'
+import type { Difficulty } from '@/core/sudoku/types'
 
 it.each(TEMPLATES)(
   'verifies the frozen $difficulty template independently',

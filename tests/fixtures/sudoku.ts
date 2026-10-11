@@ -1,4 +1,4 @@
-import type { Board, CellValue } from '../../src/core/sudoku/types'
+import type { Board, CellValue } from '@/core/sudoku/types'
 
 export function fixtureBoard(text: string): Board {
   return Array.from(text, (character): CellValue => {

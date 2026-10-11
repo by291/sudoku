@@ -1,10 +1,10 @@
 import 'fake-indexeddb/auto'
 import { afterEach, expect, it } from 'vitest'
-import { openSudokuDatabase } from './storage/database'
-import { createOwnershipCoordinator } from './ownership'
-import { createGameRepository } from './storage/repository'
+import { openSudokuDatabase } from '@/storage/database'
+import { createOwnershipCoordinator } from '@/infrastructure/ownership'
+import { createGameRepository } from '@/storage/repository'
 import { makeSession } from '../../tests/support/gameFixtures'
-import { createSaveQueue } from './storage/saveQueue'
+import { createSaveQueue } from '@/storage/saveQueue'
 
 const databases: Awaited<ReturnType<typeof openSudokuDatabase>>[] = []
 afterEach(() => {

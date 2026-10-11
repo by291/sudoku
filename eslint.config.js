@@ -4,6 +4,38 @@ import ts from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 
+const sourceImportPatterns = [{ regex: '^\\.', message: 'Use @/ for source imports.' }]
+const compositionImportPatterns = [
+  ...sourceImportPatterns,
+  {
+    regex: '^@/(?:App(?:\\.|$)|main(?:\\.|$)|layouts/|router(?:/|$)|theme/)',
+    message: 'Business and infrastructure modules must not depend on application composition.',
+  },
+]
+
+function restrictImports({ paths = [], patterns }) {
+  // Static import restrictions do not inspect import(). Generate both from one policy.
+  const dynamicImports = [
+    {
+      selector: 'ImportExpression[source.type!="Literal"]',
+      message: 'Use string-literal module paths so dependency boundaries can be checked.',
+    },
+    ...paths.map((name) => ({
+      selector: `ImportExpression[source.value=${JSON.stringify(name)}]`,
+      message: `This layer must not import ${name}.`,
+    })),
+    ...patterns.map(({ regex, message }) => ({
+      // ESQuery attribute regexes require Unicode escapes for forward slashes.
+      selector: `ImportExpression[source.value=/${regex.replaceAll('/', '\\u002f')}/i]`,
+      message,
+    })),
+  ]
+  return {
+    'no-restricted-imports': ['error', { paths, patterns }],
+    'no-restricted-syntax': ['error', ...dynamicImports],
+  }
+}
+
 export default [
   {
     ignores: [
@@ -25,14 +57,21 @@ export default [
     languageOptions: { globals: globals.browser, parserOptions: { parser: ts.parser } },
   },
   {
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/**/*.test.ts'],
+    rules: { ...restrictImports({ patterns: sourceImportPatterns }) },
+  },
+  {
     files: ['src/core/**/*.ts'],
+    ignores: ['src/**/*.test.ts'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: ['vue', 'pinia', 'idb', '**/app/**', '**/features/**', '**/infrastructure/**'],
-        },
-      ],
+      ...restrictImports({
+        paths: ['vue', 'pinia', 'vue-router', 'naive-ui', 'idb'],
+        patterns: [
+          ...sourceImportPatterns,
+          { regex: '^@/(?!core/)', message: 'The Sudoku engine must remain independent.' },
+        ],
+      }),
       'no-restricted-globals': [
         'error',
         'window',
@@ -45,18 +84,68 @@ export default [
     },
   },
   {
-    files: ['src/features/**/**Page.vue'],
+    files: ['src/{features,infrastructure,storage,worker,shared}/**/*.{ts,vue}'],
+    ignores: ['src/**/*.test.ts'],
+    rules: { ...restrictImports({ patterns: compositionImportPatterns }) },
+  },
+  {
+    files: ['src/shared/**/*.{ts,vue}'],
+    ignores: ['src/**/*.test.ts'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        { patterns: ['**/storage/database*', '**/storage/repository*'] },
-      ],
+      ...restrictImports({
+        patterns: [
+          ...compositionImportPatterns,
+          {
+            regex: '^@/(?:features|infrastructure|storage|worker)/',
+            message: 'Shared presentation must not depend on feature state or infrastructure.',
+          },
+        ],
+      }),
     },
   },
   {
-    files: ['src/features/game/session.ts', 'src/features/game/timer.ts'],
+    files: ['src/{infrastructure,storage,worker}/**/*.ts'],
+    ignores: ['src/**/*.test.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: ['vue', 'pinia', '**/infrastructure/**'] }],
+      ...restrictImports({
+        patterns: [
+          ...compositionImportPatterns,
+          {
+            regex: '^@/features/[^/]+/(?!model/)',
+            message: 'Infrastructure may consume persisted models, not feature UI or stores.',
+          },
+        ],
+      }),
+    },
+  },
+  {
+    files: ['src/features/**/views/*.vue'],
+    rules: {
+      ...restrictImports({
+        patterns: [
+          ...compositionImportPatterns,
+          {
+            regex: '^@/storage/(?:database|repository)(?:$|[./])',
+            message: 'Views must use store actions rather than write directly to the database.',
+          },
+        ],
+      }),
+    },
+  },
+  {
+    files: ['src/features/{game,learning,settings}/model/*.ts'],
+    ignores: ['src/**/*.test.ts'],
+    rules: {
+      ...restrictImports({
+        paths: ['vue', 'pinia', 'vue-router', 'naive-ui', 'idb'],
+        patterns: [
+          ...compositionImportPatterns,
+          {
+            regex: '^@/(?!core/|features/(?:game|learning|settings)/model/)',
+            message: 'Pure models may only depend on the engine and other pure models.',
+          },
+        ],
+      }),
     },
   },
   prettier,

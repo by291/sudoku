@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { countSolutions } from './search'
+import { countSolutions } from '@/core/sudoku/search'
 import { countReferenceSolutions } from '../../../tests/support/referenceSudoku'
 import {
   uniqueBoard,

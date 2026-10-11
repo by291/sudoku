@@ -1,10 +1,10 @@
 import type { IDBPTransaction } from 'idb'
-import { isRecord } from '../core/sudoku/types'
-import type { DatabaseProvider } from './storage/repository'
-import { commitTransaction } from './storage/database'
-import type { SudokuDatabase } from './storage/database'
-import { isIdentifier, isNonnegativeInteger } from './storage/records'
-import type { StorageOutcome } from './storage/records'
+import { isRecord } from '@/core/sudoku/types'
+import type { DatabaseProvider } from '@/storage/repository'
+import { commitTransaction } from '@/storage/database'
+import type { SudokuDatabase } from '@/storage/database'
+import { isIdentifier, isNonnegativeInteger } from '@/storage/records'
+import type { StorageOutcome } from '@/storage/records'
 
 export const LEASE_DURATION_MS = 6000
 export const LEASE_RENEWAL_MS = 2000

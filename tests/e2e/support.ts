@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import type { GameSession } from '../../src/features/game/session'
-import { parseSessionRecord } from '../../src/infrastructure/storage/records'
+import type { GameSession } from '@/features/game/model/session'
+import { parseSessionRecord } from '@/storage/records'
 export { expect }
 export const test = base.extend<{ browserErrors: void }>({
   browserErrors: [

@@ -1,5 +1,7 @@
 # Web Sudoku Implementation Plan
 
+This completed plan records the original implementation paths. The later [Web Architecture](../../architecture.md) and [web structure plan](2026-10-11-web-structure.md) describe the current file ownership after the frontend reorganization.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver a complete Chinese-language, browser-local Sudoku game with free play, six guided lessons, daily challenges, reliable restoration, and personal records.

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { analyzeHint } from './hint'
+import { analyzeHint } from '@/core/sudoku/hint'
 import {
   emptyBoard,
   solvedBoard,

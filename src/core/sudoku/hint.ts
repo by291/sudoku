@@ -1,8 +1,8 @@
-import type { Board, Digit } from './types'
-import type { LogicalStep } from './techniques'
-import { TECHNIQUES } from './techniques'
-import { applyLogicalStep, createLogicalWorkspace, findLogicalStep } from './logic'
-import { isComplete } from './board'
+import type { Board, Digit } from '@/core/sudoku/types'
+import type { LogicalStep } from '@/core/sudoku/techniques'
+import { TECHNIQUES } from '@/core/sudoku/techniques'
+import { applyLogicalStep, createLogicalWorkspace, findLogicalStep } from '@/core/sudoku/logic'
+import { isComplete } from '@/core/sudoku/board'
 export type HintResult =
   | { kind: 'review-entry'; cell: number }
   | { kind: 'deduction'; steps: readonly LogicalStep[]; placement: { cell: number; digit: Digit } }

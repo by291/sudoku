@@ -1,5 +1,5 @@
-import type { GameSession } from '../../src/features/game/session'
-import { PUZZLE_VERSION } from '../../src/core/sudoku/generation'
+import type { GameSession } from '@/features/game/model/session'
+import { PUZZLE_VERSION } from '@/core/sudoku/generation'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 
 export function makeSession(overrides: Partial<GameSession> = {}): GameSession {

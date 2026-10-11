@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest'
-import { findLogicalStep, analyzeLogic, rateDifficulty } from './logic'
-import { explainStep, TECHNIQUES } from './techniques'
+import { findLogicalStep, analyzeLogic, rateDifficulty } from '@/core/sudoku/logic'
+import { explainStep, TECHNIQUES } from '@/core/sudoku/techniques'
 import { emptyBoard, uniqueBoard, solvedBoard } from '../../../tests/fixtures/sudoku'
-import type { LogicalState } from './techniques'
+import type { LogicalState } from '@/core/sudoku/techniques'
 
 function state(candidates: number[]): LogicalState {
   return { board: emptyBoard, candidates }

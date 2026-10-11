@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { parseBoard, calculateCandidates, findConflicts, isComplete } from './board'
+import { parseBoard, calculateCandidates, findConflicts, isComplete } from '@/core/sudoku/board'
 import {
   solvedBoard,
   uniqueBoard,

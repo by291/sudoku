@@ -1,5 +1,5 @@
-import { parseBoard } from './board'
-import type { Board, Difficulty } from './types'
+import { parseBoard } from '@/core/sudoku/board'
+import type { Board, Difficulty } from '@/core/sudoku/types'
 
 export type PuzzleTemplate = { difficulty: Difficulty; givens: Board; solution: Board }
 function literalBoard(text: string): Board {

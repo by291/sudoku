@@ -69,11 +69,16 @@ Serve that output at the matching path. Changing the host/origin creates a separ
 ## Architecture and development guidance
 
 - `src/core/sudoku/`: Framework-independent board rules, bounded search, deterministic generation, logical techniques, and hints.
-- `src/features/game/`: Pure session transitions and timing, Pinia orchestration, shared board, controls, and daily policy.
+- `src/main.ts`, `src/App.vue`, `src/layouts/`, `src/router/`, and `src/theme/`: Bootstrap, root providers, visual shell, hash routes, and theme synchronization.
+- `src/features/game/`: Game/daily views, session controls, composables, pure models, and Pinia orchestration.
 - `src/features/learning/` and `src/features/records/`: Lessons, progress, history, and statistics.
-- `src/infrastructure/`: Validated worker messages, ownership coordination, runtime-validated records, transactional storage, and serialized saves.
-- `src/app/`: Bootstrap, hash routes, runtime injection, theme, preferences, and home.
-- `src/components/`: Shared digit input for game and lesson pages.
+- `src/features/home/` and `src/features/settings/`: Resume entries, mode selection, preference types/defaults, and shared settings actions.
+- `src/storage/`: Runtime-validated records, IndexedDB transactions, and serialized saves.
+- `src/worker/`: Validated worker messages, computation requests, and cancellation.
+- `src/infrastructure/`: Runtime injection and same-origin editing ownership.
+- `src/shared/components/`: Feature-independent Sudoku board, digit input, and confirmation dialog.
+
+See [Web Architecture](docs/architecture.md) for module ownership, dependency direction, source aliases, and naming. Tests remain beside their owners; features create only the responsibility directories they need.
 
 Common controls use Naive UI 2.45.3 with local imports. The CSS palette in `src/styles/theme.css` supplies its theme overrides, including system-theme changes. The board remains a specialized accessible CSS Grid. Modal cancellation restores focus to its trigger, and the skip link preserves the current hash route. Browser tests are configured for Chromium, Firefox, and WebKit engines; mobile emulation is not a physical-device or Safari certification.
 

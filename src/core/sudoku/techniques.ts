@@ -1,6 +1,6 @@
-import type { Unit } from './board'
-import type { Board, Digit, NoteMask } from './types'
-import { UNIT_SIZE } from './types'
+import type { Unit } from '@/core/sudoku/board'
+import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
+import { UNIT_SIZE } from '@/core/sudoku/types'
 
 export type Technique =
   'naked-single' | 'hidden-single' | 'locked-candidate' | 'naked-pair' | 'hidden-pair'
