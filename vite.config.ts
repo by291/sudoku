@@ -8,5 +8,6 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.ts', 'tooling/**/*.test.ts'],
     restoreMocks: true,
+    css: { include: [/theme\.css/] },
   },
 })

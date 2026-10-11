@@ -20,6 +20,14 @@ export default defineConfig({
       name: 'mobile',
       use: { ...devices['Pixel 7'], viewport: { width: 360, height: 800 }, deviceScaleFactor: 1 },
     },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'], viewport: { width: 1280, height: 900 } },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 },
+    },
   ],
   webServer: [
     {

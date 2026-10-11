@@ -15,17 +15,29 @@ test('keeps boards square and focus visible at 360, 390 and desktop widths', asy
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
     const board = await page.getByRole('group', { name: '数独棋盘' }).boundingBox()
-    expect(board && Math.abs(board.width - board.height)).toBeLessThan(2)
+    const firstCell = await page.getByRole('button', { name: cellName(0) }).boundingBox()
+    const lastCell = await page.getByRole('button', { name: cellName(80) }).boundingBox()
+    if (!board || !firstCell || !lastCell)
+      throw new Error('The board and corner cells must be visible')
+    expect(Math.abs(board.width - board.height)).toBeLessThan(2)
+    expect(Math.abs(firstCell.height - lastCell.height)).toBeLessThan(1)
+    expect(lastCell.y + lastCell.height).toBeLessThanOrEqual(board.y + board.height)
     if (testInfo.project.name === 'desktop')
       await page.screenshot({
         path: `.superpowers/sdd/2026-10-11-sudoku-implementation/game-${width}.png`,
         fullPage: true,
       })
   }
-  await page.getByRole('button', { name: '深色主题', exact: true }).click()
+  await page
+    .getByRole('radiogroup', { name: '界面主题', exact: true })
+    .getByText('深色', { exact: true })
+    .click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.emulateMedia({ colorScheme: 'light' })
-  await page.getByRole('button', { name: '跟随系统主题', exact: true }).click()
+  await page
+    .getByRole('radiogroup', { name: '界面主题', exact: true })
+    .getByText('系统', { exact: true })
+    .click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   await page
     .getByRole('button', { name: '返回首页', exact: true })

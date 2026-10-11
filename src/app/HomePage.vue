@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import { NAlert, NButton, NCard } from 'naive-ui'
 import { useRecordsStore } from '../features/records/useRecordsStore'
 import { usePreferencesStore } from './usePreferencesStore'
 import { sessionLink, modeName } from '../features/records/records'
@@ -19,6 +20,30 @@ const todayComplete = computed(() =>
 onMounted(records.load)
 </script>
 <template>
+  <section v-if="unfinished.length || preferences.settings.currentLessonId" class="resume-section">
+    <h2>接着上次的思路</h2>
+    <div class="resume-list">
+      <RouterLink
+        v-for="{ session } in unfinished"
+        :key="session.id"
+        :to="sessionLink(session)"
+        class="panel resume-card"
+        ><div>
+          <strong>{{ modeName(session) }}</strong>
+          <p class="muted">
+            {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} · 已用时
+            {{ formatDuration(session.elapsedMs) }}
+          </p>
+        </div>
+        <span>继续 →</span></RouterLink
+      ><RouterLink
+        v-if="preferences.settings.currentLessonId"
+        :to="`/learn/${preferences.settings.currentLessonId}`"
+        class="resume-lesson"
+        >继续最近的课程 →</RouterLink
+      >
+    </div>
+  </section>
   <section class="home-intro">
     <div>
       <p class="eyebrow">一点逻辑 · 一点耐心</p>
@@ -59,36 +84,12 @@ onMounted(records.load)
       </p></RouterLink
     >
   </div>
-  <p v-if="records.error" class="notice error" role="alert">
-    {{ records.error }} <button @click="records.load">重试读取</button>
-  </p>
-  <p v-if="records.quarantined" class="notice">
+  <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
+    {{ records.error }} <NButton @click="records.load">重试读取</NButton>
+  </NAlert>
+  <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
     有 {{ records.quarantined }} 条记录已隔离。<RouterLink to="/records">查看并清理</RouterLink>
-  </p>
-  <section v-if="unfinished.length || preferences.settings.currentLessonId" class="resume-section">
-    <h2>接着上次的思路</h2>
-    <div class="resume-list">
-      <RouterLink
-        v-for="{ session } in unfinished"
-        :key="session.id"
-        :to="sessionLink(session)"
-        class="panel resume-card"
-        ><div>
-          <strong>{{ modeName(session) }}</strong>
-          <p class="muted">
-            {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} · 已用时
-            {{ formatDuration(session.elapsedMs) }}
-          </p>
-        </div>
-        <span>继续 →</span></RouterLink
-      ><RouterLink
-        v-if="preferences.settings.currentLessonId"
-        :to="`/learn/${preferences.settings.currentLessonId}`"
-        class="resume-lesson"
-        >继续最近的课程 →</RouterLink
-      >
-    </div>
-  </section>
+  </NCard>
   <section class="home-bottom">
     <p class="muted">每一局，都是一次专注的练习。数据保存在当前浏览器。</p>
     <RouterLink to="/records">我的数独足迹 →</RouterLink>
@@ -125,7 +126,7 @@ h1 {
   padding: 14px 22px;
   border-radius: 10px;
   background: var(--accent);
-  color: var(--surface);
+  color: var(--accent-contrast);
   text-decoration: none;
 }
 .hero-art {
@@ -200,7 +201,7 @@ h1 {
   margin-bottom: 0;
 }
 .resume-section {
-  margin-top: 44px;
+  margin-top: 24px;
 }
 .resume-section h2 {
   font-size: 21px;

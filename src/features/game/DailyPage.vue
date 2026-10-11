@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NAlert, NButton } from 'naive-ui'
 import { ref, watch, onMounted, onScopeDispose, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGameStore } from './useGameStore'
@@ -73,17 +74,17 @@ onScopeDispose(() => {
         当前题目 · {{ currentDate }} ·
         {{ game.session.metadata.formalAttempt ? '正式挑战' : '练习重玩' }}
       </p>
-      <button
-        class="primary"
+      <NButton
+        type="primary"
         :disabled="game.phase === 'generating'"
         @click="game.startDaily(today)"
       >
         {{ formalCompleted || game.session?.completion ? '重玩今日挑战' : '开始 / 继续今日挑战' }}
-      </button>
+      </NButton>
     </div>
-    <p v-if="localError" class="notice error" role="alert">
-      {{ localError }} <button @click="load">重试读取</button>
-    </p>
+    <NAlert v-if="localError" class="feedback-message" type="error" :show-icon="false">
+      {{ localError }} <NButton @click="load">重试读取</NButton>
+    </NAlert>
   </GamePage>
 </template>
 <style scoped>

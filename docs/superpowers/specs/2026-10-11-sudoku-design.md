@@ -8,7 +8,7 @@ Status: Approved by the user on 2026-10-11. Implementation planning follows this
 
 Build a Chinese-language web Sudoku game that supports casual play, guided learning, and timed challenges. Keyboard interaction on desktop and touch interaction on mobile must be comfortable. Players must be able to resume interrupted sessions, and learning hints must explain the reasoning behind a move.
 
-The selected stack is Vue 3, TypeScript, Vite, Vue Router, Pinia, Web Workers, IndexedDB with idb, native CSS, Vitest, and Playwright. Use pnpm, ESLint, and Prettier for project tooling. Select compatible stable dependency versions at installation time and pin them with a lockfile.
+The selected stack is Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB with idb, native CSS, Vitest, and Playwright. Use pnpm, ESLint, and Prettier for project tooling. Select compatible stable dependency versions at installation time and pin them with a lockfile.
 
 Repository documentation, code comments, and docstrings are written in English. Player-facing interface copy is written in Chinese.
 
@@ -29,6 +29,12 @@ On desktop, display the board and control panel side by side. On mobile, arrange
 Use a calm, simple visual design: a light paper-like background, dark text, teal accents, and distinct error and hint states. Support light, dark, and system themes. Use markers or descriptions in addition to color for errors. Buttons must have text or accessible names. Board cells must expose their row, column, fixed value, player value, and notes accessibly.
 
 Use Vue Router in hash mode so direct navigation and refresh work on static hosting. Routes are `/`, `/play/free`, `/learn`, `/learn/:lessonId`, `/play/daily`, and `/records`.
+
+The UI refinement approved on 2026-10-11 uses Naive UI for buttons, confirmation modals, single-choice groups, setting checkboxes with clickable labels, and error alerts. Its theme overrides read the shared CSS palette and follow light, dark, and system preferences. Keep the Sudoku board as a specialized CSS Grid component.
+
+Show the three difficulty choices directly. Changing the selection configures the next puzzle and does not change the current board. Both game and lesson number pads use a three-column layout on phones, with touch targets at least 44 CSS pixels in each dimension. Reduce the space above the mobile board, place saved-session links before the home introduction, and provide a return link from the learning list.
+
+Disable digit entry and erasing when no cell is selected or a given is selected, and explain why next to the number pad. Keep whole-board helpers available during active play. Display the current input mode and selected position. Confirmation modals initially focus Cancel, trap focus, and restore the trigger after cancellation. Game shortcuts yield to consumed events, native form controls, composite controls, and open modals. The skip link moves focus without changing the hash route. Secondary text must remain readable in both themes, and nonessential motion respects reduced-motion preferences.
 
 ## 3. Shared board and interaction rules
 
@@ -159,7 +165,7 @@ Session tests cover immutable givens, values and notes, peer-note cleanup, undo 
 
 Persistence tests cover write ordering, read validation, schema upgrades, failure feedback, result deduplication, and editing ownership across tabs.
 
-Playwright verifies player-facing flows: starting each mode, keyboard and touch entry, submitting lesson exercises, hint explanation and application, paused-board obscuring, refresh and restoration, new-game confirmation, completion, and record updates. Cover at least desktop Chromium and mobile viewport sizes. Algorithm assertions must not ask the same solver being tested to prove its own correctness.
+Playwright verifies player-facing flows: starting each mode, keyboard and touch entry, submitting lesson exercises, hint explanation and application, paused-board obscuring, refresh and restoration, new-game confirmation, completion, and record updates. Cover desktop and mobile Chromium, desktop Firefox, and mobile WebKit. Browser-engine emulation does not replace validation on physical phones or Safari. Algorithm assertions must not ask the same solver being tested to prove its own correctness.
 
 Before delivery, run type checking, lint, engine and session tests, browser tests, and the production build. Open the production preview to inspect layout and worker asset paths. The README documents installation, development, checking, building, previewing, and static deployment, including the supported difficulties and lesson techniques.
 

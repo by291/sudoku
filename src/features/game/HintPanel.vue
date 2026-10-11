@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NButton } from 'naive-ui'
 import { computed, ref, watch } from 'vue'
 import type { HintResult } from '../../core/sudoku/hint'
 import { explainStep, TECHNIQUE_NAMES } from '../../core/sudoku/techniques'
@@ -30,9 +31,9 @@ const step = computed(() => steps.value[stepIndex.value])
       </p>
       <p>{{ explainStep(step) }}</p>
       <div class="button-row">
-        <button :disabled="stepIndex === 0" @click="stepIndex--">上一步</button
-        ><button v-if="stepIndex < steps.length - 1" @click="stepIndex++">下一步</button
-        ><button v-else class="primary" @click="$emit('apply')">应用提示</button>
+        <NButton :disabled="stepIndex === 0" @click="stepIndex--">上一步</NButton
+        ><NButton v-if="stepIndex < steps.length - 1" @click="stepIndex++">下一步</NButton
+        ><NButton v-else type="primary" @click="$emit('apply')">应用提示</NButton>
       </div></template
     >
     <p v-else>
@@ -42,7 +43,7 @@ const step = computed(() => steps.value[stepIndex.value])
           : '当前没有可解释的逻辑步骤。请检查填写，或尝试调整思路。'
       }}
     </p>
-    <button class="dismiss" @click="$emit('dismiss')">关闭提示</button>
+    <NButton class="dismiss" @click="$emit('dismiss')">关闭提示</NButton>
   </section>
 </template>
 <style scoped>

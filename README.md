@@ -1,6 +1,6 @@
 # Sudoku · 一格一念
 
-A browser-local Sudoku game with a Chinese interface, built with Vue 3, TypeScript, Vite, Vue Router, Pinia, Web Workers, IndexedDB (`idb`), and native CSS. Repository documentation and code identifiers are in English.
+A browser-local Sudoku game with a Chinese interface, built with Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB (`idb`), and native CSS. Repository documentation and code identifiers are in English.
 
 ## Requirements and setup
 
@@ -9,7 +9,7 @@ Use Node.js 26 or later and the repository-pinned pnpm 12.11.2. Development was 
 ```sh
 corepack enable
 pnpm install --frozen-lockfile
-pnpm exec playwright install chromium
+pnpm exec playwright install chromium firefox webkit
 pnpm dev
 ```
 
@@ -26,10 +26,12 @@ Open the Local URL printed by Vite. No server account, API keys, or backend serv
 | `pnpm test:unit`                    | Run domain, store, component, and storage tests                   |
 | `pnpm build`                        | Create the production `dist/` directory                           |
 | `pnpm preview`                      | Serve the production build locally                                |
-| `pnpm test:e2e`                     | Test the existing production build in desktop and mobile Chromium |
+| `pnpm test:e2e`                     | Test the production build in Chromium, Firefox, and mobile WebKit |
 | `pnpm check`                        | Run all type, lint, formatting, unit, build, and browser checks   |
 
 Build before running `test:e2e` directly. Playwright starts preview servers on ports 4173 and 4174; its second server builds and tests `/sudoku/` deployment in `dist-subpath/`. Test output, traces, and screenshots are ignored by Git. Tests use isolated browser contexts, fixture records for lengthy completion scenarios, and real production workers for generation and hints.
+
+On the current Windows development host, the pinned Firefox runtime fails before launch with a SideBySide error for the `mozglue` assembly, including after a forced reinstall. Firefox verification remains pending; `pnpm check` requires a working runtime for every configured project. To run the complete suite for the available engines explicitly, use `pnpm exec playwright test --project desktop --project mobile --project webkit` after building. This does not establish Firefox compatibility.
 
 ## Play
 
@@ -38,7 +40,7 @@ Build before running `test:e2e` directly. Playwright starts preview servers on p
 - **Daily challenge:** A Medium puzzle changes at midnight in `Asia/Shanghai`. Seeds include the puzzle version and Beijing date. One stable formal session ID is allowed per date; later replays are practice. Restarting an unfinished daily puzzle retains accumulated time and assistance. Older unfinished dates remain resumable.
 - **Records:** Separate assisted and unassisted free-play bests, all completed-game history, formal daily totals, and consecutive eligible challenge days. Learning and daily practice do not enter free-play bests. A late formal completion remains in history and totals, but does not enter the date's streak.
 
-Use digits 1–9, arrow keys, Delete/Backspace, `N` for notes, and Ctrl/Cmd+Z or Ctrl/Cmd+Shift+Z for undo/redo. On-screen controls support touch. Keyboard shortcuts leave form fields and dialogs alone.
+Use digits 1–9, arrow keys, Delete/Backspace, `N` for notes, and Ctrl/Cmd+Z or Ctrl/Cmd+Shift+Z for undo/redo. On-screen game and lesson number pads use three columns on phones. Select an editable cell to enable digit entry and erasing; the controls explain paused, protected, and read-only states. Keyboard shortcuts leave form fields, choice groups, checkboxes, and dialogs alone. The difficulty choice applies to the next puzzle.
 
 Showing a hint, checking entries, or generating candidates permanently classifies that session as assisted. Applying a hint is an ordinary undoable entry; undoing it does not remove the assistance classification. Hints explain supported logical deductions rather than revealing a search answer.
 
@@ -71,6 +73,11 @@ Serve that output at the matching path. Changing the host/origin creates a separ
 - `src/features/learning/` and `src/features/records/`: Lessons, progress, history, and statistics.
 - `src/infrastructure/`: Validated worker messages, ownership coordination, runtime-validated records, transactional storage, and serialized saves.
 - `src/app/`: Bootstrap, hash routes, runtime injection, theme, preferences, and home.
+- `src/components/`: Shared digit input for game and lesson pages.
+
+Common controls use Naive UI 2.45.3 with local imports. The CSS palette in `src/styles/theme.css` supplies its theme overrides, including system-theme changes. The board remains a specialized accessible CSS Grid. Modal cancellation restores focus to its trigger, and the skip link preserves the current hash route. Browser tests are configured for Chromium, Firefox, and WebKit engines; mobile emulation is not a physical-device or Safari certification.
+
+Game and lesson pages share `NumberPad`, while their owners handle session and exercise actions. Errors use `NAlert` directly; routine feedback uses `NCard` with `role="status"` or semantic status text. Confirmation dialogs use the library's dialog preset and retain explicit Cancel focus and trigger restoration.
 
 Read [AGENTS.md](AGENTS.md), the [approved design](docs/superpowers/specs/2026-10-11-sudoku-design.md), and the [implementation plan](docs/superpowers/plans/2026-10-11-sudoku-implementation.md) before changing behavior. Prefer current official documentation for the installed stack and keep core logic independent of browser/framework APIs. Algorithm tests use fixed seeds and an independent exact-cover uniqueness oracle.
 

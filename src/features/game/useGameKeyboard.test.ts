@@ -104,3 +104,51 @@ it('moves vertically in the same column when another row is available', () => {
     expect(game.selectedCell).toBe(expected)
   }
 })
+
+it.each(['combobox', 'listbox', 'option', 'radiogroup', 'radio', 'switch', 'checkbox'])(
+  'leaves keyboard input inside a %s to its control',
+  (role) => {
+    const actions: GameAction[] = []
+    const game = {
+      editable: true,
+      selectedCell: 2,
+      noteMode: false,
+      dispatch: (action: GameAction) => actions.push(action),
+      selectCell() {},
+      toggleNoteMode() {},
+    }
+    const control = document.createElement('div')
+    control.setAttribute('role', role)
+    document.body.append(control)
+    let handled: boolean | undefined
+    control.addEventListener('keydown', (event) => {
+      if (event instanceof KeyboardEvent) handled = handleGameKey(event, game)
+    })
+    control.dispatchEvent(new KeyboardEvent('keydown', { key: '4', bubbles: true }))
+    control.remove()
+    expect(handled).toBe(false)
+    expect(actions).toEqual([])
+  },
+)
+
+it('leaves consumed keyboard events and open custom modals untouched', () => {
+  const actions: GameAction[] = []
+  const game = {
+    editable: true,
+    selectedCell: 2,
+    noteMode: false,
+    dispatch: (action: GameAction) => actions.push(action),
+    selectCell() {},
+    toggleNoteMode() {},
+  }
+  const consumed = new KeyboardEvent('keydown', { key: '4', cancelable: true })
+  consumed.preventDefault()
+  expect(handleGameKey(consumed, game)).toBe(false)
+  const modal = document.createElement('div')
+  modal.setAttribute('role', 'dialog')
+  modal.setAttribute('aria-modal', 'true')
+  document.body.append(modal)
+  expect(handleGameKey(new KeyboardEvent('keydown', { key: '4' }), game)).toBe(false)
+  modal.remove()
+  expect(actions).toEqual([])
+})

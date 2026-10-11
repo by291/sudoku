@@ -2,11 +2,21 @@
 import { RouterLink, RouterView } from 'vue-router'
 import { useTheme } from './theme'
 import type { ThemePreference } from './theme'
-import { computed, onMounted, onScopeDispose } from 'vue'
+import { computed, onMounted, onScopeDispose, useTemplateRef } from 'vue'
 import { usePreferencesStore } from './usePreferencesStore'
 import { useRecordsStore } from '../features/records/useRecordsStore'
 import { useGameStore } from '../features/game/useGameStore'
 import { useGameRuntime } from './runtime'
+import {
+  NAlert,
+  NButton,
+  NConfigProvider,
+  NRadioButton,
+  NRadioGroup,
+  zhCN,
+  dateZhCN,
+} from 'naive-ui'
+import { useUiTheme } from './uiTheme'
 
 const preferences = usePreferencesStore(),
   records = useRecordsStore(),
@@ -18,7 +28,17 @@ const chosenTheme = computed({
     void preferences.update({ theme })
   },
 })
-const { preference, setTheme } = useTheme(chosenTheme)
+const { preference, resolvedTheme, setTheme } = useTheme(chosenTheme)
+const { theme, themeOverrides } = useUiTheme(resolvedTheme)
+const mainContent = useTemplateRef<HTMLElement>('mainContent')
+function focusMain() {
+  // The router owns the URL hash; a skip link must only move focus and scroll.
+  mainContent.value?.focus()
+  mainContent.value?.scrollIntoView()
+}
+function updateTheme(value: string | number | boolean) {
+  if (value === 'light' || value === 'dark' || value === 'system') setTheme(value)
+}
 onMounted(preferences.load)
 onScopeDispose(() => {
   records.dispose()
@@ -33,30 +53,46 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
 </script>
 
 <template>
-  <div class="app-shell">
-    <header class="site-header">
-      <RouterLink class="brand" to="/" aria-label="一格一念，返回首页">
-        <span class="brand-mark" aria-hidden="true">▦</span>
-        <span>一格一念<span class="brand-subtitle">数独 · SUDOKU</span></span>
-      </RouterLink>
-      <div class="theme-switch" role="group" aria-label="界面主题">
-        <button
-          v-for="theme in themes"
-          :key="theme.value"
-          :aria-label="theme.label"
-          :aria-pressed="preference === theme.value"
-          @click="setTheme(theme.value)"
+  <NConfigProvider
+    :theme="theme"
+    :theme-overrides="themeOverrides"
+    :locale="zhCN"
+    :date-locale="dateZhCN"
+  >
+    <div class="app-shell">
+      <a class="skip-link" href="#main-content" @click.prevent="focusMain">跳到主要内容</a>
+      <header class="site-header">
+        <RouterLink class="brand" to="/" aria-label="一格一念，返回首页">
+          <span class="brand-mark" aria-hidden="true">▦</span>
+          <span>一格一念<span class="brand-subtitle">数独 · SUDOKU</span></span>
+        </RouterLink>
+        <NRadioGroup
+          class="theme-switch"
+          :value="preference"
+          name="interface-theme"
+          role="radiogroup"
+          aria-label="界面主题"
+          @update:value="updateTheme"
         >
-          {{ theme.name }}
-        </button>
-      </div>
-    </header>
-    <p v-if="preferences.error" class="notice error" role="alert">
-      {{ preferences.error }} <button @click="preferences.update({})">重试保存设置</button>
-    </p>
-    <main aria-label="数独游戏"><RouterView /></main>
-    <footer class="site-footer">在九宫格里，留一点专注的时间。</footer>
-  </div>
+          <NRadioButton
+            v-for="choice in themes"
+            :key="choice.value"
+            :aria-label="choice.label"
+            :value="choice.value"
+          >
+            {{ choice.name }}
+          </NRadioButton>
+        </NRadioGroup>
+      </header>
+      <NAlert v-if="preferences.error" class="feedback-message" type="error" :show-icon="false">
+        {{ preferences.error }} <NButton @click="preferences.update({})">重试保存设置</NButton>
+      </NAlert>
+      <main id="main-content" ref="mainContent" tabindex="-1" aria-label="数独游戏">
+        <RouterView />
+      </main>
+      <footer class="site-footer">在九宫格里，留一点专注的时间。</footer>
+    </div>
+  </NConfigProvider>
 </template>
 
 <style scoped>
@@ -70,7 +106,7 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 28px 0;
+  padding: 20px 0;
   border-bottom: 1px solid var(--border);
 }
 .brand {
@@ -96,21 +132,15 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
 }
 .theme-switch {
   display: flex;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 3px;
 }
-.theme-switch button {
-  border: 0;
-  padding: 8px 10px;
-  min-height: 36px;
-  font-size: 12px;
-  background: transparent;
+.theme-switch :deep(.n-radio-button) {
+  min-height: 44px;
+  padding: 0 12px;
 }
-.theme-switch button[aria-pressed='true'] {
-  background: var(--accent-soft);
-  color: var(--accent);
+.theme-switch :deep(.n-radio-button:focus-within) {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  z-index: 1;
 }
 .site-footer {
   margin: 56px 0 24px;
@@ -123,14 +153,14 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
     padding: 0 16px;
   }
   .site-header {
-    padding: 18px 0;
+    padding: 12px 0;
   }
   .brand {
     font-size: 18px;
     gap: 6px;
   }
-  .theme-switch button {
-    padding: 8px;
+  .theme-switch :deep(.n-radio-button) {
+    padding: 0 9px;
   }
 }
 </style>

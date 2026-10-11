@@ -10,13 +10,30 @@ type KeyboardGame = {
   selectCell(cell: number): void
   toggleNoteMode(): void
 }
+// Composite controls own their arrow keys and typeahead, including portaled menus.
+const INTERACTIVE_CONTROL = [
+  'input',
+  'textarea',
+  'select',
+  '[contenteditable]',
+  'dialog',
+  '[role="dialog"]',
+  '[role="alertdialog"]',
+  '[role="combobox"]',
+  '[role="listbox"]',
+  '[role="option"]',
+  '[role="radiogroup"]',
+  '[role="radio"]',
+  '[role="switch"]',
+  '[role="checkbox"]',
+].join(',')
 export function handleGameKey(event: KeyboardEvent, game: KeyboardGame): boolean {
   const target = event.target
   if (
+    event.defaultPrevented ||
     !game.editable ||
-    document.querySelector('dialog[open]') ||
-    (target instanceof Element &&
-      target.closest('input,textarea,select,[contenteditable],dialog,[role="dialog"]'))
+    document.querySelector('dialog[open], [aria-modal="true"]') ||
+    (target instanceof Element && target.closest(INTERACTIVE_CONTROL))
   )
     return false
   const key = event.key.toLowerCase()

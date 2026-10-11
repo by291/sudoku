@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NAlert, NButton, NCard } from 'naive-ui'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useRecordsStore } from './useRecordsStore'
@@ -8,6 +9,10 @@ import ConfirmationDialog from '../game/ConfirmationDialog.vue'
 const records = useRecordsStore(),
   confirmation = ref<'clear' | 'quarantine' | null>(null)
 onMounted(records.load)
+function requestConfirmation(action: 'clear' | 'quarantine', event: MouseEvent) {
+  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  confirmation.value = action
+}
 async function confirm() {
   const action = confirmation.value
   confirmation.value = null
@@ -28,10 +33,12 @@ function duration(value: number | null) {
       <RouterLink to="/">返回首页</RouterLink>
     </div>
     <p class="muted">成绩和存档只属于当前浏览器。清空浏览器数据后将无法恢复。</p>
-    <p v-if="records.error" class="notice error" role="alert">
-      {{ records.error }} <button @click="records.load">重试读取</button>
-    </p>
-    <p v-if="records.notice" class="notice" role="status">{{ records.notice }}</p>
+    <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
+      {{ records.error }} <NButton @click="records.load">重试读取</NButton>
+    </NAlert>
+    <NCard v-if="records.notice" class="feedback-message" size="small" role="status">
+      {{ records.notice }}
+    </NCard>
     <p v-if="records.busy" role="status">正在处理本机记录…</p>
     <div class="stat-grid">
       <div class="panel stat">
@@ -99,22 +106,25 @@ function duration(value: number | null) {
         </li>
       </ul>
     </section>
-    <div v-if="records.quarantined" class="notice error">
+    <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
       <p>{{ records.quarantined }} 条损坏或不兼容的记录已隔离，有效数据仍可使用。</p>
-      <button @click="confirmation = 'quarantine'">清理损坏记录</button>
-    </div>
+      <NButton @click="requestConfirmation('quarantine', $event)">清理损坏记录</NButton>
+    </NCard>
     <div class="data-actions">
-      <button :disabled="records.busy" @click="confirmation = 'clear'">清空本机数据</button>
+      <NButton :disabled="records.busy" @click="requestConfirmation('clear', $event)"
+        >清空本机数据</NButton
+      >
     </div>
     <ConfirmationDialog
       v-if="confirmation"
+      destructive
       :title="confirmation === 'clear' ? '清空本机数据？' : '清理损坏记录？'"
       :description="
         confirmation === 'clear'
           ? '将删除所有存档、成绩、课程进度和设置，其他标签页也会停止当前游戏。此操作无法撤销。'
           : '仅删除已隔离的损坏记录，保留所有有效存档、成绩和设置。'
       "
-      confirm-label="确认清空"
+      :confirm-label="confirmation === 'clear' ? '确认清空' : '确认清理'"
       @cancel="confirmation = null"
       @confirm="confirm"
     />

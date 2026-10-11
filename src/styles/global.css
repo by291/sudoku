@@ -13,27 +13,6 @@ input,
 select {
   font: inherit;
 }
-button {
-  min-height: 44px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 16px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-button:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-button.primary {
-  background: var(--accent);
-  color: var(--surface);
-  border-color: var(--accent);
-}
 a {
   color: var(--accent);
 }
@@ -53,21 +32,43 @@ h3 {
   padding: 24px;
   box-shadow: var(--shadow);
 }
-.notice {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 14px;
-}
-.notice.error {
-  border-color: var(--error);
-  color: var(--error);
-}
 .muted {
   color: var(--muted);
+}
+.feedback-message {
+  margin: 12px 0;
 }
 .button-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+button,
+a,
+[role='radio'],
+[role='switch'],
+[role='checkbox'] {
+  touch-action: manipulation;
+}
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 16px;
+  z-index: 100;
+  padding: 12px 16px;
+  background: var(--surface);
+  transform: translateY(-150%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

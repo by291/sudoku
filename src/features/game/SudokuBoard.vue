@@ -126,6 +126,7 @@ watch(
 .sudoku-board {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(0, 1fr));
   aspect-ratio: 1;
   border: 2px solid var(--text);
   background: var(--surface);
@@ -148,6 +149,7 @@ watch(
   color: var(--accent);
   font-size: clamp(19px, 3vw, 30px);
   line-height: 1;
+  cursor: pointer;
 }
 .cell:nth-child(9n) {
   border-right: 0;
@@ -188,6 +190,13 @@ watch(
 }
 .cell:disabled {
   opacity: 1;
+  cursor: default;
+}
+.cell:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.cell:active:not(:disabled) {
+  background: var(--accent-soft);
 }
 .notes {
   display: grid;

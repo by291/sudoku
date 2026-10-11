@@ -1,12 +1,19 @@
 import { test, expect, seedSession, cellName, readSessions, countResults } from './support'
 import { makeSession } from '../support/gameFixtures'
-for (const value of ['easy', 'medium', 'hard']) {
+for (const [value, name] of [
+  ['easy', '简单'],
+  ['medium', '中等'],
+  ['hard', '困难'],
+] as const) {
   test(`generates a real ${value} puzzle and accepts touch controls`, async ({
     page,
     isMobile,
   }) => {
     await page.goto('/#/play/free')
-    await page.getByLabel('难度').selectOption(value)
+    await page
+      .getByRole('radiogroup', { name: '难度', exact: true })
+      .getByText(name, { exact: true })
+      .click()
     await page.getByRole('button', { name: '开始游戏', exact: true }).click()
     const board = page.getByRole('group', { name: '数独棋盘' })
     await expect(board.getByRole('button')).toHaveCount(81)
@@ -24,7 +31,11 @@ for (const value of ['easy', 'medium', 'hard']) {
     await page.getByRole('button', { name: '暂停', exact: true }).click()
     await expect(board.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
     await expect(page.getByRole('button', { name: '输入数字1', exact: true })).toBeDisabled()
-    await expect(page.getByLabel('难度')).toHaveValue(value)
+    await expect(
+      page
+        .getByRole('radiogroup', { name: '难度', exact: true })
+        .getByRole('radio', { name: name, exact: true }),
+    ).toBeChecked()
   })
 }
 test('unifies notes, keyboard history, hints, confirmation and refresh restoration', async ({
@@ -55,22 +66,22 @@ test('unifies notes, keyboard history, hints, confirmation and refresh restorati
   await page.getByRole('button', { name: '新开一局', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
   await page.getByRole('checkbox', { name: '显示计时', exact: true }).uncheck()
-  await page.getByRole('button', { name: '深色主题', exact: true }).click()
+  await page
+    .getByRole('radiogroup', { name: '界面主题', exact: true })
+    .getByText('深色', { exact: true })
+    .click()
   await page.getByRole('button', { name: '暂停', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '已保存到本机' })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
   await expect(page.getByRole('checkbox', { name: '显示计时', exact: true })).not.toBeChecked()
-  await expect(page.getByRole('button', { name: '深色主题' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
+  await expect(page.getByRole('radio', { name: '深色主题' })).toBeChecked()
   await expect(async () => {
     await page
       .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
       .first()
       .click()
-    await expect(page.getByRole('button', { name: '输入数字4', exact: true })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
   }).toPass({ timeout: 15000 })
   await expect(cell).toHaveAccessibleName(/数字4/)
 })
@@ -134,6 +145,8 @@ test('pauses on hiding and never resumes just because the page becomes visible',
     document.dispatchEvent(new Event('visibilitychange'))
   })
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
+  // The paused board renders before its asynchronous save finishes.
+  await expect(page.getByRole('status').filter({ hasText: '已保存到本机' })).toBeVisible()
   const pausedDuration = (await readSessions(page))[0].session.elapsedMs
   await page.clock.runFor(3000)
   await page.evaluate(() => {

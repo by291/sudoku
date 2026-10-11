@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NAlert, NButton, NCard, NRadioGroup, NRadioButton, NCheckbox } from 'naive-ui'
 import { computed, ref, watch, onScopeDispose } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, RouterLink } from 'vue-router'
@@ -54,6 +55,23 @@ const {
   canRedo,
 } = storeToRefs(game)
 const difficulty = ref<Difficulty>(props.practiceDifficulty)
+function updateDifficulty(value: string | number | boolean) {
+  if (value === 'easy' || value === 'medium' || value === 'hard') difficulty.value = value
+}
+const inputEditable = computed(
+  () =>
+    editable.value &&
+    selectedCell.value !== null &&
+    session.value?.puzzle.givens[selectedCell.value] === 0,
+)
+const selectionMessage = computed(() => {
+  if (readOnly.value) return '当前为只读状态，请先取得编辑权。'
+  if (phase.value === 'paused') return '游戏已暂停，继续后可以填写。'
+  if (phase.value === 'completed') return '本局已完成。'
+  if (selectedCell.value === null) return '先选择一个空格，再填写数字。'
+  const position = `第${Math.floor(selectedCell.value / 9) + 1}行第${(selectedCell.value % 9) + 1}列`
+  return inputEditable.value ? `已选 ${position}` : `${position}是题目给定，不能修改。`
+})
 const preferences = usePreferencesStore()
 const showTimer = computed({
   get: () => preferences.settings.showTimer,
@@ -156,9 +174,14 @@ async function start() {
     props.metadata,
   )
 }
-function requestNew() {
+function requestNew(event: MouseEvent) {
+  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
   if (active.value || replacementAvailable.value) confirmation.value = 'new'
   else void start()
+}
+function requestRestart(event: MouseEvent) {
+  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  confirmation.value = 'restart'
 }
 async function confirm() {
   const intention = confirmation.value
@@ -190,43 +213,47 @@ function erase() {
       <RouterLink to="/">返回首页</RouterLink>
     </div>
     <slot />
-    <p v-if="initializationError" class="notice error" role="alert">
-      {{ initializationError }} <button @click="initialize">重新读取</button>
-    </p>
-    <p v-if="error" class="notice error" role="alert">
-      {{ error }} <button v-if="canRetryGeneration" @click="game.retryGeneration">重试出题</button>
-    </p>
+    <NAlert v-if="initializationError" class="feedback-message" type="error" :show-icon="false">
+      {{ initializationError }} <NButton @click="initialize">重新读取</NButton>
+    </NAlert>
+    <NAlert v-if="error" class="feedback-message" type="error" :show-icon="false">
+      {{ error }}
+      <NButton v-if="canRetryGeneration" @click="game.retryGeneration">重试出题</NButton>
+    </NAlert>
     <p v-if="!ready" role="status">正在读取存档…</p>
     <div v-if="metadata.kind !== 'daily'" class="setup-row">
-      <label
-        >难度
-        <select
-          v-model="difficulty"
-          :disabled="phase === 'generating' || metadata.kind === 'learning'"
-        >
-          <option v-for="(name, value) in DIFFICULTY_NAMES" :key="value" :value="value">
-            {{ name }}
-          </option>
-        </select></label
-      ><button
-        class="primary"
+      <span id="difficulty-label">难度</span>
+      <NRadioGroup
+        :value="difficulty"
+        name="next-difficulty"
+        role="radiogroup"
+        aria-labelledby="difficulty-label"
+        :disabled="phase === 'generating' || metadata.kind === 'learning'"
+        @update:value="updateDifficulty"
+      >
+        <NRadioButton v-for="(name, value) in DIFFICULTY_NAMES" :key="value" :value="value">{{
+          name
+        }}</NRadioButton>
+      </NRadioGroup>
+      <NButton
+        :type="active ? 'default' : 'primary'"
         :disabled="!ready || phase === 'generating' || readOnly"
         @click="requestNew"
       >
         {{ active ? '新开一局' : '开始游戏' }}
-      </button>
+      </NButton>
     </div>
-    <div v-if="phase === 'generating'" class="notice" role="status">
-      正在为你准备一道有唯一解的题目… <button @click="game.cancelLoading">取消出题</button>
-    </div>
+    <NCard v-if="phase === 'generating'" class="feedback-message" size="small" role="status">
+      正在为你准备一道有唯一解的题目… <NButton @click="game.cancelLoading">取消出题</NButton>
+    </NCard>
     <template v-if="active && session">
-      <div v-if="readOnly" class="notice" role="status">
+      <NCard v-if="readOnly" class="feedback-message" size="small" role="status">
         本局正在其他标签页编辑。关闭或离开该页面后，可在这里重新取得编辑权。
-        <button @click="game.restoreSession(session.id)">重新载入</button>
-      </div>
-      <div v-if="saveMessage" class="notice error" role="alert">
-        {{ saveMessage }} <button v-if="!readOnly" @click="game.retrySave">重试保存</button>
-      </div>
+        <NButton @click="game.restoreSession(session.id)">重新载入</NButton>
+      </NCard>
+      <NAlert v-if="saveMessage" class="feedback-message" type="error" :show-icon="false">
+        {{ saveMessage }} <NButton v-if="!readOnly" @click="game.retrySave">重试保存</NButton>
+      </NAlert>
       <div class="session-bar">
         <span
           >{{ DIFFICULTY_NAMES[session.puzzle.difficulty] }}
@@ -234,10 +261,10 @@ function erase() {
             session.assistance.assisted ? '已使用辅助' : '独立思考'
           }}</span></span
         ><span v-if="showTimer" aria-label="游戏用时">{{ formatDuration(elapsedMs) }}</span
-        ><button v-if="phase === 'playing'" @click="game.pause">暂停</button
-        ><button v-else-if="phase === 'paused'" @click="game.resume">
+        ><NButton v-if="phase === 'playing'" @click="game.pause">暂停</NButton
+        ><NButton v-else-if="phase === 'paused'" @click="game.resume">
           {{ readOnly ? '尝试接管' : '继续游戏' }}
-        </button>
+        </NButton>
       </div>
       <div class="game-layout">
         <div>
@@ -255,9 +282,9 @@ function erase() {
             />
             <div v-if="phase === 'paused'" class="pause-cover">
               <span>稍作停留</span
-              ><button class="primary" @click="game.resume">
+              ><NButton type="primary" @click="game.resume">
                 {{ readOnly ? '尝试接管' : '继续游戏' }}
-              </button>
+              </NButton>
             </div>
           </div>
           <div class="board-footer">
@@ -268,6 +295,8 @@ function erase() {
         <div>
           <GameControls
             :editable="editable"
+            :input-editable="inputEditable"
+            :selection-message="selectionMessage"
             :note-mode="noteMode"
             :can-undo="canUndo"
             :can-redo="canRedo"
@@ -286,9 +315,9 @@ function erase() {
             @apply="game.applyHint"
             @dismiss="game.dismissHint"
           />
-          <p v-if="checkedCells.length" class="notice" aria-live="polite">
+          <NCard v-if="checkedCells.length" class="feedback-message" size="small" role="status">
             标有圆点的 {{ checkedCells.length }} 格需要重新检查。
-          </p>
+          </NCard>
           <p v-else-if="checkIsCurrent && !hint" class="muted">检查结果：当前没有发现错误填写。</p>
         </div>
       </div>
@@ -302,18 +331,18 @@ function erase() {
         <RouterLink to="/records">查看个人记录</RouterLink>
       </div>
       <div class="game-preferences">
-        <label><input v-model="showTimer" type="checkbox" /> 显示计时</label
-        ><label><input v-model="highlightConflicts" type="checkbox" /> 高亮冲突</label
-        ><button
+        <NCheckbox v-model:checked="showTimer" class="preference">显示计时</NCheckbox>
+        <NCheckbox v-model:checked="highlightConflicts" class="preference">高亮冲突</NCheckbox>
+        <NButton
           :disabled="
             readOnly ||
             phase === 'generating' ||
             (metadata.kind === 'daily' && phase === 'completed')
           "
-          @click="confirmation = 'restart'"
+          @click="requestRestart"
         >
           重新开始本题
-        </button>
+        </NButton>
       </div>
     </template>
     <div v-else-if="ready && phase !== 'generating'" class="panel empty-game">
@@ -339,7 +368,7 @@ function erase() {
 </template>
 <style scoped>
 .game-page {
-  padding-top: 32px;
+  padding-top: 24px;
 }
 .page-heading {
   display: flex;
@@ -348,7 +377,7 @@ function erase() {
   gap: 12px;
 }
 .page-heading h1 {
-  margin: 4px 0 24px;
+  margin: 4px 0 16px;
   font-size: 30px;
 }
 .eyebrow {
@@ -359,24 +388,18 @@ function erase() {
 }
 .setup-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  margin: 0 0 24px;
+  margin: 0 0 16px;
 }
-select {
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  margin-left: 8px;
-  min-height: 44px;
+.setup-row :deep(.n-radio-button) {
+  padding: 0 12px;
 }
 .session-bar {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin: 20px 0 14px;
+  margin: 12px 0;
 }
 .session-bar > :first-child {
   margin-right: auto;
@@ -413,7 +436,7 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 12px;
 }
@@ -423,7 +446,19 @@ select {
   gap: 18px;
   align-items: center;
   margin-top: 24px;
-  font-size: 13px;
+  font-size: 14px;
+}
+.preference {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.preference:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 .game-preferences button {
   margin-left: auto;
@@ -449,7 +484,21 @@ select {
     gap: 20px;
   }
   .game-page {
-    padding-top: 24px;
+    padding-top: 16px;
+  }
+  .eyebrow {
+    display: none;
+  }
+  .page-heading h1 {
+    font-size: 25px;
+    margin: 0 0 12px;
+  }
+  .setup-row {
+    flex-wrap: wrap;
+    font-size: 14px;
+  }
+  .setup-row :deep(.n-radio-button) {
+    padding: 0 10px;
   }
   .session-bar {
     gap: 6px;
@@ -458,7 +507,8 @@ select {
     margin-left: 4px;
   }
   .board-footer {
-    font-size: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
   }
   .game-preferences {
     gap: 12px;

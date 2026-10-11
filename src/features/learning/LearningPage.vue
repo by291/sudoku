@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { NAlert, NButton } from 'naive-ui'
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { LESSONS } from './lessons'
@@ -8,12 +9,13 @@ onMounted(learning.load)
 </script>
 <template>
   <section class="learning-page">
+    <RouterLink to="/">← 返回首页</RouterLink>
     <p class="eyebrow">循序渐进 / LEARN</p>
     <h1>从看懂一格，到解开整盘</h1>
     <p class="muted">六个小练习，学会让每次落笔都有理由。</p>
-    <p v-if="learning.error" class="notice error" role="alert">
-      {{ learning.error }} <button @click="learning.load">重试</button>
-    </p>
+    <NAlert v-if="learning.error" class="feedback-message" type="error" :show-icon="false">
+      {{ learning.error }} <NButton @click="learning.load">重试</NButton>
+    </NAlert>
     <div class="lesson-grid">
       <RouterLink
         v-for="(lesson, index) in LESSONS"

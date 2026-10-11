@@ -7,7 +7,7 @@ These instructions apply to the entire repository.
 - Write repository documentation in English, including README files, design documents, implementation plans, and this file.
 - Use English for identifiers, code comments, docstrings, and test descriptions.
 - Write player-facing interface copy in Chinese, as specified in the product design.
-- The selected stack is Vue 3, TypeScript, Vite, Vue Router, Pinia, Web Workers, IndexedDB with idb, and native CSS. Use pnpm, ESLint, Prettier, Vitest, and Playwright for tooling.
+- The selected stack is Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI for common controls, Web Workers, IndexedDB with idb, and native CSS. Use pnpm, ESLint, Prettier, Vitest, and Playwright for tooling.
 - Read the applicable design document in `docs/superpowers/specs/` before changing product behavior.
 
 ## Learn and follow the stack's conventions
@@ -30,6 +30,7 @@ Primary references:
 - [Vite Guide](https://vite.dev/guide/)
 - [Vue Router Guide](https://router.vuejs.org/guide/)
 - [Pinia core concepts](https://pinia.vuejs.org/core-concepts/)
+- [Naive UI documentation](https://www.naiveui.com/) and [first-party source and examples](https://github.com/tusen-ai/naive-ui)
 - [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers)
 - [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
 - [idb documentation](https://github.com/jakearchibald/idb)
@@ -76,6 +77,7 @@ Primary references:
 - Use semantic HTML, accessible labels, visible keyboard focus, and usable touch targets.
 - Use CSS Grid for the board and responsive layouts; use shared CSS variables for theme values.
 - Scope component styles where appropriate and keep global styles limited to theme, reset, and application-wide rules.
+- Use Naive UI for common controls and the shared CSS palette for theme overrides. Keep the Sudoku board specialized. Verify keyboard ownership, modal focus, and touch operation when integrating library components.
 - Communicate errors, selection, and hints with more than color alone.
 
 ## Verification

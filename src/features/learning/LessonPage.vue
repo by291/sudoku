@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { NAlert, NButton, NCard } from 'naive-ui'
+import type { CardProps } from 'naive-ui'
 import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { DIGITS } from '../../core/sudoku/types'
 import type { Digit } from '../../core/sudoku/types'
+import NumberPad from '../../components/NumberPad.vue'
 import { maskOf } from '../../core/sudoku/board'
 import SudokuBoard from '../game/SudokuBoard.vue'
 import GamePage from '../game/GamePage.vue'
@@ -18,6 +20,15 @@ const feedback = ref<string | null>(null)
 const correct = ref(false),
   busy = ref(false),
   showExplanation = ref(false)
+const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
+  correct.value
+    ? undefined
+    : {
+        color: 'var(--error-soft)',
+        borderColor: 'var(--error)',
+        textColor: 'var(--error)',
+      },
+)
 const exerciseCells = computed(() =>
   !lesson.value
     ? []
@@ -95,7 +106,9 @@ function resetExercise() {
     <RouterLink to="/learn">← 学习列表</RouterLink>
     <h1>{{ lesson.title }}</h1>
     <p class="introduction">{{ lesson.introduction }}</p>
-    <p v-if="learning.error" class="notice error" role="alert">{{ learning.error }}</p>
+    <NAlert v-if="learning.error" class="feedback-message" type="error" :show-icon="false">
+      {{ learning.error }}
+    </NAlert>
     <div class="lesson-layout">
       <div>
         <SudokuBoard
@@ -123,17 +136,12 @@ function resetExercise() {
         <p v-if="selected !== null" class="muted">
           已选：第{{ Math.floor(selected / 9) + 1 }}行第{{ (selected % 9) + 1 }}列
         </p>
-        <div class="exercise-pad">
-          <button
-            v-for="digit in DIGITS"
-            :key="digit"
-            :disabled="selected === null || busy"
-            :aria-label="`${lesson.exercise.kind === 'placement' ? '填写' : '排除'}数字${digit}`"
-            @click="answer(digit)"
-          >
-            {{ digit }}
-          </button>
-        </div>
+        <NumberPad
+          class="exercise-pad"
+          :disabled="selected === null || busy"
+          :action-label="lesson.exercise.kind === 'placement' ? '填写' : '排除'"
+          @digit="answer"
+        />
         <template v-if="lesson.exercise.kind === 'elimination'"
           ><p>已选择 {{ removals.length }} 个排除项</p>
           <ul v-if="removals.length" class="removal-list">
@@ -142,15 +150,21 @@ function resetExercise() {
               {{ pair.digit }}
             </li>
           </ul>
-          <button class="primary" :disabled="busy" @click="submitEliminations">提交排除</button
-          ><button @click="resetExercise">重置练习</button></template
+          <NButton type="primary" :disabled="busy" @click="submitEliminations">提交排除</NButton
+          ><NButton @click="resetExercise">重置练习</NButton></template
         >
-        <p v-if="feedback" class="notice" :class="{ error: !correct }" role="status">
+        <NCard
+          v-if="feedback"
+          class="feedback-message"
+          size="small"
+          role="status"
+          :theme-overrides="feedbackTheme"
+        >
           {{ feedback }}
-        </p>
-        <button @click="showExplanation = !showExplanation">
+        </NCard>
+        <NButton @click="showExplanation = !showExplanation">
           {{ showExplanation ? '收起讲解' : '查看讲解' }}
-        </button>
+        </NButton>
         <p v-if="showExplanation">{{ lesson.explanation }}</p>
         <div class="practice-link">
           <RouterLink :to="`/learn/${lesson.id}?practice=1`">进入完整棋盘练习 →</RouterLink>
@@ -182,9 +196,6 @@ h2 {
   font-size: 20px;
 }
 .exercise-pad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
   margin: 20px 0;
 }
 .practice-link {
@@ -202,14 +213,6 @@ h2 {
 @media (max-width: 700px) {
   .lesson-layout {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .exercise-pad {
-    grid-template-columns: repeat(9, 1fr);
-    gap: 4px;
-  }
-  .exercise-pad button {
-    padding: 4px;
-    min-width: 0;
   }
   .panel {
     padding: 16px;
