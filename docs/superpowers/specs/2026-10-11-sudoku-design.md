@@ -2,7 +2,7 @@
 
 Date: 2026-10-11
 
-Status: The feature scope and technology stack have been approved by the user. This document specifies the implementation details and awaits user review.
+Status: Approved by the user on 2026-10-11. Implementation planning follows this design.
 
 ## 1. Goals and approved scope
 

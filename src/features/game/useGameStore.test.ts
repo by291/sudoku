@@ -1,0 +1,182 @@
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import { expect, it } from 'vitest'
+import { gameRuntimeKey } from '../../app/runtime'
+import type { GameRuntime } from '../../app/runtime'
+import { useGameStore } from './useGameStore'
+import { makeSession } from '../../../tests/support/gameFixtures'
+import type { HintResult } from '../../core/sudoku/hint'
+import { createTestRuntime } from '../../../tests/support/runtime'
+
+function setup() {
+  let time = 0
+  let saved = makeSession()
+  let reply: (value: { status: 'completed'; value: HintResult }) => void = () => {
+    throw new Error('No hint job')
+  }
+  const token = { sessionId: saved.id, ownerId: 'test', fence: 1, epoch: 1 }
+  const runtime: GameRuntime = {
+    ownerId: 'test',
+    monotonicNow: () => time,
+    wallNow: () => new Date('2026-10-11T01:00:00.000Z'),
+    createId: () => 'new-game',
+    worker: {
+      generate: async () => ({ status: 'failed', message: 'Test generation failure' }),
+      hint: () =>
+        new Promise((resolve) => {
+          reply = resolve
+        }),
+      dispose() {},
+    },
+    ownership: {
+      acquireOwnership: async () => ({ ok: true, value: token }),
+      renewOwnership: async () => ({ ok: true, value: true }),
+      releaseOwnership: async () => ({ ok: true, value: undefined }),
+      subscribe: () => () => {},
+      notifyReset() {},
+      dispose() {},
+    },
+    repository: {
+      listSessions: async () => ({
+        ok: true,
+        value: [{ formatVersion: 1, revision: 1, session: saved }],
+      }),
+      listResults: async () => ({ ok: true, value: [] }),
+      readLessonProgress: async () => ({ ok: true, value: [] }),
+      readDatasetEpoch: async () => ({ ok: true, value: 1 }),
+      readSettings: async () => ({
+        ok: true,
+        value: {
+          theme: 'system',
+          showTimer: true,
+          highlightConflicts: true,
+          currentLessonId: null,
+        },
+      }),
+      writeSession: async () => ({ ok: false, error: { kind: 'write-failed', message: 'Unused' } }),
+      replaceActiveSession: async () => ({
+        ok: false,
+        error: { kind: 'write-failed', message: 'Unused' },
+      }),
+      writeSettings: async () => ({ ok: true, value: undefined }),
+      writeLessonProgress: async () => ({ ok: true, value: undefined }),
+      clearAll: async () => ({ ok: true, value: undefined }),
+      removeQuarantined: async () => ({ ok: true, value: undefined }),
+      countQuarantined: async () => ({ ok: true, value: 0 }),
+    },
+    createSaveQueue: () => ({
+      revision: 1,
+      async enqueue(session) {
+        saved = session
+        return { ok: true, value: { formatVersion: 1, revision: 2, session } }
+      },
+      async flush() {
+        return { ok: true, value: undefined }
+      },
+      async retry() {
+        return { ok: true, value: undefined }
+      },
+      dispose() {},
+    }),
+  }
+  const app = createApp({})
+  const pinia = createPinia()
+  app.use(pinia).provide(gameRuntimeKey, runtime)
+  const store = app.runWithContext(() => useGameStore(pinia))
+  return {
+    store,
+    advance: (milliseconds: number) => {
+      time += milliseconds
+    },
+    saved: () => saved,
+    reply: (hint: HintResult) => reply({ status: 'completed', value: hint }),
+  }
+}
+it('restores paused, records elapsed time, and refuses edits while paused', async () => {
+  const test = setup()
+  await test.store.restoreSession('fixture-free-session')
+  expect(test.store.phase).toBe('paused')
+  test.store.dispatch({ kind: 'enter', cell: 2, digit: 4 })
+  expect(test.store.board[2]).toBe(0)
+  await test.store.resume()
+  test.advance(5000)
+  await test.store.periodicSave()
+  expect(test.saved().elapsedMs).toBe(5000)
+  test.store.pause()
+  test.advance(5000)
+  expect(test.store.elapsedMs).toBe(5000)
+  test.store.dispose()
+})
+it('ignores stale hints and preserves an old session when generation fails', async () => {
+  const test = setup()
+  await test.store.restoreSession('fixture-free-session')
+  await test.store.resume()
+  const hint = test.store.requestHint()
+  test.store.dispatch({ kind: 'enter', cell: 2, digit: 4 })
+  test.reply({ kind: 'review-entry', cell: 3 })
+  await hint
+  expect(test.store.hint).toBeNull()
+  expect(test.store.session?.assistance.hintCount).toBe(0)
+  await test.store.startGame(
+    { difficulty: 'easy', seed: 'new', puzzleVersion: 'sudoku-v1' },
+    { kind: 'free' },
+  )
+  expect(test.store.session?.id).toBe('fixture-free-session')
+  expect(test.store.board[2]).toBe(4)
+  expect(test.store.error).toContain('失败')
+  test.store.dispose()
+})
+it('counts a shown hint once and applies it through the ordinary undoable action', async () => {
+  const test = setup()
+  await test.store.restoreSession('fixture-free-session')
+  await test.store.resume()
+  const job = test.store.requestHint()
+  test.reply({
+    kind: 'deduction',
+    steps: [
+      {
+        kind: 'placement',
+        technique: 'naked-single',
+        cell: 2,
+        digit: 4,
+        evidence: { unit: { kind: 'row', index: 0 }, cells: [2], digits: [4] },
+      },
+    ],
+    placement: { cell: 2, digit: 4 },
+  })
+  await job
+  expect(test.store.session?.assistance.hintCount).toBe(1)
+  test.store.applyHint()
+  expect(test.store.board[2]).toBe(4)
+  test.store.dispatch({ kind: 'undo' })
+  expect(test.store.board[2]).toBe(0)
+  expect(test.store.session?.assistance.hintCount).toBe(1)
+  test.store.dispose()
+})
+it('invalidates check feedback after the checked board changes', async () => {
+  const test = setup()
+  await test.store.restoreSession('fixture-free-session')
+  await test.store.resume()
+  test.store.dispatch({ kind: 'check' })
+  expect(test.store.checkIsCurrent).toBe(true)
+  test.store.dispatch({ kind: 'enter', cell: 2, digit: 1 })
+  expect(test.store.checkIsCurrent).toBe(false)
+  expect(test.store.session?.assistance.checkCount).toBe(1)
+  test.store.dispose()
+})
+it('retries a failed generation with the identical seed and metadata', async () => {
+  const test = await createTestRuntime()
+  const calls: unknown[] = []
+  test.runtime.worker.generate = async (input) => {
+    calls.push(input)
+    return { status: 'timed-out' }
+  }
+  const game = test.app.runWithContext(() => useGameStore(test.pinia))
+  const input = { difficulty: 'easy', seed: 'same-request', puzzleVersion: 'sudoku-v1' } as const
+  await game.startGame(input, { kind: 'free' })
+  expect(game.canRetryGeneration).toBe(true)
+  await game.retryGeneration()
+  expect(calls).toEqual([input, input])
+  game.dispose()
+  test.dispose()
+})
