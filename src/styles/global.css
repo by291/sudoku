@@ -1,6 +1,14 @@
 * {
   box-sizing: border-box;
 }
+html {
+  /* Reserve classic scrollbar space so route changes keep the header aligned. */
+  scrollbar-gutter: stable;
+}
+html[style*='overflow: hidden'] {
+  /* Naive UI scroll lock already compensates with a margin on this element. */
+  scrollbar-gutter: auto;
+}
 body {
   margin: 0;
   background: var(--background);

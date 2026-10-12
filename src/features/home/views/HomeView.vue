@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useTemplateRef } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRouter, type UseLinkReturn } from 'vue-router'
 import { NAlert, NButton, NCard, NModal } from 'naive-ui'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
@@ -20,6 +20,11 @@ const dailyStatuses = computed(() =>
 )
 const completedDailyCount = computed(
   () => dailyStatuses.value.filter((status) => status.state === 'completed').length,
+)
+const recordsDescription = computed(() =>
+  records.results.length
+    ? `已完成 ${records.results.length} 局，回顾用时、成绩与每日挑战。`
+    : '完成第一局，留下属于你的数独足迹。',
 )
 const setupMode = ref<'free' | 'daily' | null>(null)
 const variant = ref<SudokuVariant>('classic')
@@ -70,6 +75,10 @@ function restoreResumeFocus() {
   const element: unknown = resumeButton.value?.$el
   if (element instanceof HTMLElement) element.focus()
 }
+function continueRecentLesson(event: MouseEvent, navigate: UseLinkReturn['navigate']) {
+  void navigate(event)
+  resumeOpen.value = false
+}
 onMounted(records.load)
 </script>
 <template>
@@ -102,10 +111,18 @@ onMounted(records.load)
           <span>继续 →</span></RouterLink
         ><RouterLink
           v-if="preferences.settings.currentLessonId"
+          v-slot="{ href, navigate }"
           :to="`/learn/${preferences.settings.currentLessonId}`"
-          class="resume-lesson"
-          @click="resumeOpen = false"
-          >继续最近的课程 →</RouterLink
+          custom
+        >
+          <NButton
+            tag="a"
+            type="info"
+            size="large"
+            :href="href"
+            @click="continueRecentLesson($event, navigate)"
+            >继续最近的课程 →</NButton
+          ></RouterLink
         >
       </div>
     </NModal>
@@ -123,6 +140,7 @@ onMounted(records.load)
           <NButton
             v-if="unfinished.length || preferences.settings.currentLessonId"
             ref="resumeButton"
+            type="info"
             size="large"
             @click="continueLast"
             >继续上次</NButton
@@ -160,18 +178,26 @@ onMounted(records.load)
           <h2>每日挑战 <span>↗</span></h2>
           <p>{{ records.today }} · 已完成 {{ completedDailyCount }} / 6 种玩法</p></a
         ></RouterLink
+      ><RouterLink to="/records" class="panel mode-card"
+        ><span class="mode-icon" aria-hidden="true">▤</span>
+        <p class="mode-kicker">每一局，都有收获</p>
+        <h2>数独足迹 <span aria-hidden="true">↗</span></h2>
+        <p>{{ recordsDescription }}</p></RouterLink
       >
     </div>
     <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
       {{ records.error }} <NButton @click="records.load">重试读取</NButton>
     </NAlert>
     <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
-      有 {{ records.quarantined }} 条记录已隔离。<RouterLink to="/records">查看并清理</RouterLink>
+      <div class="quarantine-message">
+        <span>有 {{ records.quarantined }} 条记录已隔离。</span>
+        <RouterLink v-slot="{ href, navigate }" to="/records" custom>
+          <NButton tag="a" type="primary" size="large" :href="href" @click="navigate"
+            >查看并清理</NButton
+          >
+        </RouterLink>
+      </div>
     </NCard>
-    <section class="home-bottom">
-      <p class="muted">每一局，都是一次专注的练习。数据保存在当前浏览器。</p>
-      <RouterLink to="/records">我的数独足迹 →</RouterLink>
-    </section>
     <GameSetupDialog
       v-if="setupMode"
       v-model:variant="variant"
@@ -193,8 +219,8 @@ onMounted(records.load)
   grid-template-columns: 1.3fr 1fr;
   align-items: center;
   gap: 50px;
-  padding: clamp(40px, 6vh, 88px) 0;
-  flex: 1;
+  padding: 32px 0 80px;
+  flex: none;
 }
 .home-page {
   display: flex;
@@ -212,6 +238,7 @@ onMounted(records.load)
   margin-left: 24px;
 }
 .eyebrow {
+  margin: 0;
   color: var(--accent);
   font-size: 13px;
   letter-spacing: 3px;
@@ -223,6 +250,7 @@ h1 {
   margin: 18px 0;
 }
 .intro-copy {
+  margin: 0;
   color: var(--muted);
   font-size: 16px;
   line-height: 1.9;
@@ -261,8 +289,8 @@ h1 {
 }
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 .mode-card {
   color: var(--text);
@@ -318,19 +346,26 @@ h1 {
   font-size: 13px;
   color: var(--accent);
 }
-.resume-lesson {
-  padding: 10px 0;
-  font-size: 14px;
-}
-.home-bottom {
+.quarantine-message {
   display: flex;
-  justify-content: space-between;
-  gap: 18px;
+  flex-wrap: wrap;
   align-items: center;
-  border-top: 1px solid var(--border);
-  margin-top: 44px;
-  padding-top: 20px;
-  font-size: 12px;
+  justify-content: space-between;
+  gap: 12px;
+}
+@media (min-width: 701px) {
+  .home-page {
+    justify-content: center;
+  }
+  .mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+@media (min-width: 1101px) {
+  .mode-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 @media (max-width: 700px) {
   .home-intro {
@@ -340,10 +375,6 @@ h1 {
   .hero-art {
     display: none;
   }
-  .mode-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-  }
   .mode-card {
     padding: 18px 22px;
   }
@@ -352,13 +383,6 @@ h1 {
   }
   .mode-kicker {
     margin-top: 0;
-  }
-  .home-bottom {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .home-bottom p {
-    margin: 0;
   }
 }
 </style>

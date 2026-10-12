@@ -1,7 +1,7 @@
-import { test, expect, cellName, readSessions } from './support'
+import { test, expect, cellName, readSessions, enterExerciseDigit } from './support'
 import { LESSONS } from '@/features/learning/model/lessons'
 import { VARIANT_OPTIONS } from '@/features/game/model/variants'
-test('completes the rules exercise using only keyboard navigation', async ({ page }) => {
+test('completes the rules exercise using only keyboard navigation', async ({ page }, testInfo) => {
   await page.goto('/#/learn/rules')
   const first = page.getByRole('button', { name: cellName(0) })
   for (
@@ -15,10 +15,21 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
   for (let row = 0; row < 4; row++) await page.keyboard.press('ArrowDown')
   for (let column = 0; column < 4; column++) await page.keyboard.press('ArrowRight')
   await expect(page.getByRole('button', { name: cellName(40) })).toBeFocused()
-  for (let digit = 1; digit <= 5; digit++) await page.keyboard.press('Tab')
-  await expect(page.getByRole('button', { name: '填写数字5', exact: true })).toBeFocused()
-  await page.keyboard.press('Enter')
+  await page.keyboard.press('9')
+  await expect(page.getByRole('status')).toContainText('还差一点')
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('button', { name: cellName(41) })).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await page.keyboard.press('5')
   await expect(page.getByRole('status')).toContainText('推理正确')
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByRole('button', { name: cellName(41) })).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await page.screenshot({
+    path: `.superpowers/navigation-refinement/lesson-${testInfo.project.name}.png`,
+    fullPage: true,
+    animations: 'disabled',
+  })
 })
 test('teaches all eleven exercises with retry and durable progress', async ({ page }) => {
   for (const lesson of LESSONS) {
@@ -27,15 +38,13 @@ test('teaches all eleven exercises with retry and durable progress', async ({ pa
     if (lesson.exercise.kind === 'placement') {
       const { cell, digit } = lesson.exercise.expected
       await page.getByRole('button', { name: cellName(cell) }).click()
-      await page
-        .getByRole('button', { name: `填写数字${digit === 9 ? 8 : 9}`, exact: true })
-        .click()
+      await enterExerciseDigit(page, digit === 9 ? 8 : 9)
       await expect(page.getByRole('status')).toContainText('还差一点')
-      await page.getByRole('button', { name: `填写数字${digit}`, exact: true }).click()
+      await enterExerciseDigit(page, digit)
     } else {
       for (const { cell, digit } of lesson.exercise.expected) {
         await page.getByRole('button', { name: cellName(cell) }).click()
-        await page.getByRole('button', { name: `排除数字${digit}`, exact: true }).click()
+        await enterExerciseDigit(page, digit, '排除')
       }
       await page.getByRole('button', { name: '提交排除', exact: true }).click()
     }

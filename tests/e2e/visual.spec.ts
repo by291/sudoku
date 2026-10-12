@@ -1,4 +1,11 @@
-import { test, expect, seedSession, cellName, makeVariantHintSession } from './support'
+import {
+  test,
+  expect,
+  seedSession,
+  cellName,
+  makeVariantHintSession,
+  selectGameMenuAction,
+} from './support'
 import { makeSession } from '../support/gameFixtures'
 for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
   test(`keeps ${variant} clues aligned and tappable with notes at 360px in both themes`, async ({
@@ -8,7 +15,7 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
     await page.setViewportSize({ width: 360, height: 850 })
     await seedSession(page, makeVariantHintSession(variant))
     await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
-    await page.getByRole('button', { name: '生成候选数', exact: true }).click()
+    await selectGameMenuAction(page, '生成候选数')
     const target = variant === 'arrow' ? 40 : 0
     const cell = page.getByRole('button', { name: cellName(target) })
     if (isMobile) await cell.tap()
@@ -65,7 +72,7 @@ test('keeps boards square and focus visible at 360, 390 and desktop widths', asy
 }, testInfo) => {
   await seedSession(page, makeSession())
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
-  await page.getByRole('button', { name: '生成候选数', exact: true }).click()
+  await selectGameMenuAction(page, '生成候选数')
   await page.getByRole('button', { name: cellName(2) }).click()
   await page.getByRole('button', { name: cellName(2) }).press('ArrowRight')
   await expect(page.getByRole('button', { name: cellName(3) })).toBeFocused()

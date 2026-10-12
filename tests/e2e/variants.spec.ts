@@ -6,6 +6,8 @@ import {
   cellName,
   countResults,
   makeVariantHintSession,
+  enterGameDigit,
+  selectGameMenuAction,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
 import type { Page } from '@playwright/test'
@@ -18,18 +20,27 @@ async function chooseVariant(page: Page, field: string, name: string) {
   if (field !== '成绩玩法') {
     const dialog = page.getByRole('dialog')
     if (!(await dialog.isVisible())) {
-      await page
-        .getByRole('button', {
-          name: field === '每日玩法' ? /^(选择今日挑战|选择其他挑战)$/ : /^(开始游戏|新开一局)$/,
-        })
-        .click()
+      const entry = page.getByRole('button', {
+        name: field === '每日玩法' ? '选择今日挑战' : '开始游戏',
+        exact: true,
+      })
+      if (await entry.isVisible()) await entry.click()
+      else await selectGameMenuAction(page, field === '每日玩法' ? '选择其他挑战' : '新开一局')
     }
     await dialog.getByText(name, { exact: true }).click()
     if (field === '每日玩法')
       await dialog.getByRole('button', { name: /^(开始今日挑战|继续今日挑战|再次练习)$/ }).click()
     return
   }
-  await page.getByRole('combobox', { name: field, exact: true }).click()
+  const selector = page.getByRole('combobox', { name: field, exact: true })
+  if (!(await selector.isVisible())) {
+    await page
+      .getByRole('navigation', { name: field, exact: true })
+      .getByRole('link', { name: new RegExp(name) })
+      .click()
+    return
+  }
+  await selector.click()
   await page.getByRole('option', { name, exact: true }).click()
   await expect(page.getByRole('combobox', { name: field, exact: true })).toHaveAttribute(
     'aria-expanded',
@@ -53,7 +64,7 @@ for (const variant of variants) {
     const digit = variant.kind === 'arrow' ? 2 : 1
     await seedSession(page, session)
     await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
-    await page.getByRole('button', { name: '生成候选数', exact: true }).click()
+    await selectGameMenuAction(page, '生成候选数')
     const cell = page.getByRole('button', { name: cellName(target) })
     await cell.click()
     await expect(cell).toHaveAccessibleName(new RegExp(`笔记.*${digit}`))
@@ -106,7 +117,7 @@ for (const variant of variants) {
     )
     await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
     await page.getByRole('button', { name: cellName(0) }).click()
-    await page.getByRole('button', { name: `输入数字${fixture.solution[0]}`, exact: true }).click()
+    await enterGameDigit(page, fixture.solution[0])
     await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
     expect(await countResults(page)).toBe(1)
     await page.reload()
@@ -176,7 +187,7 @@ test('updates the explicit session URL after restarting a free puzzle', async ({
   const original = makeSession()
   await seedSession(page, original)
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
-  await page.getByRole('button', { name: '重新开始本题', exact: true }).click()
+  await selectGameMenuAction(page, '重新开始本题')
   await page.getByRole('dialog').getByRole('button', { name: '确认开始', exact: true }).click()
   await expect.poll(async () => (await readSessions(page))[0].session.id).not.toBe(original.id)
   const restarted = (await readSessions(page))[0].session
@@ -255,13 +266,13 @@ test('keeps the current rules while choosing another type and offers target resu
     (await readSessions(page)).map((record) => record.session.puzzle.rules.kind).sort(),
   ).toEqual(['arrow', 'classic'])
   await chooseVariant(page, '下一局玩法', '标准数独')
-  await page.getByRole('button', { name: '继续标准数独存档', exact: true }).click()
+  await page.getByRole('button', { name: '继续存档', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: '自由游玩 · 标准数独', exact: true }),
   ).toBeVisible()
   await expect(page).toHaveURL(/variant=classic/)
   await expect(page).toHaveURL(new RegExp(`session=${makeSession().id}`))
-  await page.getByRole('button', { name: '新开一局', exact: true }).click()
+  await selectGameMenuAction(page, '新开一局')
   await expect(page.getByRole('dialog')).toContainText('开始游戏将替换此玩法存档')
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
   expect(
@@ -279,7 +290,7 @@ test('switches independent daily types and restores the selected type after refr
     page.getByRole('radiogroup', { name: '玩法', exact: true }).getByRole('radio'),
   ).toHaveCount(6)
   await page.getByRole('dialog').getByRole('button', { name: '开始今日挑战', exact: true }).click()
-  await page.getByRole('button', { name: '生成候选数', exact: true }).click()
+  await selectGameMenuAction(page, '生成候选数')
   await chooseVariant(page, '每日玩法', '箭头数独')
   await expect(
     page.getByRole('heading', { name: '每日挑战 · 箭头数独', exact: true }),
@@ -310,7 +321,7 @@ test('restores an explicit saved type even when the query chooses Classic and fi
   ).toBeVisible()
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   await page.getByRole('button', { name: cellName(0) }).click()
-  await page.getByRole('button', { name: '输入数字5', exact: true }).click()
+  await enterGameDigit(page, 5)
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: '查看个人记录', exact: true }).click()
   await expect(page.getByText('这个玩法还没有完成记录', { exact: false })).toBeVisible()
@@ -363,7 +374,7 @@ test('retains the daily board and selector after a failed save and switches afte
     window.addEventListener('restore-test-storage', restore)
   })
   await page.getByRole('button', { name: cellName(2) }).click()
-  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await enterGameDigit(page, 4)
   await expect(page.getByRole('alert').filter({ hasText: '保存失败' })).toBeVisible()
   await chooseVariant(page, '每日玩法', '箭头数独')
   await expect(

@@ -24,9 +24,10 @@ export const router = createRouter({
     const lessonViewChanged =
       typeof to.params.lessonId === 'string' &&
       (to.query.practice === '1') !== (from.query.practice === '1')
-    const courseTypeChanged = to.path === '/learn' && to.query.variant !== from.query.variant
-    // Course choices and practice flags change the view; session queries keep the board in place.
-    return to.path !== from.path || lessonViewChanged || courseTypeChanged
+    const browsingTypeChanged =
+      ['/learn', '/records'].includes(to.path) && to.query.variant !== from.query.variant
+    // Browsing choices and practice flags change the view; session queries keep the board in place.
+    return to.path !== from.path || lessonViewChanged || browsingTypeChanged
       ? { left: 0, top: 0 }
       : false
   },

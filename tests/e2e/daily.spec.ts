@@ -1,4 +1,13 @@
-import { test, expect, seedSession, readSessions, countResults, cellName } from './support'
+import {
+  test,
+  expect,
+  seedSession,
+  readSessions,
+  countResults,
+  cellName,
+  enterGameDigit,
+  selectGameMenuAction,
+} from './support'
 import { makeSession } from '../support/gameFixtures'
 test('starts a real daily challenge and preserves time and assistance on restart', async ({
   page,
@@ -7,12 +16,12 @@ test('starts a real daily challenge and preserves time and assistance on restart
   await page.getByRole('button', { name: '选择今日挑战', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '开始今日挑战', exact: true }).click()
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
-  await page.getByRole('button', { name: '生成候选数', exact: true }).click()
+  await selectGameMenuAction(page, '生成候选数')
   await expect
     .poll(async () => (await readSessions(page))[0].session.assistance.candidateCount)
     .toBe(1)
   const before = (await readSessions(page))[0].session
-  await page.getByRole('button', { name: '重新开始本题', exact: true }).click()
+  await selectGameMenuAction(page, '重新开始本题')
   await expect(page.getByRole('dialog')).toContainText('保留累计用时')
   await page.getByRole('dialog').getByRole('button', { name: '确认开始', exact: true }).click()
   await expect
@@ -37,9 +46,9 @@ test('saves one formal result and starts replay with a new identity', async ({ p
   await seedSession(page, session, '/play/daily')
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   await page.getByRole('button', { name: cellName(2) }).click()
-  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await enterGameDigit(page, 4)
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '选择其他挑战', exact: true }).click()
+  await selectGameMenuAction(page, '选择其他挑战')
   await page.getByRole('dialog').getByRole('button', { name: '再次练习', exact: true }).click()
   await expect.poll(async () => (await readSessions(page)).length).toBe(2)
   const records = await readSessions(page)

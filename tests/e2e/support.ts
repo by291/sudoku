@@ -9,6 +9,32 @@ import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
 import type { NewSudokuVariant } from '@/core/sudoku/rules'
 export { expect }
+export async function enterGameDigit(page: Page, digit: number) {
+  const touchDigit = page.getByRole('button', { name: `输入数字${digit}`, exact: true })
+  if (await touchDigit.isVisible()) await touchDigit.click()
+  else await page.keyboard.press(String(digit))
+}
+export async function enterExerciseDigit(page: Page, digit: number, action = '填写') {
+  const touchDigit = page.getByRole('button', { name: `${action}数字${digit}`, exact: true })
+  if (await touchDigit.isVisible()) await touchDigit.click()
+  else await page.keyboard.press(String(digit))
+}
+export async function selectGameMenuAction(
+  page: Page,
+  action: '检查填写' | '生成候选数' | '新开一局' | '重新开始本题' | '选择其他挑战' | '对局设置',
+) {
+  await page.getByRole('button', { name: '更多操作', exact: true }).click()
+  await page.getByRole('menuitem', { name: action, exact: true }).click()
+}
+export async function openGameSettings(page: Page) {
+  await selectGameMenuAction(page, '对局设置')
+  return page.getByRole('dialog', { name: '对局设置', exact: true })
+}
+export async function closeGameSettings(page: Page) {
+  const dialog = page.getByRole('dialog', { name: '对局设置', exact: true })
+  await dialog.getByRole('button', { name: '关闭设置', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+}
 export function makeVariantHintSession(variant: NewSudokuVariant): GameSession {
   const example = VARIANT_EXAMPLES[variant]
   const solution =

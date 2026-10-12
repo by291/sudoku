@@ -96,7 +96,9 @@ onMounted(learning.load)
     </NAlert>
     <NAlert v-if="!variantQuery.valid" class="feedback-message" type="warning" :show-icon="false">
       无法识别这个课程玩法，请重新选择。
-      <RouterLink to="/learn">查看标准课程</RouterLink>
+      <RouterLink v-slot="{ href, navigate }" to="/learn" custom>
+        <NButton tag="a" :href="href" @click="navigate">查看标准课程</NButton>
+      </RouterLink>
     </NAlert>
     <div class="learning-workspace">
       <aside class="course-sidebar">
@@ -149,7 +151,12 @@ onMounted(learning.load)
                 {{ suggestionCaption }} · {{ suggestedLesson.title }}
               </p>
               <RouterLink v-slot="{ href, navigate }" :to="`/learn/${suggestedLesson.id}`" custom>
-                <NButton tag="a" type="primary" :href="href" @click="navigate">
+                <NButton
+                  tag="a"
+                  :type="suggestionLabel === '继续学习' ? 'info' : 'primary'"
+                  :href="href"
+                  @click="navigate"
+                >
                   {{ suggestionLabel }} <span class="forward-arrow" aria-hidden="true">→</span>
                 </NButton>
               </RouterLink>

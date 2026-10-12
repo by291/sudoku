@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NAlert, NButton, NCard, NSwitch } from 'naive-ui'
+import { NAlert, NButton, NCard, NModal, NSwitch } from 'naive-ui'
 import { computed, ref, watch, onScopeDispose } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
@@ -39,6 +39,7 @@ const props = withDefaults(
     autoRestore: true,
   },
 )
+const emit = defineEmits<{ chooseDaily: [] }>()
 const route = useRoute()
 const router = useRouter()
 const runtime = useGameRuntime()
@@ -68,6 +69,7 @@ const {
 } = storeToRefs(game)
 const difficulty = ref<Difficulty>(props.practiceDifficulty)
 const setupOpen = ref(false)
+const settingsOpen = ref(false)
 const targetLoading = ref(false)
 const nextVariant = ref<SudokuVariant>(props.practiceVariant)
 const queryVariant = computed(() => parseVariantQuery(route.query.variant))
@@ -286,8 +288,12 @@ async function retryGeneration() {
   const transition = await game.retryGeneration()
   if (transition?.status === 'ready') await syncSessionRoute()
 }
-async function requestNew(event: MouseEvent) {
-  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+async function requestNew(event?: MouseEvent) {
+  if (event?.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  if (props.metadata.kind === 'daily') {
+    emit('chooseDaily')
+    return
+  }
   if (props.metadata.kind === 'free') {
     nextVariant.value = active.value ? activeVariant.value : nextVariant.value
     difficulty.value =
@@ -321,8 +327,8 @@ function requestReload(event: MouseEvent) {
   if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
   confirmation.value = 'reload'
 }
-function requestRestart(event: MouseEvent) {
-  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+function requestRestart(event?: MouseEvent) {
+  if (event?.currentTarget instanceof HTMLElement) event.currentTarget.focus()
   confirmation.value = 'restart'
 }
 async function confirm() {
@@ -354,28 +360,23 @@ function erase() {
   <section class="game-page">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">一格一念 / {{ heading }}</p>
+        <p v-if="!active" class="eyebrow">一格一念 / {{ heading }}</p>
         <h1>
           {{ heading }}<template v-if="active"> · {{ VARIANT_NAMES[activeVariant] }}</template>
         </h1>
       </div>
-      <NButton
-        v-if="metadata.kind !== 'daily' && active"
-        :disabled="!ready || phase === 'generating' || readOnly || !queryVariant.valid"
-        @click="requestNew"
-        >新开一局</NButton
-      >
     </div>
-    <slot />
+    <slot :active="active" />
     <NAlert
       v-if="!queryVariant.valid && metadata.kind !== 'daily'"
       class="feedback-message"
       type="error"
       :show-icon="false"
     >
-      无法识别指定的玩法，请选择有效的数独类型。<RouterLink to="/play/free"
-        >返回标准数独</RouterLink
-      >
+      无法识别指定的玩法，请选择有效的数独类型。
+      <RouterLink v-slot="{ href, navigate }" to="/play/free" custom>
+        <NButton tag="a" :href="href" @click="navigate">返回标准数独</NButton>
+      </RouterLink>
     </NAlert>
     <NAlert v-if="initializationError" class="feedback-message" type="error" :show-icon="false">
       {{ initializationError }} <NButton @click="initialize">重新读取</NButton>
@@ -389,7 +390,6 @@ function erase() {
       正在为你准备一道有唯一解的题目… <NButton @click="game.cancelLoading">取消出题</NButton>
     </NCard>
     <template v-if="active && session">
-      <p class="rule-summary">{{ VARIANT_RULE_TEXT[activeVariant] }}</p>
       <NAlert
         v-if="conflictEvaluation.status === 'budget-exhausted'"
         class="feedback-message"
@@ -412,20 +412,27 @@ function erase() {
       <NAlert v-if="saveMessage" class="feedback-message" type="error" :show-icon="false">
         {{ saveMessage }} <NButton v-if="!readOnly" @click="game.retrySave">重试保存</NButton>
       </NAlert>
-      <div class="session-bar">
-        <span
-          >{{ DIFFICULTY_NAMES[session.puzzle.difficulty] }}
-          <span class="badge">{{
-            session.assistance.assisted ? '已使用辅助' : '独立思考'
-          }}</span></span
-        ><span v-if="showTimer" aria-label="游戏用时">{{ formatDuration(elapsedMs) }}</span
-        ><NButton v-if="phase === 'playing'" @click="game.pause">暂停</NButton
-        ><NButton v-else-if="phase === 'paused'" @click="game.resume">
-          {{ readOnly ? '尝试接管' : '继续游戏' }}
-        </NButton>
-      </div>
-      <div class="game-layout">
-        <div>
+      <div
+        class="game-layout"
+        :class="{ 'has-feedback': hint || checkedCells.length || checkIsCurrent }"
+      >
+        <div class="play-surface">
+          <p v-if="session.metadata.kind === 'daily'" class="session-context">
+            {{ session.metadata.challengeDate }} ·
+            {{ session.metadata.formalAttempt ? '正式挑战' : '练习重玩' }}
+          </p>
+          <div class="session-bar">
+            <span
+              >{{ DIFFICULTY_NAMES[session.puzzle.difficulty] }}
+              <span class="badge">{{
+                session.assistance.assisted ? '已使用辅助' : '独立思考'
+              }}</span></span
+            ><span v-if="showTimer" aria-label="游戏用时">{{ formatDuration(elapsedMs) }}</span
+            ><NButton v-if="phase === 'playing'" @click="game.pause">暂停</NButton
+            ><NButton v-else-if="phase === 'paused'" @click="game.resume">
+              {{ readOnly ? '尝试接管' : '继续游戏' }}
+            </NButton>
+          </div>
           <div class="board-wrap">
             <SudokuBoard
               :board="board"
@@ -447,12 +454,6 @@ function erase() {
               </NButton>
             </div>
           </div>
-          <div class="board-footer">
-            <span role="status">{{ saveLabel }}</span
-            ><span>方向键移动 · N 切换笔记</span>
-          </div>
-        </div>
-        <div>
           <GameControls
             :editable="editable"
             :input-editable="inputEditable"
@@ -461,6 +462,18 @@ function erase() {
             :can-undo="canUndo"
             :can-redo="canRedo"
             :hint-loading="hintLoading"
+            :can-restart="
+              !readOnly &&
+              phase !== 'generating' &&
+              !(metadata.kind === 'daily' && phase === 'completed')
+            "
+            :can-start-new="
+              ready &&
+              phase !== 'generating' &&
+              (metadata.kind === 'daily' || !readOnly) &&
+              queryVariant.valid
+            "
+            :new-game-label="metadata.kind === 'daily' ? '选择其他挑战' : '新开一局'"
             @digit="enterDigit"
             @erase="erase"
             @note="game.toggleNoteMode"
@@ -469,7 +482,16 @@ function erase() {
             @candidates="game.dispatch({ kind: 'generate-notes' })"
             @check="game.dispatch({ kind: 'check' })"
             @hint="game.requestHint"
-          /><HintPanel
+            @settings="settingsOpen = true"
+            @new="requestNew()"
+            @restart="requestRestart()"
+          />
+          <div class="board-footer">
+            <span role="status">{{ saveLabel }}</span>
+          </div>
+        </div>
+        <div v-if="hint || checkedCells.length || checkIsCurrent" class="game-feedback">
+          <HintPanel
             v-if="hint"
             :hint="hint"
             @highlight="displayedHintStep = $event"
@@ -489,31 +511,12 @@ function erase() {
           {{ session.assistance.assisted ? '辅助完成' : '无辅助完成' }}
         </p>
         <p>{{ saveState === 'saved' ? '成绩已保存到本机。' : '本局已完成，成绩仍待保存。' }}</p>
-        <RouterLink to="/records">查看个人记录</RouterLink>
-      </div>
-      <NCard class="game-preferences" size="small">
-        <div class="preferences-heading"><h2>对局设置</h2></div>
-        <div class="preferences-row">
-          <div class="preference" @click="showTimer = !showTimer">
-            <span>显示计时</span
-            ><NSwitch v-model:value="showTimer" aria-label="显示计时" @click.stop />
-          </div>
-          <div class="preference" @click="highlightConflicts = !highlightConflicts">
-            <span>高亮冲突</span
-            ><NSwitch v-model:value="highlightConflicts" aria-label="高亮冲突" @click.stop />
-          </div>
-          <NButton
-            :disabled="
-              readOnly ||
-              phase === 'generating' ||
-              (metadata.kind === 'daily' && phase === 'completed')
-            "
-            @click="requestRestart"
-          >
-            重新开始本题
+        <RouterLink v-slot="{ href, navigate }" to="/records" custom>
+          <NButton tag="a" type="primary" secondary :href="href" @click="navigate">
+            查看个人记录 <span aria-hidden="true"> →</span>
           </NButton>
-        </div>
-      </NCard>
+        </RouterLink>
+      </div>
     </template>
     <div
       v-else-if="ready && phase !== 'generating' && metadata.kind !== 'daily'"
@@ -541,6 +544,34 @@ function erase() {
       @start="startSelected"
       @resume="resumeTarget"
     />
+    <NModal
+      v-if="settingsOpen && active"
+      :show="true"
+      preset="card"
+      title="对局设置"
+      aria-label="对局设置"
+      role="dialog"
+      aria-modal="true"
+      style="width: min(480px, calc(100vw - 32px)); margin: 24px auto"
+      @update:show="settingsOpen = $event"
+    >
+      <div class="preferences-row">
+        <div class="preference" @click="showTimer = !showTimer">
+          <span>显示计时</span
+          ><NSwitch v-model:value="showTimer" aria-label="显示计时" @click.stop />
+        </div>
+        <div class="preference" @click="highlightConflicts = !highlightConflicts">
+          <span>高亮冲突</span
+          ><NSwitch v-model:value="highlightConflicts" aria-label="高亮冲突" @click.stop />
+        </div>
+      </div>
+      <h3 class="settings-heading">玩法规则</h3>
+      <p class="rule-summary">{{ VARIANT_RULE_TEXT[activeVariant] }}</p>
+      <h3 class="settings-heading">辅助与成绩</h3>
+      <p class="rule-summary">使用逻辑提示、检查填写或生成候选数，会将本局记为「辅助完成」。</p>
+      <slot name="settings" />
+      <template #footer><NButton @click="settingsOpen = false">关闭设置</NButton></template>
+    </NModal>
     <ConfirmationDialog
       v-if="confirmation"
       :title="confirmationContent.title"
@@ -554,7 +585,7 @@ function erase() {
 </template>
 <style scoped>
 .game-page {
-  padding-top: 24px;
+  padding-top: 16px;
 }
 .rule-summary {
   color: var(--muted);
@@ -569,9 +600,11 @@ function erase() {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  max-width: clamp(320px, calc(100dvh - 440px), 560px);
+  margin: 0 auto;
 }
 .page-heading h1 {
-  margin: 4px 0 16px;
+  margin: 4px 0;
   font-size: 30px;
 }
 .eyebrow {
@@ -584,7 +617,7 @@ function erase() {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin: 12px 0;
+  margin: 8px 0;
 }
 .session-bar > :first-child {
   margin-right: auto;
@@ -600,9 +633,26 @@ function erase() {
 }
 .game-layout {
   display: grid;
-  grid-template-columns: minmax(0, 580px) minmax(0, 340px);
-  gap: 28px;
+  grid-template-columns: minmax(0, 560px);
+  justify-content: center;
+  gap: 24px;
   align-items: start;
+}
+.game-layout.has-feedback {
+  grid-template-columns: minmax(0, 560px) minmax(0, 340px);
+}
+.play-surface {
+  width: 100%;
+  max-width: clamp(320px, calc(100dvh - 440px), 560px);
+  margin: 0 auto;
+}
+.session-context {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.game-feedback :deep(.hint-panel) {
+  margin-top: 0;
 }
 .board-wrap {
   position: relative;
@@ -623,21 +673,11 @@ function erase() {
   gap: 8px;
   font-size: 13px;
   color: var(--muted);
-  margin-top: 12px;
-}
-.game-preferences {
-  margin-top: 24px;
-  font-size: 14px;
-}
-.preferences-heading h2 {
-  font-size: 16px;
-  margin: 0 0 8px;
+  margin-top: 6px;
 }
 .preferences-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
+  display: grid;
+  gap: 12px;
 }
 .preference {
   display: flex;
@@ -648,6 +688,7 @@ function erase() {
   border-radius: 8px;
   background: var(--background);
   cursor: pointer;
+  justify-content: space-between;
 }
 .preference :deep(.n-switch) {
   min-height: 44px;
@@ -659,8 +700,9 @@ function erase() {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
-.game-preferences button {
-  margin-left: auto;
+.settings-heading {
+  margin: 20px 0 8px;
+  font-size: 14px;
 }
 .completion {
   margin-top: 24px;
@@ -677,10 +719,17 @@ function erase() {
   font-size: 70px;
   color: var(--accent);
 }
-@media (max-width: 700px) {
-  .game-layout {
+@media (max-width: 800px) {
+  .game-layout,
+  .game-layout.has-feedback {
     grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
+    gap: 16px;
+  }
+  .play-surface {
+    max-width: 560px;
+  }
+  .page-heading {
+    max-width: 560px;
   }
   .game-page {
     padding-top: 16px;
@@ -689,11 +738,12 @@ function erase() {
     display: none;
   }
   .page-heading h1 {
-    font-size: 25px;
-    margin: 0 0 12px;
+    font-size: 22px;
+    margin: 0 0 4px;
   }
   .session-bar {
     gap: 6px;
+    margin: 8px 0;
   }
   .badge {
     margin-left: 4px;
@@ -704,6 +754,12 @@ function erase() {
   }
   .preferences-row {
     gap: 12px;
+  }
+}
+@media (pointer: coarse) {
+  .play-surface,
+  .page-heading {
+    max-width: 560px;
   }
 }
 </style>

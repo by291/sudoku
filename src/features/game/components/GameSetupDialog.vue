@@ -140,9 +140,10 @@ onUnmounted(async () => {
         <NButton @click="$emit('cancel')">取消</NButton>
         <NButton
           v-if="mode === 'free' && savedSession && !savedSession.completion"
+          type="info"
           :disabled="busy"
           @click="$emit('resume')"
-          >继续{{ VARIANT_NAMES[variant] }}存档</NButton
+          >继续存档</NButton
         >
         <NButton type="primary" :disabled="busy" @click="$emit('start')">{{ startLabel }}</NButton>
       </div>

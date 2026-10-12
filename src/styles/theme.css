@@ -9,6 +9,10 @@
   --accent-active: #0d5f56;
   --accent-contrast: #fffef9;
   --accent-soft: #e0efea;
+  --resume: #526d7a;
+  --resume-hover: #46616e;
+  --resume-active: #3b5460;
+  --resume-contrast: #fffef9;
   --border: #dbdfd5;
   --control-border: #81958b;
   --error: #b14444;
@@ -30,6 +34,10 @@
   --accent-active: #5db9a9;
   --accent-contrast: #162521;
   --accent-soft: #294c41;
+  --resume: #829faa;
+  --resume-hover: #94afb9;
+  --resume-active: #75949f;
+  --resume-contrast: #162521;
   --border: #3e5349;
   --control-border: #84998d;
   --error: #ffb0a0;

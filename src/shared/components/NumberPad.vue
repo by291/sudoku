@@ -3,15 +3,25 @@ import { NButton } from 'naive-ui'
 import { DIGITS } from '@/core/sudoku/types'
 import type { Digit } from '@/core/sudoku/types'
 
-const { disabled = false, actionLabel = '输入' } = defineProps<{
+const {
+  disabled = false,
+  actionLabel = '输入',
+  layout = 'grid',
+} = defineProps<{
   disabled?: boolean
   actionLabel?: string
+  layout?: 'grid' | 'row'
 }>()
 defineEmits<{ digit: [digit: Digit] }>()
 </script>
 
 <template>
-  <div class="number-pad" role="group" aria-label="数字输入">
+  <div
+    class="number-pad"
+    :class="{ 'number-pad--row': layout === 'row' }"
+    role="group"
+    aria-label="数字输入"
+  >
     <NButton
       v-for="digit in DIGITS"
       :key="digit"
@@ -36,5 +46,15 @@ defineEmits<{ digit: [digit: Digit] }>()
 .number-pad button {
   min-width: 0;
   font-size: 24px;
+}
+.number-pad--row {
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px;
+}
+.number-pad--row button {
+  height: 52px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 8px;
 }
 </style>

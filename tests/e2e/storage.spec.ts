@@ -1,4 +1,12 @@
-import { test, expect, seedSession, cellName, readSessions, countResults } from './support'
+import {
+  test,
+  expect,
+  seedSession,
+  cellName,
+  readSessions,
+  countResults,
+  enterGameDigit,
+} from './support'
 import { makeSession } from '../support/gameFixtures'
 
 test('confirms explicit reload after a save conflict and resumes the latest record', async ({
@@ -30,20 +38,20 @@ test('confirms explicit reload after a save conflict and resumes the latest reco
     database.close()
   }, latest)
   await page.getByRole('button', { name: cellName(2) }).click()
-  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await enterGameDigit(page, 4)
   await expect(page.getByRole('alert').filter({ hasText: '请重新载入' })).toBeVisible()
   await page.getByRole('button', { name: '重新载入', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '重新载入最新存档？' })
   await expect(dialog).toContainText('未保存的填写和笔记会丢失')
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
-  await expect(page.getByRole('button', { name: '输入数字4', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '擦除', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: '重新载入', exact: true }).click()
   await dialog.getByRole('button', { name: '确认重新载入', exact: true }).click()
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   await expect(page.getByRole('button', { name: cellName(2) })).toHaveAccessibleName(/空格/)
   await expect(page.getByRole('button', { name: cellName(3) })).toHaveAccessibleName(/数字6/)
   await page.getByRole('button', { name: cellName(2) }).click()
-  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await enterGameDigit(page, 4)
   await expect.poll(async () => (await readSessions(page))[0].session.entries[2]).toBe(4)
   expect((await readSessions(page))[0].session.entries[3]).toBe(6)
 })
@@ -56,15 +64,15 @@ test('keeps a second editor read-only, permits takeover, and resets every tab', 
   const peer = await context.newPage()
   await peer.goto(page.url())
   await expect(peer.getByText(/本局正在其他标签页编辑/)).toBeVisible()
-  await expect(peer.getByRole('button', { name: '输入数字4', exact: true })).toBeDisabled()
+  await expect(peer.getByRole('button', { name: '擦除', exact: true })).toBeDisabled()
   await page.getByRole('link', { name: '返回首页', exact: true }).click()
   await peer.getByRole('button', { name: '尝试接管', exact: true }).first().click()
   await expect(peer.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
   await peer.getByRole('button', { name: cellName(2) }).click()
-  await expect(peer.getByRole('button', { name: '输入数字4', exact: true })).toBeEnabled()
-  await peer.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await expect(peer.getByRole('button', { name: '擦除', exact: true })).toBeEnabled()
+  await enterGameDigit(peer, 4)
   await expect.poll(async () => (await readSessions(peer))[0].session.entries[2]).toBe(4)
-  await page.getByRole('link', { name: /我的数独足迹/ }).click()
+  await page.getByRole('link', { name: /数独足迹/ }).click()
   await page.getByRole('button', { name: '清空本机数据', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
   expect(await readSessions(page)).toHaveLength(1)
@@ -104,7 +112,7 @@ test('shows failed completion save and retries exactly once without a public deb
     window.addEventListener('restore-test-storage', restore)
   })
   await page.getByRole('button', { name: cellName(2) }).click()
-  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await enterGameDigit(page, 4)
   await expect(page.getByRole('alert').filter({ hasText: '保存失败' })).toBeVisible()
   await expect(page.getByText('本局已完成，成绩仍待保存。', { exact: true })).toBeVisible()
   expect(await countResults(page)).toBe(0)
@@ -142,7 +150,7 @@ test('allows memory-only play when IndexedDB cannot open and saves after recover
       .first(),
   ).toBeVisible()
   await page.getByRole('button', { name: /空格/ }).first().click()
-  await page.getByRole('button', { name: '输入数字1', exact: true }).click()
+  await enterGameDigit(page, 1)
   await page.evaluate(() => window.dispatchEvent(new Event('restore-test-storage')))
   await page.getByRole('button', { name: '重试保存', exact: true }).click()
   await expect.poll(async () => (await readSessions(page)).length).toBe(1)

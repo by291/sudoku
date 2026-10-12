@@ -2,6 +2,7 @@ import { onMounted, onScopeDispose } from 'vue'
 import { isDigit, UNIT_SIZE } from '@/core/sudoku/types'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import type { GameAction } from '@/features/game/model/session'
+import { isKeyboardOwnedByControl } from '@/shared/utils/keyboardOwnership'
 type KeyboardGame = {
   editable: boolean
   selectedCell: number | null
@@ -10,32 +11,8 @@ type KeyboardGame = {
   selectCell(cell: number): void
   toggleNoteMode(): void
 }
-// Composite controls own their arrow keys and typeahead, including portaled menus.
-const INTERACTIVE_CONTROL = [
-  'input',
-  'textarea',
-  'select',
-  '[contenteditable]',
-  'dialog',
-  '[role="dialog"]',
-  '[role="alertdialog"]',
-  '[role="combobox"]',
-  '[role="listbox"]',
-  '[role="option"]',
-  '[role="radiogroup"]',
-  '[role="radio"]',
-  '[role="switch"]',
-  '[role="checkbox"]',
-].join(',')
 export function handleGameKey(event: KeyboardEvent, game: KeyboardGame): boolean {
-  const target = event.target
-  if (
-    event.defaultPrevented ||
-    !game.editable ||
-    document.querySelector('dialog[open], [aria-modal="true"]') ||
-    (target instanceof Element && target.closest(INTERACTIVE_CONTROL))
-  )
-    return false
+  if (!game.editable || isKeyboardOwnedByControl(event)) return false
   const key = event.key.toLowerCase()
   const modifier = event.ctrlKey || event.metaKey
   if (modifier && key === 'z') game.dispatch({ kind: event.shiftKey ? 'redo' : 'undo' })

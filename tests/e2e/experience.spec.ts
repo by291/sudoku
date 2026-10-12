@@ -1,4 +1,13 @@
-import { test, expect, seedSession, readSessions, cellName } from './support'
+import {
+  test,
+  expect,
+  seedSession,
+  readSessions,
+  cellName,
+  selectGameMenuAction,
+  openGameSettings,
+  closeGameSettings,
+} from './support'
 import { makeSession } from '../support/gameFixtures'
 
 test.use({ actionTimeout: 10000 })
@@ -46,7 +55,7 @@ test('keeps edits when a new-game dialog is cancelled and yields game shortcuts'
   const cell = page.getByRole('button', { name: cellName(2) })
   await cell.click()
   await page.keyboard.press('4')
-  await page.getByRole('button', { name: '新开一局', exact: true }).click()
+  await selectGameMenuAction(page, '新开一局')
   const dialog = page.getByRole('dialog', { name: '开始一局数独', exact: true })
   await dialog.getByText('温度计数独', { exact: true }).click()
   await page.keyboard.press('n')
@@ -151,6 +160,7 @@ test('resets scroll between a lesson and its saved full-board practice', async (
 
 test('uses persistent labelled switches for game preferences', async ({ page }) => {
   await seedSession(page, makeSession())
+  await openGameSettings(page)
   await page.getByRole('switch', { name: '显示计时', exact: true }).uncheck()
   await page.getByRole('switch', { name: '高亮冲突', exact: true }).uncheck()
   // Settings writes are asynchronous; reload after the last transaction commits.
@@ -176,8 +186,10 @@ test('uses persistent labelled switches for game preferences', async ({ page }) 
     )
     .toMatchObject({ showTimer: false, highlightConflicts: false })
   await page.reload()
+  await openGameSettings(page)
   await expect(page.getByRole('switch', { name: '显示计时', exact: true })).not.toBeChecked()
   await expect(page.getByRole('switch', { name: '高亮冲突', exact: true })).not.toBeChecked()
+  await closeGameSettings(page)
 })
 
 test('distinguishes the selected theme in light and dark appearances', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { test, expect, cellName } from './support'
+import { test, expect, cellName, enterExerciseDigit } from './support'
 
 test('shows one course path and retains the selected type through refresh and parent navigation', async ({
   page,
@@ -36,7 +36,7 @@ test('recommends the next unfinished lesson and resumes the last visited lesson'
 }, testInfo) => {
   await page.goto('/#/learn/rules')
   await page.getByRole('button', { name: cellName(40) }).click()
-  await page.getByRole('button', { name: '填写数字5', exact: true }).click()
+  await enterExerciseDigit(page, 5)
   await expect(page.getByRole('status')).toContainText('推理正确')
   await page.getByRole('link', { name: '返回课程列表', exact: true }).click()
   await expect(page.getByRole('progressbar', { name: '标准数独学习进度' })).toHaveAttribute(

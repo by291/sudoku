@@ -15,6 +15,7 @@ src/
   theme/useTheme.ts
   shared/components/
   shared/model/boardGeometry.ts
+  shared/utils/keyboardOwnership.ts
   features/
     home/views/
     game/{views,components,composables,model,stores}/
@@ -73,9 +74,13 @@ The worker deliberately keeps `new Worker(new URL('./sudoku.worker.ts', import.m
 
 Views use PascalCase `*View.vue` names; components use descriptive PascalCase names, composables `use...`, and stores `use...Store`. Tests stay beside their owners. The board test lives beside SudokuBoard even though fixtures use session data. Avoid barrel exports or empty directories solely for symmetry.
 
+RecordsView uses validated type queries for its desktop sidebar and compact mobile selector. Its media-query listener mounts only the active navigation surface and disposes with the view; switching layouts also closes an open selector. Type changes scroll to the top, while browser history restores the saved position. Lesson digit input and game shortcuts share the UI ownership guard under `shared/utils/`; lesson keys call the same exercise answer action as touch buttons and yield while full-board practice owns the route. Recovery and practice links compose RouterLink custom slots with Naive UI anchor buttons, preserving normal link and modified-click behavior.
+
 ## Runtime Contracts
 
 The entry provides one runtime. App settles/leaves the game before runtime disposal. Route-owned listeners, timers, and worker jobs retain existing cleanup. Layout extraction adds no KeepAlive or route transitions.
+
+GameControls renders a compact common-action row and a Naive UI More menu. Its typed events reach the existing GameView session actions; the view owns settings and confirmation modals, and DailyView owns choosing another challenge. Menu attributes expose visible ownership to the shared keyboard handler; closed-menu transitions do not block board input. The installed dropdown's built-in keyboard mode only changes highlights, so public option attributes provide real DOM focus and navigation following the [WAI menu-button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/). Selecting a modal action first focuses the stable More trigger so cancellation can restore focus. NumberPad accepts an optional row layout for full-board touch play and lesson exercises. Shared keyboard ownership guards keep game and lesson shortcuts outside composite controls and open dialogs. Native media queries show game digits for narrow or coarse-pointer devices without JavaScript device guessing; coarse-pointer and short desktop layouts retain a usable board width. DailyView composes an entry overview or the active board, with detailed policy in settings rather than repeated above the board. Read-only daily saves still allow opening the independent challenge chooser; existing store transitions determine whether a switch can proceed. Home promotes records to a fourth card and both resume actions use the same shared palette through Naive UI's Info button theme.
 
 Keyboard, touch, and hints reach the same game actions. Existing routes accept a validated `variant` query; explicit saved-session links restore the stored type. Ordinary free/daily entry waits for the player to open a setup dialog. Home confirms choices before navigating, passing transient `start=1` intent and a validated free-play `difficulty`; successful transitions replace those parameters with the actual type/session identity so refreshing resumes instead of generating again. Dialog selections stay local and do not mutate a running puzzle. Home and game/daily views compose the same controlled `GameSetupDialog`, while each owner handles starting, saved-session lookup, and errors through existing stores. Successful free/practice transitions synchronize the actual type/session query without restoring the already active session. A save-before-install guard pauses and flushes the active session before generation, restoration, or daily switching; an ordinary write failure retains the current in-memory session and editing rights for retry. Revision or ownership conflicts make the session read-only. A separate, explicitly confirmed reload action replaces local edits only after reading the latest record; failed recovery leaves local edits intact.
 

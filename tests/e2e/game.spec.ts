@@ -1,4 +1,15 @@
-import { test, expect, seedSession, cellName, readSessions, countResults } from './support'
+import {
+  test,
+  expect,
+  seedSession,
+  cellName,
+  readSessions,
+  countResults,
+  enterGameDigit,
+  selectGameMenuAction,
+  openGameSettings,
+  closeGameSettings,
+} from './support'
 import { makeSession } from '../support/gameFixtures'
 for (const [value, name] of [
   ['easy', '简单'],
@@ -21,7 +32,7 @@ for (const [value, name] of [
     const empty = board.getByRole('button', { name: /空格/ }).first()
     if (isMobile) await empty.tap()
     else await empty.click()
-    await page.getByRole('button', { name: '输入数字1', exact: true }).click()
+    await enterGameDigit(page, 1)
     await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled()
     expect((await readSessions(page))[0].session.puzzle.difficulty).toBe(value)
     expect(
@@ -31,7 +42,7 @@ for (const [value, name] of [
     expect(size && Math.abs(size.width - size.height)).toBeLessThan(2)
     await page.getByRole('button', { name: '暂停', exact: true }).click()
     await expect(board.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
-    await expect(page.getByRole('button', { name: '输入数字1', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '擦除', exact: true })).toBeDisabled()
     await expect(page.getByText(`${name} 独立思考`, { exact: true })).toBeVisible()
   })
 }
@@ -57,12 +68,14 @@ test('unifies notes, keyboard history, hints, confirmation and refresh restorati
   await expect(hint).toBeVisible()
   await hint.getByRole('button', { name: '应用提示', exact: true }).click()
   await expect(hint).not.toBeVisible()
-  await page.getByRole('button', { name: '重新开始本题', exact: true }).click()
+  await selectGameMenuAction(page, '重新开始本题')
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
   await expect(cell).toHaveAccessibleName(/数字4/)
-  await page.getByRole('button', { name: '新开一局', exact: true }).click()
+  await selectGameMenuAction(page, '新开一局')
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+  await openGameSettings(page)
   await page.getByRole('switch', { name: '显示计时', exact: true }).uncheck()
+  await closeGameSettings(page)
   await page
     .getByRole('radiogroup', { name: '界面主题', exact: true })
     .getByText('深色', { exact: true })
@@ -71,7 +84,9 @@ test('unifies notes, keyboard history, hints, confirmation and refresh restorati
   await expect(page.getByRole('status').filter({ hasText: '已保存到本机' })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
+  await openGameSettings(page)
   await expect(page.getByRole('switch', { name: '显示计时', exact: true })).not.toBeChecked()
+  await closeGameSettings(page)
   await expect(page.getByRole('radio', { name: '深色主题' })).toBeChecked()
   await expect(async () => {
     await page
@@ -90,7 +105,7 @@ test('completes once and displays the saved result', async ({ page }) => {
   await seedSession(page, session)
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   await page.getByRole('button', { name: cellName(2) }).click()
-  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await enterGameDigit(page, 4)
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
   expect(await countResults(page)).toBe(1)
   await page.getByRole('link', { name: '查看个人记录', exact: true }).click()
@@ -135,7 +150,9 @@ test('pauses on hiding and never resumes just because the page becomes visible',
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   await page.clock.runFor(5000)
   await expect(page.getByLabel('游戏用时')).toHaveText('00:05')
+  await openGameSettings(page)
   await page.getByRole('switch', { name: '显示计时', exact: true }).uncheck()
+  await closeGameSettings(page)
   await page.clock.runFor(2000)
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
@@ -145,19 +162,23 @@ test('pauses on hiding and never resumes just because the page becomes visible',
   // The paused board renders before its asynchronous save finishes.
   await expect(page.getByRole('status').filter({ hasText: '已保存到本机' })).toBeVisible()
   const pausedDuration = (await readSessions(page))[0].session.elapsedMs
+  // The installed clock also advances while the settings menu and dialog are used.
+  const pausedSeconds = Math.floor(pausedDuration / 1000)
+  const pausedTime = `${String(Math.floor(pausedSeconds / 60)).padStart(2, '0')}:${String(pausedSeconds % 60).padStart(2, '0')}`
   await page.clock.runFor(3000)
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
     document.dispatchEvent(new Event('visibilitychange'))
   })
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
+  await openGameSettings(page)
   await page.getByRole('switch', { name: '显示计时', exact: true }).check()
-  await expect(page.getByLabel('游戏用时')).toHaveText('00:07')
+  await closeGameSettings(page)
+  await expect(page.getByLabel('游戏用时')).toHaveText(pausedTime)
   await expect
     .poll(async () => (await readSessions(page))[0].session.elapsedMs)
     .toBe(pausedDuration)
   expect(pausedDuration).toBeGreaterThanOrEqual(7000)
-  expect(pausedDuration).toBeLessThan(8000)
 })
 test('cancels a delayed generation without replacing the old save', async ({ page }) => {
   await seedSession(page, makeSession())
@@ -169,7 +190,7 @@ test('cancels a delayed generation without replacing the old save', async ({ pag
       }
     }
   })
-  await page.getByRole('button', { name: '新开一局', exact: true }).click()
+  await selectGameMenuAction(page, '新开一局')
   await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
   await page.getByRole('button', { name: '取消出题', exact: true }).click()
   await expect(page.getByRole('alert').filter({ hasText: '已取消出题' })).toBeVisible()

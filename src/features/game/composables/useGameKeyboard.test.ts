@@ -152,3 +152,26 @@ it('leaves consumed keyboard events and open custom modals untouched', () => {
   modal.remove()
   expect(actions).toEqual([])
 })
+
+it('lets an open action menu own input while focus remains on its trigger', () => {
+  const actions: GameAction[] = []
+  const game = {
+    editable: true,
+    selectedCell: 2,
+    noteMode: false,
+    dispatch: (action: GameAction) => actions.push(action),
+    selectCell() {},
+    toggleNoteMode() {},
+  }
+  const menu = document.createElement('div')
+  menu.setAttribute('role', 'menu')
+  menu.setAttribute('aria-hidden', 'false')
+  document.body.append(menu)
+  const event = new KeyboardEvent('keydown', { key: '4', cancelable: true })
+  expect(handleGameKey(event, game)).toBe(false)
+  expect(actions).toEqual([])
+  menu.setAttribute('aria-hidden', 'true')
+  expect(handleGameKey(new KeyboardEvent('keydown', { key: '4' }), game)).toBe(true)
+  expect(actions).toEqual([{ kind: 'enter', cell: 2, digit: 4 }])
+  menu.remove()
+})
