@@ -10,11 +10,12 @@ for (const [value, name] of [
     isMobile,
   }) => {
     await page.goto('/#/play/free')
+    await page.getByRole('button', { name: '开始游戏', exact: true }).click()
     await page
       .getByRole('radiogroup', { name: '难度', exact: true })
       .getByText(name, { exact: true })
       .click()
-    await page.getByRole('button', { name: '开始游戏', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
     const board = page.getByRole('group', { name: '数独棋盘' })
     await expect(board.getByRole('button')).toHaveCount(81)
     const empty = board.getByRole('button', { name: /空格/ }).first()
@@ -31,11 +32,7 @@ for (const [value, name] of [
     await page.getByRole('button', { name: '暂停', exact: true }).click()
     await expect(board.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
     await expect(page.getByRole('button', { name: '输入数字1', exact: true })).toBeDisabled()
-    await expect(
-      page
-        .getByRole('radiogroup', { name: '难度', exact: true })
-        .getByRole('radio', { name: name, exact: true }),
-    ).toBeChecked()
+    await expect(page.getByText(`${name} 独立思考`, { exact: true })).toBeVisible()
   })
 }
 test('unifies notes, keyboard history, hints, confirmation and refresh restoration', async ({
@@ -65,7 +62,7 @@ test('unifies notes, keyboard history, hints, confirmation and refresh restorati
   await expect(cell).toHaveAccessibleName(/数字4/)
   await page.getByRole('button', { name: '新开一局', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
-  await page.getByRole('checkbox', { name: '显示计时', exact: true }).uncheck()
+  await page.getByRole('switch', { name: '显示计时', exact: true }).uncheck()
   await page
     .getByRole('radiogroup', { name: '界面主题', exact: true })
     .getByText('深色', { exact: true })
@@ -74,7 +71,7 @@ test('unifies notes, keyboard history, hints, confirmation and refresh restorati
   await expect(page.getByRole('status').filter({ hasText: '已保存到本机' })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
-  await expect(page.getByRole('checkbox', { name: '显示计时', exact: true })).not.toBeChecked()
+  await expect(page.getByRole('switch', { name: '显示计时', exact: true })).not.toBeChecked()
   await expect(page.getByRole('radio', { name: '深色主题' })).toBeChecked()
   await expect(async () => {
     await page
@@ -138,7 +135,7 @@ test('pauses on hiding and never resumes just because the page becomes visible',
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   await page.clock.runFor(5000)
   await expect(page.getByLabel('游戏用时')).toHaveText('00:05')
-  await page.getByRole('checkbox', { name: '显示计时', exact: true }).uncheck()
+  await page.getByRole('switch', { name: '显示计时', exact: true }).uncheck()
   await page.clock.runFor(2000)
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
@@ -154,7 +151,7 @@ test('pauses on hiding and never resumes just because the page becomes visible',
     document.dispatchEvent(new Event('visibilitychange'))
   })
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
-  await page.getByRole('checkbox', { name: '显示计时', exact: true }).check()
+  await page.getByRole('switch', { name: '显示计时', exact: true }).check()
   await expect(page.getByLabel('游戏用时')).toHaveText('00:07')
   await expect
     .poll(async () => (await readSessions(page))[0].session.elapsedMs)
@@ -173,7 +170,7 @@ test('cancels a delayed generation without replacing the old save', async ({ pag
     }
   })
   await page.getByRole('button', { name: '新开一局', exact: true }).click()
-  await page.getByRole('dialog').getByRole('button', { name: '确认开始', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
   await page.getByRole('button', { name: '取消出题', exact: true }).click()
   await expect(page.getByRole('alert').filter({ hasText: '已取消出题' })).toBeVisible()
   expect((await readSessions(page))[0].session.id).toBe('fixture-free-session')

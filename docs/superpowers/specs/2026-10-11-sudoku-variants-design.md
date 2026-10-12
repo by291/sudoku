@@ -71,7 +71,7 @@ Use difficulty policies scoped to each type:
 
 Classic retains its current exact difficulty policy and generation behavior. Variant labels compare difficulty within that type; a Hard Killer time is not compared with a Hard Classic time. Rate through the actual explainable deduction sequence, not clue count or the search solver. Reject generated puzzles that cannot be finished with the supported logical policy. Search is used for validation and uniqueness, not as a source of claimed logical hints.
 
-The short rule lessons use fixed, validated examples and one exercise per new type. Keep the existing six Classic lessons, their progress identifiers, and full-board practice. Each new rule lesson links to an Easy practice game of its type; an advanced variant-strategy curriculum is outside this extension.
+The short rule lessons use fixed, validated examples and one exercise per new type. Keep the existing six Classic lessons, their progress identifiers, and full-board practice. Course navigation displays one type at a time with its completion and start/resume/review action; returning from a lesson retains that type. Each new rule lesson links to an Easy practice game of its type; an advanced variant-strategy curriculum is outside this extension.
 
 ## 6. Seeded generation and worker contracts
 
@@ -101,9 +101,9 @@ Generation requests specify the type; hint requests carry the complete puzzle ru
 
 Keep `/play/free`, `/play/daily`, the learning routes, and `/records`. Add a validated `variant` query for type selection. A link without that query defaults to Classic; explicit saved-session links restore the type encoded in that session. Unknown type queries show actionable feedback and do not silently start a different puzzle.
 
-Free play exposes one Naive UI type selector and the existing three difficulty choices. These configure the next game. Changing them does not mutate a running puzzle. The board heading always shows the actual active type. Starting a different type preserves the paused save of the old type; if the target type has an unfinished save, offer resume or confirmed replacement.
+The UX refinement approved on 2026-10-12 exposes type cards and the three difficulty choices in a Naive UI setup modal. Home Start confirms choices before navigation, and New Game opens the same modal. Changing a choice does not mutate a running puzzle. The board heading always shows the actual active type. Starting a different type preserves the paused save of the old type; if the target type has an unfinished save, offer resume or an explicit replacement notice before confirmation.
 
-Daily play exposes the same six types and their individual completion status. Changing the daily type settles and saves the current session before loading the selected type. On a failed save, retain the unsaved current session and offer retry; switching must not discard its in-memory state.
+Daily play exposes the same six type cards and their individual completion status in its setup modal. Confirming the selected type settles and saves the current session before starting or continuing that type. Medium remains fixed, and completed types explicitly offer practice. Selection alone performs no game transition. On a failed save, retain the unsaved current session and offer retry; switching must not discard its in-memory state.
 
 The shared board retains CSS Grid and existing cell buttons. Draw clue geometry with a responsive SVG layer aligned to the 9×9 grid; decorative SVG has `pointer-events: none` and is hidden from accessibility APIs. Digits, notes, focus rings, and conflict/hint markers remain readable above the drawings.
 

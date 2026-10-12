@@ -4,7 +4,8 @@ test('starts a real daily challenge and preserves time and assistance on restart
   page,
 }) => {
   await page.goto('/#/play/daily')
-  await page.getByRole('button', { name: '开始 / 继续今日挑战', exact: true }).click()
+  await page.getByRole('button', { name: '选择今日挑战', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '开始今日挑战', exact: true }).click()
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
   await page.getByRole('button', { name: '生成候选数', exact: true }).click()
   await expect
@@ -38,7 +39,8 @@ test('saves one formal result and starts replay with a new identity', async ({ p
   await page.getByRole('button', { name: cellName(2) }).click()
   await page.getByRole('button', { name: '输入数字4', exact: true }).click()
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '重玩今日挑战', exact: true }).click()
+  await page.getByRole('button', { name: '选择其他挑战', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '再次练习', exact: true }).click()
   await expect.poll(async () => (await readSessions(page)).length).toBe(2)
   const records = await readSessions(page)
   expect(

@@ -66,6 +66,11 @@ export function useTheme(preference: Ref<ThemePreference> = ref('system')) {
         borderColor: color('--border'),
         paddingSmall: '12px',
       },
+      Radio: {
+        buttonColorActive: color('--accent'),
+        buttonTextColorActive: color('--accent-contrast'),
+        buttonBorderColorActive: color('--accent'),
+      },
     }
     return { theme, themeOverrides }
   })

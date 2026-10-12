@@ -50,7 +50,7 @@ export function cellName(cell: number): RegExp {
 }
 export async function seedSession(page: Page, session: GameSession, route = '/play/free') {
   await page.goto('/#/')
-  await expect(page.getByRole('link', { name: /开始一局数独/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /开始一局数独/ })).toBeVisible()
   await page.evaluate(async (session) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('sudoku-local', 1)

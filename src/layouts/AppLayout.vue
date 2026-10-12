@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import { useTemplateRef } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { computed, useTemplateRef } from 'vue'
 import { NAlert, NButton, NRadioButton, NRadioGroup } from 'naive-ui'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import type { ThemePreference } from '@/features/settings/model/preferences'
@@ -8,6 +8,11 @@ import type { ThemePreference } from '@/features/settings/model/preferences'
 defineProps<{ preference: ThemePreference }>()
 const emit = defineEmits<{ theme: [preference: ThemePreference] }>()
 const preferences = usePreferencesStore()
+const route = useRoute()
+const backTarget = computed(() => {
+  if (route.path === '/') return null
+  return route.meta.parentNavigation?.(route) ?? { to: '/', label: '返回首页' }
+})
 
 const mainContent = useTemplateRef<HTMLElement>('mainContent')
 function focusMain() {
@@ -56,6 +61,23 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
       {{ preferences.error }} <NButton @click="preferences.update({})">重试保存设置</NButton>
     </NAlert>
     <main id="main-content" ref="mainContent" tabindex="-1" aria-label="数独游戏">
+      <nav v-if="backTarget" class="page-navigation" aria-label="页面导航">
+        <RouterLink v-slot="{ href, navigate }" :to="backTarget.to" custom>
+          <NButton tag="a" :href="href" @click="navigate">
+            <svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="m10 5-7 7 7 7M3 12h18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            {{ backTarget.label }}
+          </NButton>
+        </RouterLink>
+      </nav>
       <RouterView />
     </main>
     <footer class="site-footer">在九宫格里，留一点专注的时间。</footer>
@@ -64,9 +86,26 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
 
 <style scoped>
 .app-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   max-width: 1160px;
   margin: auto;
   padding: 0 24px;
+}
+main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.page-navigation {
+  padding-top: 24px;
+}
+.back-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
 }
 .site-header {
   display: flex;
@@ -110,7 +149,7 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
   z-index: 1;
 }
 .site-footer {
-  margin: 56px 0 24px;
+  padding: 32px 0 24px;
   color: var(--muted);
   font-size: 12px;
   text-align: center;
@@ -127,7 +166,10 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
     gap: 6px;
   }
   .theme-switch :deep(.n-radio-button) {
-    padding: 0 9px;
+    padding: 0 8px;
+  }
+  .page-navigation {
+    padding-top: 16px;
   }
 }
 </style>

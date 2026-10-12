@@ -1,5 +1,6 @@
 import { test, expect, cellName, readSessions } from './support'
 import { LESSONS } from '@/features/learning/model/lessons'
+import { VARIANT_OPTIONS } from '@/features/game/model/variants'
 test('completes the rules exercise using only keyboard navigation', async ({ page }) => {
   await page.goto('/#/learn/rules')
   const first = page.getByRole('button', { name: cellName(0) })
@@ -39,13 +40,26 @@ test('teaches all eleven exercises with retry and durable progress', async ({ pa
       await page.getByRole('button', { name: '提交排除', exact: true }).click()
     }
     await expect(page.getByRole('status')).toContainText('推理正确')
-    await page.getByRole('link', { name: /学习列表/ }).click()
+    await page.getByRole('link', { name: /返回课程列表/ }).click()
     await expect(
       page.getByRole('link').filter({ hasText: lesson.title }).filter({ hasText: '已完成' }),
     ).toBeVisible()
   }
   await page.reload()
-  await expect(page.getByRole('link').filter({ hasText: '已完成' })).toHaveCount(11)
+  await expect(page.getByRole('progressbar', { name: '全部课程学习进度' })).toHaveAttribute(
+    'aria-valuetext',
+    '已完成 11 / 11 节',
+  )
+  for (const variant of VARIANT_OPTIONS) {
+    await page
+      .getByRole('navigation', { name: '学习玩法' })
+      .getByRole('link', { name: new RegExp(variant.label) })
+      .click()
+    await expect(
+      page.getByRole('list', { name: '课程路径' }).getByRole('link').filter({ hasText: '已完成' }),
+    ).toHaveCount(variant.value === 'classic' ? 6 : 1)
+    await expect(page.getByRole('link', { name: '复习课程', exact: true })).toBeVisible()
+  }
 })
 test('starts learning practice and confirms replacing a different lesson game', async ({
   page,
@@ -54,7 +68,7 @@ test('starts learning practice and confirms replacing a different lesson game', 
   await page.getByRole('button', { name: '开始游戏', exact: true }).click()
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
   await page.getByRole('link', { name: '返回本节课程', exact: true }).click()
-  await page.getByRole('link', { name: /学习列表/ }).click()
+  await page.getByRole('link', { name: /返回课程列表/ }).click()
   await page.getByRole('link').filter({ hasText: '显性数对' }).click()
   await page.getByRole('link', { name: /进入完整棋盘练习/ }).click()
   await page.getByRole('button', { name: '开始游戏', exact: true }).click()

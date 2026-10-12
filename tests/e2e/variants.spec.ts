@@ -15,6 +15,20 @@ import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
 import type { Digit } from '@/core/sudoku/types'
 async function chooseVariant(page: Page, field: string, name: string) {
+  if (field !== '成绩玩法') {
+    const dialog = page.getByRole('dialog')
+    if (!(await dialog.isVisible())) {
+      await page
+        .getByRole('button', {
+          name: field === '每日玩法' ? /^(选择今日挑战|选择其他挑战)$/ : /^(开始游戏|新开一局)$/,
+        })
+        .click()
+    }
+    await dialog.getByText(name, { exact: true }).click()
+    if (field === '每日玩法')
+      await dialog.getByRole('button', { name: /^(开始今日挑战|继续今日挑战|再次练习)$/ }).click()
+    return
+  }
   await page.getByRole('combobox', { name: field, exact: true }).click()
   await page.getByRole('option', { name, exact: true }).click()
   await expect(page.getByRole('combobox', { name: field, exact: true })).toHaveAttribute(
@@ -106,6 +120,7 @@ for (const variant of variants) {
   }) => {
     await page.goto(`/#/play/free?variant=${variant.kind}`)
     await page.getByRole('button', { name: '开始游戏', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
     await expect(page.getByRole('heading', { name: new RegExp(variant.name) })).toBeVisible()
     const clue =
       variant.clue === 'region'
@@ -140,7 +155,7 @@ test('rejects an unknown variant and offers an actionable recovery', async ({ pa
 test('retains a type selected from the default free URL after refresh', async ({ page }) => {
   await page.goto('/#/play/free?source=home')
   await chooseVariant(page, '下一局玩法', '箭头数独')
-  await page.getByRole('button', { name: '开始游戏', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: '自由游玩 · 箭头数独', exact: true }),
   ).toBeVisible()
@@ -232,7 +247,7 @@ test('keeps the current rules while choosing another type and offers target resu
     page.getByRole('heading', { name: '自由游玩 · 标准数独', exact: true }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: cellName(2) })).toHaveAccessibleName(/空格/)
-  await page.getByRole('button', { name: '新开一局', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: '自由游玩 · 箭头数独', exact: true }),
   ).toBeVisible()
@@ -247,7 +262,7 @@ test('keeps the current rules while choosing another type and offers target resu
   await expect(page).toHaveURL(/variant=classic/)
   await expect(page).toHaveURL(new RegExp(`session=${makeSession().id}`))
   await page.getByRole('button', { name: '新开一局', exact: true }).click()
-  await expect(page.getByRole('dialog')).toContainText('替换标准数独')
+  await expect(page.getByRole('dialog')).toContainText('开始游戏将替换此玩法存档')
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
   expect(
     (await readSessions(page)).find((record) => record.session.puzzle.rules.kind === 'classic')
@@ -259,10 +274,11 @@ test('switches independent daily types and restores the selected type after refr
 }) => {
   await page.clock.setFixedTime(new Date('2026-10-11T01:00:00Z'))
   await page.goto('/#/play/daily')
-  await page.getByRole('button', { name: '开始 / 继续今日挑战', exact: true }).click()
+  await page.getByRole('button', { name: '选择今日挑战', exact: true }).click()
   await expect(
-    page.getByRole('list', { name: '六种每日挑战状态' }).getByRole('listitem'),
+    page.getByRole('radiogroup', { name: '玩法', exact: true }).getByRole('radio'),
   ).toHaveCount(6)
+  await page.getByRole('dialog').getByRole('button', { name: '开始今日挑战', exact: true }).click()
   await page.getByRole('button', { name: '生成候选数', exact: true }).click()
   await chooseVariant(page, '每日玩法', '箭头数独')
   await expect(

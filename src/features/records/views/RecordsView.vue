@@ -4,7 +4,6 @@ import { onMounted, ref, computed } from 'vue'
 import { VARIANT_NAMES, VARIANT_OPTIONS } from '@/features/game/model/variants'
 import { isSudokuVariant } from '@/core/sudoku/rules'
 import type { SudokuVariant } from '@/core/sudoku/rules'
-import { RouterLink } from 'vue-router'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { modeName } from '@/features/records/model/records'
@@ -43,7 +42,6 @@ function duration(value: number | null) {
         <p class="eyebrow">一点积累 / RECORDS</p>
         <h1>我的数独足迹</h1>
       </div>
-      <RouterLink to="/">返回首页</RouterLink>
     </div>
     <p class="muted">成绩和存档只属于当前浏览器。清空浏览器数据后将无法恢复。</p>
     <label class="variant-field"

@@ -101,10 +101,8 @@ function resetExercise() {
     :heading="`${lesson.title} · 实战练习`"
     :practice-difficulty="lesson.practiceDifficulty"
     :practice-variant="lesson.practiceVariant"
-    ><RouterLink :to="`/learn/${lesson.id}`">返回本节课程</RouterLink></GameView
-  >
+  />
   <section v-else class="lesson-page">
-    <RouterLink to="/learn">← 学习列表</RouterLink>
     <h1>{{ lesson.title }}</h1>
     <p class="introduction">{{ lesson.introduction }}</p>
     <NAlert v-if="learning.error" class="feedback-message" type="error" :show-icon="false">

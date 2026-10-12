@@ -1,82 +1,531 @@
 <script setup lang="ts">
-import { NAlert, NButton } from 'naive-ui'
-import { onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { NAlert, NButton, NProgress } from 'naive-ui'
+import { computed, onMounted } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { LESSONS } from '@/features/learning/model/lessons'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
+import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
+import {
+  parseVariantQuery,
+  VARIANT_NAMES,
+  VARIANT_OPTIONS,
+  VARIANT_RULE_TEXT,
+} from '@/features/game/model/variants'
+
+const route = useRoute()
 const learning = useLearningStore()
+const preferences = usePreferencesStore()
+const variantQuery = computed(() => parseVariantQuery(route.query.variant))
+const selectedVariant = computed(() =>
+  variantQuery.value.valid ? variantQuery.value.value : 'classic',
+)
+const completedLessonIds = computed(() => new Set(learning.progress.map((item) => item.lessonId)))
+const totalCompleted = computed(
+  () => LESSONS.filter((lesson) => completedLessonIds.value.has(lesson.id)).length,
+)
+const courseChoices = computed(() =>
+  VARIANT_OPTIONS.map((variant) => {
+    const lessons = LESSONS.filter((lesson) => lesson.practiceVariant === variant.value)
+    return {
+      ...variant,
+      total: lessons.length,
+      completed: lessons.filter((lesson) => completedLessonIds.value.has(lesson.id)).length,
+    }
+  }),
+)
+const selectedLessons = computed(() =>
+  LESSONS.filter((lesson) => lesson.practiceVariant === selectedVariant.value),
+)
+const completedCount = computed(
+  () => selectedLessons.value.filter((lesson) => completedLessonIds.value.has(lesson.id)).length,
+)
+const progressText = computed(
+  () => `已完成 ${completedCount.value} / ${selectedLessons.value.length} 节`,
+)
+const progressPercentage = computed(() =>
+  selectedLessons.value.length ? (completedCount.value / selectedLessons.value.length) * 100 : 0,
+)
+const suggestedLesson = computed(() => {
+  const unfinished = selectedLessons.value.filter(
+    (lesson) => !completedLessonIds.value.has(lesson.id),
+  )
+  return (
+    unfinished.find((lesson) => lesson.id === preferences.settings.currentLessonId) ??
+    unfinished[0] ??
+    selectedLessons.value[0]
+  )
+})
+const suggestionLabel = computed(() => {
+  if (suggestedLesson.value && completedLessonIds.value.has(suggestedLesson.value.id))
+    return '复习课程'
+  if (suggestedLesson.value?.id === preferences.settings.currentLessonId) return '继续学习'
+  return completedCount.value ? '学习下一节' : '开始学习'
+})
+const suggestionCaption = computed(() => {
+  if (suggestionLabel.value === '复习课程') return '全部学完了，再巩固一次'
+  if (suggestionLabel.value === '继续学习') return '接着上次的思路'
+  return completedCount.value ? '下一步，试试这节课' : '推荐从这里开始'
+})
+const classicStages: Readonly<Record<string, string>> = {
+  rules: '起步 · 认识棋盘',
+  'naked-single': '基础 · 寻找唯一',
+  'locked-candidate': '进阶 · 排除候选',
+}
+const lessonSteps = computed(() =>
+  selectedLessons.value.map((lesson, index) => ({
+    lesson,
+    number: String(index + 1).padStart(2, '0'),
+    stage: selectedVariant.value === 'classic' ? classicStages[lesson.id] : '入门 · 理解玩法',
+    completed: completedLessonIds.value.has(lesson.id),
+    suggested: lesson.id === suggestedLesson.value?.id,
+  })),
+)
+
 onMounted(learning.load)
 </script>
+
 <template>
   <section class="learning-page">
-    <RouterLink to="/">← 返回首页</RouterLink>
-    <p class="eyebrow">循序渐进 / LEARN</p>
-    <h1>从看懂一格，到解开整盘</h1>
-    <p class="muted">六节标准数独课与五种变体规则，学会让每次落笔都有理由。</p>
+    <header class="learning-heading">
+      <p class="eyebrow">循序渐进 / LEARN</p>
+      <h1>从看懂一格，到解开整盘</h1>
+      <p class="muted">选一种玩法，沿着推理的路径，慢慢练熟。</p>
+    </header>
     <NAlert v-if="learning.error" class="feedback-message" type="error" :show-icon="false">
       {{ learning.error }} <NButton @click="learning.load">重试</NButton>
     </NAlert>
-    <div class="lesson-grid">
-      <RouterLink
-        v-for="(lesson, index) in LESSONS"
-        :key="lesson.id"
-        :to="`/learn/${lesson.id}`"
-        class="panel lesson-card"
-        ><span class="lesson-number">{{ String(index + 1).padStart(2, '0') }}</span
-        ><span class="status">{{
-          learning.progress.some((item) => item.lessonId === lesson.id) ? '✓ 已完成' : '开始学习 →'
-        }}</span>
-        <h2>{{ lesson.title }}</h2>
-        <p>{{ lesson.introduction }}</p></RouterLink
-      >
+    <NAlert v-if="!variantQuery.valid" class="feedback-message" type="warning" :show-icon="false">
+      无法识别这个课程玩法，请重新选择。
+      <RouterLink to="/learn">查看标准课程</RouterLink>
+    </NAlert>
+    <div class="learning-workspace">
+      <aside class="course-sidebar">
+        <h2 class="sidebar-heading">选择玩法</h2>
+        <nav class="course-navigation" aria-label="学习玩法">
+          <RouterLink
+            v-for="choice in courseChoices"
+            :key="choice.value"
+            v-slot="{ href, navigate }"
+            :to="{ path: '/learn', query: { variant: choice.value } }"
+            custom
+          >
+            <NButton
+              tag="a"
+              :href="href"
+              :aria-current="selectedVariant === choice.value ? 'page' : undefined"
+              :type="selectedVariant === choice.value ? 'primary' : 'default'"
+              :quaternary="selectedVariant !== choice.value"
+              class="course-choice"
+              @click="navigate"
+            >
+              <span class="choice-name">{{ choice.label }}</span>
+              <span class="choice-progress">{{ choice.completed }} / {{ choice.total }}</span>
+            </NButton>
+          </RouterLink>
+        </nav>
+        <div class="total-progress">
+          <p>我的学习进度</p>
+          <NProgress
+            type="line"
+            :percentage="(totalCompleted / LESSONS.length) * 100"
+            :show-indicator="false"
+            :height="5"
+            color="var(--accent)"
+            rail-color="var(--border)"
+            aria-label="全部课程学习进度"
+            :aria-valuetext="`已完成 ${totalCompleted} / ${LESSONS.length} 节`"
+          />
+          <span class="muted">已完成 {{ totalCompleted }} / {{ LESSONS.length }} 节</span>
+        </div>
+      </aside>
+      <section class="course-content" :aria-label="VARIANT_NAMES[selectedVariant]">
+        <div class="course-overview">
+          <div class="overview-copy">
+            <p class="eyebrow">{{ selectedVariant === 'classic' ? '逻辑基础' : '变体入门' }}</p>
+            <h2>{{ VARIANT_NAMES[selectedVariant] }}</h2>
+            <p class="course-description">{{ VARIANT_RULE_TEXT[selectedVariant] }}</p>
+            <template v-if="suggestedLesson">
+              <p class="suggestion-caption">
+                {{ suggestionCaption }} · {{ suggestedLesson.title }}
+              </p>
+              <RouterLink v-slot="{ href, navigate }" :to="`/learn/${suggestedLesson.id}`" custom>
+                <NButton tag="a" type="primary" :href="href" @click="navigate">
+                  {{ suggestionLabel }} <span class="forward-arrow" aria-hidden="true">→</span>
+                </NButton>
+              </RouterLink>
+            </template>
+          </div>
+          <div class="course-progress">
+            <NProgress
+              type="circle"
+              style="width: 100%"
+              :percentage="progressPercentage"
+              :stroke-width="5"
+              color="var(--accent)"
+              rail-color="var(--border)"
+              :aria-label="`${VARIANT_NAMES[selectedVariant]}学习进度`"
+              :aria-valuetext="progressText"
+            >
+              <span class="progress-count">
+                {{ completedCount
+                }}<span class="progress-total"> / {{ selectedLessons.length }}</span>
+              </span>
+            </NProgress>
+            <p>课程已完成</p>
+          </div>
+        </div>
+        <div class="path-heading">
+          <h2>课程路径</h2>
+          <span class="muted">{{ selectedLessons.length }} 节互动课程 · 随时可以重学</span>
+        </div>
+        <ol class="lesson-path" aria-label="课程路径">
+          <li v-for="step in lessonSteps" :key="step.lesson.id" class="lesson-step">
+            <p v-if="step.stage" class="stage-label">{{ step.stage }}</p>
+            <RouterLink
+              :to="`/learn/${step.lesson.id}`"
+              class="lesson-link"
+              :class="{ 'suggested-lesson': step.suggested, 'completed-lesson': step.completed }"
+            >
+              <span class="step-number" aria-hidden="true">{{ step.number }}</span>
+              <div class="step-copy">
+                <h3>{{ step.lesson.title }}</h3>
+                <p>{{ step.lesson.introduction }}</p>
+              </div>
+              <span class="step-status">
+                {{ step.completed ? '已完成' : step.suggested ? '推荐学习' : '可学习' }}
+                <span class="step-arrow" aria-hidden="true">↗</span>
+              </span>
+            </RouterLink>
+          </li>
+        </ol>
+        <p class="learning-note">读懂讲解 · 完成互动练习 · 进入完整棋盘，把方法用起来。</p>
+      </section>
     </div>
   </section>
 </template>
+
 <style scoped>
 .learning-page {
-  padding-top: 40px;
+  padding-top: 24px;
+}
+.learning-heading {
+  margin-bottom: 32px;
 }
 h1 {
+  margin: 8px 0 12px;
   font-size: 30px;
-  margin: 8px 0;
 }
 .eyebrow {
+  margin: 0 0 8px;
   color: var(--accent);
   font-size: 12px;
   letter-spacing: 2px;
 }
-.lesson-grid {
+.learning-workspace {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  margin-top: 30px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+  gap: 32px;
 }
-.lesson-card {
-  text-decoration: none;
-  color: var(--text);
+.course-sidebar {
+  position: sticky;
+  top: 24px;
+  padding: 20px 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
 }
-.lesson-number {
-  color: var(--accent);
-  font-size: 26px;
+.sidebar-heading {
+  margin: 0 12px 16px;
+  font-size: 16px;
 }
-.status {
-  float: right;
-  color: var(--accent);
+.course-navigation {
+  display: grid;
+  gap: 8px;
+}
+.course-choice {
+  height: auto;
+  min-height: 52px;
+  padding: 12px;
+  border-radius: 10px;
+}
+.course-choice :deep(.n-button__content) {
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+}
+.course-choice[aria-current='page'] .choice-name {
+  font-weight: 700;
+}
+.choice-progress {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.total-progress {
+  margin: 20px 12px 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
   font-size: 12px;
 }
-.lesson-card h2 {
-  font-size: 21px;
+.total-progress p {
+  margin: 0 0 12px;
+  font-size: 13px;
 }
-.lesson-card p {
+.total-progress > span {
+  display: block;
+  margin-top: 8px;
+}
+.course-content {
+  min-width: 0;
+}
+.course-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: center;
+  gap: 28px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--accent-soft);
+}
+.overview-copy h2 {
+  margin: 0;
+  font-size: 28px;
+}
+.course-description {
+  margin: 12px 0 20px;
   font-size: 14px;
+}
+.suggestion-caption {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.forward-arrow {
+  margin-left: 20px;
+}
+.course-progress {
+  text-align: center;
+}
+.progress-count {
+  color: var(--text);
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.progress-total {
+  color: var(--muted);
+  font-size: 15px;
+}
+.course-progress p {
+  margin: 10px 0 0;
+  font-size: 12px;
   color: var(--muted);
 }
-@media (max-width: 600px) {
-  .lesson-grid {
+.path-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 28px 0 16px;
+}
+.path-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.path-heading > span {
+  font-size: 12px;
+}
+.lesson-path {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lesson-step {
+  position: relative;
+  padding-bottom: 12px;
+}
+.lesson-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 36px;
+  bottom: -40px;
+  left: 36px;
+  border-left: 1px solid var(--control-border);
+}
+.stage-label {
+  position: relative;
+  margin: 8px 0 10px;
+  padding-left: 16px;
+  background: var(--background);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.lesson-link {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  padding: 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+.lesson-link:hover {
+  border-color: var(--accent);
+  background: var(--peer);
+}
+.suggested-lesson {
+  border-color: var(--accent);
+}
+.step-number {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--background);
+  color: var(--muted);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.suggested-lesson .step-number {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+.completed-lesson .step-number {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.step-copy h3 {
+  margin: 2px 0 8px;
+  font-size: 17px;
+}
+.step-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.step-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.step-arrow {
+  font-size: 18px;
+}
+.learning-note {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (max-width: 800px) {
+  .learning-workspace {
     grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
   }
-  .learning-page h1 {
+  .course-sidebar {
+    position: static;
+    padding: 16px;
+  }
+  .sidebar-heading {
+    margin-left: 0;
+  }
+  .course-navigation {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .course-choice {
+    padding: 12px 10px;
+  }
+  .total-progress {
+    margin: 16px 0 0;
+    padding-top: 16px;
+  }
+}
+@media (max-width: 600px) {
+  h1 {
     font-size: 25px;
+  }
+  .course-navigation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .course-choice :deep(.n-button__content) {
+    gap: 8px;
+  }
+  .course-overview {
+    grid-template-columns: minmax(0, 1fr) 72px;
+    align-items: start;
+    gap: 12px;
+    padding: 20px;
+  }
+  .overview-copy {
+    display: contents;
+  }
+  .overview-copy .eyebrow {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    margin: 0;
+  }
+  .overview-copy h2 {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 24px;
+  }
+  .course-progress {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .course-description,
+  .suggestion-caption {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .course-description {
+    margin-top: 4px;
+  }
+  .overview-copy > a {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .progress-count {
+    font-size: 24px;
+  }
+  .progress-total {
+    font-size: 12px;
+  }
+  .course-progress p {
+    display: none;
+  }
+  .lesson-link {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .step-number {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+  .lesson-step:not(:last-child)::before {
+    left: 32px;
+  }
+  .step-status {
+    grid-column: 2;
+    margin: 0;
+    justify-content: space-between;
   }
 }
 </style>

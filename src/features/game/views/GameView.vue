@@ -1,20 +1,15 @@
 <script setup lang="ts">
-import { NAlert, NButton, NCard, NRadioGroup, NRadioButton, NCheckbox, NSelect } from 'naive-ui'
+import { NAlert, NButton, NCard, NSwitch } from 'naive-ui'
 import { computed, ref, watch, onScopeDispose } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import type { LogicalStep } from '@/core/sudoku/techniques'
 import type { Difficulty, Digit } from '@/core/sudoku/types'
+import { isDifficulty } from '@/core/sudoku/types'
 import { compileRules } from '@/core/sudoku/rules'
 import { createGenerationInput } from '@/core/sudoku/generation'
 import type { SudokuVariant } from '@/core/sudoku/rules'
-import { isSudokuVariant } from '@/core/sudoku/rules'
-import {
-  VARIANT_OPTIONS,
-  VARIANT_NAMES,
-  VARIANT_RULE_TEXT,
-  parseVariantQuery,
-} from '@/features/game/model/variants'
+import { VARIANT_NAMES, VARIANT_RULE_TEXT, parseVariantQuery } from '@/features/game/model/variants'
 import type { SessionRecord } from '@/storage/records'
 import type { SessionMetadata } from '@/features/game/model/session'
 import { useGameStore } from '@/features/game/stores/useGameStore'
@@ -27,6 +22,7 @@ import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 import GameControls from '@/features/game/components/GameControls.vue'
 import HintPanel from '@/features/game/components/HintPanel.vue'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
+import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
 const props = withDefaults(
   defineProps<{
     metadata?: SessionMetadata
@@ -71,8 +67,8 @@ const {
   conflictEvaluation,
 } = storeToRefs(game)
 const difficulty = ref<Difficulty>(props.practiceDifficulty)
-const variantOptions = [...VARIANT_OPTIONS]
-const variantMenuOpen = ref(false)
+const setupOpen = ref(false)
+const targetLoading = ref(false)
 const nextVariant = ref<SudokuVariant>(props.practiceVariant)
 const queryVariant = computed(() => parseVariantQuery(route.query.variant))
 const targetSession = ref<SessionRecord | null>(null)
@@ -80,21 +76,17 @@ let targetLookup = 0
 async function refreshTarget() {
   const epoch = ++targetLookup
   if (props.metadata.kind !== 'free') return
+  targetLoading.value = true
   const result = await game.findFreeSession(nextVariant.value)
   if (epoch !== targetLookup) return
+  targetLoading.value = false
   targetSession.value = result.ok ? result.value : null
   if (!result.ok)
     initializationError.value = '目标玩法存档读取失败。新开一局可暂存在内存中，请保持页面打开。'
 }
-function updateVariant(value: unknown) {
-  if (isSudokuVariant(value)) nextVariant.value = value
-}
 watch(nextVariant, () => {
   void refreshTarget()
 })
-function updateDifficulty(value: string | number | boolean) {
-  if (value === 'easy' || value === 'medium' || value === 'hard') difficulty.value = value
-}
 const inputEditable = computed(
   () =>
     editable.value &&
@@ -206,6 +198,22 @@ async function initialize() {
   }
   nextVariant.value =
     props.metadata.kind === 'learning' ? props.practiceVariant : queryVariant.value.value
+  if (props.autoRestore && !requestedId && props.metadata.kind === 'free') {
+    // Only an explicit save link resumes a board; ordinary entry waits for the setup dialog.
+    const transition = await game.clearActiveSession()
+    if (current !== initialization) return
+    ready.value = true
+    if (transition.status !== 'ready') return
+    if (route.query.start === '1') {
+      if (!isDifficulty(route.query.difficulty)) {
+        initializationError.value = '无法识别指定的难度，请重新选择。'
+        return
+      }
+      difficulty.value = route.query.difficulty
+      await start()
+    } else void refreshTarget()
+    return
+  }
   if (props.autoRestore) {
     const records = requestedId
       ? await game.findSession(requestedId)
@@ -267,8 +275,11 @@ async function start() {
 }
 async function syncSessionRoute() {
   if (disposed || props.metadata.kind === 'daily' || !active.value || !session.value) return
+  const query = { ...route.query }
+  delete query.start
+  delete query.difficulty
   await router.replace({
-    query: { ...route.query, variant: activeVariant.value, session: session.value.id },
+    query: { ...query, variant: activeVariant.value, session: session.value.id },
   })
 }
 async function retryGeneration() {
@@ -277,6 +288,14 @@ async function retryGeneration() {
 }
 async function requestNew(event: MouseEvent) {
   if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  if (props.metadata.kind === 'free') {
+    nextVariant.value = active.value ? activeVariant.value : nextVariant.value
+    difficulty.value =
+      active.value && session.value ? session.value.puzzle.difficulty : difficulty.value
+    setupOpen.value = true
+    void refreshTarget()
+    return
+  }
   await refreshTarget()
   if (
     targetSession.value ||
@@ -285,8 +304,13 @@ async function requestNew(event: MouseEvent) {
     confirmation.value = 'new'
   else void start()
 }
+function startSelected() {
+  setupOpen.value = false
+  void start()
+}
 async function resumeTarget() {
   if (!targetSession.value) return
+  setupOpen.value = false
   const transition = await game.restoreSession(targetSession.value.session.id)
   if (transition.status === 'ready') {
     await game.resume()
@@ -335,7 +359,12 @@ function erase() {
           {{ heading }}<template v-if="active"> · {{ VARIANT_NAMES[activeVariant] }}</template>
         </h1>
       </div>
-      <RouterLink to="/">返回首页</RouterLink>
+      <NButton
+        v-if="metadata.kind !== 'daily' && active"
+        :disabled="!ready || phase === 'generating' || readOnly || !queryVariant.valid"
+        @click="requestNew"
+        >新开一局</NButton
+      >
     </div>
     <slot />
     <NAlert
@@ -356,62 +385,6 @@ function erase() {
       <NButton v-if="canRetryGeneration" @click="retryGeneration">重试出题</NButton>
     </NAlert>
     <p v-if="!ready" role="status">正在读取存档…</p>
-    <div v-if="metadata.kind !== 'daily'" class="setup-row">
-      <label v-if="metadata.kind === 'free'" class="variant-field"
-        >下一局玩法
-        <NSelect
-          v-model:show="variantMenuOpen"
-          filterable
-          :value="nextVariant"
-          :options="variantOptions"
-          :disabled="phase === 'generating' || !queryVariant.valid"
-          :input-props="{
-            role: 'combobox',
-            'aria-label': '下一局玩法',
-            'aria-expanded': variantMenuOpen,
-            'aria-controls': 'next-variant-menu',
-          }"
-          :menu-props="{ id: 'next-variant-menu', role: 'listbox', 'aria-label': '玩法选项' }"
-          :node-props="
-            (option) => ({ role: 'option', 'aria-selected': option.value === nextVariant })
-          "
-          @update:value="updateVariant"
-        />
-      </label>
-      <span id="difficulty-label">难度</span>
-      <NRadioGroup
-        :value="difficulty"
-        name="next-difficulty"
-        role="radiogroup"
-        aria-labelledby="difficulty-label"
-        :disabled="phase === 'generating' || metadata.kind === 'learning'"
-        @update:value="updateDifficulty"
-      >
-        <NRadioButton v-for="(name, value) in DIFFICULTY_NAMES" :key="value" :value="value">{{
-          name
-        }}</NRadioButton>
-      </NRadioGroup>
-      <NButton
-        :type="active ? 'default' : 'primary'"
-        :disabled="!ready || phase === 'generating' || readOnly || !queryVariant.valid"
-        @click="requestNew"
-      >
-        {{ active ? '新开一局' : '开始游戏' }}
-      </NButton>
-    </div>
-    <NCard
-      v-if="
-        metadata.kind === 'free' &&
-        targetSession &&
-        !targetSession.session.completion &&
-        targetSession.session.id !== session?.id
-      "
-      class="feedback-message"
-      size="small"
-    >
-      {{ VARIANT_NAMES[nextVariant] }}有未完成的存档。可以继续，或新开一局替换此玩法存档。
-      <NButton @click="resumeTarget">继续{{ VARIANT_NAMES[nextVariant] }}存档</NButton>
-    </NCard>
     <NCard v-if="phase === 'generating'" class="feedback-message" size="small" role="status">
       正在为你准备一道有唯一解的题目… <NButton @click="game.cancelLoading">取消出题</NButton>
     </NCard>
@@ -518,26 +491,56 @@ function erase() {
         <p>{{ saveState === 'saved' ? '成绩已保存到本机。' : '本局已完成，成绩仍待保存。' }}</p>
         <RouterLink to="/records">查看个人记录</RouterLink>
       </div>
-      <div class="game-preferences">
-        <NCheckbox v-model:checked="showTimer" class="preference">显示计时</NCheckbox>
-        <NCheckbox v-model:checked="highlightConflicts" class="preference">高亮冲突</NCheckbox>
-        <NButton
-          :disabled="
-            readOnly ||
-            phase === 'generating' ||
-            (metadata.kind === 'daily' && phase === 'completed')
-          "
-          @click="requestRestart"
-        >
-          重新开始本题
-        </NButton>
-      </div>
+      <NCard class="game-preferences" size="small">
+        <div class="preferences-heading"><h2>对局设置</h2></div>
+        <div class="preferences-row">
+          <div class="preference" @click="showTimer = !showTimer">
+            <span>显示计时</span
+            ><NSwitch v-model:value="showTimer" aria-label="显示计时" @click.stop />
+          </div>
+          <div class="preference" @click="highlightConflicts = !highlightConflicts">
+            <span>高亮冲突</span
+            ><NSwitch v-model:value="highlightConflicts" aria-label="高亮冲突" @click.stop />
+          </div>
+          <NButton
+            :disabled="
+              readOnly ||
+              phase === 'generating' ||
+              (metadata.kind === 'daily' && phase === 'completed')
+            "
+            @click="requestRestart"
+          >
+            重新开始本题
+          </NButton>
+        </div>
+      </NCard>
     </template>
-    <div v-else-if="ready && phase !== 'generating'" class="panel empty-game">
+    <div
+      v-else-if="ready && phase !== 'generating' && metadata.kind !== 'daily'"
+      class="panel empty-game"
+    >
       <span aria-hidden="true">▦</span>
       <h2>让思绪落在这九宫格里</h2>
       <p class="muted">选择一个适合自己的难度，随时暂停，也可以跟着提示学习。</p>
+      <NButton
+        type="primary"
+        size="large"
+        :disabled="!queryVariant.valid || readOnly"
+        @click="requestNew"
+        >开始游戏</NButton
+      >
     </div>
+    <GameSetupDialog
+      v-if="setupOpen"
+      v-model:variant="nextVariant"
+      v-model:difficulty="difficulty"
+      :saved-session="targetSession?.session"
+      :busy="targetLoading"
+      :error="initializationError"
+      @cancel="setupOpen = false"
+      @start="startSelected"
+      @resume="resumeTarget"
+    />
     <ConfirmationDialog
       v-if="confirmation"
       :title="confirmationContent.title"
@@ -552,12 +555,6 @@ function erase() {
 <style scoped>
 .game-page {
   padding-top: 24px;
-}
-.variant-field {
-  display: grid;
-  gap: 8px;
-  width: 240px;
-  max-width: 100%;
 }
 .rule-summary {
   color: var(--muted);
@@ -582,15 +579,6 @@ function erase() {
   font-size: 12px;
   letter-spacing: 1px;
   margin: 0;
-}
-.setup-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 0 0 16px;
-}
-.setup-row :deep(.n-radio-button) {
-  padding: 0 12px;
 }
 .session-bar {
   display: flex;
@@ -638,20 +626,34 @@ function erase() {
   margin-top: 12px;
 }
 .game-preferences {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  align-items: center;
   margin-top: 24px;
   font-size: 14px;
 }
+.preferences-heading h2 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.preferences-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
 .preference {
-  display: inline-flex;
-  gap: 8px;
+  display: flex;
+  gap: 24px;
   align-items: center;
   min-height: 44px;
-  padding: 6px 8px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--background);
   cursor: pointer;
+}
+.preference :deep(.n-switch) {
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
 }
 .preference:focus-visible {
   outline: 3px solid var(--accent);
@@ -690,13 +692,6 @@ function erase() {
     font-size: 25px;
     margin: 0 0 12px;
   }
-  .setup-row {
-    flex-wrap: wrap;
-    font-size: 14px;
-  }
-  .setup-row :deep(.n-radio-button) {
-    padding: 0 10px;
-  }
   .session-bar {
     gap: 6px;
   }
@@ -707,7 +702,7 @@ function erase() {
     flex-wrap: wrap;
     font-size: 12px;
   }
-  .game-preferences {
+  .preferences-row {
     gap: 12px;
   }
 }

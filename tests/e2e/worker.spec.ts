@@ -167,6 +167,7 @@ test('loads hash routes and the real worker from a static deployment subpath', a
   await page.goto('http://127.0.0.1:4174/sudoku/#/play/free')
   const worker = page.waitForEvent('worker')
   await page.getByRole('button', { name: '开始游戏', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
   expect((await worker).url()).toContain('/sudoku/assets/sudoku.worker-')
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
   await page.getByRole('button', { name: '暂停', exact: true }).click()

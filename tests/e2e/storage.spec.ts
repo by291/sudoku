@@ -132,6 +132,7 @@ test('allows memory-only play when IndexedDB cannot open and saves after recover
   })
   await page.goto('/#/play/free')
   await page.getByRole('button', { name: '开始游戏', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
   await expect(
     page
