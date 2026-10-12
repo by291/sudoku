@@ -6,6 +6,8 @@ import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { getChallengeDate } from '@/features/game/model/daily'
 import { summarizeRecords } from '@/features/records/model/records'
+import type { SudokuVariant } from '@/core/sudoku/rules'
+import type { RecordSummary } from '@/features/records/model/records'
 import type { SessionRecord, ResultRecord } from '@/storage/records'
 export const useRecordsStore = defineStore('records', () => {
   const runtime = useGameRuntime(),
@@ -20,7 +22,20 @@ export const useRecordsStore = defineStore('records', () => {
     busy = ref(false)
   const today = ref(getChallengeDate(runtime.wallNow()))
   let operation = 0
-  const summary = computed(() => summarizeRecords(results.value, today.value))
+  const summaries = computed<Readonly<Record<SudokuVariant, RecordSummary>>>(() => {
+    const summarize = (variant: SudokuVariant) =>
+      summarizeRecords(results.value, today.value, variant)
+    // Explicit keys keep the public contract checked without an unchecked fromEntries cast.
+    return {
+      classic: summarize('classic'),
+      diagonal: summarize('diagonal'),
+      jigsaw: summarize('jigsaw'),
+      killer: summarize('killer'),
+      thermo: summarize('thermo'),
+      arrow: summarize('arrow'),
+    }
+  })
+  const summary = computed(() => summaries.value.classic)
   async function load() {
     const epoch = ++operation
     today.value = getChallengeDate(runtime.wallNow())
@@ -90,6 +105,7 @@ export const useRecordsStore = defineStore('records', () => {
     sessions,
     results,
     summary,
+    summaries,
     today,
     quarantined,
     error,

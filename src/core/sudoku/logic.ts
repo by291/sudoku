@@ -1,5 +1,5 @@
 import {
-  calculateCandidates,
+  calculateBaseCandidates,
   digitsIn,
   isComplete,
   maskOf,
@@ -10,11 +10,68 @@ import type { SudokuUnit } from '@/core/sudoku/board'
 import { DIGITS } from '@/core/sudoku/types'
 import type { Board, CellValue, Difficulty, Digit, NoteMask } from '@/core/sudoku/types'
 import { TECHNIQUES } from '@/core/sudoku/techniques'
-import type { LogicalState, LogicalStep, Technique } from '@/core/sudoku/techniques'
+import type {
+  LogicalState,
+  LogicalStep,
+  Technique,
+  ClassicTechnique,
+  RuleEvidence,
+} from '@/core/sudoku/techniques'
+import { isClassicTechnique } from '@/core/sudoku/techniques'
+import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
+import type { RuleContext } from '@/core/sudoku/rules'
+import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
+import type { WorkBudget } from '@/core/sudoku/budget'
+import { findVariantStep, VARIANT_TECHNIQUE_POLICIES } from '@/core/sudoku/variantTechniques'
+import type { StepOutcome } from '@/core/sudoku/variantTechniques'
 
-export type LogicalWorkspace = { board: CellValue[]; candidates: NoteMask[] }
-export function createLogicalWorkspace(board: Board): LogicalWorkspace {
-  return { board: [...board], candidates: [...calculateCandidates(board)] }
+export type LogicalWorkspace = {
+  board: CellValue[]
+  candidates: NoteMask[]
+  context: RuleContext
+  premises: RuleEvidence[]
+}
+export type LogicalOptions = { context: RuleContext; workBudget: WorkBudget }
+export type LogicResult = {
+  status: 'solved' | 'stalled' | 'budget-exhausted'
+  board: Board
+  steps: readonly LogicalStep[]
+}
+export function createLogicalWorkspace(
+  board: Board,
+  context: RuleContext = CLASSIC_CONTEXT,
+): LogicalWorkspace {
+  // Cage exclusion is emitted as an explained step, rather than hidden initialization.
+  const base = context.rules.kind === 'killer' ? CLASSIC_CONTEXT : context
+  return {
+    board: [...board],
+    candidates: [...calculateBaseCandidates(board, base)],
+    context,
+    premises: [],
+  }
+}
+function unitsFor(state: LogicalState): readonly SudokuUnit[] {
+  return state.context?.units ?? UNITS
+}
+function unitEvidence(
+  state: LogicalState,
+  unit: SudokuUnit,
+  cells: readonly number[],
+  digits: readonly Digit[],
+): LogicalStep['evidence'] {
+  return {
+    kind: 'unit',
+    unit: { kind: unit.kind, index: unit.index },
+    cells,
+    digits,
+    premises: [...(state.premises ?? [])],
+    units:
+      state.context?.rules.kind !== 'classic'
+        ? unitsFor(state)
+            .filter((candidate) => cells.some((cell) => candidate.cells.includes(cell)))
+            .map(({ kind, index }) => ({ kind, index }))
+        : [],
+  }
 }
 function positions(state: LogicalState, unit: SudokuUnit, digit: Digit): number[] {
   return unit.cells.filter(
@@ -22,6 +79,7 @@ function positions(state: LogicalState, unit: SudokuUnit, digit: Digit): number[
   )
 }
 function elimination(
+  state: LogicalState,
   technique: Technique,
   unit: SudokuUnit,
   cells: readonly number[],
@@ -32,12 +90,12 @@ function elimination(
   return {
     kind: 'elimination',
     technique,
-    evidence: { unit: { kind: unit.kind, index: unit.index }, cells, digits },
+    evidence: unitEvidence(state, unit, cells, digits),
     removals: removals.sort((a, b) => a.cell - b.cell || a.digit - b.digit),
   }
 }
 function nakedSingle(state: LogicalState): LogicalStep | null {
-  for (const unit of UNITS)
+  for (const unit of unitsFor(state))
     for (const cell of unit.cells) {
       const digits = digitsIn(state.candidates[cell])
       if (state.board[cell] === 0 && digits.length === 1)
@@ -46,13 +104,13 @@ function nakedSingle(state: LogicalState): LogicalStep | null {
           technique: 'naked-single',
           cell,
           digit: digits[0],
-          evidence: { unit: { kind: unit.kind, index: unit.index }, cells: [cell], digits },
+          evidence: unitEvidence(state, unit, [cell], digits),
         }
     }
   return null
 }
 function hiddenSingle(state: LogicalState): LogicalStep | null {
-  for (const unit of UNITS)
+  for (const unit of unitsFor(state))
     for (const digit of DIGITS) {
       const cells = positions(state, unit, digit)
       if (cells.length === 1)
@@ -61,31 +119,35 @@ function hiddenSingle(state: LogicalState): LogicalStep | null {
           technique: 'hidden-single',
           cell: cells[0],
           digit,
-          evidence: { unit: { kind: unit.kind, index: unit.index }, cells, digits: [digit] },
+          evidence: unitEvidence(state, unit, cells, [digit]),
         }
     }
   return null
 }
 function lockedCandidate(state: LogicalState): LogicalStep | null {
-  for (const source of UNITS)
+  for (const source of unitsFor(state))
     for (const digit of DIGITS) {
       const cells = positions(state, source, digit)
       if (cells.length < 2) continue
-      for (const target of UNITS) {
-        if (source.kind === target.kind || (source.kind !== 'box' && target.kind !== 'box'))
+      for (const target of unitsFor(state)) {
+        if (
+          source === target ||
+          (state.context?.rules.kind === 'classic' &&
+            (source.kind === target.kind || (source.kind !== 'box' && target.kind !== 'box')))
+        )
           continue
         if (!cells.every((cell) => target.cells.includes(cell))) continue
         const removals = positions(state, target, digit)
           .filter((cell) => !source.cells.includes(cell))
           .map((cell) => ({ cell, digit }))
-        const step = elimination('locked-candidate', source, cells, [digit], removals)
+        const step = elimination(state, 'locked-candidate', source, cells, [digit], removals)
         if (step) return step
       }
     }
   return null
 }
 function nakedPair(state: LogicalState): LogicalStep | null {
-  for (const unit of UNITS)
+  for (const unit of unitsFor(state))
     for (const cell of unit.cells) {
       if (state.board[cell] !== 0) continue
       const digits = digitsIn(state.candidates[cell])
@@ -102,13 +164,13 @@ function nakedPair(state: LogicalState): LogicalStep | null {
             .filter((digit) => (state.candidates[target] & maskOf(digit)) !== 0)
             .map((digit) => ({ cell: target, digit })),
         )
-      const step = elimination('naked-pair', unit, cells, digits, removals)
+      const step = elimination(state, 'naked-pair', unit, cells, digits, removals)
       if (step) return step
     }
   return null
 }
 function hiddenPair(state: LogicalState): LogicalStep | null {
-  for (const unit of UNITS)
+  for (const unit of unitsFor(state))
     for (const first of DIGITS) {
       const cells = positions(state, unit, first)
       if (cells.length !== 2) continue
@@ -122,13 +184,13 @@ function hiddenPair(state: LogicalState): LogicalStep | null {
             .filter((digit) => digit !== first && digit !== second)
             .map((digit) => ({ cell, digit })),
         )
-        const step = elimination('hidden-pair', unit, cells, [first, second], removals)
+        const step = elimination(state, 'hidden-pair', unit, cells, [first, second], removals)
         if (step) return step
       }
     }
   return null
 }
-const detectors: Record<Technique, (state: LogicalState) => LogicalStep | null> = {
+const detectors: Record<ClassicTechnique, (state: LogicalState) => LogicalStep | null> = {
   'naked-single': nakedSingle,
   'hidden-single': hiddenSingle,
   'locked-candidate': lockedCandidate,
@@ -136,44 +198,83 @@ const detectors: Record<Technique, (state: LogicalState) => LogicalStep | null> 
   'hidden-pair': hiddenPair,
 }
 export function findLogicalStep(
-  state: LogicalState,
+  state: LogicalWorkspace,
   allowed: readonly Technique[],
-): LogicalStep | null {
-  for (const technique of TECHNIQUES) {
-    if (!allowed.includes(technique)) continue
-    const step = detectors[technique](state)
-    if (step) return step
+  budget: WorkBudget = createWorkBudget(DEFAULT_WORK_LIMIT),
+): StepOutcome {
+  const ordered =
+    state.context.rules.kind === 'classic'
+      ? TECHNIQUES.filter((technique) => allowed.includes(technique))
+      : allowed
+  if (state.context.rules.kind !== 'classic' && !consumeWork(budget))
+    return { status: 'budget-exhausted' }
+  for (const technique of ordered) {
+    if (isClassicTechnique(technique)) {
+      const step = detectors[technique](state)
+      if (step) return { status: 'complete', step }
+    } else {
+      const result = findVariantStep(state, state.context, [technique], budget)
+      if (result.status === 'budget-exhausted' || result.step) return result
+    }
   }
-  return null
+  return { status: 'complete', step: null }
 }
 export function applyLogicalStep(state: LogicalWorkspace, step: LogicalStep): void {
   if (step.kind === 'elimination') {
     for (const removal of step.removals) state.candidates[removal.cell] &= ~maskOf(removal.digit)
+    if (step.evidence.kind !== 'unit') state.premises.push(step.evidence)
     return
   }
   state.board[step.cell] = step.digit
   state.candidates[step.cell] = 0
-  for (const peer of PEERS[step.cell]) state.candidates[peer] &= ~maskOf(step.digit)
+  const peers =
+    state.context.rules.kind === 'classic'
+      ? PEERS[step.cell]
+      : [
+          ...new Set(
+            state.context.units
+              .filter((unit) => unit.cells.includes(step.cell))
+              .flatMap((unit) => unit.cells),
+          ),
+        ]
+  for (const peer of peers) state.candidates[peer] &= ~maskOf(step.digit)
+  state.premises = []
 }
 export function analyzeLogic(
   board: Board,
   allowed: readonly Technique[],
   stepBudget: number,
-): {
-  status: 'solved' | 'stalled' | 'budget-exhausted'
-  board: Board
-  steps: readonly LogicalStep[]
-} {
-  const state = createLogicalWorkspace(board)
+  options?: LogicalOptions,
+): LogicResult {
+  const state = createLogicalWorkspace(board, options?.context)
+  const budget = options?.workBudget ?? createWorkBudget(DEFAULT_WORK_LIMIT)
   const steps: LogicalStep[] = []
-  while (!isComplete(state.board)) {
+  while (!isComplete(state.board, state.context)) {
     if (steps.length >= stepBudget) return { status: 'budget-exhausted', board: state.board, steps }
-    const step = findLogicalStep(state, allowed)
-    if (!step) return { status: 'stalled', board: state.board, steps }
-    applyLogicalStep(state, step)
-    steps.push(step)
+    const result = findLogicalStep(state, allowed, budget)
+    if (result.status === 'budget-exhausted')
+      return { status: 'budget-exhausted', board: state.board, steps }
+    if (!result.step) return { status: 'stalled', board: state.board, steps }
+    applyLogicalStep(state, result.step)
+    steps.push(result.step)
   }
   return { status: 'solved', board: state.board, steps }
+}
+export function rateVariantDifficulty(
+  board: Board,
+  context: RuleContext,
+  stepBudget: number,
+  workBudget: WorkBudget,
+): { status: 'rated'; difficulty: Difficulty | null } | { status: 'budget-exhausted' } {
+  for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+    const result = analyzeLogic(board, VARIANT_TECHNIQUE_POLICIES[difficulty], stepBudget, {
+      context,
+      workBudget,
+    })
+    if (result.status === 'solved') return { status: 'rated', difficulty }
+    if (result.status === 'budget-exhausted') return { status: 'budget-exhausted' }
+  }
+  return { status: 'rated', difficulty: null }
 }
 export function rateDifficulty(board: Board, stepBudget: number): Difficulty | null {
   for (const [difficulty, count] of [

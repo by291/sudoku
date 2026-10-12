@@ -9,11 +9,14 @@ import type { ParseResult } from '@/core/sudoku/types'
 import type { Board } from '@/core/sudoku/types'
 import { isRecord, ALL_DIGITS_MASK, BOARD_SIZE } from '@/core/sudoku/types'
 import { parsePuzzle } from '@/core/sudoku/generation'
+import type { Puzzle } from '@/core/sudoku/generation'
+import { CLASSIC_RULES, compileRules } from '@/core/sudoku/rules'
+import { getDailyIdentity } from '@/features/game/model/daily'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import type { Settings } from '@/features/settings/model/preferences'
 import { isLessonId } from '@/features/learning/model/lessonIds'
-export type SessionRecord = { formatVersion: 1; revision: number; session: GameSession }
-export type ResultRecord = { formatVersion: 1; session: GameSession }
+export type SessionRecord = { formatVersion: 2; revision: number; session: GameSession }
+export type ResultRecord = { formatVersion: 2; session: GameSession }
 export type LessonProgress = { lessonId: string; completedAt: string }
 export type StorageFailure = {
   kind: 'unavailable' | 'write-failed' | 'ownership-lost' | 'revision-conflict'
@@ -125,7 +128,8 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
     return invalid('Invalid puzzle, mode metadata, or assistance')
   if (
     metadata.kind === 'daily' &&
-    metadata.formalAttempt !== (value.id === `daily:${metadata.challengeDate}:formal`)
+    metadata.formalAttempt !==
+      (value.id === getDailyIdentity(metadata.challengeDate, puzzle.value.rules.kind).formalId)
   )
     return invalid('Daily formal identity does not match eligibility')
   const layers = parseLayers(value, puzzle.value.givens),
@@ -154,7 +158,8 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
     const board = puzzle.value.givens.map((given, cell) =>
       given === 0 ? layers.entries[cell] : given,
     )
-    if (!isComplete(board)) return invalid('Completed session is not solved')
+    if (!isComplete(board, compileRules(puzzle.value.rules)))
+      return invalid('Completed session is not solved')
     completion = {
       completedAt: value.completion.completedAt,
       elapsedMs: value.completion.elapsedMs,
@@ -177,21 +182,39 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
     },
   }
 }
+function parseLegacyPuzzle(value: unknown): ParseResult<Puzzle> {
+  if (!isRecord(value)) return { valid: false, issues: ['Invalid legacy puzzle'] }
+  const parsed = parsePuzzle({ ...value, rules: value.rules ?? CLASSIC_RULES })
+  if (parsed.valid && parsed.value.rules.kind !== 'classic')
+    return { valid: false, issues: ['Legacy records only support Classic Sudoku'] }
+  return parsed
+}
+function parseLegacySession(value: unknown): ParseResult<GameSession> {
+  if (!isRecord(value)) return { valid: false, issues: ['Invalid legacy session'] }
+  const puzzle = parseLegacyPuzzle(value.puzzle)
+  return puzzle.valid ? parseSession({ ...value, puzzle: puzzle.value }) : puzzle
+}
 export function parseSessionRecord(value: unknown): ParseResult<SessionRecord> {
-  if (!isRecord(value) || value.formatVersion !== 1 || !isNonnegativeInteger(value.revision))
+  if (
+    !isRecord(value) ||
+    (value.formatVersion !== 1 && value.formatVersion !== 2) ||
+    !isNonnegativeInteger(value.revision)
+  )
     return { valid: false, issues: ['Unsupported session format or revision'] }
-  const session = parseSession(value.session)
+  const session =
+    value.formatVersion === 1 ? parseLegacySession(value.session) : parseSession(value.session)
   return session.valid
-    ? { valid: true, value: { formatVersion: 1, revision: value.revision, session: session.value } }
+    ? { valid: true, value: { formatVersion: 2, revision: value.revision, session: session.value } }
     : session
 }
 export function parseResultRecord(value: unknown): ParseResult<ResultRecord> {
-  if (!isRecord(value) || value.formatVersion !== 1)
+  if (!isRecord(value) || (value.formatVersion !== 1 && value.formatVersion !== 2))
     return { valid: false, issues: ['Unsupported result format'] }
-  const session = parseSession(value.session)
+  const session =
+    value.formatVersion === 1 ? parseLegacySession(value.session) : parseSession(value.session)
   if (!session.valid) return session
   return session.value.completion
-    ? { valid: true, value: { formatVersion: 1, session: session.value } }
+    ? { valid: true, value: { formatVersion: 2, session: session.value } }
     : { valid: false, issues: ['Result must be completed'] }
 }
 export function parseSettings(value: unknown): ParseResult<Settings> {

@@ -2,7 +2,14 @@
 import { computed, useTemplateRef, watch, nextTick } from 'vue'
 import type { Board, NoteMask } from '@/core/sudoku/types'
 import { DIGITS } from '@/core/sudoku/types'
-import { digitsIn, maskOf, PEERS } from '@/core/sudoku/board'
+import { digitsIn, maskOf } from '@/core/sudoku/board'
+import type { PuzzleRules } from '@/core/sudoku/rules'
+import {
+  getBoardGeometry,
+  getCellRuleContext,
+  getSelectedRuleDescriptions,
+} from '@/shared/model/boardGeometry'
+import SudokuClues from '@/shared/components/SudokuClues.vue'
 const props = defineProps<{
   board: Board
   givens: Board
@@ -12,9 +19,21 @@ const props = defineProps<{
   hintCells: readonly number[]
   disabled: boolean
   obscured: boolean
+  rules: PuzzleRules
+  relatedCells: readonly number[]
 }>()
 const emit = defineEmits<{ select: [cell: number] }>()
 const root = useTemplateRef<HTMLDivElement>('root')
+const geometry = computed(() => getBoardGeometry(props.rules))
+const selectedRules = computed(() =>
+  !props.obscured && props.selectedCell !== null
+    ? getSelectedRuleDescriptions(props.selectedCell, props.rules)
+    : [],
+)
+const cageAnchors = computed(
+  () =>
+    new Set(geometry.value.clues.flatMap((clue) => (clue.kind === 'cage' ? [clue.anchor] : []))),
+)
 function navigate(event: KeyboardEvent, cell: number) {
   if (props.disabled || props.obscured || event.ctrlKey || event.metaKey || event.altKey) return
   const row = Math.floor(cell / 9),
@@ -57,22 +76,24 @@ const cells = computed(() =>
           : `空格${notes.length ? `，笔记${notes.join('、')}` : ''}`) +
       (!props.obscured && conflicting ? '，冲突，请检查' : '') +
       (!props.obscured && highlighted ? '，提示位置' : '')
+    const ruleContext = props.obscured ? '' : getCellRuleContext(cell, props.rules)
     return {
       cell,
       value,
       given,
-      label,
+      label: label + (ruleContext ? `，${ruleContext}` : ''),
       notes: DIGITS.map((digit) => ({ digit, visible: !!(props.notes[cell] & maskOf(digit)) })),
       conflicting,
       highlighted,
       selected: cell === props.selectedCell,
-      peer: props.selectedCell !== null && PEERS[props.selectedCell].includes(cell),
+      peer: props.relatedCells.includes(cell),
       matching:
         props.selectedCell !== null &&
         props.board[props.selectedCell] !== 0 &&
         value === props.board[props.selectedCell],
-      boxRight: column === 2 || column === 5,
-      boxBottom: row === 2 || row === 5,
+      boxRight: props.rules.kind !== 'jigsaw' && (column === 2 || column === 5),
+      boxBottom: props.rules.kind !== 'jigsaw' && (row === 2 || row === 5),
+      cageAnchor: cageAnchors.value.has(cell),
     }
   }),
 )
@@ -87,43 +108,52 @@ watch(
 )
 </script>
 <template>
-  <div ref="root" class="sudoku-board" role="group" aria-label="数独棋盘">
-    <button
-      v-for="item in cells"
-      :key="item.cell"
-      class="cell"
-      :class="{
-        given: item.given,
-        selected: item.selected && !obscured,
-        peer: item.peer && !obscured,
-        matching: item.matching && !obscured,
-        conflict: item.conflicting && !obscured,
-        hinted: item.highlighted && !obscured,
-        'box-right': item.boxRight,
-        'box-bottom': item.boxBottom,
-      }"
-      :aria-label="item.label"
-      :aria-pressed="item.selected"
-      :tabindex="item.cell === (selectedCell ?? 0) ? 0 : -1"
-      :disabled="disabled"
-      @click="$emit('select', item.cell)"
-      @keydown="navigate($event, item.cell)"
-    >
-      <template v-if="!obscured">
-        <span v-if="item.value" class="value">{{ item.value }}</span>
-        <span v-else class="notes" aria-hidden="true"
-          ><span v-for="note in item.notes" :key="note.digit">{{
-            note.visible ? note.digit : ''
-          }}</span></span
-        >
-        <span v-if="item.conflicting" class="marker" aria-hidden="true">!</span
-        ><span v-else-if="item.highlighted" class="marker" aria-hidden="true">•</span>
-      </template>
-    </button>
+  <div class="sudoku-widget">
+    <div ref="root" class="sudoku-board" role="group" aria-label="数独棋盘">
+      <button
+        v-for="item in cells"
+        :key="item.cell"
+        class="cell"
+        :class="{
+          given: item.given,
+          selected: item.selected && !obscured,
+          peer: item.peer && !obscured,
+          matching: item.matching && !obscured,
+          conflict: item.conflicting && !obscured,
+          hinted: item.highlighted && !obscured,
+          'box-right': item.boxRight,
+          'box-bottom': item.boxBottom,
+          'cage-anchor': item.cageAnchor,
+        }"
+        :aria-label="item.label"
+        :aria-pressed="item.selected"
+        :tabindex="item.cell === (selectedCell ?? 0) ? 0 : -1"
+        :disabled="disabled"
+        @click="$emit('select', item.cell)"
+        @keydown="navigate($event, item.cell)"
+      >
+        <template v-if="!obscured">
+          <span v-if="item.value" class="value">{{ item.value }}</span>
+          <span v-else class="notes" aria-hidden="true"
+            ><span v-for="note in item.notes" :key="note.digit">{{
+              note.visible ? note.digit : ''
+            }}</span></span
+          >
+          <span v-if="item.conflicting" class="marker" aria-hidden="true">!</span
+          ><span v-else-if="item.highlighted" class="marker" aria-hidden="true">•</span>
+        </template>
+      </button>
+      <SudokuClues :geometry="geometry" :obscured="obscured" />
+    </div>
+    <ul v-if="selectedRules.length" class="selected-rules" aria-label="所选格子的规则">
+      <li v-for="description in selectedRules" :key="description">{{ description }}</li>
+    </ul>
   </div>
 </template>
 <style scoped>
 .sudoku-board {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   grid-template-rows: repeat(9, minmax(0, 1fr));
@@ -186,7 +216,15 @@ watch(
 }
 .cell:focus-visible {
   outline-offset: -4px;
-  z-index: 1;
+}
+/* Raise the focus ring alone so an opaque cell background cannot conceal its clue. */
+.cell:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  outline: 2px solid var(--accent);
+  pointer-events: none;
+  z-index: 3;
 }
 .cell:disabled {
   opacity: 1;
@@ -199,8 +237,12 @@ watch(
   background: var(--accent-soft);
 }
 .notes {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   width: 100%;
   height: 100%;
   padding: 3px;
@@ -212,9 +254,36 @@ watch(
   place-items: center;
 }
 .marker {
+  z-index: 3;
   position: absolute;
   right: 2px;
   top: 2px;
   font-size: 10px;
+}
+.value {
+  position: relative;
+  z-index: 2;
+}
+.value,
+.notes span {
+  text-shadow:
+    1px 0 var(--surface),
+    -1px 0 var(--surface),
+    0 1px var(--surface),
+    0 -1px var(--surface);
+}
+.cage-anchor .notes {
+  padding-top: 40%;
+  padding-bottom: 0;
+}
+.cage-anchor .value {
+  transform: translateY(12%);
+}
+.selected-rules {
+  padding-left: 20px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
 }
 </style>

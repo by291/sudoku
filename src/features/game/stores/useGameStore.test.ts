@@ -39,7 +39,7 @@ function setup() {
     repository: {
       listSessions: async () => ({
         ok: true,
-        value: [{ formatVersion: 1, revision: 1, session: saved }],
+        value: [{ formatVersion: 2, revision: 1, session: saved }],
       }),
       listResults: async () => ({ ok: true, value: [] }),
       readLessonProgress: async () => ({ ok: true, value: [] }),
@@ -68,7 +68,7 @@ function setup() {
       revision: 1,
       async enqueue(session) {
         saved = session
-        return { ok: true, value: { formatVersion: 1, revision: 2, session } }
+        return { ok: true, value: { formatVersion: 2, revision: 2, session } }
       },
       async flush() {
         return { ok: true, value: undefined }
@@ -118,7 +118,7 @@ it('ignores stale hints and preserves an old session when generation fails', asy
   expect(test.store.hint).toBeNull()
   expect(test.store.session?.assistance.hintCount).toBe(0)
   await test.store.startGame(
-    { difficulty: 'easy', seed: 'new', puzzleVersion: 'sudoku-v1' },
+    { difficulty: 'easy', seed: 'new', variant: 'classic', puzzleVersion: 'sudoku-v1' },
     { kind: 'free' },
   )
   expect(test.store.session?.id).toBe('fixture-free-session')
@@ -139,7 +139,13 @@ it('counts a shown hint once and applies it through the ordinary undoable action
         technique: 'naked-single',
         cell: 2,
         digit: 4,
-        evidence: { unit: { kind: 'row', index: 0 }, cells: [2], digits: [4] },
+        evidence: {
+          kind: 'unit',
+          premises: [],
+          unit: { kind: 'row', index: 0 },
+          cells: [2],
+          digits: [4],
+        },
       },
     ],
     placement: { cell: 2, digit: 4 },
@@ -172,7 +178,12 @@ it('retries a failed generation with the identical seed and metadata', async () 
     return { status: 'timed-out' }
   }
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
-  const input = { difficulty: 'easy', seed: 'same-request', puzzleVersion: 'sudoku-v1' } as const
+  const input = {
+    difficulty: 'easy',
+    seed: 'same-request',
+    variant: 'classic',
+    puzzleVersion: 'sudoku-v1',
+  } as const
   await game.startGame(input, { kind: 'free' })
   expect(game.canRetryGeneration).toBe(true)
   await game.retryGeneration()

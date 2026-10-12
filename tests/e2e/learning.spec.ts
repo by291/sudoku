@@ -19,7 +19,7 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
   await page.keyboard.press('Enter')
   await expect(page.getByRole('status')).toContainText('推理正确')
 })
-test('teaches all six exercises with retry and durable progress', async ({ page }) => {
+test('teaches all eleven exercises with retry and durable progress', async ({ page }) => {
   for (const lesson of LESSONS) {
     await page.goto(`/#/learn/${lesson.id}`)
     await expect(page.getByRole('heading', { name: lesson.title, exact: true })).toBeVisible()
@@ -45,7 +45,7 @@ test('teaches all six exercises with retry and durable progress', async ({ page 
     ).toBeVisible()
   }
   await page.reload()
-  await expect(page.getByRole('link').filter({ hasText: '已完成' })).toHaveCount(6)
+  await expect(page.getByRole('link').filter({ hasText: '已完成' })).toHaveCount(11)
 })
 test('starts learning practice and confirms replacing a different lesson game', async ({
   page,

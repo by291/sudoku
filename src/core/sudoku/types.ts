@@ -5,8 +5,14 @@ export type NoteMask = number
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type ParseResult<T> = { valid: true; value: T } | { valid: false; issues: readonly string[] }
 export type SearchResult =
-  | { status: 'complete'; count: 0 | 1 | 2; solution: Board | null; nodesVisited: number }
-  | { status: 'budget-exhausted'; nodesVisited: number }
+  | {
+      status: 'complete'
+      count: 0 | 1 | 2
+      solution: Board | null
+      nodesVisited: number
+      workUsed: number
+    }
+  | { status: 'budget-exhausted'; nodesVisited: number; workUsed: number }
 
 export const BOARD_SIZE = 81
 export const UNIT_SIZE = 9

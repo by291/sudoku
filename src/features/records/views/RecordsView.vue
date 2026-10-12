@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { NAlert, NButton, NCard } from 'naive-ui'
-import { onMounted, ref } from 'vue'
+import { NAlert, NButton, NCard, NSelect } from 'naive-ui'
+import { onMounted, ref, computed } from 'vue'
+import { VARIANT_NAMES, VARIANT_OPTIONS } from '@/features/game/model/variants'
+import { isSudokuVariant } from '@/core/sudoku/rules'
+import type { SudokuVariant } from '@/core/sudoku/rules'
 import { RouterLink } from 'vue-router'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
@@ -8,6 +11,16 @@ import { modeName } from '@/features/records/model/records'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
 const records = useRecordsStore(),
   confirmation = ref<'clear' | 'quarantine' | null>(null)
+const variant = ref<SudokuVariant>('classic')
+const variantOptions = [...VARIANT_OPTIONS]
+const variantMenuOpen = ref(false)
+const summary = computed(() => records.summaries[variant.value])
+const results = computed(() =>
+  records.results.filter((record) => record.session.puzzle.rules.kind === variant.value),
+)
+function updateVariant(value: unknown) {
+  if (isSudokuVariant(value)) variant.value = value
+}
 onMounted(records.load)
 function requestConfirmation(action: 'clear' | 'quarantine', event: MouseEvent) {
   if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
@@ -33,6 +46,25 @@ function duration(value: number | null) {
       <RouterLink to="/">返回首页</RouterLink>
     </div>
     <p class="muted">成绩和存档只属于当前浏览器。清空浏览器数据后将无法恢复。</p>
+    <label class="variant-field"
+      >成绩玩法
+      <NSelect
+        v-model:show="variantMenuOpen"
+        filterable
+        :value="variant"
+        :options="variantOptions"
+        :input-props="{
+          role: 'combobox',
+          'aria-label': '成绩玩法',
+          'aria-expanded': variantMenuOpen,
+          'aria-controls': 'records-variant-menu',
+        }"
+        :menu-props="{ id: 'records-variant-menu', role: 'listbox', 'aria-label': '玩法选项' }"
+        :node-props="(option) => ({ role: 'option', 'aria-selected': option.value === variant })"
+        @update:value="updateVariant"
+      />
+    </label>
+    <p class="muted">当前统计 · {{ VARIANT_NAMES[variant] }}。难度与最快成绩按玩法分别计算。</p>
     <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
       {{ records.error }} <NButton @click="records.load">重试读取</NButton>
     </NAlert>
@@ -42,22 +74,20 @@ function duration(value: number | null) {
     <p v-if="records.busy" role="status">正在处理本机记录…</p>
     <div class="stat-grid">
       <div class="panel stat">
-        <span>当前连续挑战</span
-        ><strong>{{ records.summary.currentStreak }} <small>天</small></strong>
+        <span>当前连续挑战</span><strong>{{ summary.currentStreak }} <small>天</small></strong>
       </div>
       <div class="panel stat">
-        <span>最长连续挑战</span
-        ><strong>{{ records.summary.longestStreak }} <small>天</small></strong>
+        <span>最长连续挑战</span><strong>{{ summary.longestStreak }} <small>天</small></strong>
       </div>
       <div class="panel stat">
         <span>正式挑战完成</span
         ><strong
-          >{{ records.summary.dailyTotals.unassisted + records.summary.dailyTotals.assisted }}
+          >{{ summary.dailyTotals.unassisted + summary.dailyTotals.assisted }}
           <small>次</small></strong
         >
         <p>
-          无辅助 {{ records.summary.dailyTotals.unassisted }} · 辅助
-          {{ records.summary.dailyTotals.assisted }}
+          无辅助 {{ summary.dailyTotals.unassisted }} · 辅助
+          {{ summary.dailyTotals.assisted }}
         </p>
       </div>
     </div>
@@ -72,7 +102,7 @@ function duration(value: number | null) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(best, difficulty) in records.summary.freeBests" :key="difficulty">
+          <tr v-for="(best, difficulty) in summary.freeBests" :key="difficulty">
             <th scope="row">{{ DIFFICULTY_NAMES[difficulty] }}</th>
             <td>{{ duration(best.unassisted) }}</td>
             <td>{{ duration(best.assisted) }}</td>
@@ -85,11 +115,13 @@ function duration(value: number | null) {
     </section>
     <section class="panel history">
       <h2>完成记录</h2>
-      <p v-if="!records.results.length" class="muted">还没有完成记录，先享受解题的过程吧。</p>
+      <p v-if="!results.length" class="muted">这个玩法还没有完成记录，先享受解题的过程吧。</p>
       <ul v-else>
-        <li v-for="{ session } in records.results" :key="session.id">
+        <li v-for="{ session } in results" :key="session.id">
           <div>
-            <strong>{{ modeName(session) }}</strong>
+            <strong
+              >{{ VARIANT_NAMES[session.puzzle.rules.kind] }} · {{ modeName(session) }}</strong
+            >
             <p class="muted">
               {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} ·
               {{
@@ -133,6 +165,11 @@ function duration(value: number | null) {
 <style scoped>
 .records-page {
   padding-top: 32px;
+}
+.variant-field {
+  display: grid;
+  gap: 8px;
+  max-width: 280px;
 }
 .page-heading {
   display: flex;

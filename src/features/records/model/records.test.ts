@@ -2,6 +2,7 @@ import { expect, it } from 'vitest'
 import { summarizeRecords } from '@/features/records/model/records'
 import type { ResultRecord } from '@/storage/records'
 import { makeSession } from '../../../../tests/support/gameFixtures'
+import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 function result(
   id: string,
   elapsedMs: number,
@@ -20,7 +21,7 @@ function result(
     session.mode = 'daily'
     session.metadata = { kind: 'daily', challengeDate: date, formalAttempt }
   }
-  return { formatVersion: 1, session }
+  return { formatVersion: 2, session }
 }
 it('separates free bests, excludes other modes, and counts each ID once', () => {
   const free = result('free', 60000)
@@ -53,4 +54,22 @@ it('joins eligible dates across year boundaries and excludes late finishes from 
     dailyTotals: { assisted: 1, unassisted: 3 },
   })
   expect(summarizeRecords(results, '2027-01-03').currentStreak).toBe(0)
+})
+it('keeps each type and assistance classification independent on the same dates', () => {
+  const classic = result('classic-daily', 1000, false, '2026-10-11')
+  const arrowDaily = result('arrow-daily', 2000, true, '2026-10-11')
+  const arrowFree = result('arrow-free', 3000)
+  for (const record of [arrowDaily, arrowFree])
+    record.session.puzzle = { ...record.session.puzzle, ...VARIANT_FIXTURES.arrow }
+  const all = [classic, arrowDaily, arrowFree]
+  expect(summarizeRecords(all, '2026-10-11', 'classic')).toMatchObject({
+    dailyTotals: { assisted: 0, unassisted: 1 },
+    currentStreak: 1,
+    freeBests: { easy: { assisted: null, unassisted: null } },
+  })
+  expect(summarizeRecords(all, '2026-10-11', 'arrow')).toMatchObject({
+    dailyTotals: { assisted: 1, unassisted: 0 },
+    currentStreak: 1,
+    freeBests: { easy: { assisted: null, unassisted: 3000 } },
+  })
 })

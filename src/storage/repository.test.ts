@@ -5,6 +5,8 @@ import { openSudokuDatabase } from '@/storage/database'
 import { createGameRepository } from '@/storage/repository'
 import { makeSession } from '../../tests/support/gameFixtures'
 import { deferred } from '../../tests/support/deferred'
+import { createOwnershipCoordinator } from '@/infrastructure/ownership'
+import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 
 const databases: { name: string; close: () => void }[] = []
 async function setup() {
@@ -43,7 +45,10 @@ it('isolates corrupt records and preserves valid saves during cleanup', async ()
     ...valid,
     session: { ...valid.session, id: 'corrupt', notes: [512] },
   })
-  expect(await repository.listSessions()).toEqual({ ok: true, value: [valid] })
+  expect(await repository.listSessions()).toEqual({
+    ok: true,
+    value: [{ ...valid, formatVersion: 2 }],
+  })
   expect(await database.count('quarantine')).toBe(1)
   expect(await repository.countQuarantined()).toEqual({ ok: true, value: 1 })
   await repository.removeQuarantined()
@@ -121,3 +126,155 @@ for (const store of ['settings', 'lessons'] as const) {
     expect(await database.count(store)).toBe(0)
   })
 }
+
+it('replaces only the requested free variant slot and writes v2 without a schema upgrade', async () => {
+  const { database, repository } = await setup()
+  const owner = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
+  async function acquire(id: string) {
+    const result = await owner.acquireOwnership(id, 'test-tab')
+    if (!result.ok || !result.value) throw new Error('Expected edit lease')
+    return result.value
+  }
+  try {
+    const classic = makeSession({ id: 'classic-save' })
+    const arrow = makeSession({
+      id: 'arrow-save',
+      puzzle: { ...makeSession().puzzle, ...VARIANT_FIXTURES.arrow },
+    })
+    const classicToken = await acquire(classic.id)
+    const arrowToken = await acquire(arrow.id)
+    const outcomes = await Promise.all([
+      repository.replaceActiveSession(classic, classicToken, null),
+      repository.replaceActiveSession(arrow, arrowToken, null),
+    ])
+    expect(outcomes.every((result) => result.ok)).toBe(true)
+    const replacement = { ...arrow, id: 'arrow-new' }
+    const nextToken = await acquire(replacement.id)
+    expect(
+      await repository.replaceActiveSession(replacement, nextToken, {
+        id: classic.id,
+        revision: 1,
+        token: classicToken,
+      }),
+    ).toMatchObject({ ok: false, error: { kind: 'revision-conflict' } })
+    const controller = new AbortController()
+    controller.abort()
+    expect(
+      (
+        await repository.replaceActiveSession(
+          replacement,
+          nextToken,
+          { id: arrow.id, revision: 1, token: arrowToken },
+          controller.signal,
+        )
+      ).ok,
+    ).toBe(false)
+    expect(await database.count('sessions')).toBe(2)
+    expect(
+      await repository.replaceActiveSession(replacement, nextToken, {
+        id: arrow.id,
+        revision: 0,
+        token: arrowToken,
+      }),
+    ).toMatchObject({ ok: false, error: { kind: 'revision-conflict' } })
+    expect(
+      await repository.replaceActiveSession(replacement, nextToken, {
+        id: arrow.id,
+        revision: 1,
+        token: arrowToken,
+      }),
+    ).toMatchObject({ ok: true, value: { formatVersion: 2 } })
+    const remaining = await repository.listSessions()
+    if (!remaining.ok) throw new Error('Expected valid remaining saves')
+    expect(remaining.value.map((record) => record.session.id).sort()).toEqual([
+      'arrow-new',
+      'classic-save',
+    ])
+    expect(database.version).toBe(1)
+  } finally {
+    owner.dispose()
+  }
+})
+
+it('preserves the single learning practice slot across variants', async () => {
+  const { database, repository } = await setup()
+  const owner = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
+  const classic = makeSession({
+    id: 'practice-classic',
+    mode: 'learning',
+    metadata: { kind: 'learning', lessonId: 'rules' },
+  })
+  const arrow = {
+    ...classic,
+    id: 'practice-arrow',
+    puzzle: { ...classic.puzzle, ...VARIANT_FIXTURES.arrow },
+  }
+  const first = await owner.acquireOwnership(classic.id, 'tab')
+  const next = await owner.acquireOwnership(arrow.id, 'tab')
+  if (!first.ok || !first.value || !next.ok || !next.value) throw new Error('Expected leases')
+  try {
+    expect((await repository.replaceActiveSession(classic, first.value, null)).ok).toBe(true)
+    expect(await repository.replaceActiveSession(arrow, next.value, null)).toMatchObject({
+      ok: false,
+      error: { kind: 'revision-conflict' },
+    })
+    expect(
+      (
+        await repository.replaceActiveSession(arrow, next.value, {
+          id: classic.id,
+          revision: 1,
+          token: first.value,
+        })
+      ).ok,
+    ).toBe(true)
+    expect(await database.count('sessions')).toBe(1)
+  } finally {
+    owner.dispose()
+  }
+})
+
+it('upgrades a legacy completed save on write and quarantines unsupported bytes with reasons', async () => {
+  const { database, repository } = await setup()
+  const owner = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
+  const session = makeSession({
+    id: 'daily:2026-10-11:formal',
+    mode: 'daily',
+    metadata: { kind: 'daily', challengeDate: '2026-10-11', formalAttempt: true },
+  })
+  session.entries = session.puzzle.solution.map((digit, cell) =>
+    session.puzzle.givens[cell] === 0 ? digit : 0,
+  )
+  session.completion = { completedAt: session.startedAt, elapsedMs: 0 }
+  const { rules, ...puzzle } = session.puzzle
+  expect(rules.kind).toBe('classic')
+  const legacySession = { ...session, puzzle }
+  await database.put('sessions', { formatVersion: 1, revision: 9, session: legacySession })
+  await database.put('results', { formatVersion: 1, session: legacySession })
+  const malformed = { formatVersion: 99, revision: 1, session: { ...session, id: 'foreign' } }
+  await database.put('sessions', malformed)
+  const parsed = await repository.listSessions()
+  if (!parsed.ok) throw new Error('Expected valid legacy normalization')
+  expect(parsed.value).toMatchObject([
+    {
+      formatVersion: 2,
+      revision: 9,
+      session: { id: session.id, puzzle: { rules: { kind: 'classic' } } },
+    },
+  ])
+  expect(await database.get('quarantine', 'sessions:foreign')).toMatchObject({
+    value: malformed,
+    issues: ['Unsupported session format or revision'],
+  })
+  const lease = await owner.acquireOwnership(session.id, 'migration-tab')
+  if (!lease.ok || !lease.value) throw new Error('Expected migration lease')
+  try {
+    expect(await repository.writeSession(parsed.value[0].session, 9, lease.value)).toMatchObject({
+      ok: true,
+      value: { formatVersion: 2, revision: 10 },
+    })
+    expect(await database.get('results', session.id)).toMatchObject({ formatVersion: 2, session })
+    expect(await database.count('results')).toBe(1)
+  } finally {
+    owner.dispose()
+  }
+})

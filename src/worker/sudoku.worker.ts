@@ -3,6 +3,8 @@ import { analyzeHint } from '@/core/sudoku/hint'
 import { isRecord } from '@/core/sudoku/types'
 import { parseWorkerRequest } from '@/worker/protocol'
 import type { WorkerResponse } from '@/worker/protocol'
+import { compileRules } from '@/core/sudoku/rules'
+import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 
 addEventListener('message', (event: MessageEvent<unknown>) => {
   const parsed = parseWorkerRequest(event.data)
@@ -34,7 +36,13 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
       response = {
         kind: 'hint',
         requestId: request.requestId,
-        outcome: { status: 'completed', value: analyzeHint(request.board, request.solution, 500) },
+        outcome: {
+          status: 'completed',
+          value: analyzeHint(request.board, request.solution, 500, {
+            context: compileRules(request.rules),
+            workBudget: createWorkBudget(DEFAULT_WORK_LIMIT),
+          }),
+        },
       }
     postMessage(response)
   } catch (error) {

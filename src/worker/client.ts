@@ -2,12 +2,18 @@ import type { Board } from '@/core/sudoku/types'
 import type { GenerationInput, Puzzle } from '@/core/sudoku/generation'
 import type { HintResult } from '@/core/sudoku/hint'
 import type { WorkerOutcome } from '@/worker/protocol'
-import { parseWorkerResponse } from '@/worker/protocol'
+import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import type { WorkerRequest } from '@/worker/protocol'
 import { isRecord } from '@/core/sudoku/types'
+import type { PuzzleRules } from '@/core/sudoku/rules'
 export interface SudokuWorkerClient {
   generate(input: GenerationInput, signal?: AbortSignal): Promise<WorkerOutcome<Puzzle>>
-  hint(board: Board, solution: Board, signal?: AbortSignal): Promise<WorkerOutcome<HintResult>>
+  hint(
+    board: Board,
+    solution: Board,
+    rules: PuzzleRules,
+    signal?: AbortSignal,
+  ): Promise<WorkerOutcome<HintResult>>
   dispose(): void
 }
 export function createSudokuWorkerClient(): SudokuWorkerClient {
@@ -72,17 +78,31 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
         { kind: 'generate', requestId: crypto.randomUUID(), input },
         (value) => {
           const parsed = parseWorkerResponse(value)
-          return parsed.valid && parsed.value.kind === 'generate' ? parsed.value.outcome : null
+          if (!parsed.valid || parsed.value.kind !== 'generate') return null
+          const outcome = parsed.value.outcome
+          if (
+            outcome.status === 'completed' &&
+            (outcome.value.rules.kind !== input.variant ||
+              outcome.value.seed !== input.seed ||
+              outcome.value.difficulty !== input.difficulty ||
+              outcome.value.puzzleVersion !== input.puzzleVersion)
+          )
+            return null
+          return outcome
         },
         signal,
       )
     },
-    hint(board, solution, signal) {
+    hint(board, solution, rules, signal) {
       return run(
-        { kind: 'hint', requestId: crypto.randomUUID(), board, solution },
+        { kind: 'hint', requestId: crypto.randomUUID(), board, solution, rules },
         (value) => {
           const parsed = parseWorkerResponse(value)
-          return parsed.valid && parsed.value.kind === 'hint' ? parsed.value.outcome : null
+          if (!parsed.valid || parsed.value.kind !== 'hint') return null
+          const outcome = parsed.value.outcome
+          if (outcome.status !== 'completed') return outcome
+          const hint = validateHintEvidence(outcome.value, rules)
+          return hint.valid ? { status: 'completed', value: hint.value } : null
         },
         signal,
       )

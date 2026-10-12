@@ -1,6 +1,6 @@
 # Web Architecture
 
-The [product design](superpowers/specs/2026-10-11-sudoku-design.md) defines behavior, [AGENTS.md](../AGENTS.md) defines development conventions, and [README](../README.md) lists setup and verification commands. This document describes current module ownership.
+The [product design](superpowers/specs/2026-10-11-sudoku-design.md) and [variants design](superpowers/specs/2026-10-11-sudoku-variants-design.md) define behavior, [AGENTS.md](../AGENTS.md) defines development conventions, and [README](../README.md) lists setup and verification commands. This document describes current module ownership.
 
 ## Organization
 
@@ -14,6 +14,7 @@ src/
   router/index.ts
   theme/useTheme.ts
   shared/components/
+  shared/model/boardGeometry.ts
   features/
     home/views/
     game/{views,components,composables,model,stores}/
@@ -76,4 +77,14 @@ Views use PascalCase `*View.vue` names; components use descriptive PascalCase na
 
 The entry provides one runtime. App settles/leaves the game before runtime disposal. Route-owned listeners, timers, and worker jobs retain existing cleanup. Layout extraction adds no KeepAlive or route transitions.
 
-Keyboard, touch, and hints reach the same game actions. Routes, persisted versions, defaults, session IDs, clock calculations, and Chinese copy remain unchanged. Root and `/sudoku/` builds must load real worker assets; existing browser tests exercise both paths.
+Keyboard, touch, and hints reach the same game actions. Existing routes accept a validated `variant` query; explicit saved-session links restore the stored type. Free selector state stays local and configures the next puzzle. Successful free/practice transitions synchronize the actual type/session query without restoring the already active session. A save-before-install guard pauses and flushes the active session before generation, restoration, or daily switching; an ordinary write failure retains the current in-memory session and editing rights for retry. Revision or ownership conflicts make the session read-only. A separate, explicitly confirmed reload action replaces local edits only after reading the latest record; failed recovery leaves local edits intact.
+
+`PuzzleRules` is a discriminated union under `core/sudoku/rules.ts`. Its compiled `RuleContext` distinguishes complete nine-digit units, duplicate peers, related highlights, and arithmetic/path constraints. Jigsaw replaces boxes; Killer cages and Arrow shafts are not nine-digit units. Framework-independent bounded evaluation drives candidates, conflicts, uniqueness, completion, and explainable deductions. Clue reductions appear as typed evidence rather than hidden candidate pruning. Exhaustion remains inconclusive.
+
+`shared/model/boardGeometry.ts` formats actual regions and clues without solving. `SudokuClues` draws decorative SVG in board coordinates, while the CSS Grid retains buttons, notes, digits, and focus. Accessible cell labels and selected-rule text explain the geometry; pause removes clue presentation as well as values.
+
+`GenerationInput` pairs each type with its supported generation version. Classic keeps `sudoku-v1`; variants use `sudoku-variants-v1`. Safe transformations preserve geometry and arithmetic, and fifteen independently verified original fallback slots cover five types and three policies. Worker decoders validate complete rules, proof shapes, and clue identity; the client rejects mismatched type/version/seed/difficulty and stale results.
+
+Storage writes format-2 sessions/results and normalizes validated format-1 records to Classic without rewriting historical facts. The database schema stays at version 1. Free replacement is transactional and scoped by type, learning retains one practice slot, and leases/revisions/dataset epochs continue to fence stale writes. Formal daily identities and eligibility are independent by type/date; Classic IDs remain compatible. Pure aggregation produces six daily statuses and six separate record summaries.
+
+Root and `/sudoku/` builds must load real worker assets. Browser tests exercise every new type at both roots, and independent test oracles validate returned puzzles without calling production compilation or search. Chromium desktop/mobile emulation and WebKit are configured alongside Firefox; host launch failures and physical-device verification are reported separately.

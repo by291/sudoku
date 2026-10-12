@@ -2,7 +2,31 @@ import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { GameSession } from '@/features/game/model/session'
 import { parseSessionRecord } from '@/storage/records'
+import { makeSession } from '../support/gameFixtures'
+import { VARIANT_FIXTURES } from '../fixtures/variants'
+import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
+import type { NewSudokuVariant } from '@/core/sudoku/rules'
 export { expect }
+export function makeVariantHintSession(variant: NewSudokuVariant): GameSession {
+  const example = VARIANT_EXAMPLES[variant]
+  const solution =
+    variant === 'thermo' || variant === 'arrow'
+      ? VARIANT_FIXTURES[variant].solution
+      : VARIANT_TEMPLATES[variant].easy[0].solution
+  return makeSession({
+    id: `${variant}-hint-fixture`,
+    puzzle: {
+      givens: example.board,
+      solution,
+      rules: example.rules,
+      difficulty: 'easy',
+      seed: `${variant}-known-rule-facts`,
+      puzzleVersion: VARIANT_PUZZLE_VERSION,
+    },
+  })
+}
 export const test = base.extend<{ browserErrors: void }>({
   browserErrors: [
     async ({ context }, use) => {
@@ -35,7 +59,7 @@ export async function seedSession(page: Page, session: GameSession, route = '/pl
     })
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction('sessions', 'readwrite')
-      transaction.objectStore('sessions').put({ formatVersion: 1, revision: 1, session })
+      transaction.objectStore('sessions').put({ formatVersion: 2, revision: 1, session })
       transaction.oncomplete = () => resolve()
       transaction.onabort = () => reject(transaction.error)
     })

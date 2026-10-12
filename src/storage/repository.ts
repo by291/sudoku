@@ -55,6 +55,12 @@ function isMatchingPrevious(raw: unknown, previous: { id: string; revision: numb
 function assertActive(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Session creation cancelled', 'AbortError')
 }
+function belongsToSlot(candidate: GameSession, target: GameSession): boolean {
+  return (
+    candidate.mode === target.mode &&
+    (target.mode !== 'free' || candidate.puzzle.rules.kind === target.puzzle.rules.kind)
+  )
+}
 async function assertDatasetEpoch(
   transaction: IDBPTransaction<SudokuDatabase, ('meta' | 'settings' | 'lessons')[], 'readwrite'>,
   expectedEpoch: number,
@@ -142,16 +148,23 @@ export function createGameRepository(
           )
             throw new StorageConflict('revision-conflict', 'The saved revision has changed')
           const record: SessionRecord = {
-            formatVersion: 1,
+            formatVersion: 2,
             revision: expectedRevision + 1,
             session: parsed.value,
           }
           assertActive(signal)
           await transaction.objectStore('sessions').put(record)
-          if (session.completion && !(await transaction.objectStore('results').get(session.id)))
-            await transaction
-              .objectStore('results')
-              .put({ formatVersion: 1, session: parsed.value })
+          if (session.completion) {
+            const results = transaction.objectStore('results')
+            const existing = await results.get(session.id)
+            if (existing === undefined)
+              await results.put({ formatVersion: 2, session: parsed.value })
+            else {
+              // Upgrade the original result rather than replacing its first completion facts.
+              const original = parseResultRecord(existing)
+              if (original.valid) await results.put(original.value)
+            }
+          }
           assertActive(signal)
           return record
         })
@@ -165,10 +178,19 @@ export function createGameRepository(
         return commitTransaction(transaction, async () => {
           assertActive(signal)
           await assertOwnership(transaction, token, (options.now ?? Date.now)())
-          const slot = await transaction
+          const records = await transaction
             .objectStore('sessions')
             .index('by-mode')
             .getAll(session.mode)
+          const slot = records.filter((raw) => {
+            const current = parseSessionRecord(raw)
+            if (!current.valid)
+              throw new StorageConflict(
+                'revision-conflict',
+                'The active slot contains invalid data; reload saved games',
+              )
+            return belongsToSlot(current.value.session, session)
+          })
           if (
             (await transaction.objectStore('sessions').get(session.id)) ||
             slot.length > 1 ||
@@ -178,12 +200,18 @@ export function createGameRepository(
           if (previous) {
             await assertOwnership(transaction, previous.token, (options.now ?? Date.now)())
             const raw = await transaction.objectStore('sessions').get(previous.id)
-            if (!isMatchingPrevious(raw, previous))
+            const previousRecord = parseSessionRecord(raw)
+            if (
+              !isMatchingPrevious(raw, previous) ||
+              !previousRecord.valid ||
+              !belongsToSlot(previousRecord.value.session, session) ||
+              previous.token.sessionId !== previous.id
+            )
               throw new StorageConflict('revision-conflict', 'Previous session changed')
             assertActive(signal)
             await transaction.objectStore('sessions').delete(previous.id)
           }
-          const record: SessionRecord = { formatVersion: 1, revision: 1, session: parsed.value }
+          const record: SessionRecord = { formatVersion: 2, revision: 1, session: parsed.value }
           assertActive(signal)
           await transaction.objectStore('sessions').put(record)
           assertActive(signal)

@@ -25,6 +25,7 @@ it('never reports uniqueness after budget exhaustion', () => {
   expect(countSolutions(emptyBoard, { maxSolutions: 2, nodeBudget: 0 })).toEqual({
     status: 'budget-exhausted',
     nodesVisited: 0,
+    workUsed: 0,
   })
   expect(countSolutions(uniqueBoard, { maxSolutions: 2, nodeBudget: 1 })).toMatchObject({
     status: 'budget-exhausted',

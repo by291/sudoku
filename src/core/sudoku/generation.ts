@@ -7,15 +7,47 @@ import { rateDifficulty } from '@/core/sudoku/logic'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import { isDifficulty, isRecord } from '@/core/sudoku/types'
 import type { ParseResult } from '@/core/sudoku/types'
+import { CLASSIC_RULES, compileRules, isSudokuVariant, parseRules } from '@/core/sudoku/rules'
+import type { NewSudokuVariant, PuzzleRules, SudokuVariant } from '@/core/sudoku/rules'
+import { generateVariantPuzzle } from '@/core/sudoku/variantGeneration'
+import { seededRandom, shuffle } from '@/core/sudoku/random'
 export const PUZZLE_VERSION = 'sudoku-v1'
+export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v1'
 export type Puzzle = {
   givens: Board
   solution: Board
   difficulty: Difficulty
   seed: string
   puzzleVersion: string
+  rules: PuzzleRules
 }
-export type GenerationInput = { seed: string; difficulty: Difficulty; puzzleVersion: string }
+export type GenerationInput = { seed: string; difficulty: Difficulty } & (
+  | { variant: 'classic'; puzzleVersion: typeof PUZZLE_VERSION }
+  | { variant: NewSudokuVariant; puzzleVersion: typeof VARIANT_PUZZLE_VERSION }
+)
+export function createGenerationInput(
+  variant: SudokuVariant,
+  difficulty: Difficulty,
+  seed: string,
+): GenerationInput {
+  return variant === 'classic'
+    ? { variant, difficulty, seed, puzzleVersion: PUZZLE_VERSION }
+    : { variant, difficulty, seed, puzzleVersion: VARIANT_PUZZLE_VERSION }
+}
+export function parseGenerationInput(value: unknown): ParseResult<GenerationInput> {
+  if (
+    !isRecord(value) ||
+    !isDifficulty(value.difficulty) ||
+    typeof value.seed !== 'string' ||
+    !value.seed ||
+    !isSudokuVariant(value.variant)
+  )
+    return { valid: false, issues: ['Invalid generation input'] }
+  const parsed = createGenerationInput(value.variant, value.difficulty, value.seed)
+  return parsed.puzzleVersion === value.puzzleVersion
+    ? { valid: true, value: parsed }
+    : { valid: false, issues: ['Unsupported generation version for this type'] }
+}
 export type GenerationLimits = {
   maxLayouts: number
   searchNodes: number
@@ -37,10 +69,12 @@ export function parsePuzzle(value: unknown): ParseResult<Puzzle> {
   )
     return { valid: false, issues: ['Invalid puzzle metadata'] }
   const givens = parseBoard(value.givens),
-    solution = parseBoard(value.solution)
-  if (!givens.valid || !solution.valid) return { valid: false, issues: ['Invalid puzzle board'] }
+    solution = parseBoard(value.solution),
+    rules = parseRules(value.rules)
+  if (!givens.valid || !solution.valid || !rules.valid)
+    return { valid: false, issues: ['Invalid puzzle board or rules'] }
   if (
-    !isComplete(solution.value) ||
+    !isComplete(solution.value, compileRules(rules.value)) ||
     givens.value.some((digit, cell) => digit !== 0 && digit !== solution.value[cell])
   )
     return { valid: false, issues: ['Solution does not satisfy puzzle givens'] }
@@ -52,6 +86,7 @@ export function parsePuzzle(value: unknown): ParseResult<Puzzle> {
       difficulty: value.difficulty,
       seed: value.seed,
       puzzleVersion: value.puzzleVersion,
+      rules: rules.value,
     },
   }
 }
@@ -60,27 +95,6 @@ export const DEFAULT_GENERATION_LIMITS: GenerationLimits = {
   searchNodes: 1000000,
   logicalSteps: 500,
   fallbackNodes: 1000000,
-}
-function seededRandom(seed: string): () => number {
-  // sudoku-v1 hashes UTF-16 code units using FNV-1a, then uses Mulberry32.
-  // Every shuffle consumes this stream; neither wall time nor Math.random participates.
-  let state = 2166136261
-  for (let index = 0; index < seed.length; index++)
-    state = Math.imul(state ^ seed.charCodeAt(index), 16777619) >>> 0
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0
-    let value = Math.imul(state ^ (state >>> 15), state | 1)
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
-  }
-}
-function shuffle<T>(values: readonly T[], random: () => number): T[] {
-  const result = [...values]
-  for (let index = result.length - 1; index > 0; index--) {
-    const partner = Math.floor(random() * (index + 1))
-    ;[result[index], result[partner]] = [result[partner], result[index]]
-  }
-  return result
 }
 function transform(template: PuzzleTemplate, random: () => number): PuzzleTemplate {
   const digits = shuffle(DIGITS, random)
@@ -110,8 +124,8 @@ export function generatePuzzle(
   input: GenerationInput,
   limits = DEFAULT_GENERATION_LIMITS,
 ): GenerationResult {
-  if (input.puzzleVersion !== PUZZLE_VERSION)
-    return { status: 'failed', reason: 'Unsupported puzzle version' }
+  const parsed = parseGenerationInput(input)
+  if (!parsed.valid) return { status: 'failed', reason: parsed.issues.join('; ') }
   if (!input.seed || !['easy', 'medium', 'hard'].includes(input.difficulty))
     return { status: 'failed', reason: 'Invalid generation input' }
   const limitKeys: readonly (keyof GenerationLimits)[] = [
@@ -128,12 +142,14 @@ export function generatePuzzle(
     )
       return { status: 'failed', reason: 'Invalid generation budget' }
   }
+  if (input.puzzleVersion === VARIANT_PUZZLE_VERSION) return generateVariantPuzzle(input, limits)
   const random = seededRandom(`${input.puzzleVersion}:${input.difficulty}:${input.seed}`)
   let nodesRemaining = limits.searchNodes
   const makePuzzle = (template: PuzzleTemplate): Puzzle => ({
     ...template,
     seed: input.seed,
     puzzleVersion: input.puzzleVersion,
+    rules: CLASSIC_RULES,
   })
   const clueTargets: Record<Difficulty, number> = { easy: 36, medium: 32, hard: 30 }
   for (let layout = 0; layout < limits.maxLayouts && nodesRemaining > 0; layout++) {

@@ -1,5 +1,10 @@
 import { expect, it } from 'vitest'
-import { generatePuzzle, PUZZLE_VERSION } from '@/core/sudoku/generation'
+import {
+  createGenerationInput,
+  generatePuzzle,
+  parseGenerationInput,
+  PUZZLE_VERSION,
+} from '@/core/sudoku/generation'
 import { TEMPLATES } from '@/core/sudoku/templates'
 import { rateDifficulty, analyzeLogic } from '@/core/sudoku/logic'
 import { TECHNIQUES } from '@/core/sudoku/techniques'
@@ -29,7 +34,7 @@ it.each(
     ['generation-01', 'generation-02', 'generation-03'].map((seed) => ({ difficulty, seed })),
   ),
 )('generates a unique reproducible $difficulty puzzle for $seed', (input) => {
-  const request = { ...input, puzzleVersion: PUZZLE_VERSION }
+  const request = createGenerationInput('classic', input.difficulty, input.seed)
   const result = generatePuzzle(request)
   expect(result.status).toBe('ready')
   expect(generatePuzzle(request)).toEqual(result)
@@ -45,6 +50,7 @@ it.each(
 })
 it('falls back deterministically only after verifying its transformed template', () => {
   const input = {
+    variant: 'classic',
     seed: 'fallback',
     difficulty: 'hard',
     puzzleVersion: PUZZLE_VERSION,
@@ -60,7 +66,12 @@ it('falls back deterministically only after verifying its transformed template',
   })
 })
 it('rejects unsupported generation versions rather than silently changing the rules', () => {
-  expect(generatePuzzle({ seed: 'a', difficulty: 'easy', puzzleVersion: 'unknown' }).status).toBe(
-    'failed',
-  )
+  expect(
+    parseGenerationInput({
+      variant: 'classic',
+      seed: 'a',
+      difficulty: 'easy',
+      puzzleVersion: 'unknown',
+    }).valid,
+  ).toBe(false)
 })

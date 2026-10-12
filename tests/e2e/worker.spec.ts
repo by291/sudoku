@@ -1,16 +1,29 @@
 import { readdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
-import { test, expect } from './support'
+import { test, expect, makeVariantHintSession } from './support'
 import type { WorkerRequest } from '@/worker/protocol'
 import { parseWorkerResponse } from '@/worker/protocol'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 import { countReferenceSolutions } from '../support/referenceSudoku'
 import { rateDifficulty } from '@/core/sudoku/logic'
+import { rateVariantDifficulty } from '@/core/sudoku/logic'
+import { compileRules } from '@/core/sudoku/rules'
+import { createGenerationInput } from '@/core/sudoku/generation'
+import { createWorkBudget } from '@/core/sudoku/budget'
+import { explainStep } from '@/core/sudoku/techniques'
+import { referenceCountSolutions } from '../support/referenceVariants'
 const asset = readdirSync('dist/assets').find(
   (file) => file.startsWith('sudoku.worker-') && file.endsWith('.js'),
 )
 if (!asset) throw new Error('Build the application before running browser tests')
-async function runWorker(page: Page, request: WorkerRequest) {
+async function runWorker(page: Page, request: WorkerRequest, base: '/' | '/sudoku/' = '/') {
+  const workerAsset =
+    base === '/'
+      ? asset
+      : readdirSync('dist-subpath/assets').find(
+          (file) => file.startsWith('sudoku.worker-') && file.endsWith('.js'),
+        )
+  if (!workerAsset) throw new Error('Missing production worker asset')
   return page.evaluate(
     ({ url, request }) =>
       new Promise<unknown>((resolve, reject) => {
@@ -31,7 +44,7 @@ async function runWorker(page: Page, request: WorkerRequest) {
         }
         worker.postMessage(request)
       }),
-    { url: `/assets/${asset}`, request },
+    { url: `${base}assets/${workerAsset}`, request },
   )
 }
 test('verifies fixed production-worker seeds and a known logical conclusion', async ({ page }) => {
@@ -41,7 +54,12 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
       await runWorker(page, {
         kind: 'generate',
         requestId: `seed-${difficulty}`,
-        input: { difficulty, seed: 'production-fixed-seed', puzzleVersion: 'sudoku-v1' },
+        input: {
+          difficulty,
+          seed: 'production-fixed-seed',
+          variant: 'classic',
+          puzzleVersion: 'sudoku-v1',
+        },
       }),
     )
     if (
@@ -60,6 +78,7 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
       requestId: 'known-hint',
       board: uniqueBoard,
       solution: solvedBoard,
+      rules: { kind: 'classic' },
     }),
   )
   expect(hint).toMatchObject({
@@ -73,6 +92,77 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
     },
   })
 })
+
+for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
+  test(`verifies real ${variant} generation and rule evidence at both deployment roots`, async ({
+    page,
+  }) => {
+    const fixture = makeVariantHintSession(variant)
+    for (const base of ['/', '/sudoku/'] as const) {
+      await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+      const generated = parseWorkerResponse(
+        await runWorker(
+          page,
+          {
+            kind: 'generate',
+            requestId: `${variant}-${base}-generate`,
+            input: createGenerationInput(variant, 'medium', 'production-fixed-variant-seed'),
+          },
+          base,
+        ),
+      )
+      if (
+        !generated.valid ||
+        generated.value.kind !== 'generate' ||
+        generated.value.outcome.status !== 'completed'
+      )
+        throw new Error('Expected generated variant')
+      const puzzle = generated.value.outcome.value
+      expect(puzzle.rules.kind).toBe(variant)
+      expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
+        count: 1,
+        solution: puzzle.solution,
+      })
+      expect(
+        rateVariantDifficulty(
+          puzzle.givens,
+          compileRules(puzzle.rules),
+          500,
+          createWorkBudget(1000000),
+        ),
+      ).toEqual({ status: 'rated', difficulty: 'medium' })
+      const hint = parseWorkerResponse(
+        await runWorker(
+          page,
+          {
+            kind: 'hint',
+            requestId: `${variant}-${base}-hint`,
+            board: fixture.puzzle.givens,
+            solution: fixture.puzzle.solution,
+            rules: fixture.puzzle.rules,
+          },
+          base,
+        ),
+      )
+      if (
+        !hint.valid ||
+        hint.value.kind !== 'hint' ||
+        hint.value.outcome.status !== 'completed' ||
+        hint.value.outcome.value.kind !== 'deduction'
+      )
+        throw new Error('Expected rule deduction')
+      expect(hint.value.outcome.value.placement).toEqual({
+        cell: variant === 'arrow' ? 40 : 0,
+        digit: variant === 'arrow' ? 2 : 1,
+      })
+      expect(hint.value.outcome.value.steps.map(explainStep).join(' ')).toContain(
+        { diagonal: '对角线', jigsaw: '不规则区域', killer: '笼', thermo: '递增', arrow: '总和' }[
+          variant
+        ],
+      )
+    }
+  })
+}
 test('loads hash routes and the real worker from a static deployment subpath', async ({ page }) => {
   await page.goto('http://127.0.0.1:4174/sudoku/#/play/free')
   const worker = page.waitForEvent('worker')

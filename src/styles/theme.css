@@ -15,6 +15,8 @@
   --error-soft: #fae4df;
   --hint: #f3e4b7;
   --peer: #f0f3e9;
+  --clue-stroke: #5f796c;
+  --clue-fill: #91ab9c;
   --shadow: 0 8px 32px #233a3608;
 }
 :root[data-theme='dark'] {
@@ -34,5 +36,7 @@
   --error-soft: #633e36;
   --hint: #66582c;
   --peer: #293f34;
+  --clue-stroke: #a3bfae;
+  --clue-fill: #617e6e;
   --shadow: 0 8px 32px #0002;
 }

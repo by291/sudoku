@@ -1,4 +1,4 @@
-import type { LogicalState, LogicalStep, Technique } from '@/core/sudoku/techniques'
+import type { LogicalState, LogicalStep, ClassicTechnique } from '@/core/sudoku/techniques'
 export const EXAMPLES = {
   'naked-single': {
     board: [
@@ -17,7 +17,13 @@ export const EXAMPLES = {
       technique: 'naked-single',
       cell: 40,
       digit: 5,
-      evidence: { unit: { kind: 'row', index: 4 }, cells: [40], digits: [5] },
+      evidence: {
+        kind: 'unit',
+        premises: [],
+        unit: { kind: 'row', index: 4 },
+        cells: [40],
+        digits: [5],
+      },
     },
   },
   'hidden-single': {
@@ -37,7 +43,13 @@ export const EXAMPLES = {
       technique: 'hidden-single',
       cell: 24,
       digit: 5,
-      evidence: { unit: { kind: 'row', index: 2 }, cells: [24], digits: [5] },
+      evidence: {
+        kind: 'unit',
+        premises: [],
+        unit: { kind: 'row', index: 2 },
+        cells: [24],
+        digits: [5],
+      },
     },
   },
   'locked-candidate': {
@@ -55,7 +67,13 @@ export const EXAMPLES = {
     step: {
       kind: 'elimination',
       technique: 'locked-candidate',
-      evidence: { unit: { kind: 'row', index: 1 }, cells: [15, 16], digits: [3] },
+      evidence: {
+        kind: 'unit',
+        premises: [],
+        unit: { kind: 'row', index: 1 },
+        cells: [15, 16],
+        digits: [3],
+      },
       removals: [{ cell: 24, digit: 3 }],
     },
   },
@@ -74,7 +92,13 @@ export const EXAMPLES = {
     step: {
       kind: 'elimination',
       technique: 'hidden-pair',
-      evidence: { unit: { kind: 'row', index: 6 }, cells: [54, 56], digits: [1, 9] },
+      evidence: {
+        kind: 'unit',
+        premises: [],
+        unit: { kind: 'row', index: 6 },
+        cells: [54, 56],
+        digits: [1, 9],
+      },
       removals: [
         { cell: 54, digit: 3 },
         { cell: 56, digit: 3 },
@@ -99,11 +123,17 @@ export const EXAMPLES = {
     step: {
       kind: 'elimination',
       technique: 'naked-pair',
-      evidence: { unit: { kind: 'column', index: 1 }, cells: [28, 46], digits: [1, 5] },
+      evidence: {
+        kind: 'unit',
+        premises: [],
+        unit: { kind: 'column', index: 1 },
+        cells: [28, 46],
+        digits: [1, 5],
+      },
       removals: [
         { cell: 73, digit: 1 },
         { cell: 73, digit: 5 },
       ],
     },
   },
-} satisfies Record<Technique, LogicalState & { step: LogicalStep }>
+} satisfies Record<ClassicTechnique, LogicalState & { step: LogicalStep }>

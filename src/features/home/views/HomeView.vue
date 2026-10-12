@@ -6,16 +6,20 @@ import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import { sessionLink, modeName } from '@/features/records/model/records'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
+import { VARIANT_NAMES } from '@/features/game/model/variants'
+import { getDailyStatuses } from '@/features/game/model/daily'
 const records = useRecordsStore(),
   preferences = usePreferencesStore()
 const unfinished = computed(() => records.sessions.filter((record) => !record.session.completion))
-const todayComplete = computed(() =>
-  records.results.some(
-    ({ session }) =>
-      session.metadata.kind === 'daily' &&
-      session.metadata.challengeDate === records.today &&
-      session.metadata.formalAttempt,
-  ),
+const dailyStatuses = computed(() =>
+  getDailyStatuses(records.sessions, records.results, records.today),
+)
+const completedDailyCount = computed(
+  () => dailyStatuses.value.filter((status) => status.state === 'completed').length,
+)
+const dailyLink = computed(
+  () =>
+    `/play/daily?variant=${dailyStatuses.value.find((status) => status.state !== 'completed')?.variant ?? 'classic'}`,
 )
 onMounted(records.load)
 </script>
@@ -29,7 +33,7 @@ onMounted(records.load)
         :to="sessionLink(session)"
         class="panel resume-card"
         ><div>
-          <strong>{{ modeName(session) }}</strong>
+          <strong>{{ VARIANT_NAMES[session.puzzle.rules.kind] }} · {{ modeName(session) }}</strong>
           <p class="muted">
             {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} · 已用时
             {{ formatDuration(session.elapsedMs) }}
@@ -68,20 +72,17 @@ onMounted(records.load)
       ><span class="mode-icon">▦</span>
       <p class="mode-kicker">按自己的节奏</p>
       <h2>自由游玩 <span>↗</span></h2>
-      <p>三个难度，随时暂停。把每一道题，慢慢想明白。</p></RouterLink
+      <p>六种玩法，三个难度，随时暂停。把每一道题，慢慢想明白。</p></RouterLink
     ><RouterLink to="/learn" class="panel mode-card"
       ><span class="mode-icon">✎</span>
       <p class="mode-kicker">让每一步有理由</p>
       <h2>学习数独 <span>↗</span></h2>
-      <p>从基础规则到数对技巧，跟着六节小课练习推理。</p></RouterLink
-    ><RouterLink to="/play/daily" class="panel mode-card"
+      <p>从标准技巧到五种变体规则，跟着小课练习推理。</p></RouterLink
+    ><RouterLink :to="dailyLink" class="panel mode-card"
       ><span class="mode-icon">◷</span>
       <p class="mode-kicker">每天，一次小挑战</p>
       <h2>每日挑战 <span>↗</span></h2>
-      <p>
-        {{ records.today }} ·
-        {{ todayComplete ? '正式挑战已完成，欢迎重玩' : '今天的中等难度棋盘，等你来解' }}
-      </p></RouterLink
+      <p>{{ records.today }} · 已完成 {{ completedDailyCount }} / 6 种玩法</p></RouterLink
     >
   </div>
   <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">

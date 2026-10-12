@@ -1,5 +1,52 @@
 import { test, expect, seedSession, cellName, readSessions, countResults } from './support'
 import { makeSession } from '../support/gameFixtures'
+
+test('confirms explicit reload after a save conflict and resumes the latest record', async ({
+  page,
+}) => {
+  await seedSession(page, makeSession())
+  await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
+  const current = (await readSessions(page))[0]
+  const latest = {
+    ...current,
+    revision: current.revision + 1,
+    session: {
+      ...current.session,
+      entries: current.session.entries.map((digit, cell) => (cell === 3 ? 6 : digit)),
+    },
+  }
+  await page.evaluate(async (record) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sudoku-local', 1)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction('sessions', 'readwrite')
+      transaction.objectStore('sessions').put(record)
+      transaction.oncomplete = () => resolve()
+      transaction.onabort = () => reject(transaction.error)
+    })
+    database.close()
+  }, latest)
+  await page.getByRole('button', { name: cellName(2) }).click()
+  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await expect(page.getByRole('alert').filter({ hasText: '请重新载入' })).toBeVisible()
+  await page.getByRole('button', { name: '重新载入', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '重新载入最新存档？' })
+  await expect(dialog).toContainText('未保存的填写和笔记会丢失')
+  await dialog.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.getByRole('button', { name: '输入数字4', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: '重新载入', exact: true }).click()
+  await dialog.getByRole('button', { name: '确认重新载入', exact: true }).click()
+  await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
+  await expect(page.getByRole('button', { name: cellName(2) })).toHaveAccessibleName(/空格/)
+  await expect(page.getByRole('button', { name: cellName(3) })).toHaveAccessibleName(/数字6/)
+  await page.getByRole('button', { name: cellName(2) }).click()
+  await page.getByRole('button', { name: '输入数字4', exact: true }).click()
+  await expect.poll(async () => (await readSessions(page))[0].session.entries[2]).toBe(4)
+  expect((await readSessions(page))[0].session.entries[3]).toBe(6)
+})
 test('keeps a second editor read-only, permits takeover, and resets every tab', async ({
   page,
   context,

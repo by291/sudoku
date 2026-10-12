@@ -100,6 +100,7 @@ function resetExercise() {
     :metadata="{ kind: 'learning', lessonId: lesson.id }"
     :heading="`${lesson.title} · 实战练习`"
     :practice-difficulty="lesson.practiceDifficulty"
+    :practice-variant="lesson.practiceVariant"
     ><RouterLink :to="`/learn/${lesson.id}`">返回本节课程</RouterLink></GameView
   >
   <section v-else class="lesson-page">
@@ -115,6 +116,8 @@ function resetExercise() {
           :board="lesson.board"
           :givens="lesson.board"
           :notes="exampleNotes"
+          :rules="lesson.rules"
+          :related-cells="[]"
           :selected-cell="selected"
           :conflicts="[]"
           :hint-cells="exerciseCells"

@@ -1,31 +1,11 @@
-import {
-  ALL_DIGITS_MASK,
-  BOARD_SIZE,
-  BOX_SIZE,
-  DIGITS,
-  UNIT_SIZE,
-  isDigit,
-} from '@/core/sudoku/types'
+import { ALL_DIGITS_MASK, BOARD_SIZE, DIGITS, UNIT_SIZE, isDigit } from '@/core/sudoku/types'
 import type { Board, CellValue, Digit, NoteMask, ParseResult } from '@/core/sudoku/types'
 
-export type Unit = { kind: 'row' | 'column' | 'box'; index: number }
-export type SudokuUnit = Unit & { cells: readonly number[] }
-export const UNITS: readonly SudokuUnit[] = ['row', 'column', 'box'].flatMap((kind) =>
-  Array.from({ length: UNIT_SIZE }, (_, index): SudokuUnit => ({
-    kind: kind === 'row' ? 'row' : kind === 'column' ? 'column' : 'box',
-    index,
-    cells: Array.from({ length: UNIT_SIZE }, (_, offset) =>
-      kind === 'row'
-        ? index * UNIT_SIZE + offset
-        : kind === 'column'
-          ? offset * UNIT_SIZE + index
-          : Math.floor(index / BOX_SIZE) * BOX_SIZE * UNIT_SIZE +
-            (index % BOX_SIZE) * BOX_SIZE +
-            Math.floor(offset / BOX_SIZE) * UNIT_SIZE +
-            (offset % BOX_SIZE),
-    ),
-  })),
-)
+export type { Unit, SudokuUnit } from '@/core/sudoku/rules'
+import type { SudokuUnit } from '@/core/sudoku/rules'
+import type { RuleContext } from '@/core/sudoku/rules'
+import { CLASSIC_CONTEXT, satisfiesConstraint } from '@/core/sudoku/rules'
+export const UNITS: readonly SudokuUnit[] = CLASSIC_CONTEXT.units
 
 export function maskOf(digit: Digit): NoteMask {
   return 1 << (digit - 1)
@@ -68,8 +48,24 @@ export function findConflicts(board: Board): readonly number[] {
   }
   return [...conflicts].sort((a, b) => a - b)
 }
-export function isComplete(board: Board): boolean {
-  return board.length === BOARD_SIZE && board.every(isDigit) && findConflicts(board).length === 0
+export function isComplete(board: Board, context: RuleContext = CLASSIC_CONTEXT): boolean {
+  return (
+    board.length === BOARD_SIZE &&
+    board.every(isDigit) &&
+    context.units.every(
+      (unit) => new Set(unit.cells.map((cell) => board[cell])).size === UNIT_SIZE,
+    ) &&
+    context.constraints.every((constraint) => satisfiesConstraint(board, constraint))
+  )
+}
+export function calculateBaseCandidates(board: Board, context: RuleContext): readonly NoteMask[] {
+  return board.map((value, cell) => {
+    if (value !== 0) return 0
+    let mask = ALL_DIGITS_MASK
+    for (const peer of context.duplicatePeers[cell])
+      if (board[peer] !== 0) mask &= ~maskOf(board[peer])
+    return mask
+  })
 }
 export function calculateCandidates(board: Board): readonly NoteMask[] {
   return board.map((value, cell) => {

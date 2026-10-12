@@ -19,7 +19,7 @@ it('clears all player stores and resets in-memory preferences only after commit'
     1,
   )
   const session = makeSession()
-  await test.database.put('sessions', { formatVersion: 1, revision: 1, session })
+  await test.database.put('sessions', { formatVersion: 2, revision: 1, session })
   await game.restoreSession(session.id)
   await records.load()
   expect(records.sessions).toHaveLength(1)
@@ -46,7 +46,7 @@ it('retains recoverable records and current preferences when reset aborts', asyn
   const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
   const preferences = test.app.runWithContext(() => usePreferencesStore(test.pinia))
   await preferences.update({ theme: 'dark' })
-  await test.database.put('sessions', { formatVersion: 1, revision: 1, session: makeSession() })
+  await test.database.put('sessions', { formatVersion: 2, revision: 1, session: makeSession() })
   await records.load()
   const raw = unwrap(test.database),
     original = raw.transaction.bind(raw)

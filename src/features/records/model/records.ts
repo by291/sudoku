@@ -1,6 +1,7 @@
 import type { Difficulty } from '@/core/sudoku/types'
 import type { ResultRecord } from '@/storage/records'
 import type { GameSession } from '@/features/game/model/session'
+import type { SudokuVariant } from '@/core/sudoku/rules'
 import { getChallengeDate, isChallengeDate } from '@/features/game/model/daily'
 export type RecordSummary = {
   freeBests: Record<Difficulty, { assisted: number | null; unassisted: number | null }>
@@ -9,7 +10,11 @@ export type RecordSummary = {
   longestStreak: number
 }
 const DAY_MS = 86400000
-export function summarizeRecords(results: readonly ResultRecord[], today: string): RecordSummary {
+export function summarizeRecords(
+  results: readonly ResultRecord[],
+  today: string,
+  variant: SudokuVariant = 'classic',
+): RecordSummary {
   if (!isChallengeDate(today)) throw new TypeError('Invalid summary date')
   const summary: RecordSummary = {
     freeBests: {
@@ -24,6 +29,7 @@ export function summarizeRecords(results: readonly ResultRecord[], today: string
   const seen = new Set<string>(),
     eligible = new Set<number>()
   for (const { session } of results) {
+    if (session.puzzle.rules.kind !== variant) continue
     if (seen.has(session.id) || !session.completion) continue
     seen.add(session.id)
     const classification = session.assistance.assisted ? 'assisted' : 'unassisted'
@@ -55,7 +61,7 @@ export function summarizeRecords(results: readonly ResultRecord[], today: string
   return summary
 }
 export function sessionLink(session: GameSession): string {
-  const query = `session=${encodeURIComponent(session.id)}`
+  const query = `variant=${session.puzzle.rules.kind}&session=${encodeURIComponent(session.id)}`
   if (session.metadata.kind === 'learning')
     return `/learn/${encodeURIComponent(session.metadata.lessonId)}?practice=1&${query}`
   return `/play/${session.mode === 'daily' ? 'daily' : 'free'}?${query}`

@@ -1,7 +1,12 @@
 import type { Board, Digit, Difficulty, NoteMask } from '@/core/sudoku/types'
 import { EXAMPLES } from '@/features/learning/model/examples'
 import { explainStep, TECHNIQUE_NAMES } from '@/core/sudoku/techniques'
-import type { Technique } from '@/core/sudoku/techniques'
+import type { ClassicTechnique } from '@/core/sudoku/techniques'
+import { CLASSIC_RULES } from '@/core/sudoku/rules'
+import type { PuzzleRules, SudokuVariant } from '@/core/sudoku/rules'
+import { VARIANT_NAMES, VARIANT_RULE_TEXT } from '@/features/game/model/variants'
+import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
 export type Exercise =
   | { kind: 'placement'; expected: { cell: number; digit: Digit } }
   | { kind: 'elimination'; expected: readonly { cell: number; digit: Digit }[] }
@@ -14,8 +19,10 @@ export type Lesson = {
   explanation: string
   exercise: Exercise
   practiceDifficulty: Difficulty
+  rules: PuzzleRules
+  practiceVariant: SudokuVariant
 }
-const introductions: Record<Technique, string> = {
+const introductions: Record<ClassicTechnique, string> = {
   'naked-single': '逐一排除同一行、列、宫里已出现的数字。如果只剩一个候选数，就可以落笔。',
   'hidden-single':
     '把注意力放在一个数字上：即使某格有多个候选数，这个数字也可能在整个单元里只有一个位置。',
@@ -28,6 +35,8 @@ const techniqueLessons = Object.entries(EXAMPLES).map(([id, example]): Lesson =>
   const step = example.step
   return {
     id,
+    rules: CLASSIC_RULES,
+    practiceVariant: 'classic',
     title: TECHNIQUE_NAMES[step.technique],
     introduction: introductions[step.technique],
     board: example.board,
@@ -48,6 +57,8 @@ const techniqueLessons = Object.entries(EXAMPLES).map(([id, example]): Lesson =>
 export const LESSONS: readonly Lesson[] = [
   {
     id: 'rules',
+    rules: CLASSIC_RULES,
+    practiceVariant: 'classic',
     title: '认识数独',
     introduction:
       '在 9 × 9 的棋盘中填入 1–9。每一行、每一列、每个 3 × 3 宫中的数字都只能出现一次。题目给定的数字不能修改。',
@@ -68,6 +79,27 @@ export const LESSONS: readonly Lesson[] = [
         second.id,
       ),
   ),
+  ...SUDOKU_VARIANTS.flatMap((variant): Lesson[] => {
+    if (variant === 'classic') return []
+    const example = VARIANT_EXAMPLES[variant]
+    return [
+      {
+        id: `${variant}-rules`,
+        title: `认识${VARIANT_NAMES[variant]}`,
+        introduction: VARIANT_RULE_TEXT[variant],
+        rules: example.rules,
+        practiceVariant: variant,
+        board: example.board,
+        candidates: example.candidates,
+        explanation: explainStep(example.step),
+        exercise: {
+          kind: 'placement',
+          expected: { cell: example.step.cell, digit: example.step.digit },
+        },
+        practiceDifficulty: 'easy',
+      },
+    ]
+  }),
 ]
 export function checkExercise(
   lesson: Lesson,

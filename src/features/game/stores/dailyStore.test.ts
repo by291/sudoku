@@ -6,6 +6,10 @@ import { isDigit } from '@/core/sudoku/types'
 import { createApp } from 'vue'
 import { createPinia, disposePinia } from 'pinia'
 import { gameRuntimeKey } from '@/infrastructure/runtime'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
+import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
+import type { GenerationInput } from '@/core/sudoku/generation'
+import { getDailyIdentity } from '@/features/game/model/daily'
 it('restores yesterday and old puzzle versions without generating them again', async () => {
   const test = await createTestRuntime()
   const saved = makeSession({
@@ -34,7 +38,7 @@ it('uses one stable formal ID and keeps replay results separate', async () => {
     value: { ...makeSession().puzzle, ...input },
   })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
-  await game.startDaily('2026-10-11')
+  await game.startDaily('2026-10-11', 'classic')
   expect(game.session?.id).toBe('daily:2026-10-11:formal')
   const puzzle = game.session?.puzzle
   if (!puzzle) throw new Error('Expected puzzle')
@@ -44,7 +48,7 @@ it('uses one stable formal ID and keeps replay results separate', async () => {
   }
   expect(game.phase).toBe('completed')
   await game.leaveGame()
-  await game.startDaily('2026-10-11')
+  await game.startDaily('2026-10-11', 'classic')
   expect(game.session?.metadata).toMatchObject({ formalAttempt: false })
   expect(game.session?.id).not.toBe('daily:2026-10-11:formal')
   const results = await test.runtime.repository.listResults()
@@ -65,7 +69,10 @@ it('converges concurrent starts on a single formal session with one editor', asy
     .provide(gameRuntimeKey, { ...test.runtime, ownerId: 'peer-owner' })
   const first = test.app.runWithContext(() => useGameStore(test.pinia))
   const second = peerApp.runWithContext(() => useGameStore(peerPinia))
-  await Promise.all([first.startDaily('2026-10-11'), second.startDaily('2026-10-11')])
+  await Promise.all([
+    first.startDaily('2026-10-11', 'classic'),
+    second.startDaily('2026-10-11', 'classic'),
+  ])
   expect(await test.database.count('sessions')).toBe(1)
   expect([first.session?.id, second.session?.id]).toEqual([
     'daily:2026-10-11:formal',
@@ -78,4 +85,43 @@ it('converges concurrent starts on a single formal session with one editor', asy
   second.dispose()
   disposePinia(peerPinia)
   test.dispose()
+})
+it('uses six Medium daily inputs and preserves independent formal attempts after Classic completes', async () => {
+  const test = await createTestRuntime()
+  const calls: GenerationInput[] = []
+  test.runtime.worker.generate = async (input) => {
+    calls.push(input)
+    const fixture =
+      input.variant === 'classic' ? makeSession().puzzle : VARIANT_FIXTURES[input.variant]
+    return { status: 'completed', value: { ...makeSession().puzzle, ...fixture, ...input } }
+  }
+  const game = test.app.runWithContext(() => useGameStore(test.pinia))
+  try {
+    for (const variant of SUDOKU_VARIANTS) {
+      expect(await game.startDaily('2026-10-11', variant)).toEqual({ status: 'ready' })
+      expect(game.session?.id).toBe(getDailyIdentity('2026-10-11', variant).formalId)
+      expect(game.activeVariant).toBe(variant)
+      expect(game.session?.metadata).toMatchObject({ formalAttempt: true })
+      if (variant === 'classic') {
+        const puzzle = game.session?.puzzle
+        if (!puzzle) throw new Error('Expected daily puzzle')
+        for (let cell = 0; cell < 81; cell++) {
+          const digit = puzzle.solution[cell]
+          if (!puzzle.givens[cell] && isDigit(digit)) game.dispatch({ kind: 'enter', cell, digit })
+        }
+      }
+    }
+    expect(calls.map((input) => input.difficulty)).toEqual(Array(6).fill('medium'))
+    expect(await test.database.count('sessions')).toBe(6)
+    expect(await game.startDaily('2026-10-11', 'arrow')).toEqual({ status: 'ready' })
+    expect(calls).toHaveLength(6)
+    expect(game.session?.metadata).toMatchObject({ formalAttempt: true })
+    await game.startDaily('2026-10-11', 'classic')
+    expect(game.session?.metadata).toMatchObject({ formalAttempt: false })
+    expect(game.session?.id).not.toBe('daily:2026-10-11:formal')
+  } finally {
+    await game.leaveGame()
+    game.dispose()
+    test.dispose()
+  }
 })

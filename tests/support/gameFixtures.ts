@@ -12,6 +12,7 @@ export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
       difficulty: 'easy',
       seed: 'fixture',
       puzzleVersion: PUZZLE_VERSION,
+      rules: { kind: 'classic' },
     },
     entries: Array(81).fill(0),
     notes: Array(81).fill(0),

@@ -15,7 +15,7 @@ it('copies snapshots and serializes revisions while retrying only the newest fai
       await Promise.resolve()
       return fail
         ? { ok: false, error: { kind: 'write-failed', message: 'Aborted' } }
-        : { ok: true, value: { formatVersion: 1, revision: revision + 1, session } }
+        : { ok: true, value: { formatVersion: 2, revision: revision + 1, session } }
     },
   }
   const queue = createSaveQueue(writer, { sessionId: 'game', ownerId: 'a', fence: 1, epoch: 1 }, 0)

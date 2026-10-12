@@ -1,7 +1,11 @@
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 import type { Puzzle } from '@/core/sudoku/generation'
 import { parsePuzzle } from '@/core/sudoku/generation'
-import { calculateCandidates, isCellIndex, isComplete, maskOf, PEERS } from '@/core/sudoku/board'
+import { isCellIndex, isComplete, maskOf } from '@/core/sudoku/board'
+import { compileRules } from '@/core/sudoku/rules'
+import { evaluateCandidates } from '@/core/sudoku/constraints'
+import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
+import type { WorkBudget } from '@/core/sudoku/budget'
 import { BOARD_SIZE, isDigit } from '@/core/sudoku/types'
 export type GameMode = 'free' | 'learning' | 'daily'
 export type SessionPhase = 'generating' | 'playing' | 'paused' | 'completed' | 'failed'
@@ -40,6 +44,9 @@ export type GameAction =
   | { kind: 'redo' }
   | { kind: 'hint-shown' }
   | { kind: 'check' }
+export type SessionActionResult =
+  | { status: 'complete'; session: GameSession; changed: boolean; boardComplete: boolean }
+  | { status: 'budget-exhausted'; session: GameSession; changed: false; boardComplete: false }
 export function createSession(
   puzzle: Puzzle,
   metadata: SessionMetadata,
@@ -80,12 +87,19 @@ function sameLayers(first: BoardLayers, second: BoardLayers): boolean {
 export function applySessionAction(
   session: GameSession,
   action: GameAction,
-): { session: GameSession; changed: boolean; boardComplete: boolean } {
-  const unchanged = { session, changed: false, boardComplete: false }
+  workBudget: WorkBudget = createWorkBudget(DEFAULT_WORK_LIMIT),
+): SessionActionResult {
+  const unchanged: SessionActionResult = {
+    status: 'complete',
+    session,
+    changed: false,
+    boardComplete: false,
+  }
   if (session.completion) return unchanged
   if ('cell' in action && (!isCellIndex(action.cell) || session.puzzle.givens[action.cell] !== 0))
     return unchanged
   if ('digit' in action && !isDigit(action.digit)) return unchanged
+  const context = compileRules(session.puzzle.rules)
   if (action.kind === 'undo' || action.kind === 'redo') {
     const source = action.kind === 'undo' ? session.undoStack : session.redoStack
     const move = source.at(-1)
@@ -99,7 +113,12 @@ export function applySessionAction(
       redoStack:
         action.kind === 'redo' ? session.redoStack.slice(0, -1) : [...session.redoStack, move],
     }
-    return { session: next, changed: true, boardComplete: isComplete(sessionBoard(next)) }
+    return {
+      status: 'complete',
+      session: next,
+      changed: true,
+      boardComplete: isComplete(sessionBoard(next), context),
+    }
   }
   const before = layers(session),
     entries = [...session.entries],
@@ -110,7 +129,7 @@ export function applySessionAction(
       if (entries[action.cell] === action.digit) return unchanged
       entries[action.cell] = action.digit
       notes[action.cell] = 0
-      for (const peer of PEERS[action.cell]) notes[peer] &= ~maskOf(action.digit)
+      for (const peer of context.duplicatePeers[action.cell]) notes[peer] &= ~maskOf(action.digit)
       break
     case 'erase':
       entries[action.cell] = 0
@@ -128,11 +147,15 @@ export function applySessionAction(
       assistance.checkCount++
       assistance.assisted = true
       break
-    case 'generate-notes':
-      notes.splice(0, BOARD_SIZE, ...calculateCandidates(sessionBoard(session)))
+    case 'generate-notes': {
+      const result = evaluateCandidates(sessionBoard(session), context, workBudget)
+      if (result.status === 'budget-exhausted')
+        return { status: 'budget-exhausted', session, changed: false, boardComplete: false }
+      notes.splice(0, BOARD_SIZE, ...result.candidates)
       assistance.candidateCount++
       assistance.assisted = true
       break
+    }
   }
   const after = { entries, notes }
   const boardChanged = !sameLayers(before, after)
@@ -150,14 +173,20 @@ export function applySessionAction(
       : session.undoStack,
     redoStack: boardChanged ? [] : session.redoStack,
   }
-  return { session: next, changed: true, boardComplete: isComplete(sessionBoard(next)) }
+  return {
+    status: 'complete',
+    session: next,
+    changed: true,
+    boardComplete: isComplete(sessionBoard(next), context),
+  }
 }
 export function completeSession(
   session: GameSession,
   completedAt: string,
   elapsedMs: number,
 ): GameSession {
-  if (session.completion || !isComplete(sessionBoard(session))) return session
+  if (session.completion || !isComplete(sessionBoard(session), compileRules(session.puzzle.rules)))
+    return session
   if (!Number.isFinite(elapsedMs) || elapsedMs < 0 || !Number.isFinite(Date.parse(completedAt)))
     throw new TypeError('Invalid completion metadata')
   const duration = Math.floor(elapsedMs)
