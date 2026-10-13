@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest'
 import { parseWorkerRequest, parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import { createGenerationInput } from '@/core/sudoku/generation'
+import { assessPuzzle, createAssessmentInput, toAssessmentOutcome } from '@/core/sudoku/rating'
+import { RATING_FIXTURES } from '../../tests/fixtures/rating'
 import { analyzeHint } from '@/core/sudoku/hint'
 import { createLogicalWorkspace } from '@/core/sudoku/logic'
 import { findVariantStep } from '@/core/sudoku/variantTechniques'
@@ -12,6 +14,65 @@ import {
   ARROW_REPEAT_RULES,
   VARIANT_FIXTURES,
 } from '../../tests/fixtures/variants'
+
+it.each(RATING_FIXTURES)('accepts compact assessment for $id', (fixture) => {
+  const input = createAssessmentInput(fixture.board, fixture.rules)
+  const outcome = { status: 'completed', value: toAssessmentOutcome(assessPuzzle(input)) }
+
+  expect(parseWorkerRequest({ kind: 'assess', requestId: fixture.id, input })).toEqual({
+    valid: true,
+    value: { kind: 'assess', requestId: fixture.id, input },
+  })
+  expect(parseWorkerResponse({ kind: 'assess', requestId: fixture.id, outcome })).toEqual({
+    valid: true,
+    value: { kind: 'assess', requestId: fixture.id, outcome },
+  })
+  expect(
+    parseWorkerRequest({
+      kind: 'assess',
+      requestId: fixture.id,
+      input: { ...input, ratingVersion: 'future' },
+    }).valid,
+  ).toBe(false)
+  expect(
+    parseWorkerResponse({
+      kind: 'assess',
+      requestId: fixture.id,
+      outcome: { status: 'completed', value: {} },
+    }).valid,
+  ).toBe(false)
+})
+
+it('decodes optional generation metadata independently from a playable puzzle', () => {
+  const fixture = RATING_FIXTURES[0]
+  const puzzle = {
+    seed: 'metadata',
+    difficulty: 'easy',
+    puzzleVersion: 'sudoku-v2',
+    givens: fixture.board,
+    solution: fixture.solution,
+    rules: fixture.rules,
+  }
+  const base = {
+    kind: 'generate',
+    requestId: 'metadata',
+    outcome: { status: 'completed', value: puzzle },
+  }
+
+  expect(parseWorkerResponse(base)).toEqual({ valid: true, value: base })
+  expect(
+    parseWorkerResponse({ ...base, outcome: { ...base.outcome, assessment: null } }),
+  ).toMatchObject({
+    valid: true,
+    value: {
+      outcome: {
+        status: 'completed',
+        value: puzzle,
+        assessment: { status: 'unavailable', reason: 'invalid-summary' },
+      },
+    },
+  })
+})
 
 it.each(Object.entries(VARIANT_FIXTURES))(
   'accepts complete %s rules and validates the supplied solution',

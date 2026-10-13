@@ -11,6 +11,7 @@ import type { GameSession, SessionMetadata, SessionPhase } from '@/features/game
 import type { GameTransition } from '@/features/game/model/variants'
 import type { StorageOutcome, SessionRecord } from '@/storage/records'
 import type { SessionPersistence } from '@/features/game/stores/sessionPersistence'
+import type { PuzzleAssessment } from '@/core/sudoku/rating'
 
 export type SessionTransitionHost = {
   session: Ref<GameSession | null>
@@ -391,11 +392,23 @@ export function createSessionTransitions(
   async function replaceWithPuzzle(
     puzzle: Puzzle,
     metadata: SessionMetadata,
-    id = runtime.createId(),
-    epoch = operationGeneration,
-    signal?: AbortSignal,
+    options: {
+      id?: string
+      epoch?: number
+      signal?: AbortSignal
+      assessment?: PuzzleAssessment
+    } = {},
   ): Promise<GameTransition> {
-    const next = createSession(puzzle, metadata, id, runtime.wallNow().toISOString())
+    const id = options.id ?? runtime.createId()
+    const epoch = options.epoch ?? operationGeneration
+    const signal = options.signal
+    const next = createSession(
+      puzzle,
+      metadata,
+      id,
+      runtime.wallNow().toISOString(),
+      options.assessment,
+    )
     const catalog = await runtime.repository.listSessions()
     if (epoch !== operationGeneration) {
       return { status: 'cancelled' }
@@ -628,7 +641,12 @@ export function createSessionTransitions(
         : { status: 'blocked', reason: 'generation' }
     }
 
-    const transition = await replaceWithPuzzle(result.value, metadata, id, epoch, job.signal)
+    const transition = await replaceWithPuzzle(result.value, metadata, {
+      id,
+      epoch,
+      signal: job.signal,
+      assessment: result.assessment,
+    })
     if (controller === job) {
       controller = null
     }
@@ -761,7 +779,9 @@ export function createSessionTransitions(
       return prepared
     }
 
-    return replaceWithPuzzle(session.value.puzzle, session.value.metadata)
+    return replaceWithPuzzle(session.value.puzzle, session.value.metadata, {
+      assessment: session.value.assessment,
+    })
   }
 
   async function startDaily(date: string, variant: SudokuVariant): Promise<GameTransition> {

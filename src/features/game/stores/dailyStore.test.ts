@@ -1,6 +1,6 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { createTestRuntime } from '../../../../tests/support/runtime'
-import { makeSession } from '../../../../tests/support/gameFixtures'
+import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { isDigit } from '@/core/sudoku/types'
 import { createApp } from 'vue'
@@ -19,6 +19,9 @@ it('restores yesterday and old puzzle versions without generating them again', a
     metadata: { kind: 'daily', challengeDate: '2026-10-10', formalAttempt: true },
   })
   saved.puzzle = { ...saved.puzzle, puzzleVersion: 'older-puzzle' }
+  saved.assessment = makeAssessment(saved.puzzle)
+  const assess = vi.spyOn(test.runtime.worker, 'assess')
+  const generate = vi.spyOn(test.runtime.worker, 'generate')
   const lease = await test.runtime.ownership.acquireOwnership(saved.id, 'seed-owner')
   if (!lease.ok || !lease.value) {
     throw new Error('Expected fixture lease')
@@ -32,6 +35,9 @@ it('restores yesterday and old puzzle versions without generating them again', a
   expect(game.phase).toBe('paused')
   expect(game.session?.puzzle.puzzleVersion).toBe('older-puzzle')
   expect(game.session?.metadata).toEqual(saved.metadata)
+  expect(game.session?.assessment).toEqual(saved.assessment)
+  expect(assess).not.toHaveBeenCalled()
+  expect(generate).not.toHaveBeenCalled()
   await game.leaveGame()
   game.dispose()
   test.dispose()

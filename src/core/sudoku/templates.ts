@@ -14,7 +14,7 @@ function literalBoard(text: string): Board {
 const solution = literalBoard(
   '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
 )
-// Frozen sudoku-v1 fixtures, independently unique. Medium requires locked candidates;
+// Authored fallback fixtures, independently unique. Medium requires locked candidates;
 // Hard additionally requires the row-4 pair {2, 4} in cells 33 and 34.
 export const TEMPLATES: readonly PuzzleTemplate[] = [
   {

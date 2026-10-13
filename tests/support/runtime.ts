@@ -23,6 +23,7 @@ export async function createTestRuntime() {
     createSaveQueue: (token, revision) => createSaveQueue(repository, token, revision),
     worker: {
       generate: async () => ({ status: 'failed', message: 'No worker configured' }),
+      assess: async () => ({ status: 'failed', message: 'No worker configured' }),
       hint: async () => ({ status: 'failed', message: 'No worker configured' }),
       dispose() {},
     },

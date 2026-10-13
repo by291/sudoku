@@ -8,7 +8,7 @@ import {
 } from '@/core/sudoku/board'
 import type { SudokuUnit } from '@/core/sudoku/board'
 import { DIGITS } from '@/core/sudoku/types'
-import type { Board, CellValue, Difficulty, Digit, NoteMask } from '@/core/sudoku/types'
+import type { Board, CellValue, Digit, NoteMask } from '@/core/sudoku/types'
 import { TECHNIQUES } from '@/core/sudoku/techniques'
 import type {
   LogicalState,
@@ -22,7 +22,7 @@ import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
 import type { RuleContext } from '@/core/sudoku/rules'
 import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { findVariantStep, VARIANT_TECHNIQUE_POLICIES } from '@/core/sudoku/variantTechniques'
+import { findVariantStep } from '@/core/sudoku/variantTechniques'
 import type { StepOutcome } from '@/core/sudoku/variantTechniques'
 
 export type LogicalWorkspace = {
@@ -32,7 +32,10 @@ export type LogicalWorkspace = {
   premises: RuleEvidence[]
 }
 
-export type LogicalOptions = { context: RuleContext; workBudget: WorkBudget }
+export type LogicalOptions = {
+  context: RuleContext
+  workBudget: WorkBudget
+}
 
 export type LogicResult = {
   status: 'solved' | 'stalled' | 'budget-exhausted'
@@ -267,7 +270,7 @@ export function findLogicalStep(
     state.context.rules.kind === 'classic'
       ? TECHNIQUES.filter((technique) => allowed.includes(technique))
       : allowed
-  if (state.context.rules.kind !== 'classic' && !consumeWork(budget)) {
+  if (!consumeWork(budget)) {
     return { status: 'budget-exhausted' }
   }
 
@@ -350,46 +353,4 @@ export function analyzeLogic(
   }
 
   return { status: 'solved', board: state.board, steps }
-}
-
-export function rateVariantDifficulty(
-  board: Board,
-  context: RuleContext,
-  stepBudget: number,
-  workBudget: WorkBudget,
-): { status: 'rated'; difficulty: Difficulty | null } | { status: 'budget-exhausted' } {
-  for (const difficulty of ['easy', 'medium', 'hard'] as const) {
-    const result = analyzeLogic(board, VARIANT_TECHNIQUE_POLICIES[difficulty], stepBudget, {
-      context,
-      workBudget,
-    })
-    if (result.status === 'solved') {
-      return { status: 'rated', difficulty }
-    }
-
-    if (result.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted' }
-    }
-  }
-
-  return { status: 'rated', difficulty: null }
-}
-
-export function rateDifficulty(board: Board, stepBudget: number): Difficulty | null {
-  for (const [difficulty, count] of [
-    ['easy', 2],
-    ['medium', 3],
-    ['hard', 5],
-  ] satisfies [Difficulty, number][]) {
-    const result = analyzeLogic(board, TECHNIQUES.slice(0, count), stepBudget)
-    if (result.status === 'solved') {
-      return difficulty
-    }
-
-    if (result.status === 'budget-exhausted') {
-      return null
-    }
-  }
-
-  return null
 }

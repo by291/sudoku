@@ -4,6 +4,7 @@ import { createGenerationInput, PUZZLE_VERSION } from '@/core/sudoku/generation'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 import { solvedBoard, uniqueBoard } from '../../tests/fixtures/sudoku'
 import type { WorkerRequest } from '@/worker/protocol'
+import { createAssessmentInput } from '@/core/sudoku/rating'
 
 class FakeWorker extends EventTarget {
   static instances: FakeWorker[] = []
@@ -47,6 +48,67 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
+})
+
+it('assesses with the same timeout, stale reply fence, cancellation, and disposal', async () => {
+  const client = createSudokuWorkerClient()
+  const assessmentInput = createAssessmentInput(uniqueBoard, { kind: 'classic' })
+  const pending = client.assess(assessmentInput)
+  const worker = latestWorker()
+  const reply = {
+    kind: 'assess',
+    requestId: worker.requests[0].requestId,
+    outcome: {
+      status: 'completed',
+      value: {
+        status: 'ungraded',
+        ratingVersion: assessmentInput.ratingVersion,
+        variant: 'classic',
+      },
+    },
+  }
+  worker.reply({ ...reply, requestId: 'stale' })
+
+  expect(worker.terminated).toBe(false)
+  worker.reply(reply)
+
+  expect(await pending).toEqual(reply.outcome)
+  expect(worker.terminated).toBe(true)
+  const timed = client.assess(assessmentInput)
+  await vi.advanceTimersByTimeAsync(14999)
+
+  expect(latestWorker().terminated).toBe(false)
+  await vi.advanceTimersByTimeAsync(1)
+
+  expect(await timed).toEqual({ status: 'timed-out' })
+  const controller = new AbortController()
+  const cancelled = client.assess(assessmentInput, controller.signal)
+  controller.abort()
+
+  expect(await cancelled).toEqual({ status: 'cancelled' })
+  const disposed = client.assess(assessmentInput)
+  client.dispose()
+
+  expect(await disposed).toEqual({ status: 'cancelled' })
+  expect(await client.assess(assessmentInput)).toEqual({ status: 'cancelled' })
+})
+
+it('rejects assessment identities that differ from the submitted rules', async () => {
+  const client = createSudokuWorkerClient()
+  const pending = client.assess(createAssessmentInput(uniqueBoard, { kind: 'classic' }))
+  const worker = latestWorker()
+  worker.reply({
+    kind: 'assess',
+    requestId: worker.requests[0].requestId,
+    outcome: {
+      status: 'completed',
+      value: { status: 'ungraded', variant: 'arrow', ratingVersion: 'sudoku-rating-v1' },
+    },
+  })
+
+  expect(await pending).toMatchObject({ status: 'failed' })
+  expect(worker.terminated).toBe(true)
+  client.dispose()
 })
 it('terminates work after the exact timeout without changing retry input', async () => {
   const client = createSudokuWorkerClient()

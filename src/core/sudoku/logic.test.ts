@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
-import { findLogicalStep, analyzeLogic, rateDifficulty } from '@/core/sudoku/logic'
+import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
+import { findLogicalStep, analyzeLogic } from '@/core/sudoku/logic'
 import { explainStep, TECHNIQUES } from '@/core/sudoku/techniques'
 import { emptyBoard, uniqueBoard, solvedBoard } from '../../../tests/fixtures/sudoku'
 import { createLogicalWorkspace } from '@/core/sudoku/logic'
@@ -169,7 +170,10 @@ it('solves the known easy puzzle using singles and preserves its input', () => {
     status: 'solved',
     board: solvedBoard,
   })
-  expect(rateDifficulty(uniqueBoard, 500)).toBe('easy')
+  expect(assessPuzzle(createAssessmentInput(uniqueBoard, { kind: 'classic' }))).toMatchObject({
+    status: 'rated',
+    summary: { difficulty: 'easy' },
+  })
   expect(analyzeLogic(uniqueBoard, TECHNIQUES, 0).status).toBe('budget-exhausted')
 })
 

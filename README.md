@@ -20,7 +20,7 @@ Open the Local URL printed by Vite. No server account, API keys, or backend serv
 | Command                             | Purpose                                                           |
 | ----------------------------------- | ----------------------------------------------------------------- |
 | `pnpm dev`                          | Start the development server on loopback                          |
-| `pnpm typecheck`                    | Check Vue, browser, worker, tooling, and browser-test types       |
+| `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types   |
 | `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries         |
 | `pnpm format:check` / `pnpm format` | Check or apply formatting                                         |
 | `pnpm test:unit`                    | Run domain, store, component, and storage tests                   |
@@ -42,7 +42,19 @@ pnpm exec playwright install --no-remove chromium firefox webkit
 pnpm check
 ```
 
-Set the variable in the same terminal for installation and subsequent test commands; it applies to that terminal session. The project cache is ignored by Git. This workaround retains every configured browser project and the pinned dependency versions. On 2026-10-13, all 88 Firefox end-to-end tests passed using the project-local installation.
+Set the variable in the same terminal for installation and subsequent test commands; it applies to that terminal session. The project cache is ignored by Git. This workaround retains every configured browser project and the pinned dependency versions. On 2026-10-13, all 94 Firefox end-to-end tests passed using the project-local installation. The [generation milestone verification report](docs/superpowers/verification/2026-10-13-sudoku-classic-terminal-diversity.md) records the historical checks and browser concurrency used on this host.
+
+## Internal assessment
+
+Production workers call the pure TypeScript assessor directly, using `sudoku-rating-v1` and default limits of 500 steps per policy and one million shared work units. No external rater or runtime service is required. Browser tests verify actual emitted workers against authored fixture grades, explicit unavailable outcomes, and request budgets at both deployment roots.
+
+Generation defaults are `{ maxLayouts: 20, maxWork: 1000000, maxSteps: 500, fallbackWork: 1000000 }`. Construction, uniqueness, assessment, and variant necessity share `maxWork`; fallback validation shares its separate `fallbackWork`. Ready generation includes its accepted compact assessment, which Worker delivery reuses.
+
+Versioned summaries carry the type, difficulty, and workload: steps, placements, eliminations, explicit candidate removals, all eleven technique counts, highest technique/tier, and steps using variant evidence. Placement propagation is excluded from candidate-removal counts. Only the successful policy contributes statistics; failed easier policies share the work budget but discard their board state and trace. Completed boards have zero counts and null highest fields. No weighted numeric score is assigned.
+
+Difficulty is the first supported Easy/Medium/Hard policy that completes the puzzle, compared within its type. Rating does not prove uniqueness. Ungraded, exhausted, and invalid outcomes remain explicit. Sessions/results store compact assessment snapshots; restoring valid saved boards does not generate or regrade them. Missing, corrupt, unsupported, or mismatched metadata retains the existing explicit boundary behavior.
+
+Current Classic generation (`sudoku-v2`) constructs complete grids with seeded randomized MRV search, then removes clues under independent uniqueness and shared difficulty checks. Variants use `sudoku-variants-v2` and their existing meaningful geometry strategies. Only complete matching assessments can be delivered, including verified authored fallbacks. New free and daily requests use current versions immediately; no historical generator or daily cutoff table is maintained. Historical seeds are not reproduction contracts. Stored attempts and completed facts still take precedence, with no storage clearing. See the [Phase B plan](docs/superpowers/plans/2026-10-13-sudoku-classic-terminal-diversity.md) for scope and verification.
 
 ## Play
 
@@ -109,10 +121,10 @@ Game and lesson pages share `NumberPad`, while their owners handle session and e
 
 Read [AGENTS.md](AGENTS.md), the [original product design](docs/superpowers/specs/2026-10-11-sudoku-design.md), and the [variants design](docs/superpowers/specs/2026-10-11-sudoku-variants-design.md) before changing behavior. The [variants implementation plan](docs/superpowers/plans/2026-10-11-sudoku-variants.md) records its contracts and verification. Prefer current official documentation for the installed stack and keep core logic independent of browser/framework APIs. Algorithm tests use fixed seeds, an independent exact-cover Classic oracle, and a separate rule-aware variant oracle that never calls production evaluation.
 
-Classic preserves its `sudoku-v1` seeded generation stream. New types use `sudoku-variants-v1` with type, difficulty, and seed in their generation identity. Daily seeds are `daily:sudoku-v1:<date>` for Classic and `daily:sudoku-variants-v1:<type>:<date>` for variants.
+Current generation uses `sudoku-v2` for Classic and `sudoku-variants-v2` for variants, with type, difficulty, and seed in the construction identity. Daily seeds are `daily:sudoku-v2:<date>` for Classic and `daily:sudoku-variants-v2:<type>:<date>` for variants. Stored daily attempts remain snapshots and take precedence over new construction.
 
 Variant generation allows 20 layout attempts and 500 logical steps per analysis, sharing one million work units across generation searches, arithmetic assignments, and repeated propagation. A separate one-million-unit budget validates fallback uniqueness, logical rating, and rule necessity. Fifteen original frozen fallback slots cover every new type/tier. Delivered clues must matter to solving; transformations remap the entire geometry and preserve sums/order. Exhaustion is explicit and never becomes a false proof, a different difficulty, or an unverified puzzle. Worker requests retain a 15-second timeout and cancellation.
 
 Easy variant policies use singles and direct cage remainder, Thermo bounds, and Arrow equations. Medium adds intersections and cage/Arrow combinations; Hard adds pairs. Hints include the arithmetic or region premises leading to a placement. Difficulty compares puzzles within the selected type. Supported techniques deliberately limit generation and hints; advanced variant strategies are outside this release.
 
-Solution layouts use safe seeded transformations of authored complete grids, followed by generated geometry/given selection and validation. This ensures reproducibility and bounded work while offering less solution diversity than sampling all completed grids.
+Classic uses seeded randomized MRV terminal construction followed by clue removal and validation. Variant layouts use safe seeded transformations of authored complete grids, followed by generated geometry/given selection and validation. Both paths remain reproducible and bounded; neither claims uniform sampling of completed grids.

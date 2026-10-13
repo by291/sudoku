@@ -15,6 +15,7 @@ Read [AGENTS.md](../AGENTS.md), [Web Architecture](architecture.md), and the [va
 | Chinese catalogue                       | `src/features/game/model/variants.ts`: `VARIANT_PRESENTATION`, ordered options, and query validation; review setup and teaching summaries too                     |
 | Board geometry and accessibility        | `src/shared/model/boardGeometry.ts`: `VariantBoardAdapter`; `SudokuClues.vue` renders supported clue primitives                                                   |
 | Worker proof boundary                   | `src/worker/hintEvidence.ts`: evidence decoding and validation against the actual puzzle; `protocol.ts` retains message envelopes                                 |
+| Internal assessment                     | `src/core/sudoku/ratingPolicies.ts` and `rating.ts`: applicable nested policies, ordered tiers, version, workload semantics, and runtime decoders                 |
 | Teaching                                | `src/features/learning/model/{lessonIds,lessons,variantExamples}.ts`: stable identifiers and independently justified exercises                                    |
 | Daily, saves, and records               | Game daily models, `src/storage/records.ts`, and records aggregation: identity, runtime validation, slot scope, and statistics                                    |
 
@@ -28,7 +29,8 @@ Definitions do not import the registry that constructs them. Shared rule/topolog
 4. Provide authored fallback fixtures for every supported difficulty. Verify them with an independent reference solver and explicit expected facts. Budget exhaustion is inconclusive; it never proves uniqueness or contradiction.
 5. Register Chinese names/rules and board presentation. Check accessible cell descriptions, clue overlap, selected-rule text, focus, and pause concealment. Introduce new rendering geometry only when current primitives cannot express the rule.
 6. Add teaching examples with stable lesson identifiers and known deductions. Extend worker evidence to identify the actual clue, cell positions, direction, bounds, and numeric premises; a valid object shape alone is insufficient.
-7. Verify separate free-save slots, formal daily identity, replay eligibility, and record filtering. Keep existing generation versions and legacy Classic identities intact unless an explicit migration has been designed.
+7. Verify separate free-save slots, formal daily identity, replay eligibility, stored-attempt precedence, and record filtering. Current generation does not require historical seed reproduction; avoid rewriting stored boards or formal eligibility.
+8. Register applicable Easy/Medium/Hard policies with `satisfies` coverage and explicit order. Register new techniques in the tier map and complete count shape; update evidence classification/decoding together. Add independently justified fixtures and verify real production-worker outcomes at both roots. Keep rating and generation versions separate; generated ready results must carry a matching complete assessment under shared work accounting.
 
 ## A genuinely new constraint primitive
 
@@ -36,8 +38,8 @@ Registration cannot make an unsupported constraint solvable. Extend `RuleConstra
 
 Use fixed fixtures to prove valid and invalid assignments, candidates, conflicts, uniqueness, completion, and supported deductions. Reference checks must not call production constraint evaluation. A search or arithmetic budget that runs out must return an inconclusive result rather than a false deduction.
 
-## Compatibility and verification
+## Determinism and verification
 
-Seeded generation is a compatibility contract: random call order, legal transforms, template order, and fallback selection all affect existing puzzle identities. `tests/fixtures/generationCompatibility.json` captures 36 historical outputs from the engine before this refactor. Do not regenerate those expectations to accommodate a changed implementation. Add separately justified cases for new behavior.
+Random call order, legal transforms, template order, and fallback selection determine current seeded output. Pin current determinism and independent solution/tier facts. The user removed historical-generation compatibility requirements: no old generator dispatch, frozen old-output corpus, or daily cutoff is required. Bump current generation identity when algorithm semantics change; do not silently regrade or regenerate saved boards.
 
 Run relevant engine, worker, lifecycle, storage, and presentation tests during implementation. Before completion, run type checking, lint, formatting, all unit tests, root and `/sudoku/` builds, and the configured Playwright projects. Verify real worker assets, modal keyboard ownership, touch controls, pauses, saves, lessons, and completion. Report actual unavailable browser runtimes; mobile emulation does not certify a physical device.

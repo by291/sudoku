@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { deleteDB, unwrap } from 'idb'
 import { openSudokuDatabase } from '@/storage/database'
 import { createGameRepository } from '@/storage/repository'
-import { makeSession } from '../../tests/support/gameFixtures'
+import { makeAssessment, makeSession } from '../../tests/support/gameFixtures'
 import { deferred } from '../../tests/support/deferred'
 import { createOwnershipCoordinator } from '@/storage/ownership'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
@@ -23,6 +23,37 @@ afterEach(async () => {
     database.close()
     await deleteDB(database.name)
   }
+})
+
+it('keeps corrupt assessment metadata out of quarantine and preserves completed snapshots', async () => {
+  const { database, repository } = await setup()
+  const session = makeSession()
+  await database.put('sessions', {
+    formatVersion: 2,
+    revision: 8,
+    session: { ...session, assessment: null },
+  })
+  const completed = makeSession({ assessment: makeAssessment() })
+  completed.entries = completed.puzzle.solution.map((digit, cell) =>
+    completed.puzzle.givens[cell] ? 0 : digit,
+  )
+  completed.completion = { completedAt: completed.startedAt, elapsedMs: 0 }
+  await database.put('results', { formatVersion: 2, session: completed })
+
+  expect(await repository.listSessions()).toMatchObject({
+    ok: true,
+    value: [
+      {
+        revision: 8,
+        session: { ...session, assessment: { status: 'unavailable', reason: 'invalid-summary' } },
+      },
+    ],
+  })
+  expect(await repository.listResults()).toEqual({
+    ok: true,
+    value: [{ formatVersion: 2, session: completed }],
+  })
+  expect(await database.count('quarantine')).toBe(0)
 })
 it('upgrades an empty database and round-trips settings and progress', async () => {
   const { database, repository } = await setup()

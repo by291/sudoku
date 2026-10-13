@@ -8,7 +8,7 @@ export default defineConfig({
   worker: { format: 'es' },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.ts', 'tooling/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     restoreMocks: true,
     css: { include: [/theme\.css/] },
   },

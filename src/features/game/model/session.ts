@@ -7,6 +7,8 @@ import { evaluateCandidates } from '@/core/sudoku/constraints'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { BOARD_SIZE, isDigit } from '@/core/sudoku/types'
+import { decodePuzzleAssessment } from '@/core/sudoku/rating'
+import type { PuzzleAssessment } from '@/core/sudoku/rating'
 
 export type GameMode = 'free' | 'learning' | 'daily'
 
@@ -31,6 +33,7 @@ export type Assistance = {
 export type GameSession = {
   id: string
   puzzle: Puzzle
+  assessment?: PuzzleAssessment
   mode: GameMode
   entries: Board
   notes: readonly NoteMask[]
@@ -62,6 +65,7 @@ export function createSession(
   metadata: SessionMetadata,
   id: string,
   startedAt: string,
+  assessment?: PuzzleAssessment,
 ): GameSession {
   const parsed = parsePuzzle(puzzle)
   if (!parsed.valid) {
@@ -72,9 +76,15 @@ export function createSession(
     throw new TypeError('Invalid session identity')
   }
 
+  const snapshot = decodePuzzleAssessment(assessment, {
+    variant: parsed.value.rules.kind,
+    difficulty: parsed.value.difficulty,
+  })
+
   return {
     id,
     puzzle: parsed.value,
+    ...(snapshot === undefined ? {} : { assessment: snapshot }),
     mode: metadata.kind,
     metadata: { ...metadata },
     entries: Array(BOARD_SIZE).fill(0),

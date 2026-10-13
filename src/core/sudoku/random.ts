@@ -1,5 +1,5 @@
-// sudoku-v1 hashes UTF-16 code units using FNV-1a, then uses Mulberry32.
-// Preserve its stream consumption when changing Classic generation.
+// Hash UTF-16 code units with FNV-1a, then produce a deterministic Mulberry32 stream.
+// Generator call ordering is fixed within each current generation version.
 export function seededRandom(seed: string): () => number {
   let state = 2166136261
 

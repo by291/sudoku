@@ -5,29 +5,9 @@ import { getConstraintSupport } from '@/core/sudoku/constraints'
 import { constraintCells } from '@/core/sudoku/rules'
 import type { RuleConstraint, RuleContext } from '@/core/sudoku/rules'
 import { DIGITS, isDigit } from '@/core/sudoku/types'
-import type { Difficulty, NoteMask } from '@/core/sudoku/types'
+import type { NoteMask } from '@/core/sudoku/types'
 import type { LogicalState, LogicalStep, RuleEvidence, Technique } from '@/core/sudoku/techniques'
 import { matchesRuleTechnique } from '@/core/sudoku/techniques'
-
-const easy: readonly Technique[] = [
-  'naked-single',
-  'hidden-single',
-  'cage-distinct',
-  'cage-remainder',
-  'thermo-bound',
-  'arrow-equation',
-]
-const medium: readonly Technique[] = [
-  ...easy,
-  'locked-candidate',
-  'cage-combination',
-  'arrow-combination',
-]
-export const VARIANT_TECHNIQUE_POLICIES: Record<Difficulty, readonly Technique[]> = {
-  easy,
-  medium,
-  hard: [...medium, 'naked-pair', 'hidden-pair'],
-}
 
 export type StepOutcome =
   { status: 'complete'; step: LogicalStep | null } | { status: 'budget-exhausted' }

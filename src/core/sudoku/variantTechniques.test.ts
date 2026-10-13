@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest'
-import { findVariantStep, VARIANT_TECHNIQUE_POLICIES } from '@/core/sudoku/variantTechniques'
-import { createLogicalWorkspace, findLogicalStep, rateVariantDifficulty } from '@/core/sudoku/logic'
+import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
+import { findVariantStep } from '@/core/sudoku/variantTechniques'
+import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
+import { createLogicalWorkspace, findLogicalStep } from '@/core/sudoku/logic'
 import { analyzeHint } from '@/core/sudoku/hint'
 import { explainStep } from '@/core/sudoku/techniques'
 import { compileRules } from '@/core/sudoku/rules'
@@ -14,9 +16,9 @@ import {
 import type { Board } from '@/core/sudoku/types'
 
 it('keeps combination deductions outside the easy policy', () => {
-  expect(VARIANT_TECHNIQUE_POLICIES.easy).not.toContain('arrow-combination')
-  expect(VARIANT_TECHNIQUE_POLICIES.medium).toContain('arrow-combination')
-  expect(VARIANT_TECHNIQUE_POLICIES.hard).toContain('hidden-pair')
+  expect(RATING_POLICIES.arrow.easy).not.toContain('arrow-combination')
+  expect(RATING_POLICIES.arrow.medium).toContain('arrow-combination')
+  expect(RATING_POLICIES.arrow.hard).toContain('hidden-pair')
 })
 it('solves a one-unknown arrow equation without excluding permitted repeats', () => {
   const board = [...ARROW_REPEAT_BOARD]
@@ -112,14 +114,10 @@ it.each(['diagonal', 'jigsaw'] as const)('uses %s units for hidden singles', (va
   })
 })
 it('returns an explicit arithmetic budget outcome rather than a claimed difficulty', () => {
-  const fixture = VARIANT_FIXTURES.arrow
-
   expect(
-    rateVariantDifficulty(
-      ARROW_REPEAT_BOARD,
-      compileRules(fixture.rules),
-      500,
+    assessPuzzleWithBudget(
+      createAssessmentInput(ARROW_REPEAT_BOARD, ARROW_REPEAT_RULES),
       createWorkBudget(0),
     ),
-  ).toEqual({ status: 'budget-exhausted' })
+  ).toMatchObject({ status: 'budget-exhausted' })
 })

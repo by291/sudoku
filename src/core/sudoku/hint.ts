@@ -6,7 +6,7 @@ import { isComplete } from '@/core/sudoku/board'
 import type { LogicalOptions } from '@/core/sudoku/logic'
 import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
-import { VARIANT_TECHNIQUE_POLICIES } from '@/core/sudoku/variantTechniques'
+import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
 
 export type HintResult =
   | { kind: 'review-entry'; cell: number }
@@ -31,7 +31,8 @@ export function analyzeHint(
 
   const state = createLogicalWorkspace(board, context)
   const budget = options?.workBudget ?? createWorkBudget(DEFAULT_WORK_LIMIT)
-  const techniques = context.rules.kind === 'classic' ? TECHNIQUES : VARIANT_TECHNIQUE_POLICIES.hard
+  const techniques =
+    context.rules.kind === 'classic' ? TECHNIQUES : RATING_POLICIES[context.rules.kind].hard
   const steps: LogicalStep[] = []
 
   for (let index = 0; index < stepBudget; index++) {

@@ -4,6 +4,20 @@ Date: 2026-10-13
 
 Status: Approved by the user on 2026-10-13, with authorization to commit this design and continue with implementation planning. Phase A is the first implementation milestone; Phase B follows after its compatibility and assessment foundations are verified.
 
+## Continuation amendment: remove the development CLI
+
+On 2026-10-13 the user requested removal of the Node CLI and the complete `tooling/` directory. Production Workers continue to use the internal engine directly. Move the retained module-boundary suite to `tests/module-boundaries.test.ts`, remove command-specific source/tests/build configuration and scripts, and validate real Worker outcomes against fixed fixture facts instead of a second adapter. Historical implementation plans and verification reports describe their earlier milestones; their CLI requirements no longer apply.
+
+## Continuation amendment: no historical generation compatibility
+
+On 2026-10-13 the user authorized Phase B implementation without backward-generation compatibility. This amendment supersedes the version-preservation, frozen-output, legacy-wrapper, and future daily-cutover requirements below, which describe historical Phase A decisions.
+
+Keep current paths only: `sudoku-v2` for Classic and `sudoku-variants-v2` after integrating variant assessment. Remove template-only Classic generation, legacy rating wrappers, and historical output fixtures. Use limits `{ maxLayouts: 20, maxWork: 1000000, maxSteps: 500, fallbackWork: 1000000 }`. Construction, uniqueness, assessment, and variant necessity share one budget; fallback validation shares a separate budget. Ready generation carries its accepted compact assessment, reused by Worker delivery.
+
+Free play and new daily construction immediately use the current factory, without historical dispatch or cutoff tables. Valid saved boards remain snapshots; do not clear storage, regenerate them, rewrite results, or alter formal eligibility. Unrelated record-format normalization stays. Preserve the 15-second timeout, cancellation, authored fallbacks, and independent uniqueness tests.
+
+Prove Classic terminal diversity with independent intercalate counts: unequal counts establish different transformation classes; equal counts do not prove equivalence. Do not claim uniform sampling. Scores, advanced techniques, and variant geometry diversity remain separate work.
+
 ## 1. Intent and decisions
 
 Improve puzzle generation and difficulty assessment for the existing Chinese-language Sudoku application. A delivered puzzle must have a unique solution, be solvable with the techniques supported for its type and difficulty, and carry an explainable assessment. Development tools and production must execute the same assessment code with the same policies.
@@ -73,7 +87,7 @@ Keep the engine independent of Vue, Pinia, DOM APIs, storage, and worker globals
 - `ratingPolicies.ts` owns typed, static, ordered policies for all six types and the assessment version.
 - `rating.ts` orchestrates assessment, selects the successful policy, and summarizes its trace.
 - Generation modules construct candidates and use search and rating to decide acceptance.
-- A thin development CLI handles input/output and calls the same engine exports used by workers.
+- Production workers adapt input/output and call the pure engine exports directly.
 - Workers own transport and resource lifetime; storage owns persistence and boundary decoding.
 
 `rating.ts` may depend on `logic.ts` and the policy definitions. The logical runner must not import rating orchestration. Existing rating entry points move to the rating owner with their legacy signatures and behavior preserved during the compatibility phase. Update internal imports instead of retaining a circular forwarding facade.
@@ -116,7 +130,7 @@ Count a logical deduction as one step regardless of how many candidates it remov
 
 These are product metrics of a particular deterministic trace, not measurements of player time. They support within-tier workload comparison and corpus inspection. The first release exposes the existing three tiers to players and keeps these statistics internal; it does not publish a universal numeric score or add new difficulty choices.
 
-Do not fix arbitrary weights or workload acceptance thresholds in the first release. A later policy may define a weighted workload score and within-tier bands after evaluating a versioned corpus and player feedback. Such weights and bands require their own reviewed policy revision. Until then, generation accepts by technique tier, and CLI reports show the metric distributions without converting them into additional grades.
+Do not fix arbitrary weights or workload acceptance thresholds in the first release. A later policy may define a weighted workload score and within-tier bands after evaluating a versioned corpus and player feedback. Such weights and bands require their own reviewed policy revision. Until then, generation accepts by technique tier, and assessment summaries retain workload metrics without converting them into additional grades.
 
 Bottleneck metrics, such as the number of available next deductions at each state, are deferred. They require extra detector enumeration, deduplication, and budgets. Their effect on human difficulty must be validated before they influence generation.
 
@@ -139,17 +153,17 @@ Use `sudoku-rating-v1` as the initial assessment version, with complete type-spe
 
 Full traces are available for tests and development walkthroughs but are not persisted for every game. Store the compact summary. Requesting a hint continues to analyze current player entries; an initial rating trace is not a hint script for a changed board.
 
-## 8. Development and production parity
+## 8. Production worker assessment
 
-The development CLI and the production worker import the same engine assessment function and static policies. No environment-specific score calculations, default technique lists, or fallback classifications are permitted.
+Production workers import the pure engine assessment function and static policies. No environment-specific score calculations, default technique lists, or fallback classifications are permitted.
 
-The CLI accepts puzzle/rule input and supports single assessment, batch JSONL reports, and fixed-seed generation reports. Reports include the assessment version, input identity, limits, outcome, tier, workload, and generated/fallback source when available. These commands operate on local files and do not upload player data.
+Assessment requests contain the board, complete rules, assessment version, and explicit work limits. Responses retain rated, ungraded, exhausted, and invalid outcomes with their applicable fields. Generated games retain the accepted compact assessment without repeating grading during delivery.
 
-Workers continue validating messages and rejecting stale responses. Both adapters map domain outcomes explicitly. Cancellation and wall-clock timeouts describe execution interruption; they never become a claimed difficulty or select a different generated puzzle.
+Workers continue validating messages and rejecting stale responses. Domain outcomes map explicitly. Cancellation and wall-clock timeouts describe execution interruption; they never become a claimed difficulty or select a different generated puzzle.
 
-For the same board, rules, assessment version, and work limits, Node and browser execution must return identical domain results and workload counts. Optional adapter timings are performance diagnostics and are excluded from equality checks and seed identity.
+Fixed board, rules, assessment version, and work limits determine domain results and workload counts. Wall-clock timing is a performance diagnostic outside grade and seed identity.
 
-CLI and worker conformance is verified by invoking both adapters on fixed fixtures. Sharing a module is necessary but does not by itself prove that adapters supplied matching rules, versions, and limits.
+Validate actual emitted Worker assets at both deployment roots against authored fixtures and explicit expected facts. Verify budget handling, outcome decoding, accepted summary identity, and saved-session restoration without a CLI dependency.
 
 ## 9. Generation pipeline
 
@@ -202,7 +216,7 @@ If a future assessment changes a detector, technique order, policy, or workload 
 
 ### Phase A: Formalize shared internal assessment
 
-Extract explicit type-specific policies, introduce the assessment contract and workload summary, and preserve the existing tier semantics. Add a thin Node CLI and production worker integration that invoke the same function. Carry optional assessment metadata without changing legacy puzzle identity or generation outcomes.
+Extract explicit type-specific policies, introduce the assessment contract and workload summary, and preserve the existing tier semantics. Integrate the pure assessor into production workers. Carry optional assessment metadata without changing legacy puzzle identity or generation outcomes.
 
 Use fixed fixtures and seeded reports to inspect each type/tier's statistics. Retain current Chinese labels, supported techniques, UI layouts, teaching content, and generated/fallback acceptance criteria. This phase needs no external rating dependency or backend.
 
@@ -238,7 +252,7 @@ Player-feedback calibration is also deferred. The current static application can
 
 ### Adapter and persistence behavior
 
-- Run identical fixture requests through the Node CLI and real production worker assets and compare domain outcomes exactly.
+- Run fixed fixture requests through real production worker assets and validate known grades, outcome semantics, and work limits.
 - Validate malformed transport/metadata, missing legacy metadata, unsupported summary versions, and disagreement between summary and puzzle identity.
 - Verify cancellation, stale replies, timeout/retry behavior, save restoration, new generation-version dispatch, and retained daily identities.
 - Keep generation and assessment usable at both the hosting root and `/sudoku/`.

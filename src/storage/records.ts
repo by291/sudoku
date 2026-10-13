@@ -15,6 +15,7 @@ import { getDailyIdentity } from '@/features/game/model/daily'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import type { Settings } from '@/features/settings/model/preferences'
 import { isLessonId } from '@/features/learning/model/lessonIds'
+import { decodePuzzleAssessment } from '@/core/sudoku/rating'
 
 export type SessionRecord = { formatVersion: 2; revision: number; session: GameSession }
 
@@ -248,11 +249,18 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
     }
   }
 
+  // Optional assessment corruption must not quarantine an independently valid game.
+  const assessment = decodePuzzleAssessment(value.assessment, {
+    variant: puzzle.value.rules.kind,
+    difficulty: puzzle.value.difficulty,
+  })
+
   return {
     valid: true,
     value: {
       id: value.id,
       puzzle: puzzle.value,
+      ...(assessment === undefined ? {} : { assessment }),
       mode: metadata.kind,
       metadata,
       ...layers,

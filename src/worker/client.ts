@@ -1,14 +1,16 @@
 import type { Board } from '@/core/sudoku/types'
-import type { GenerationInput, Puzzle } from '@/core/sudoku/generation'
+import type { GenerationInput } from '@/core/sudoku/generation'
 import type { HintResult } from '@/core/sudoku/hint'
-import type { WorkerOutcome } from '@/worker/protocol'
+import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
 import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import type { WorkerRequest } from '@/worker/protocol'
 import { isRecord } from '@/core/sudoku/types'
 import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { AssessmentInput, AssessmentOutcome } from '@/core/sudoku/rating'
 
 export interface SudokuWorkerClient {
-  generate(input: GenerationInput, signal?: AbortSignal): Promise<WorkerOutcome<Puzzle>>
+  generate(input: GenerationInput, signal?: AbortSignal): Promise<GenerateOutcome>
+  assess(input: AssessmentInput, signal?: AbortSignal): Promise<WorkerOutcome<AssessmentOutcome>>
   hint(
     board: Board,
     solution: Board,
@@ -110,6 +112,32 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
               outcome.value.puzzleVersion !== input.puzzleVersion)
           ) {
             return null
+          }
+
+          return outcome
+        },
+        signal,
+      )
+    },
+    assess(input, signal) {
+      return run(
+        { kind: 'assess', requestId: crypto.randomUUID(), input },
+        (value) => {
+          const parsed = parseWorkerResponse(value)
+          if (!parsed.valid || parsed.value.kind !== 'assess') {
+            return null
+          }
+
+          const outcome = parsed.value.outcome
+          if (outcome.status === 'completed' && outcome.value.status !== 'invalid') {
+            const identity =
+              outcome.value.status === 'rated' ? outcome.value.summary : outcome.value
+            if (
+              identity.variant !== input.rules.kind ||
+              identity.ratingVersion !== input.ratingVersion
+            ) {
+              return null
+            }
           }
 
           return outcome

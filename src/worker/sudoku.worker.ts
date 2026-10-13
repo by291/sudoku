@@ -5,6 +5,7 @@ import { parseWorkerRequest } from '@/worker/protocol'
 import type { WorkerResponse } from '@/worker/protocol'
 import { compileRules } from '@/core/sudoku/rules'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
+import { assessPuzzle, toAssessmentOutcome } from '@/core/sudoku/rating'
 
 addEventListener('message', (event: MessageEvent<unknown>) => {
   const parsed = parseWorkerRequest(event.data)
@@ -30,10 +31,20 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
         requestId: request.requestId,
         outcome:
           result.status === 'ready'
-            ? { status: 'completed', value: result.puzzle }
+            ? {
+                status: 'completed',
+                value: result.puzzle,
+                assessment: { status: 'rated', summary: result.assessment },
+              }
             : result.status === 'budget-exhausted'
               ? { status: 'budget-exhausted', message: 'Fallback verification budget exhausted' }
               : { status: 'failed', message: result.reason },
+      }
+    } else if (request.kind === 'assess') {
+      response = {
+        kind: 'assess',
+        requestId: request.requestId,
+        outcome: { status: 'completed', value: toAssessmentOutcome(assessPuzzle(request.input)) },
       }
     } else {
       response = {

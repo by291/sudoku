@@ -2,8 +2,9 @@ import { expect, it } from 'vitest'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { compileRules } from '@/core/sudoku/rules'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { analyzeLogic, rateVariantDifficulty } from '@/core/sudoku/logic'
-import { VARIANT_TECHNIQUE_POLICIES } from '@/core/sudoku/variantTechniques'
+import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
+import { analyzeLogic } from '@/core/sudoku/logic'
+import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
 import { variantRulesMatter } from '@/core/sudoku/variantGeneration'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 
@@ -22,14 +23,19 @@ it('verifies all fifteen original fallback slots independently', () => {
         const budget = createWorkBudget(1000000)
 
         expect(
-          rateVariantDifficulty(template.givens, compileRules(template.rules), 500, budget),
-        ).toEqual({ status: 'rated', difficulty })
+          assessPuzzleWithBudget(createAssessmentInput(template.givens, template.rules), budget),
+        ).toMatchObject({ status: 'rated', summary: { difficulty } })
         expect(variantRulesMatter(template, budget)).toEqual({ status: 'complete', matters: true })
         const context = compileRules(template.rules)
-        const proof = analyzeLogic(template.givens, VARIANT_TECHNIQUE_POLICIES[difficulty], 500, {
-          context,
-          workBudget: createWorkBudget(1000000),
-        })
+        const proof = analyzeLogic(
+          template.givens,
+          RATING_POLICIES[template.rules.kind][difficulty],
+          500,
+          {
+            context,
+            workBudget: createWorkBudget(1000000),
+          },
+        )
 
         expect(proof.status).toBe('solved')
 
@@ -47,7 +53,7 @@ it('verifies all fifteen original fallback slots independently', () => {
           const easier = difficulty === 'hard' ? 'medium' : 'easy'
 
           expect(
-            analyzeLogic(template.givens, VARIANT_TECHNIQUE_POLICIES[easier], 500, {
+            analyzeLogic(template.givens, RATING_POLICIES[template.rules.kind][easier], 500, {
               context,
               workBudget: createWorkBudget(1000000),
             }).status,

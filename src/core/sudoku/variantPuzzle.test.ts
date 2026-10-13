@@ -2,8 +2,7 @@ import { expect, it } from 'vitest'
 import { generatePuzzle, parsePuzzle, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
 import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
-import { compileRules } from '@/core/sudoku/rules'
-import { rateVariantDifficulty } from '@/core/sudoku/logic'
+import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { variantRulesMatter } from '@/core/sudoku/variantGeneration'
 
@@ -39,9 +38,9 @@ it.each(
     })
     const budget = createWorkBudget(1000000)
 
-    expect(rateVariantDifficulty(puzzle.givens, compileRules(puzzle.rules), 500, budget)).toEqual({
+    expect(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))).toMatchObject({
       status: 'rated',
-      difficulty,
+      summary: result.assessment,
     })
     expect(variantRulesMatter(puzzle, budget)).toEqual({ status: 'complete', matters: true })
   },
@@ -54,10 +53,10 @@ it('validates fallback independently and never returns an unverified puzzle afte
     puzzleVersion: VARIANT_PUZZLE_VERSION,
     seed: 'forced-fallback',
   } as const
-  const limits = { maxLayouts: 0, searchNodes: 0, logicalSteps: 500, fallbackNodes: 1000000 }
+  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500, fallbackWork: 1000000 }
 
   expect(generatePuzzle(input, limits)).toMatchObject({ status: 'ready', source: 'fallback' })
-  expect(generatePuzzle(input, { ...limits, fallbackNodes: 0 })).toEqual({
+  expect(generatePuzzle(input, { ...limits, fallbackWork: 0 })).toEqual({
     status: 'budget-exhausted',
     stage: 'fallback-validation',
   })

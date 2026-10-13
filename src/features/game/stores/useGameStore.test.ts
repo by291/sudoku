@@ -22,6 +22,7 @@ function setup() {
     createId: () => 'new-game',
     worker: {
       generate: async () => ({ status: 'failed', message: 'Test generation failure' }),
+      assess: async () => ({ status: 'failed', message: 'Test assessment failure' }),
       hint: () =>
         new Promise((resolve) => {
           reply = resolve
@@ -126,7 +127,7 @@ it('ignores stale hints and preserves an old session when generation fails', asy
   expect(test.store.hint).toBeNull()
   expect(test.store.session?.assistance.hintCount).toBe(0)
   await test.store.startGame(
-    { difficulty: 'easy', seed: 'new', variant: 'classic', puzzleVersion: 'sudoku-v1' },
+    { difficulty: 'easy', seed: 'new', variant: 'classic', puzzleVersion: 'sudoku-v2' },
     { kind: 'free' },
   )
 
@@ -197,7 +198,7 @@ it('retries a failed generation with the identical seed and metadata', async () 
     difficulty: 'easy',
     seed: 'same-request',
     variant: 'classic',
-    puzzleVersion: 'sudoku-v1',
+    puzzleVersion: 'sudoku-v2',
   } as const
   await game.startGame(input, { kind: 'free' })
 

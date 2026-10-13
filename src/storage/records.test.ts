@@ -5,11 +5,46 @@ import {
   parseSettings,
   parseLessonProgress,
 } from '@/storage/records'
-import { makeSession } from '../../tests/support/gameFixtures'
+import { makeAssessment, makeSession } from '../../tests/support/gameFixtures'
 import { applySessionAction } from '@/features/game/model/session'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 
 const fixture = { formatVersion: 2, revision: 0, session: makeSession() }
+
+it.each([null, { status: 'rated', summary: { ratingVersion: 'future' } }])(
+  'keeps a valid game when its assessment is corrupt or unsupported: %j',
+  (assessment) => {
+    const played = applySessionAction(makeSession(), { kind: 'enter', cell: 2, digit: 4 }).session
+    const session = applySessionAction(played, { kind: 'hint-shown' }).session
+    const parsed = parseSessionRecord({
+      formatVersion: 2,
+      revision: 19,
+      session: { ...session, assessment },
+    })
+
+    expect(parsed).toMatchObject({
+      valid: true,
+      value: { revision: 19, session: { ...session, assessment: { status: 'unavailable' } } },
+    })
+    if (parsed.valid) {
+      expect(parseSessionRecord(parsed.value)).toEqual(parsed)
+    }
+  },
+)
+
+it('preserves the completed assessment snapshot and leaves old records absent', () => {
+  const session = makeSession({ assessment: makeAssessment() })
+  session.entries = session.puzzle.solution.map((digit, cell) =>
+    session.puzzle.givens[cell] ? 0 : digit,
+  )
+  session.completion = { completedAt: session.startedAt, elapsedMs: 0 }
+
+  expect(parseResultRecord({ formatVersion: 2, session })).toEqual({
+    valid: true,
+    value: { formatVersion: 2, session },
+  })
+  expect(parseSessionRecord(fixture)).toEqual({ valid: true, value: fixture })
+})
 it('accepts valid sessions including wrong player entries and older stored puzzle versions', () => {
   expect(parseSessionRecord(fixture)).toEqual({ valid: true, value: fixture })
   const session = applySessionAction(makeSession(), { kind: 'enter', cell: 2, digit: 1 }).session

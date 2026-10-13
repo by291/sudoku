@@ -13,7 +13,7 @@ import { countSolutions } from '@/core/sudoku/search'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import type { VariantTemplate } from '@/core/sudoku/variantTemplates'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { rateVariantDifficulty } from '@/core/sudoku/logic'
+import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
 import type {
   GenerationInput,
@@ -30,7 +30,7 @@ export function transformVariantTemplate(
 ): VariantTemplate {
   const kind = template.rules.kind
   if (kind === 'classic') {
-    throw new TypeError('Classic uses its original transformation stream')
+    throw new TypeError('Classic uses its own terminal construction')
   }
 
   const strategy = VARIANT_GENERATION_STRATEGIES[kind]
@@ -126,12 +126,12 @@ const CELL_INDICES = Array.from({ length: 81 }, (_, cell) => cell)
 function seededTransform(template: VariantTemplate, random: () => number): VariantTemplate {
   const symmetry = SYMMETRIES[Math.floor(random() * SYMMETRIES.length)]
   if (template.rules.kind === 'classic') {
-    throw new TypeError('Classic uses its original transformation stream')
+    throw new TypeError('Classic uses its own terminal construction')
   }
 
   const strategy = VARIANT_GENERATION_STRATEGIES[template.rules.kind]
 
-  // Random-call order is part of sudoku-variants-v1, including Arrow skipping complement draws.
+  // Seed identity includes geometry calls and Arrow skipping unsupported complement draws.
   if (strategy.allowsDigitMap) {
     const digits: readonly Digit[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -145,7 +145,7 @@ function seededTransform(template: VariantTemplate, random: () => number): Varia
 }
 
 export function generateVariantPuzzle(
-  input: Extract<GenerationInput, { puzzleVersion: 'sudoku-variants-v1' }>,
+  input: Extract<GenerationInput, { puzzleVersion: 'sudoku-variants-v2' }>,
   limits: GenerationLimits,
 ): GenerationResult {
   const random = seededRandom(
@@ -161,7 +161,8 @@ export function generateVariantPuzzle(
     seed: input.seed,
     puzzleVersion: input.puzzleVersion,
   })
-  const generationBudget = createWorkBudget(limits.searchNodes)
+  // Geometry, uniqueness, fresh assessment policies, and necessity share work across every layout.
+  const generationBudget = createWorkBudget(limits.maxWork)
 
   for (
     let layout = 0;
@@ -194,7 +195,12 @@ export function generateVariantPuzzle(
         workBudget: generationBudget,
       })
       if (unique.status === 'budget-exhausted') {
+        givens[cell] = previous
         break
+      }
+
+      if (unique.count === 0) {
+        return { status: 'failed', reason: 'Constructed variant lost its known solution' }
       }
 
       if (unique.count !== 1) {
@@ -202,17 +208,27 @@ export function generateVariantPuzzle(
         continue
       }
 
-      const rating = rateVariantDifficulty(givens, context, limits.logicalSteps, generationBudget)
+      const rating = assessPuzzleWithBudget(
+        createAssessmentInput(givens, rules, {
+          maxSteps: limits.maxSteps,
+          maxWork: generationBudget.limit,
+        }),
+        generationBudget,
+      )
       if (rating.status === 'budget-exhausted') {
+        givens[cell] = previous
         break
       }
 
-      if (!rating.difficulty) {
+      if (rating.status === 'invalid') {
+        return { status: 'failed', reason: rating.issues.join('; ') }
+      }
+      if (rating.status !== 'rated') {
         givens[cell] = previous
         continue
       }
 
-      if (rating.difficulty !== input.difficulty) {
+      if (rating.summary.difficulty !== input.difficulty) {
         continue
       }
 
@@ -220,7 +236,7 @@ export function generateVariantPuzzle(
         rules,
         solution: base.solution,
         givens: [...givens],
-        difficulty: rating.difficulty,
+        difficulty: rating.summary.difficulty,
       }
       const necessity = variantRulesMatter(candidate, generationBudget)
       if (necessity.status === 'budget-exhausted') {
@@ -228,13 +244,18 @@ export function generateVariantPuzzle(
       }
 
       if (necessity.matters) {
-        return { status: 'ready', source: 'generated', puzzle: makePuzzle(candidate) }
+        return {
+          status: 'ready',
+          source: 'generated',
+          puzzle: makePuzzle(candidate),
+          assessment: rating.summary,
+        }
       }
     }
   }
 
   const fallback = seededTransform(templates[Math.floor(random() * templates.length)], random)
-  const fallbackBudget = createWorkBudget(limits.fallbackNodes)
+  const fallbackBudget = createWorkBudget(limits.fallbackWork)
   const context = compileRules(fallback.rules)
   const unique = countSolutions(fallback.givens, {
     maxSolutions: 2,
@@ -246,10 +267,11 @@ export function generateVariantPuzzle(
     return { status: 'budget-exhausted', stage: 'fallback-validation' }
   }
 
-  const rating = rateVariantDifficulty(
-    fallback.givens,
-    context,
-    limits.logicalSteps,
+  const rating = assessPuzzleWithBudget(
+    createAssessmentInput(fallback.givens, fallback.rules, {
+      maxSteps: limits.maxSteps,
+      maxWork: fallbackBudget.limit,
+    }),
     fallbackBudget,
   )
   if (rating.status === 'budget-exhausted') {
@@ -263,12 +285,18 @@ export function generateVariantPuzzle(
 
   if (
     unique.count !== 1 ||
-    rating.difficulty !== input.difficulty ||
+    rating.status !== 'rated' ||
+    rating.summary.difficulty !== input.difficulty ||
     !necessity.matters ||
     !isComplete(fallback.solution, context)
   ) {
     return { status: 'failed', reason: 'Fallback validation failed' }
   }
 
-  return { status: 'ready', source: 'fallback', puzzle: makePuzzle(fallback) }
+  return {
+    status: 'ready',
+    source: 'fallback',
+    puzzle: makePuzzle(fallback),
+    assessment: rating.summary,
+  }
 }

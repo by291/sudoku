@@ -1,59 +1,12 @@
-import { readdirSync } from 'node:fs'
-import type { Page } from '@playwright/test'
+import { runWorker } from './workerHarness'
 import { test, expect, makeVariantHintSession } from './support'
-import type { WorkerRequest } from '@/worker/protocol'
 import { parseWorkerResponse } from '@/worker/protocol'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 import { countReferenceSolutions } from '../support/referenceSudoku'
-import { rateDifficulty } from '@/core/sudoku/logic'
-import { rateVariantDifficulty } from '@/core/sudoku/logic'
-import { compileRules } from '@/core/sudoku/rules'
+import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { createGenerationInput } from '@/core/sudoku/generation'
-import { createWorkBudget } from '@/core/sudoku/budget'
 import { explainStep } from '@/core/sudoku/techniques'
 import { referenceCountSolutions } from '../support/referenceVariants'
-
-const asset = readdirSync('dist/assets').find(
-  (file) => file.startsWith('sudoku.worker-') && file.endsWith('.js'),
-)
-if (!asset) {
-  throw new Error('Build the application before running browser tests')
-}
-
-async function runWorker(page: Page, request: WorkerRequest, base: '/' | '/sudoku/' = '/') {
-  const workerAsset =
-    base === '/'
-      ? asset
-      : readdirSync('dist-subpath/assets').find(
-          (file) => file.startsWith('sudoku.worker-') && file.endsWith('.js'),
-        )
-  if (!workerAsset) {
-    throw new Error('Missing production worker asset')
-  }
-
-  return page.evaluate(
-    ({ url, request }) =>
-      new Promise<unknown>((resolve, reject) => {
-        const worker = new Worker(url, { type: 'module' })
-        const timer = setTimeout(() => {
-          worker.terminate()
-          reject(new Error('Real worker timed out'))
-        }, 15000)
-        worker.onmessage = (event: MessageEvent<unknown>) => {
-          clearTimeout(timer)
-          worker.terminate()
-          resolve(event.data)
-        }
-        worker.onerror = (event) => {
-          clearTimeout(timer)
-          worker.terminate()
-          reject(new Error(event.message))
-        }
-        worker.postMessage(request)
-      }),
-    { url: `${base}assets/${workerAsset}`, request },
-  )
-}
 
 test('verifies fixed production-worker seeds and a known logical conclusion', async ({ page }) => {
   await page.goto('/#/')
@@ -67,7 +20,7 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
           difficulty,
           seed: 'production-fixed-seed',
           variant: 'classic',
-          puzzleVersion: 'sudoku-v1',
+          puzzleVersion: 'sudoku-v2',
         },
       }),
     )
@@ -81,8 +34,19 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
 
     const puzzle = response.value.outcome.value
 
+    expect(response.value.outcome.assessment).toMatchObject({
+      status: 'rated',
+      summary: { variant: 'classic', difficulty },
+    })
+
     expect(countReferenceSolutions(puzzle.givens, 2)).toBe(1)
-    expect(rateDifficulty(puzzle.givens, 500)).toBe(difficulty)
+    expect(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))).toMatchObject({
+      status: 'rated',
+      summary:
+        response.value.outcome.assessment?.status === 'rated'
+          ? response.value.outcome.assessment.summary
+          : undefined,
+    })
   }
 
   const hint = parseWorkerResponse(
@@ -136,19 +100,20 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
 
       const puzzle = generated.value.outcome.value
 
+      expect(generated.value.outcome.assessment).toMatchObject({
+        status: 'rated',
+        summary: { variant, difficulty: 'medium' },
+      })
+
       expect(puzzle.rules.kind).toBe(variant)
       expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
         count: 1,
         solution: puzzle.solution,
       })
-      expect(
-        rateVariantDifficulty(
-          puzzle.givens,
-          compileRules(puzzle.rules),
-          500,
-          createWorkBudget(1000000),
-        ),
-      ).toEqual({ status: 'rated', difficulty: 'medium' })
+      expect(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))).toMatchObject({
+        status: 'rated',
+        summary: { variant, difficulty: 'medium' },
+      })
       const hint = parseWorkerResponse(
         await runWorker(
           page,

@@ -99,9 +99,10 @@ test('keeps boards square and focus visible at 360, 390 and desktop widths', asy
   for (const width of [360, 390, 1280]) {
     await page.setViewportSize({ width, height: 900 })
 
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true)
+    // A closing menu is teleported and may still be leaving when the viewport changes.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true)
     const board = await page.getByRole('group', { name: '数独棋盘' }).boundingBox()
     const firstCell = await page.getByRole('button', { name: cellName(0) }).boundingBox()
     const lastCell = await page.getByRole('button', { name: cellName(80) }).boundingBox()

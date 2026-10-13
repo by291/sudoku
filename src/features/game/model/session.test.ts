@@ -1,9 +1,26 @@
 import { expect, it } from 'vitest'
 import { applySessionAction, completeSession, createSession } from '@/features/game/model/session'
-import { makeSession } from '../../../../tests/support/gameFixtures'
+import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { emptyBoard, solvedBoard } from '../../../../tests/fixtures/sudoku'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import { createWorkBudget } from '@/core/sudoku/budget'
+
+it('installs an independent assessment snapshot and preserves it through player actions', () => {
+  const fixture = makeSession()
+  const assessment = makeAssessment(fixture.puzzle)
+  const session = createSession(
+    fixture.puzzle,
+    fixture.metadata,
+    fixture.id,
+    fixture.startedAt,
+    assessment,
+  )
+  const changed = applySessionAction(session, { kind: 'enter', cell: 2, digit: 4 }).session
+
+  expect(session.assessment).toEqual(assessment)
+  expect(changed.assessment).toEqual(assessment)
+  expect(session.assessment).not.toBe(assessment)
+})
 
 it('initializes entries independently from givens', () => {
   const fixture = makeSession()

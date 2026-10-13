@@ -3,21 +3,27 @@ import {
   createGenerationInput,
   generatePuzzle,
   parseGenerationInput,
+  parseGenerationLimits,
   PUZZLE_VERSION,
 } from '@/core/sudoku/generation'
 import { TEMPLATES } from '@/core/sudoku/templates'
-import { rateDifficulty, analyzeLogic } from '@/core/sudoku/logic'
+import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
+import { analyzeLogic } from '@/core/sudoku/logic'
 import { TECHNIQUES } from '@/core/sudoku/techniques'
 import { countReferenceSolutions } from '../../../tests/support/referenceSudoku'
 import { isComplete } from '@/core/sudoku/board'
 import type { Difficulty } from '@/core/sudoku/types'
+import { countIntercalates } from '../../../tests/support/terminalDiversity'
 
 it.each(TEMPLATES)(
   'verifies the frozen $difficulty template independently',
   ({ givens, solution, difficulty }) => {
     expect(countReferenceSolutions(givens, 2)).toBe(1)
     expect(isComplete(solution)).toBe(true)
-    expect(rateDifficulty(givens, 500)).toBe(difficulty)
+    expect(assessPuzzle(createAssessmentInput(givens, { kind: 'classic' }))).toMatchObject({
+      status: 'rated',
+      summary: { difficulty },
+    })
     expect(analyzeLogic(givens, TECHNIQUES, 500)).toMatchObject({
       status: 'solved',
       board: solution,
@@ -47,7 +53,9 @@ it.each(
   }
 
   expect(countReferenceSolutions(result.puzzle.givens, 2)).toBe(1)
-  expect(rateDifficulty(result.puzzle.givens, 500)).toBe(input.difficulty)
+  expect(
+    assessPuzzle(createAssessmentInput(result.puzzle.givens, result.puzzle.rules)),
+  ).toMatchObject({ status: 'rated', summary: result.assessment })
   expect(isComplete(result.puzzle.solution)).toBe(true)
   expect(
     result.puzzle.givens.every(
@@ -62,7 +70,7 @@ it('falls back deterministically only after verifying its transformed template',
     difficulty: 'hard',
     puzzleVersion: PUZZLE_VERSION,
   } satisfies Parameters<typeof generatePuzzle>[0]
-  const limits = { maxLayouts: 0, searchNodes: 0, logicalSteps: 500, fallbackNodes: 1000000 }
+  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500, fallbackWork: 1000000 }
   const result = generatePuzzle(input, limits)
 
   expect(result).toMatchObject({ status: 'ready', source: 'fallback' })
@@ -71,10 +79,67 @@ it('falls back deterministically only after verifying its transformed template',
     expect(countReferenceSolutions(result.puzzle.givens, 2)).toBe(1)
   }
 
-  expect(generatePuzzle(input, { ...limits, fallbackNodes: 0 })).toEqual({
+  expect(generatePuzzle(input, { ...limits, fallbackWork: 0 })).toEqual({
     status: 'budget-exhausted',
     stage: 'fallback-validation',
   })
+})
+
+it('uses only current generation versions and returns an accepted assessment', () => {
+  const input = createGenerationInput('classic', 'easy', 'current-generation')
+  expect(input.puzzleVersion).toBe('sudoku-v2')
+  expect(createGenerationInput('arrow', 'easy', 'current-generation').puzzleVersion).toBe(
+    'sudoku-variants-v2',
+  )
+  expect(parseGenerationInput({ ...input, puzzleVersion: 'sudoku-v1' }).valid).toBe(false)
+  const result = generatePuzzle(input)
+
+  expect(result).toMatchObject({
+    status: 'ready',
+    assessment: { variant: 'classic', difficulty: 'easy', ratingVersion: 'sudoku-rating-v1' },
+  })
+})
+
+it('validates exact current work limits without accepting historical field names', () => {
+  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500, fallbackWork: 1000000 }
+
+  expect(parseGenerationLimits(limits)).toEqual({ valid: true, value: limits })
+  expect(parseGenerationLimits({ ...limits, maxWork: Infinity }).valid).toBe(false)
+  expect(parseGenerationLimits({ ...limits, maxSteps: 501 }).valid).toBe(false)
+  expect(
+    parseGenerationLimits({
+      maxLayouts: 0,
+      searchNodes: 0,
+      logicalSteps: 500,
+      fallbackNodes: 1000000,
+    }).valid,
+  ).toBe(false)
+  expect(parseGenerationLimits({ ...limits, extra: 0 }).valid).toBe(false)
+})
+
+it('delivers generated puzzles from independently different terminal classes', () => {
+  const counts = new Set<number>()
+  for (let index = 1; index <= 4; index++) {
+    const seed = `classic-v2-corpus-${String(index).padStart(2, '0')}`
+    const result = generatePuzzle(createGenerationInput('classic', 'easy', seed))
+
+    expect(result).toMatchObject({ status: 'ready', source: 'generated' })
+    if (result.status !== 'ready') {
+      throw new Error(seed)
+    }
+    expect(countReferenceSolutions(result.puzzle.givens, 2)).toBe(1)
+    counts.add(countIntercalates(result.puzzle.solution))
+  }
+
+  expect(counts.size).toBeGreaterThan(1)
+})
+
+it('never delivers a puzzle when fallback assessment cannot finish', () => {
+  const input = createGenerationInput('classic', 'hard', 'incomplete-fallback')
+
+  expect(
+    generatePuzzle(input, { maxLayouts: 0, maxWork: 0, maxSteps: 0, fallbackWork: 1000000 }),
+  ).toEqual({ status: 'budget-exhausted', stage: 'fallback-validation' })
 })
 it('rejects unsupported generation versions rather than silently changing the rules', () => {
   expect(

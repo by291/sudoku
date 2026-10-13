@@ -1,5 +1,12 @@
 import type { GameSession } from '@/features/game/model/session'
 import { PUZZLE_VERSION } from '@/core/sudoku/generation'
+import type { Puzzle } from '@/core/sudoku/generation'
+import {
+  assessPuzzle,
+  createAssessmentInput,
+  toAssessmentOutcome,
+  toPuzzleAssessment,
+} from '@/core/sudoku/rating'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 
 export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
@@ -25,4 +32,12 @@ export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
     metadata: { kind: 'free' },
     ...overrides,
   }
+}
+
+// Snapshot tests consume a real assessment; algorithm expectations live in the core fixture suite.
+export function makeAssessment(puzzle: Puzzle = makeSession().puzzle) {
+  return toPuzzleAssessment(
+    toAssessmentOutcome(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))),
+    { variant: puzzle.rules.kind, difficulty: puzzle.difficulty },
+  )
 }

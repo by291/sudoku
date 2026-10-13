@@ -8,11 +8,11 @@ import { deferred } from '../../../../tests/support/deferred'
 import type { GameSession } from '@/features/game/model/session'
 import { completeSession } from '@/features/game/model/session'
 import { createTestRuntime } from '../../../../tests/support/runtime'
-import { makeSession } from '../../../../tests/support/gameFixtures'
+import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { createGenerationInput } from '@/core/sudoku/generation'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
-import type { WorkerOutcome } from '@/worker/protocol'
+import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
 import type { Puzzle } from '@/core/sudoku/generation'
 
 const runtimes: Awaited<ReturnType<typeof createTestRuntime>>[] = []
@@ -32,6 +32,84 @@ afterEach(() => {
     test.dispose()
   }
 })
+
+it.each(['rated', 'unavailable'] as const)(
+  'installs %s metadata, retains it on restart, and restores without assessment work',
+  async (status) => {
+    const test = await setup()
+    const puzzle = makeSession().puzzle
+    const assessment =
+      status === 'rated'
+        ? makeAssessment(puzzle)
+        : { status: 'unavailable' as const, reason: 'ungraded' as const, issues: [] }
+    const assess = vi.spyOn(test.runtime.worker, 'assess')
+    test.runtime.worker.generate = vi.fn(async () => ({
+      status: 'completed' as const,
+      value: puzzle,
+      assessment,
+    }))
+
+    expect(
+      await test.game.startGame(createGenerationInput('classic', 'easy', 'snapshot'), {
+        kind: 'free',
+      }),
+    ).toEqual({ status: 'ready' })
+    expect(test.game.session?.assessment).toEqual(assessment)
+    await test.game.restartFree()
+
+    expect(test.game.session?.assessment).toEqual(assessment)
+    const id = test.game.session?.id
+    if (!id) {
+      throw new Error('Missing installed session')
+    }
+    await test.game.leaveGame()
+    test.game.dropSession()
+    await test.game.restoreSession(id)
+
+    expect(test.game.session?.assessment).toEqual(assessment)
+    expect(assess).not.toHaveBeenCalled()
+    expect(test.runtime.worker.generate).toHaveBeenCalledTimes(1)
+  },
+)
+
+it.each(['cancel', 'switch', 'reset'] as const)(
+  'fences the puzzle and assessment after %s while generation is pending',
+  async (action) => {
+    const original = makeSession({ assessment: makeAssessment() })
+    const test = await setup(original)
+    const pending = deferred<GenerateOutcome>()
+    const entered = deferred<void>()
+    test.runtime.worker.generate = () => {
+      entered.resolve()
+      return pending.promise
+    }
+    const starting = test.game.startGame(createGenerationInput('classic', 'easy', 'late'), {
+      kind: 'free',
+    })
+    await entered.promise
+    if (action === 'cancel') {
+      test.game.cancelLoading()
+    } else if (action === 'switch') {
+      await test.game.restoreSession(original.id)
+    } else {
+      await test.runtime.repository.clearAll()
+      test.game.dropSession()
+    }
+    pending.resolve({
+      status: 'completed',
+      value: { ...original.puzzle, seed: 'late' },
+      assessment: { status: 'unavailable', reason: 'ungraded', issues: [] },
+    })
+
+    expect(await starting).toEqual({ status: 'cancelled' })
+    if (action === 'reset') {
+      expect(test.game.session).toBeNull()
+    } else {
+      expect(test.game.session?.puzzle).toEqual(original.puzzle)
+      expect(test.game.session?.assessment).toEqual(original.assessment)
+    }
+  },
+)
 
 it('releases a delayed acquired lease exactly once after cancellation', async () => {
   const test = await setup()
@@ -512,7 +590,7 @@ it('does not create or install a cancelled game while its catalog read is pendin
       difficulty: 'easy',
       seed: 'cancel-before-commit',
       variant: 'classic',
-      puzzleVersion: 'sudoku-v1',
+      puzzleVersion: 'sudoku-v2',
     },
     { kind: 'free' },
   )
