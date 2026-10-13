@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 import { handleGameKey } from '@/features/game/composables/useGameKeyboard'
 import type { GameAction } from '@/features/game/model/session'
+
 it('routes digits, notes, erasing, arrows and history through shared actions', () => {
   const actions: GameAction[] = []
   const game = {
@@ -15,10 +16,14 @@ it('routes digits, notes, erasing, arrows and history through shared actions', (
       this.noteMode = !this.noteMode
     },
   }
-  for (const key of ['4', 'n', '5', 'ArrowRight', 'Backspace'])
+
+  for (const key of ['4', 'n', '5', 'ArrowRight', 'Backspace']) {
     handleGameKey(new KeyboardEvent('keydown', { key, cancelable: true }), game)
+  }
+
   handleGameKey(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }), game)
   handleGameKey(new KeyboardEvent('keydown', { key: 'z', metaKey: true, shiftKey: true }), game)
+
   expect(actions).toEqual([
     { kind: 'enter', cell: 2, digit: 4 },
     { kind: 'toggle-note', cell: 2, digit: 5 },
@@ -38,6 +43,7 @@ it('leaves form fields, dialog controls and inactive games untouched', () => {
     selectCell() {},
     toggleNoteMode() {},
   }
+
   for (const html of [
     '<input>',
     '<textarea></textarea>',
@@ -50,12 +56,16 @@ it('leaves form fields, dialog controls and inactive games untouched', () => {
     document.body.append(container)
     const target = container.querySelector('button') ?? container.firstElementChild
     target?.addEventListener('keydown', (event) => {
-      if (event instanceof KeyboardEvent) handleGameKey(event, game)
+      if (event instanceof KeyboardEvent) {
+        handleGameKey(event, game)
+      }
     })
     target?.dispatchEvent(new KeyboardEvent('keydown', { key: '4', bubbles: true }))
     container.remove()
   }
+
   game.editable = false
+
   expect(handleGameKey(new KeyboardEvent('keydown', { key: '4' }), game)).toBe(false)
 })
 it.each([
@@ -76,6 +86,7 @@ it.each([
       toggleNoteMode() {},
     }
     const event = new KeyboardEvent('keydown', { key, cancelable: true })
+
     expect(handleGameKey(event, game)).toBe(true)
     expect(game.selectedCell).toBe(cell)
     expect(event.defaultPrevented).toBe(true)
@@ -101,6 +112,7 @@ it('moves vertically in the same column when another row is available', () => {
       toggleNoteMode() {},
     }
     handleGameKey(new KeyboardEvent('keydown', { key }), game)
+
     expect(game.selectedCell).toBe(expected)
   }
 })
@@ -122,10 +134,13 @@ it.each(['combobox', 'listbox', 'option', 'radiogroup', 'radio', 'switch', 'chec
     document.body.append(control)
     let handled: boolean | undefined
     control.addEventListener('keydown', (event) => {
-      if (event instanceof KeyboardEvent) handled = handleGameKey(event, game)
+      if (event instanceof KeyboardEvent) {
+        handled = handleGameKey(event, game)
+      }
     })
     control.dispatchEvent(new KeyboardEvent('keydown', { key: '4', bubbles: true }))
     control.remove()
+
     expect(handled).toBe(false)
     expect(actions).toEqual([])
   },
@@ -143,13 +158,16 @@ it('leaves consumed keyboard events and open custom modals untouched', () => {
   }
   const consumed = new KeyboardEvent('keydown', { key: '4', cancelable: true })
   consumed.preventDefault()
+
   expect(handleGameKey(consumed, game)).toBe(false)
   const modal = document.createElement('div')
   modal.setAttribute('role', 'dialog')
   modal.setAttribute('aria-modal', 'true')
   document.body.append(modal)
+
   expect(handleGameKey(new KeyboardEvent('keydown', { key: '4' }), game)).toBe(false)
   modal.remove()
+
   expect(actions).toEqual([])
 })
 
@@ -168,9 +186,11 @@ it('lets an open action menu own input while focus remains on its trigger', () =
   menu.setAttribute('aria-hidden', 'false')
   document.body.append(menu)
   const event = new KeyboardEvent('keydown', { key: '4', cancelable: true })
+
   expect(handleGameKey(event, game)).toBe(false)
   expect(actions).toEqual([])
   menu.setAttribute('aria-hidden', 'true')
+
   expect(handleGameKey(new KeyboardEvent('keydown', { key: '4' }), game)).toBe(true)
   expect(actions).toEqual([{ kind: 'enter', cell: 2, digit: 4 }])
   menu.remove()

@@ -1,28 +1,36 @@
 <script setup lang="ts">
 import { NAlert, NButton, NCard } from 'naive-ui'
 import type { CardProps } from 'naive-ui'
-import { computed, onMounted, onScopeDispose, ref, useId, watch } from 'vue'
+import { computed, useId } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import type { Digit } from '@/core/sudoku/types'
-import { isDigit } from '@/core/sudoku/types'
-import { isKeyboardOwnedByControl } from '@/shared/utils/keyboardOwnership'
 import NumberPad from '@/shared/components/NumberPad.vue'
-import { maskOf } from '@/core/sudoku/board'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 import GameView from '@/features/game/views/GameView.vue'
 import { LESSONS } from '@/features/learning/model/lessons'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
-const route = useRoute(),
-  learning = useLearningStore()
+import { useLessonExercise } from '@/features/learning/composables/useLessonExercise'
+
+const route = useRoute()
+const learning = useLearningStore()
 const lesson = computed(() => LESSONS.find((lesson) => lesson.id === route.params.lessonId))
 const practice = computed(() => route.query.practice === '1')
 const explanationId = useId()
-const selected = ref<number | null>(null)
-const removals = ref<{ cell: number; digit: Digit }[]>([])
-const feedback = ref<string | null>(null)
-const correct = ref(false),
-  busy = ref(false),
-  showExplanation = ref(false)
+const {
+  selected,
+  removals,
+  feedback,
+  correct,
+  busy,
+  showExplanation,
+  exerciseCells,
+  exercisePrompt,
+  selectionText,
+  exampleNotes,
+  answer,
+  submitEliminations,
+  resetExercise,
+} = useLessonExercise(lesson, practice)
+
 const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
   correct.value
     ? undefined
@@ -32,94 +40,6 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
         textColor: 'var(--error)',
       },
 )
-const exerciseCells = computed(() =>
-  !lesson.value
-    ? []
-    : lesson.value.exercise.kind === 'placement'
-      ? [lesson.value.exercise.expected.cell]
-      : [...new Set(lesson.value.exercise.expected.map((pair) => pair.cell))],
-)
-const exercisePrompt = computed(() =>
-  lesson.value?.exercise.kind === 'placement'
-    ? '点击圆点标出的空格，填写应该出现的数字。'
-    : '点击圆点标出的格子，选择可以排除的候选数。再次选择可撤回，然后提交全部排除。',
-)
-const selectionText = computed(() =>
-  selected.value === null
-    ? '先选择一个练习格'
-    : `已选第${Math.floor(selected.value / 9) + 1}行第${(selected.value % 9) + 1}列`,
-)
-const exampleNotes = computed(
-  () =>
-    lesson.value?.candidates.map((mask, cell) =>
-      removals.value
-        .filter((pair) => pair.cell === cell)
-        .reduce((remaining, pair) => remaining & ~maskOf(pair.digit), mask),
-    ) ?? [],
-)
-watch(
-  () => lesson.value?.id,
-  async (id) => {
-    selected.value = null
-    removals.value = []
-    feedback.value = null
-    correct.value = false
-    showExplanation.value = false
-    await learning.load()
-    if (id) learning.selectLesson(id)
-  },
-  { immediate: true },
-)
-async function answer(digit: Digit) {
-  if (!lesson.value || selected.value === null || busy.value) return
-  if (lesson.value.exercise.kind === 'elimination') {
-    if (!(lesson.value.candidates[selected.value] & maskOf(digit))) return
-    const pair = { cell: selected.value, digit }
-    const exists = removals.value.some(
-      (item) => item.cell === pair.cell && item.digit === pair.digit,
-    )
-    removals.value = exists
-      ? removals.value.filter((item) => item.cell !== pair.cell || item.digit !== pair.digit)
-      : [...removals.value, pair]
-  } else {
-    busy.value = true
-    const result = await learning.submitExercise(lesson.value.id, { cell: selected.value, digit })
-    feedback.value = result.explanation
-    correct.value = result.correct
-    busy.value = false
-  }
-}
-async function submitEliminations() {
-  if (!lesson.value || busy.value) return
-  busy.value = true
-  const result = await learning.submitExercise(lesson.value.id, removals.value)
-  feedback.value = result.explanation
-  correct.value = result.correct
-  busy.value = false
-}
-function resetExercise() {
-  removals.value = []
-  feedback.value = null
-}
-function handleExerciseKey(event: KeyboardEvent) {
-  if (
-    practice.value ||
-    !lesson.value ||
-    selected.value === null ||
-    busy.value ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey ||
-    isKeyboardOwnedByControl(event)
-  )
-    return
-  const digit = Number(event.key)
-  if (event.key.length !== 1 || !isDigit(digit)) return
-  event.preventDefault()
-  void answer(digit)
-}
-onMounted(() => window.addEventListener('keydown', handleExerciseKey))
-onScopeDispose(() => window.removeEventListener('keydown', handleExerciseKey))
 </script>
 <template>
   <section v-if="!lesson" class="panel unknown">

@@ -1,9 +1,11 @@
 import { test, expect, cellName, readSessions, enterExerciseDigit } from './support'
 import { LESSONS } from '@/features/learning/model/lessons'
 import { VARIANT_OPTIONS } from '@/features/game/model/variants'
+
 test('completes the rules exercise using only keyboard navigation', async ({ page }, testInfo) => {
   await page.goto('/#/learn/rules')
   const first = page.getByRole('button', { name: cellName(0) })
+
   for (
     let tabs = 0;
     tabs < 20 && !(await first.evaluate((element) => element === document.activeElement));
@@ -11,9 +13,17 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
   ) {
     await page.keyboard.press('Tab')
   }
+
   await expect(first).toBeFocused()
-  for (let row = 0; row < 4; row++) await page.keyboard.press('ArrowDown')
-  for (let column = 0; column < 4; column++) await page.keyboard.press('ArrowRight')
+
+  for (let row = 0; row < 4; row++) {
+    await page.keyboard.press('ArrowDown')
+  }
+
+  for (let column = 0; column < 4; column++) {
+    await page.keyboard.press('ArrowRight')
+  }
+
   await expect(page.getByRole('button', { name: cellName(40) })).toBeFocused()
   await page.keyboard.press('9')
   await expect(page.getByRole('status')).toContainText('还差一点')
@@ -46,19 +56,23 @@ test('teaches all eleven exercises with retry and durable progress', async ({ pa
         await page.getByRole('button', { name: cellName(cell) }).click()
         await enterExerciseDigit(page, digit, '排除')
       }
+
       await page.getByRole('button', { name: '提交排除', exact: true }).click()
     }
+
     await expect(page.getByRole('status')).toContainText('推理正确')
     await page.getByRole('link', { name: /返回课程列表/ }).click()
     await expect(
       page.getByRole('link').filter({ hasText: lesson.title }).filter({ hasText: '已完成' }),
     ).toBeVisible()
   }
+
   await page.reload()
   await expect(page.getByRole('progressbar', { name: '全部课程学习进度' })).toHaveAttribute(
     'aria-valuetext',
     '已完成 11 / 11 节',
   )
+
   for (const variant of VARIANT_OPTIONS) {
     await page
       .getByRole('navigation', { name: '学习玩法' })
@@ -82,6 +96,7 @@ test('starts learning practice and confirms replacing a different lesson game', 
   await page.getByRole('link', { name: /进入完整棋盘练习/ }).click()
   await page.getByRole('button', { name: '开始游戏', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+
   expect((await readSessions(page))[0].session.metadata).toEqual({
     kind: 'learning',
     lessonId: 'rules',

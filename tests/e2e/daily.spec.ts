@@ -9,6 +9,7 @@ import {
   selectGameMenuAction,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
+
 test('starts a real daily challenge and preserves time and assistance on restart', async ({
   page,
 }) => {
@@ -28,6 +29,7 @@ test('starts a real daily challenge and preserves time and assistance on restart
     .poll(async () => (await readSessions(page))[0].session.notes.every((mask) => mask === 0))
     .toBe(true)
   const after = (await readSessions(page))[0].session
+
   expect(after.id).toBe(before.id)
   expect(after.assistance).toEqual(before.assistance)
   expect(after.elapsedMs).toBeGreaterThanOrEqual(before.elapsedMs)
@@ -52,6 +54,7 @@ test('saves one formal result and starts replay with a new identity', async ({ p
   await page.getByRole('dialog').getByRole('button', { name: '再次练习', exact: true }).click()
   await expect.poll(async () => (await readSessions(page)).length).toBe(2)
   const records = await readSessions(page)
+
   expect(
     records.filter(
       ({ session }) => session.metadata.kind === 'daily' && session.metadata.formalAttempt,

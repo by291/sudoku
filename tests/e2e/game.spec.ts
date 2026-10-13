@@ -11,6 +11,7 @@ import {
   closeGameSettings,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
+
 for (const [value, name] of [
   ['easy', '简单'],
   ['medium', '中等'],
@@ -30,15 +31,21 @@ for (const [value, name] of [
     const board = page.getByRole('group', { name: '数独棋盘' })
     await expect(board.getByRole('button')).toHaveCount(81)
     const empty = board.getByRole('button', { name: /空格/ }).first()
-    if (isMobile) await empty.tap()
-    else await empty.click()
+    if (isMobile) {
+      await empty.tap()
+    } else {
+      await empty.click()
+    }
+
     await enterGameDigit(page, 1)
     await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeEnabled()
+
     expect((await readSessions(page))[0].session.puzzle.difficulty).toBe(value)
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
     const size = await board.boundingBox()
+
     expect(size && Math.abs(size.width - size.height)).toBeLessThan(2)
     await page.getByRole('button', { name: '暂停', exact: true }).click()
     await expect(board.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
@@ -107,6 +114,7 @@ test('completes once and displays the saved result', async ({ page }) => {
   await page.getByRole('button', { name: cellName(2) }).click()
   await enterGameDigit(page, 4)
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
+
   expect(await countResults(page)).toBe(1)
   await page.getByRole('link', { name: '查看个人记录', exact: true }).click()
   await expect(page.getByRole('heading', { name: '完成记录' })).toBeVisible()
@@ -178,6 +186,7 @@ test('pauses on hiding and never resumes just because the page becomes visible',
   await expect
     .poll(async () => (await readSessions(page))[0].session.elapsedMs)
     .toBe(pausedDuration)
+
   expect(pausedDuration).toBeGreaterThanOrEqual(7000)
 })
 test('cancels a delayed generation without replacing the old save', async ({ page }) => {
@@ -194,5 +203,6 @@ test('cancels a delayed generation without replacing the old save', async ({ pag
   await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
   await page.getByRole('button', { name: '取消出题', exact: true }).click()
   await expect(page.getByRole('alert').filter({ hasText: '已取消出题' })).toBeVisible()
+
   expect((await readSessions(page))[0].session.id).toBe('fixture-free-session')
 })

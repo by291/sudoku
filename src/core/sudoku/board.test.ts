@@ -23,6 +23,7 @@ it('accepts valid board data without treating player conflicts as malformed', ()
 })
 it('calculates the only possible digit in a single empty cell', () => {
   const board = solvedBoard.map((value, index) => (index === 0 ? 0 : value))
+
   expect(calculateCandidates(board)).toEqual([16, ...Array(80).fill(0)])
 })
 it('reports duplicates and requires a valid full board for completion', () => {

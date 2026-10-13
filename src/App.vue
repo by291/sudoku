@@ -7,7 +7,7 @@ import type { ThemePreference } from '@/features/settings/model/preferences'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { useGameStore } from '@/features/game/stores/useGameStore'
-import { useGameRuntime } from '@/infrastructure/runtime'
+import { useGameRuntime } from '@/runtime'
 
 const preferences = usePreferencesStore()
 const records = useRecordsStore()

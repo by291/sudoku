@@ -5,16 +5,19 @@ import { openSudokuDatabase } from '@/storage/database'
 import { createGameRepository } from '@/storage/repository'
 import { makeSession } from '../../tests/support/gameFixtures'
 import { deferred } from '../../tests/support/deferred'
-import { createOwnershipCoordinator } from '@/infrastructure/ownership'
+import { createOwnershipCoordinator } from '@/storage/ownership'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 
 const databases: { name: string; close: () => void }[] = []
+
 async function setup() {
-  const name = crypto.randomUUID(),
-    database = await openSudokuDatabase(name)
+  const name = crypto.randomUUID()
+  const database = await openSudokuDatabase(name)
   databases.push({ name, close: () => database.close() })
+
   return { database, repository: createGameRepository(() => Promise.resolve(database)) }
 }
+
 afterEach(async () => {
   for (const database of databases.splice(0)) {
     database.close()
@@ -23,6 +26,7 @@ afterEach(async () => {
 })
 it('upgrades an empty database and round-trips settings and progress', async () => {
   const { database, repository } = await setup()
+
   expect(database.objectStoreNames.contains('sessions')).toBe(true)
   const settings = {
     theme: 'dark',
@@ -30,14 +34,17 @@ it('upgrades an empty database and round-trips settings and progress', async () 
     highlightConflicts: true,
     currentLessonId: null,
   } as const
+
   expect(await repository.writeSettings(settings, 1)).toEqual({ ok: true, value: undefined })
   expect(await repository.readSettings()).toEqual({ ok: true, value: settings })
   const progress = { lessonId: 'rules', completedAt: '2026-10-11T01:00:00.000Z' }
   await repository.writeLessonProgress(progress, 1)
+
   expect(await repository.readLessonProgress()).toEqual({ ok: true, value: [progress] })
 })
 it('isolates corrupt records and preserves valid saves during cleanup', async () => {
   const { database, repository } = await setup()
+
   expect(database.objectStoreNames.contains('sessions')).toBe(true)
   const valid = { formatVersion: 1, revision: 0, session: makeSession() }
   await database.put('sessions', valid)
@@ -45,6 +52,7 @@ it('isolates corrupt records and preserves valid saves during cleanup', async ()
     ...valid,
     session: { ...valid.session, id: 'corrupt', notes: [512] },
   })
+
   expect(await repository.listSessions()).toEqual({
     ok: true,
     value: [{ ...valid, formatVersion: 2 }],
@@ -52,11 +60,13 @@ it('isolates corrupt records and preserves valid saves during cleanup', async ()
   expect(await database.count('quarantine')).toBe(1)
   expect(await repository.countQuarantined()).toEqual({ ok: true, value: 1 })
   await repository.removeQuarantined()
+
   expect(await database.count('quarantine')).toBe(0)
   expect(await database.count('sessions')).toBe(1)
 })
 it('returns an explicit failure when IndexedDB cannot open', async () => {
   const repository = createGameRepository(() => Promise.reject(new Error('Storage blocked')))
+
   expect(await repository.listSessions()).toMatchObject({
     ok: false,
     error: { kind: 'unavailable' },
@@ -74,6 +84,7 @@ it('does not claim write success after its connection has closed', async () => {
     },
     1,
   )
+
   expect(result).toMatchObject({ ok: false, error: { kind: 'write-failed' } })
 })
 
@@ -84,6 +95,7 @@ it('reports an aborted transaction without committing preferences or leaking a r
   const spy = vi.spyOn(raw, 'transaction').mockImplementation((stores, mode, options) => {
     const transaction = original(stores, mode, options)
     queueMicrotask(() => transaction.abort())
+
     return transaction
   })
   const result = await repository.writeSettings(
@@ -96,17 +108,19 @@ it('reports an aborted transaction without committing preferences or leaking a r
     1,
   )
   spy.mockRestore()
+
   expect(result).toMatchObject({ ok: false, error: { kind: 'write-failed' } })
   expect(await database.get('settings', 'preferences')).toBeUndefined()
 })
 for (const store of ['settings', 'lessons'] as const) {
   it(`fences a delayed ${store} write against a concurrent clear-all`, async () => {
     const { database, repository } = await setup()
-    const gate = deferred<void>(),
-      entered = deferred<void>()
+    const gate = deferred<void>()
+    const entered = deferred<void>()
     const otherTab = createGameRepository(async () => {
       entered.resolve()
       await gate.promise
+
       return database
     })
     const pending =
@@ -120,8 +134,10 @@ for (const store of ['settings', 'lessons'] as const) {
             1,
           )
     await entered.promise
+
     expect(await repository.clearAll()).toEqual({ ok: true, value: undefined })
     gate.resolve()
+
     expect(await pending).toMatchObject({ ok: false, error: { kind: 'revision-conflict' } })
     expect(await database.count(store)).toBe(0)
   })
@@ -130,11 +146,16 @@ for (const store of ['settings', 'lessons'] as const) {
 it('replaces only the requested free variant slot and writes v2 without a schema upgrade', async () => {
   const { database, repository } = await setup()
   const owner = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
+
   async function acquire(id: string) {
     const result = await owner.acquireOwnership(id, 'test-tab')
-    if (!result.ok || !result.value) throw new Error('Expected edit lease')
+    if (!result.ok || !result.value) {
+      throw new Error('Expected edit lease')
+    }
+
     return result.value
   }
+
   try {
     const classic = makeSession({ id: 'classic-save' })
     const arrow = makeSession({
@@ -147,9 +168,11 @@ it('replaces only the requested free variant slot and writes v2 without a schema
       repository.replaceActiveSession(classic, classicToken, null),
       repository.replaceActiveSession(arrow, arrowToken, null),
     ])
+
     expect(outcomes.every((result) => result.ok)).toBe(true)
     const replacement = { ...arrow, id: 'arrow-new' }
     const nextToken = await acquire(replacement.id)
+
     expect(
       await repository.replaceActiveSession(replacement, nextToken, {
         id: classic.id,
@@ -159,6 +182,7 @@ it('replaces only the requested free variant slot and writes v2 without a schema
     ).toMatchObject({ ok: false, error: { kind: 'revision-conflict' } })
     const controller = new AbortController()
     controller.abort()
+
     expect(
       (
         await repository.replaceActiveSession(
@@ -185,7 +209,10 @@ it('replaces only the requested free variant slot and writes v2 without a schema
       }),
     ).toMatchObject({ ok: true, value: { formatVersion: 2 } })
     const remaining = await repository.listSessions()
-    if (!remaining.ok) throw new Error('Expected valid remaining saves')
+    if (!remaining.ok) {
+      throw new Error('Expected valid remaining saves')
+    }
+
     expect(remaining.value.map((record) => record.session.id).sort()).toEqual([
       'arrow-new',
       'classic-save',
@@ -211,7 +238,10 @@ it('preserves the single learning practice slot across variants', async () => {
   }
   const first = await owner.acquireOwnership(classic.id, 'tab')
   const next = await owner.acquireOwnership(arrow.id, 'tab')
-  if (!first.ok || !first.value || !next.ok || !next.value) throw new Error('Expected leases')
+  if (!first.ok || !first.value || !next.ok || !next.value) {
+    throw new Error('Expected leases')
+  }
+
   try {
     expect((await repository.replaceActiveSession(classic, first.value, null)).ok).toBe(true)
     expect(await repository.replaceActiveSession(arrow, next.value, null)).toMatchObject({
@@ -246,6 +276,7 @@ it('upgrades a legacy completed save on write and quarantines unsupported bytes 
   )
   session.completion = { completedAt: session.startedAt, elapsedMs: 0 }
   const { rules, ...puzzle } = session.puzzle
+
   expect(rules.kind).toBe('classic')
   const legacySession = { ...session, puzzle }
   await database.put('sessions', { formatVersion: 1, revision: 9, session: legacySession })
@@ -253,7 +284,10 @@ it('upgrades a legacy completed save on write and quarantines unsupported bytes 
   const malformed = { formatVersion: 99, revision: 1, session: { ...session, id: 'foreign' } }
   await database.put('sessions', malformed)
   const parsed = await repository.listSessions()
-  if (!parsed.ok) throw new Error('Expected valid legacy normalization')
+  if (!parsed.ok) {
+    throw new Error('Expected valid legacy normalization')
+  }
+
   expect(parsed.value).toMatchObject([
     {
       formatVersion: 2,
@@ -266,7 +300,10 @@ it('upgrades a legacy completed save on write and quarantines unsupported bytes 
     issues: ['Unsupported session format or revision'],
   })
   const lease = await owner.acquireOwnership(session.id, 'migration-tab')
-  if (!lease.ok || !lease.value) throw new Error('Expected migration lease')
+  if (!lease.ok || !lease.value) {
+    throw new Error('Expected migration lease')
+  }
+
   try {
     expect(await repository.writeSession(parsed.value[0].session, 9, lease.value)).toMatchObject({
       ok: true,

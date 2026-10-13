@@ -9,14 +9,17 @@ import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 addEventListener('message', (event: MessageEvent<unknown>) => {
   const parsed = parseWorkerRequest(event.data)
   if (!parsed.valid) {
-    if (isRecord(event.data) && typeof event.data.requestId === 'string')
+    if (isRecord(event.data) && typeof event.data.requestId === 'string') {
       postMessage({
         kind: event.data.kind,
         requestId: event.data.requestId,
         outcome: { status: 'failed', message: parsed.issues.join('; ') },
       })
+    }
+
     return
   }
+
   const request = parsed.value
   try {
     let response: WorkerResponse
@@ -32,7 +35,7 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
               ? { status: 'budget-exhausted', message: 'Fallback verification budget exhausted' }
               : { status: 'failed', message: result.reason },
       }
-    } else
+    } else {
       response = {
         kind: 'hint',
         requestId: request.requestId,
@@ -44,6 +47,8 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
           }),
         },
       }
+    }
+
     postMessage(response)
   } catch (error) {
     postMessage({

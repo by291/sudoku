@@ -11,6 +11,7 @@ export const LESSON_IDS = [
   'thermo-rules',
   'arrow-rules',
 ] as const
+
 export function isLessonId(value: unknown): value is (typeof LESSON_IDS)[number] {
   return LESSON_IDS.some((id) => id === value)
 }

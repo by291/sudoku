@@ -1,6 +1,6 @@
 # Web Architecture
 
-The [product design](superpowers/specs/2026-10-11-sudoku-design.md) and [variants design](superpowers/specs/2026-10-11-sudoku-variants-design.md) define behavior, [AGENTS.md](../AGENTS.md) defines development conventions, and [README](../README.md) lists setup and verification commands. This document describes current module ownership.
+The [product design](superpowers/specs/2026-10-11-sudoku-design.md) and [variants design](superpowers/specs/2026-10-11-sudoku-variants-design.md) define behavior, [AGENTS.md](../AGENTS.md) defines development conventions, and [README](../README.md) lists setup and verification commands. This document describes current module ownership. See [Adding a Sudoku Variant](variant-extension.md) for the concrete extension checklist.
 
 ## Organization
 
@@ -9,6 +9,7 @@ The frontend adopts the explicit application composition and cohesive feature or
 ```text
 src/
   main.ts
+  runtime.ts
   App.vue
   layouts/AppLayout.vue
   router/index.ts
@@ -19,49 +20,46 @@ src/
   features/
     home/views/
     game/{views,components,composables,model,stores}/
-    learning/{views,model,stores}/
+    learning/{views,composables,model,stores}/
     records/{views,model,stores}/
     settings/{model,stores}/
   core/sudoku/
   storage/
   worker/
-  infrastructure/
-    runtime.ts
-    ownership.ts
   styles/
 ```
 
-| Owner                         | Responsibility                                                                                                           |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `main.ts`                     | Install Pinia, hash router, and one injected runtime, then mount App                                                     |
-| `App.vue`                     | Root Naive UI configuration, effective theme, preference loading, and resource disposal                                  |
-| `layouts/AppLayout.vue`       | Header, theme choices, consistent parent navigation, preference failures, skip link, main landmark, and footer           |
-| `router/`                     | Existing routes and their views; static-host hash navigation                                                             |
-| `theme/useTheme.ts`           | One composable for light/dark/system synchronization and Naive UI configuration from the shared CSS palette              |
-| `shared/components/`          | Controlled SudokuBoard, NumberPad, and ConfirmationDialog; emit actions without choosing a store or persistence strategy |
-| `features/home/views/`        | Workflow entry dialogs and a standalone resume action, with a saved-session chooser when needed                          |
-| `features/game/views/`        | GameView for free play/full-board practice, DailyView for challenges                                                     |
-| `features/game/components/`   | Controlled setup dialog, session controls, and logical hint presentation                                                 |
-| `features/game/composables/`  | Keyboard ownership, lifecycle listeners, save triggers, and route-leave behavior                                         |
-| `features/game/model/`        | Pure session transitions, clock calculations, daily policy, and display helpers                                          |
-| `features/game/stores/`       | Session actions, worker requests, ownership, and saves                                                                   |
-| `features/learning/`          | Lesson models/examples, progress store, and lesson/list views; full-board practice composes GameView                     |
-| `features/records/`           | Aggregation, records store, history view, and confirmed local-data controls                                              |
-| `features/settings/`          | Pure preference types/defaults and the preferences store; no separate settings page is needed                            |
-| `core/sudoku/`                | Framework-independent rules, search, logical deductions, generation, and types                                           |
-| `infrastructure/runtime.ts`   | Construct and inject shared worker/repository/ownership/clock services                                                   |
-| `worker/`                     | Validated messages, cancellation, budgets, and engine execution                                                          |
-| `storage/`                    | Database schema, record validation, transactions, and ordered saves                                                      |
-| `infrastructure/ownership.ts` | Editing leases and dataset-reset coordination                                                                            |
-| `styles/`                     | CSS palette, reset, focus, reduced-motion rules, and shared presentation utilities                                       |
+| Owner                        | Responsibility                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `main.ts`                    | Install Pinia, hash router, and one injected runtime, then mount App                                                     |
+| `App.vue`                    | Root Naive UI configuration, effective theme, preference loading, and resource disposal                                  |
+| `layouts/AppLayout.vue`      | Header, theme choices, consistent parent navigation, preference failures, skip link, main landmark, and footer           |
+| `router/`                    | Existing routes and their views; static-host hash navigation                                                             |
+| `theme/useTheme.ts`          | One composable for light/dark/system synchronization and Naive UI configuration from the shared CSS palette              |
+| `shared/components/`         | Controlled SudokuBoard, NumberPad, and ConfirmationDialog; emit actions without choosing a store or persistence strategy |
+| `features/home/views/`       | Workflow entry dialogs and a standalone resume action, with a saved-session chooser when needed                          |
+| `features/game/views/`       | GameView for free play/full-board practice, DailyView for challenges                                                     |
+| `features/game/components/`  | Controlled setup/settings dialogs, session controls, and logical hint presentation                                       |
+| `features/game/composables/` | Route entry, keyboard ownership, lifecycle listeners, save triggers, and route-leave behavior                            |
+| `features/game/model/`       | Pure session transitions, clock calculations, daily policy, and display helpers                                          |
+| `features/game/stores/`      | Player session actions composed with internal persistence and transition owners                                          |
+| `features/learning/`         | Lesson models/examples, progress store, exercise composable, and views; practice composes GameView                       |
+| `features/records/`          | Aggregation, records store, history view, and confirmed local-data controls                                              |
+| `features/settings/`         | Pure preference types/defaults and the preferences store; no separate settings page is needed                            |
+| `core/sudoku/`               | Framework-independent rules, search, logical deductions, generation, and types                                           |
+| `runtime.ts`                 | Construct and inject shared worker/repository/ownership/clock services                                                   |
+| `worker/`                    | Validated messages, cancellation, budgets, and engine execution                                                          |
+| `storage/`                   | Database schema, record validation, transactions, editing leases, and ordered saves                                      |
+| `storage/ownership.ts`       | Editing leases and dataset-reset coordination                                                                            |
+| `styles/`                    | CSS palette, reset, focus, reduced-motion rules, and shared presentation utilities                                       |
 
 ## Dependency Direction
 
-- Application composition connects layouts, themes, features, storage, workers, and infrastructure. Business and browser-service modules never import App, main, router, layouts, or theme implementation.
-- Shared components depend on Vue, Naive UI, shared components, and pure engine types/helpers. They never import features, storage, workers, or infrastructure. Shared means reusable across Sudoku workflows, not generic to every application.
+- Application composition connects layouts, themes, and features with storage and workers through `runtime.ts`. Feature stores and composables access its injected services. Business and browser-service modules never import App, main, router, layouts, or theme implementation.
+- Shared components depend on Vue, Naive UI, shared components, and pure engine types/helpers. They never import features, storage, workers, or the application runtime. Shared means reusable across Sudoku workflows, not generic to every application.
 - Views render store state and call actions; they never open the database or call the repository directly. Learning may compose the game view, and home may read game/records models and stores.
 - Game, learning, and settings models remain pure and consume engine or other pure model exports. Records aggregation consumes game models and a persisted result type; that type-only storage dependency performs no I/O.
-- Storage, workers, and runtime/ownership infrastructure may consume pure feature models, never feature stores, components, or views. Storage owns persisted-data validation. Runtime injection is a Vue browser adapter outside the pure engine.
+- Storage, workers, and the application runtime may consume pure feature models, never feature stores, components, or views. Storage and workers never import the application runtime. Storage owns persisted-data validation and editing leases; `storage/database.ts` owns their shared connection-provider type. Runtime injection is a Vue browser adapter outside the pure engine.
 - The engine imports only engine modules and has no framework, UI, database, or browser-global dependencies.
 
 ESLint enforces these boundaries for static imports and dynamic `import()` using the same policy. Dynamic imports use string-literal module paths so their dependencies can be checked. `tooling/module-boundaries.test.ts` exercises rejected and permitted imports with the real lint configuration. Tests may import composition and cross-feature fixtures to verify complete behavior.
@@ -78,7 +76,7 @@ RecordsView uses validated type queries for its desktop sidebar and compact mobi
 
 ## Runtime Contracts
 
-The entry provides one runtime. App settles/leaves the game before runtime disposal. Route-owned listeners, timers, and worker jobs retain existing cleanup. Layout extraction adds no KeepAlive or route transitions.
+The entry provides one runtime. `useGameEntry` and `useDailyEntry` own route initialization, target lookups, and entry cleanup; views retain presentation and confirmations. `useLessonExercise` owns temporary exercise state, shared keyboard actions, and delayed-answer fencing. `GameSettingsDialog` is a controlled view of preferences and policy slots. The game store retains clock, input, hints, and completion; `sessionPersistence` owns attached queues, revisions, dirty state, and idempotent lease release, while `sessionTransitions` owns save-before-switch coordination and one cancellation generation. Their factories do not import the store that composes them. App settles/leaves the game before runtime disposal. Route-owned listeners, timers, and worker jobs retain existing cleanup. Layout extraction adds no KeepAlive or route transitions.
 
 GameControls renders a compact common-action row and a Naive UI More menu. Its typed events reach the existing GameView session actions; the view owns settings and confirmation modals, and DailyView owns choosing another challenge. Menu attributes expose visible ownership to the shared keyboard handler; closed-menu transitions do not block board input. The installed dropdown's built-in keyboard mode only changes highlights, so public option attributes provide real DOM focus and navigation following the [WAI menu-button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/). Selecting a modal action first focuses the stable More trigger so cancellation can restore focus. NumberPad accepts an optional row layout for full-board touch play and lesson exercises. Shared keyboard ownership guards keep game and lesson shortcuts outside composite controls and open dialogs. Native media queries show game digits for narrow or coarse-pointer devices without JavaScript device guessing; coarse-pointer and short desktop layouts retain a usable board width. DailyView composes an entry overview or the active board, with detailed policy in settings rather than repeated above the board. Read-only daily saves still allow opening the independent challenge chooser; existing store transitions determine whether a switch can proceed. Home promotes records to a fourth card and both resume actions use the same shared palette through Naive UI's Info button theme.
 
@@ -86,11 +84,11 @@ Keyboard, touch, and hints reach the same game actions. Existing routes accept a
 
 AppLayout renders the common parent link: workflow pages return home, lessons return to their own type's course path, and full-board practice returns to its own lesson. Typed route metadata resolves lesson destinations at the composition boundary, following the [Vue Router route metadata convention](https://router.vuejs.org/guide/advanced/meta.html), so the layout does not import lesson data. These destinations are deterministic for direct links as well as in-app navigation. LearningView derives the selected course from the validated `variant` query, completion from the learning store, and its recommended unfinished lesson from the current-lesson preference. It keeps all lessons accessible without changing progress identifiers or persistence. The router scrolls to the top when entering a different page, choosing a different learning type, or switching a lesson between its exercise and full-board practice. Browser back/forward restores the saved position, following the [Vue Router scroll behavior contract](https://router.vuejs.org/guide/advanced/scroll-behavior.html). Session-query updates preserve the current board position. Modal body dimensions are passed to Naive UI directly because its teleported preset surface does not retain the calling component's scoped-style attribute.
 
-`PuzzleRules` is a discriminated union under `core/sudoku/rules.ts`. Its compiled `RuleContext` distinguishes complete nine-digit units, duplicate peers, related highlights, and arithmetic/path constraints. Jigsaw replaces boxes; Killer cages and Arrow shafts are not nine-digit units. Framework-independent bounded evaluation drives candidates, conflicts, uniqueness, completion, and explainable deductions. Clue reductions appear as typed evidence rather than hidden candidate pruning. Exhaustion remains inconclusive.
+`PuzzleRules` is a discriminated union under `core/sudoku/ruleTypes.ts`, re-exported through the public `rules.ts` facade. `variantRegistry.ts` composes typed decoders/compilers from `variants/*.ts`; topology helpers live in `ruleTopology.ts`. Definitions never import their registry. Its compiled `RuleContext` distinguishes complete nine-digit units, duplicate peers, related highlights, and arithmetic/path constraints. Jigsaw replaces boxes; Killer cages and Arrow shafts are not nine-digit units. Framework-independent bounded evaluation drives candidates, conflicts, uniqueness, completion, and explainable deductions. Clue reductions appear as typed evidence rather than hidden candidate pruning. Exhaustion remains inconclusive.
 
-`shared/model/boardGeometry.ts` formats actual regions and clues without solving. `SudokuClues` draws decorative SVG in board coordinates, while the CSS Grid retains buttons, notes, digits, and focus. Accessible cell labels and selected-rule text explain the geometry; pause removes clue presentation as well as values.
+`features/game/model/variants.ts` owns the complete Chinese catalogue and ordered choices. `shared/model/boardGeometry.ts` composes typed board adapters to format actual regions and clues without solving. Engine definitions contain no framework or presentation dependencies. `SudokuClues` draws decorative SVG in board coordinates, while the CSS Grid retains buttons, notes, digits, and focus. Accessible cell labels and selected-rule text explain the geometry; pause removes clue presentation as well as values.
 
-`GenerationInput` pairs each type with its supported generation version. Classic keeps `sudoku-v1`; variants use `sudoku-variants-v1`. Safe transformations preserve geometry and arithmetic, and fifteen independently verified original fallback slots cover five types and three policies. Worker decoders validate complete rules, proof shapes, and clue identity; the client rejects mismatched type/version/seed/difficulty and stale results.
+`GenerationInput` pairs each type with its supported generation version. Classic keeps `sudoku-v1`; variants use `sudoku-variants-v1`. Typed strategies in `generationStrategies.ts` and the variant modules declare geometry construction and legal digit/complement transforms. `variantGeneration.ts` retains common uniqueness, rating, necessity, budget, and fallback orchestration. Safe transformations preserve geometry and arithmetic, and fifteen independently verified original fallback slots cover five types and three policies. `worker/protocol.ts` validates transport envelopes; `hintEvidence.ts` decodes proof shapes and checks premises against actual clue identity; the client rejects mismatched type/version/seed/difficulty and stale results.
 
 Storage writes format-2 sessions/results and normalizes validated format-1 records to Classic without rewriting historical facts. The database schema stays at version 1. Free replacement is transactional and scoped by type, learning retains one practice slot, and leases/revisions/dataset epochs continue to fence stale writes. Formal daily identities and eligibility are independent by type/date; Classic IDs remain compatible. Pure aggregation produces six daily statuses and six separate record summaries.
 

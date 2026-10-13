@@ -5,10 +5,12 @@ import { createSudokuWorkerClient } from '@/worker/client'
 import type { GameRepository } from '@/storage/repository'
 import { createGameRepository } from '@/storage/repository'
 import { openSudokuDatabase } from '@/storage/database'
-import type { OwnershipCoordinator, OwnershipToken } from '@/infrastructure/ownership'
-import { createOwnershipCoordinator } from '@/infrastructure/ownership'
+import type { OwnershipCoordinator, OwnershipToken } from '@/storage/ownership'
+import { createOwnershipCoordinator } from '@/storage/ownership'
 import type { SaveQueue } from '@/storage/saveQueue'
 import { createSaveQueue } from '@/storage/saveQueue'
+
+// Compose application-scoped browser services here; App owns their final disposal.
 export interface GameRuntime {
   worker: SudokuWorkerClient
   repository: GameRepository
@@ -20,33 +22,43 @@ export interface GameRuntime {
   ownerId: string
   dispose?(): void
 }
+
 export const gameRuntimeKey: InjectionKey<GameRuntime> = Symbol('GameRuntime')
+
 export function useGameRuntime(): GameRuntime {
   const runtime = inject(gameRuntimeKey)
-  if (!runtime) throw new Error('GameRuntime must be provided by the application')
+  if (!runtime) {
+    throw new Error('GameRuntime must be provided by the application')
+  }
+
   return runtime
 }
+
 export function createGameRuntime(): GameRuntime {
   // Reuse one live connection; failed opens and version changes permit a fresh connection.
   let opening: ReturnType<typeof openSudokuDatabase> | null = null
   const provider = () => {
-    if (!opening)
+    if (!opening) {
       opening = openSudokuDatabase()
         .then((database) => {
           database.addEventListener('versionchange', () => {
             opening = null
           })
+
           return database
         })
         .catch((error: unknown) => {
           opening = null
           throw error
         })
+    }
+
     return opening
   }
   const ownership = createOwnershipCoordinator(provider)
   const repository = createGameRepository(provider, { onReset: () => ownership.notifyReset() })
   const worker = createSudokuWorkerClient()
+
   return {
     worker,
     repository,
@@ -59,7 +71,9 @@ export function createGameRuntime(): GameRuntime {
     dispose() {
       worker.dispose()
       ownership.dispose()
-      if (opening) void opening.then((database) => database.close())
+      if (opening) {
+        void opening.then((database) => database.close())
+      }
     },
   }
 }

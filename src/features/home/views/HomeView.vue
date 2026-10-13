@@ -6,14 +6,15 @@ import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import { sessionLink, modeName } from '@/features/records/model/records'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
-import { VARIANT_NAMES } from '@/features/game/model/variants'
+import { getVariantPresentation } from '@/features/game/model/variants'
 import { getDailyStatuses } from '@/features/game/model/daily'
 import type { SudokuVariant } from '@/core/sudoku/rules'
 import type { Difficulty } from '@/core/sudoku/types'
 import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
+
 const router = useRouter()
-const records = useRecordsStore(),
-  preferences = usePreferencesStore()
+const records = useRecordsStore()
+const preferences = usePreferencesStore()
 const unfinished = computed(() => records.sessions.filter((record) => !record.session.completion))
 const dailyStatuses = computed(() =>
   getDailyStatuses(records.sessions, records.results, records.today),
@@ -37,16 +38,27 @@ const selectedSave = computed(
 )
 const resumeOpen = ref(false)
 const resumeButton = useTemplateRef<InstanceType<typeof NButton>>('resumeButton')
+
 function openSetup(mode: 'free' | 'daily', event: MouseEvent) {
-  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+    return
+  }
+
   event.preventDefault()
-  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.focus()
+  }
+
   setupMode.value = mode
   void records.load()
 }
+
 function startSelected() {
   const mode = setupMode.value
-  if (!mode) return
+  if (!mode) {
+    return
+  }
+
   setupMode.value = null
   void router.push({
     path: `/play/${mode}`,
@@ -57,28 +69,45 @@ function startSelected() {
     },
   })
 }
+
 function resumeSelected() {
-  if (!selectedSave.value) return
+  if (!selectedSave.value) {
+    return
+  }
+
   setupMode.value = null
   void router.push(sessionLink(selectedSave.value))
 }
+
 function continueLast(event: MouseEvent) {
-  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.focus()
+  }
+
   if (unfinished.value.length === 1) {
     const record = unfinished.value[0]
-    if (record) void router.push(sessionLink(record.session))
+    if (record) {
+      void router.push(sessionLink(record.session))
+    }
   } else if (!unfinished.value.length && preferences.settings.currentLessonId) {
     void router.push(`/learn/${preferences.settings.currentLessonId}`)
-  } else resumeOpen.value = true
+  } else {
+    resumeOpen.value = true
+  }
 }
+
 function restoreResumeFocus() {
   const element: unknown = resumeButton.value?.$el
-  if (element instanceof HTMLElement) element.focus()
+  if (element instanceof HTMLElement) {
+    element.focus()
+  }
 }
+
 function continueRecentLesson(event: MouseEvent, navigate: UseLinkReturn['navigate']) {
   void navigate(event)
   resumeOpen.value = false
 }
+
 onMounted(records.load)
 </script>
 <template>
@@ -101,7 +130,8 @@ onMounted(records.load)
           @click="resumeOpen = false"
           ><div>
             <strong
-              >{{ VARIANT_NAMES[session.puzzle.rules.kind] }} · {{ modeName(session) }}</strong
+              >{{ getVariantPresentation(session.puzzle.rules.kind).label }} ·
+              {{ modeName(session) }}</strong
             >
             <p class="muted">
               {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} · 已用时

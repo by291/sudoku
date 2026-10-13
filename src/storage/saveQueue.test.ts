@@ -13,6 +13,7 @@ it('copies snapshots and serializes revisions while retrying only the newest fai
     ): Promise<StorageOutcome<SessionRecord>> {
       writes.push({ revision, elapsed: session.elapsedMs })
       await Promise.resolve()
+
       return fail
         ? { ok: false, error: { kind: 'write-failed', message: 'Aborted' } }
         : { ok: true, value: { formatVersion: 2, revision: revision + 1, session } }
@@ -24,14 +25,17 @@ it('copies snapshots and serializes revisions while retrying only the newest fai
   session.elapsedMs = 10
   const second = queue.enqueue(session)
   await Promise.all([first, second])
+
   expect(writes).toEqual([
     { revision: 0, elapsed: 0 },
     { revision: 1, elapsed: 10 },
   ])
   fail = true
+
   expect(await queue.enqueue({ ...session, elapsedMs: 20 })).toMatchObject({ ok: false })
   expect(await queue.enqueue({ ...session, elapsedMs: 30 })).toMatchObject({ ok: false })
   fail = false
+
   expect(await queue.retry()).toEqual({ ok: true, value: undefined })
   expect(writes.at(-1)).toEqual({ revision: 2, elapsed: 30 })
   queue.dispose()
@@ -42,6 +46,7 @@ it('does not retry an ownership or revision conflict', async () => {
     {
       async writeSession(): Promise<StorageOutcome<SessionRecord>> {
         calls++
+
         return { ok: false, error: { kind: 'revision-conflict', message: 'Peer saved' } }
       },
     },
@@ -49,6 +54,7 @@ it('does not retry an ownership or revision conflict', async () => {
     0,
   )
   await queue.enqueue(makeSession())
+
   expect(await queue.retry()).toMatchObject({ ok: false, error: { kind: 'revision-conflict' } })
   expect(calls).toBe(1)
 })

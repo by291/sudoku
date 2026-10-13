@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import type { HintResult } from '@/core/sudoku/hint'
 import { explainStep, explainStepEvidence, TECHNIQUE_NAMES } from '@/core/sudoku/techniques'
 import type { LogicalStep } from '@/core/sudoku/techniques'
+
 const props = defineProps<{ hint: HintResult }>()
 const emit = defineEmits<{ apply: []; dismiss: []; highlight: [step: LogicalStep | null] }>()
 const stepIndex = ref(0)

@@ -20,12 +20,16 @@ declare module 'vue-router' {
 export const router = createRouter({
   history: createWebHashHistory(),
   scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) return savedPosition
+    if (savedPosition) {
+      return savedPosition
+    }
+
     const lessonViewChanged =
       typeof to.params.lessonId === 'string' &&
       (to.query.practice === '1') !== (from.query.practice === '1')
     const browsingTypeChanged =
       ['/learn', '/records'].includes(to.path) && to.query.variant !== from.query.variant
+
     // Browsing choices and practice flags change the view; session queries keep the board in place.
     return to.path !== from.path || lessonViewChanged || browsingTypeChanged
       ? { left: 0, top: 0 }
@@ -46,7 +50,9 @@ export const router = createRouter({
               label: '返回本节课程',
             }
           }
+
           const lesson = LESSONS.find((item) => item.id === route.params.lessonId)
+
           return {
             to: lesson ? { path: '/learn', query: { variant: lesson.practiceVariant } } : '/learn',
             label: '返回课程列表',

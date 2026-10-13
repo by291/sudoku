@@ -10,18 +10,25 @@ const emit = defineEmits<{ theme: [preference: ThemePreference] }>()
 const preferences = usePreferencesStore()
 const route = useRoute()
 const backTarget = computed(() => {
-  if (route.path === '/') return null
+  if (route.path === '/') {
+    return null
+  }
+
   return route.meta.parentNavigation?.(route) ?? { to: '/', label: '返回首页' }
 })
 
 const mainContent = useTemplateRef<HTMLElement>('mainContent')
+
 function focusMain() {
   // The router owns the URL hash; a skip link must only move focus and scroll.
   mainContent.value?.focus()
   mainContent.value?.scrollIntoView()
 }
+
 function updateTheme(value: string | number | boolean) {
-  if (value === 'light' || value === 'dark' || value === 'system') emit('theme', value)
+  if (value === 'light' || value === 'dark' || value === 'system') {
+    emit('theme', value)
+  }
 }
 
 const themes: { value: ThemePreference; label: string; name: string }[] = [

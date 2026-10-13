@@ -3,7 +3,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { createTestRuntime } from '../tests/support/runtime'
 import { NConfigProvider } from 'naive-ui'
 import themeCss from '@/styles/theme.css?raw'
-import { gameRuntimeKey } from '@/infrastructure/runtime'
+import { gameRuntimeKey } from '@/runtime'
 import App from '@/App.vue'
 import { router } from '@/router/index'
 
@@ -38,15 +38,19 @@ it('changes themes and exposes an accessible home landmark', async () => {
   const wrapper = mount(App, {
     global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
   })
+
   expect(wrapper.find('main').exists()).toBe(true)
   expect(wrapper.get('main').attributes('aria-label')).toBe('数独游戏')
   await wrapper.get('input[type="radio"][value="dark"]').trigger('change')
+
   expect(document.documentElement.dataset.theme).toBe('dark')
   const overrides = wrapper.findComponent(NConfigProvider).props('themeOverrides')
   const palette = getComputedStyle(document.documentElement)
+
   expect(overrides?.common?.textColor1).toBe(palette.getPropertyValue('--text').trim())
   expect(overrides?.Button?.color).toBe(palette.getPropertyValue('--surface').trim())
   await wrapper.get('input[type="radio"][value="light"]').trigger('change')
+
   expect(document.documentElement.dataset.theme).toBe('light')
   wrapper.unmount()
 })
@@ -55,11 +59,17 @@ it('follows system theme changes only while its scope is alive', async () => {
   const wrapper = mount(App, {
     global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
   })
+
   expect(wrapper.find('input[type="radio"][value="system"]').exists()).toBe(true)
   await wrapper.get('input[type="radio"][value="system"]').trigger('change')
   media.matches = true
-  for (const listener of listeners) listener()
+
+  for (const listener of listeners) {
+    listener()
+  }
+
   expect(document.documentElement.dataset.theme).toBe('dark')
   wrapper.unmount()
+
   expect(listeners.size).toBe(0)
 })

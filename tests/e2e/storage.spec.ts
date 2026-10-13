@@ -53,6 +53,7 @@ test('confirms explicit reload after a save conflict and resumes the latest reco
   await page.getByRole('button', { name: cellName(2) }).click()
   await enterGameDigit(page, 4)
   await expect.poll(async () => (await readSessions(page))[0].session.entries[2]).toBe(4)
+
   expect((await readSessions(page))[0].session.entries[3]).toBe(6)
 })
 test('keeps a second editor read-only, permits takeover, and resets every tab', async ({
@@ -75,11 +76,13 @@ test('keeps a second editor read-only, permits takeover, and resets every tab', 
   await page.getByRole('link', { name: /数独足迹/ }).click()
   await page.getByRole('button', { name: '清空本机数据', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+
   expect(await readSessions(page)).toHaveLength(1)
   await page.getByRole('button', { name: '清空本机数据', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '确认清空', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '本机数据已清空' })).toBeVisible()
   await expect(peer.getByRole('group', { name: '数独棋盘' })).not.toBeVisible()
+
   expect(await readSessions(peer)).toHaveLength(0)
   expect(await countResults(peer)).toBe(0)
 })
@@ -101,8 +104,10 @@ test('shows failed completion save and retries exactly once without a public deb
         args[1] === 'readwrite' &&
         transaction.objectStoreNames.contains('sessions') &&
         transaction.objectStoreNames.contains('results')
-      )
+      ) {
         queueMicrotask(() => transaction.abort())
+      }
+
       return transaction
     }
     const restore = () => {
@@ -115,13 +120,16 @@ test('shows failed completion save and retries exactly once without a public deb
   await enterGameDigit(page, 4)
   await expect(page.getByRole('alert').filter({ hasText: '保存失败' })).toBeVisible()
   await expect(page.getByText('本局已完成，成绩仍待保存。', { exact: true })).toBeVisible()
+
   expect(await countResults(page)).toBe(0)
   await page.evaluate(() => window.dispatchEvent(new Event('restore-test-storage')))
   await page.getByRole('button', { name: '重试保存', exact: true }).click()
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
+
   expect(await countResults(page)).toBe(1)
   await page.reload()
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
+
   expect(await countResults(page)).toBe(1)
 })
 test('allows memory-only play when IndexedDB cannot open and saves after recovery', async ({

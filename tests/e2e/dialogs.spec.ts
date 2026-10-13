@@ -9,7 +9,10 @@ test('keeps setup inside the phone viewport and restores keyboard focus', async 
   const dialog = page.getByRole('dialog', { name: '开始一局数独', exact: true })
   await expect(dialog).toBeVisible()
   const bounds = await dialog.boundingBox()
-  if (!bounds) throw new Error('Missing visible setup dialog')
+  if (!bounds) {
+    throw new Error('Missing visible setup dialog')
+  }
+
   expect(bounds.x).toBeGreaterThanOrEqual(15)
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(345)
   await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeFocused()

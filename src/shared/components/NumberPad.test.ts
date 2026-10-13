@@ -19,10 +19,12 @@ describe('NumberPad', () => {
 
     expect(button.attributes('disabled')).toBeDefined()
     await button.trigger('click')
+
     expect(wrapper.emitted('digit')).toBeUndefined()
 
     await wrapper.setProps({ disabled: false, actionLabel: '填写' })
     await wrapper.get('button[aria-label="填写数字7"]').trigger('click')
+
     expect(wrapper.emitted('digit')).toEqual([[7]])
     wrapper.unmount()
   })

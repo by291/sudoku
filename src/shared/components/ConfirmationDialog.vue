@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onUnmounted, useId, useTemplateRef, watch } from 'vue'
 import { NModal } from 'naive-ui'
+
 withDefaults(
   defineProps<{
     title: string
@@ -28,7 +29,9 @@ watch(
 onUnmounted(async () => {
   // Restore after the teleported modal and its focus trap have been removed.
   await nextTick()
-  if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
+  if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+    previousFocus.focus()
+  }
 })
 </script>
 <template>

@@ -10,6 +10,7 @@ import {
   getSelectedRuleDescriptions,
 } from '@/shared/model/boardGeometry'
 import SudokuClues from '@/shared/components/SudokuClues.vue'
+
 const props = defineProps<{
   board: Board
   givens: Board
@@ -34,10 +35,14 @@ const cageAnchors = computed(
   () =>
     new Set(geometry.value.clues.flatMap((clue) => (clue.kind === 'cage' ? [clue.anchor] : []))),
 )
+
 function navigate(event: KeyboardEvent, cell: number) {
-  if (props.disabled || props.obscured || event.ctrlKey || event.metaKey || event.altKey) return
-  const row = Math.floor(cell / 9),
-    column = cell % 9
+  if (props.disabled || props.obscured || event.ctrlKey || event.metaKey || event.altKey) {
+    return
+  }
+
+  const row = Math.floor(cell / 9)
+  const column = cell % 9
   let next: number
   switch (event.key) {
     case 'ArrowLeft':
@@ -59,29 +64,50 @@ function navigate(event: KeyboardEvent, cell: number) {
   event.stopPropagation()
   emit('select', next)
 }
+
 const cells = computed(() =>
   props.board.map((value, cell) => {
     const given = props.givens[cell] !== 0
-    const row = Math.floor(cell / 9),
-      column = cell % 9
+    const row = Math.floor(cell / 9)
+    const column = cell % 9
     const notes = digitsIn(props.notes[cell])
     const conflicting = props.conflicts.includes(cell)
     const highlighted = props.hintCells.includes(cell)
-    const label =
-      `第${row + 1}行第${column + 1}列，` +
-      (props.obscured
-        ? '已暂停'
-        : value
-          ? `数字${value}${given ? '，题目给定' : ''}`
-          : `空格${notes.length ? `，笔记${notes.join('、')}` : ''}`) +
-      (!props.obscured && conflicting ? '，冲突，请检查' : '') +
-      (!props.obscured && highlighted ? '，提示位置' : '')
-    const ruleContext = props.obscured ? '' : getCellRuleContext(cell, props.rules)
+    const descriptions = [`第${row + 1}行第${column + 1}列`]
+    if (props.obscured) {
+      descriptions.push('已暂停')
+    } else {
+      if (value) {
+        descriptions.push(`数字${value}`)
+        if (given) {
+          descriptions.push('题目给定')
+        }
+      } else {
+        descriptions.push('空格')
+        if (notes.length) {
+          descriptions.push(`笔记${notes.join('、')}`)
+        }
+      }
+
+      if (conflicting) {
+        descriptions.push('冲突，请检查')
+      }
+
+      if (highlighted) {
+        descriptions.push('提示位置')
+      }
+
+      const ruleContext = getCellRuleContext(cell, props.rules)
+      if (ruleContext) {
+        descriptions.push(ruleContext)
+      }
+    }
+
     return {
       cell,
       value,
       given,
-      label: label + (ruleContext ? `，${ruleContext}` : ''),
+      label: descriptions.join('，'),
       notes: DIGITS.map((digit) => ({ digit, visible: !!(props.notes[cell] & maskOf(digit)) })),
       conflicting,
       highlighted,

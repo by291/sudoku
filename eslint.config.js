@@ -9,7 +9,7 @@ const compositionImportPatterns = [
   ...sourceImportPatterns,
   {
     regex: '^@/(?:App(?:\\.|$)|main(?:\\.|$)|layouts/|router(?:/|$)|theme/)',
-    message: 'Business and infrastructure modules must not depend on application composition.',
+    message: 'Business and browser-service modules must not depend on application presentation.',
   },
 ]
 
@@ -84,7 +84,7 @@ export default [
     },
   },
   {
-    files: ['src/{features,infrastructure,storage,worker,shared}/**/*.{ts,vue}'],
+    files: ['src/runtime.ts', 'src/{features,storage,worker,shared}/**/*.{ts,vue}'],
     ignores: ['src/**/*.test.ts'],
     rules: { ...restrictImports({ patterns: compositionImportPatterns }) },
   },
@@ -96,15 +96,15 @@ export default [
         patterns: [
           ...compositionImportPatterns,
           {
-            regex: '^@/(?:features|infrastructure|storage|worker)/',
-            message: 'Shared presentation must not depend on feature state or infrastructure.',
+            regex: '^@/(?:runtime(?:[./]|$)|(?:features|storage|worker)/)',
+            message: 'Shared presentation must not depend on feature state or browser services.',
           },
         ],
       }),
     },
   },
   {
-    files: ['src/{infrastructure,storage,worker}/**/*.ts'],
+    files: ['src/runtime.ts', 'src/{storage,worker}/**/*.ts'],
     ignores: ['src/**/*.test.ts'],
     rules: {
       ...restrictImports({
@@ -112,7 +112,11 @@ export default [
           ...compositionImportPatterns,
           {
             regex: '^@/features/[^/]+/(?!model/)',
-            message: 'Infrastructure may consume persisted models, not feature UI or stores.',
+            message: 'Browser services may consume persisted models, not feature UI or stores.',
+          },
+          {
+            regex: '^@/runtime(?:[./]|$)',
+            message: 'Storage and workers must not depend on the application runtime.',
           },
         ],
       }),
@@ -149,4 +153,11 @@ export default [
     },
   },
   prettier,
+  {
+    files: ['src/**/*.{ts,vue}'],
+    rules: {
+      curly: ['error', 'all'],
+      'one-var': ['error', 'never'],
+    },
+  },
 ]

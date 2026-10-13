@@ -16,6 +16,7 @@ import { LESSONS } from '@/features/learning/model/lessons'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
 import type { Digit } from '@/core/sudoku/types'
+
 async function chooseVariant(page: Page, field: string, name: string) {
   if (field !== '成绩玩法') {
     const dialog = page.getByRole('dialog')
@@ -24,22 +25,31 @@ async function chooseVariant(page: Page, field: string, name: string) {
         name: field === '每日玩法' ? '选择今日挑战' : '开始游戏',
         exact: true,
       })
-      if (await entry.isVisible()) await entry.click()
-      else await selectGameMenuAction(page, field === '每日玩法' ? '选择其他挑战' : '新开一局')
+      if (await entry.isVisible()) {
+        await entry.click()
+      } else {
+        await selectGameMenuAction(page, field === '每日玩法' ? '选择其他挑战' : '新开一局')
+      }
     }
+
     await dialog.getByText(name, { exact: true }).click()
-    if (field === '每日玩法')
+    if (field === '每日玩法') {
       await dialog.getByRole('button', { name: /^(开始今日挑战|继续今日挑战|再次练习)$/ }).click()
+    }
+
     return
   }
+
   const selector = page.getByRole('combobox', { name: field, exact: true })
   if (!(await selector.isVisible())) {
     await page
       .getByRole('navigation', { name: field, exact: true })
       .getByRole('link', { name: new RegExp(name) })
       .click()
+
     return
   }
+
   await selector.click()
   await page.getByRole('option', { name, exact: true }).click()
   await expect(page.getByRole('combobox', { name: field, exact: true })).toHaveAttribute(
@@ -48,6 +58,7 @@ async function chooseVariant(page: Page, field: string, name: string) {
   )
   await expect(page.getByRole('listbox', { name: '玩法选项', exact: true })).toBeHidden()
 }
+
 const variants = [
   { kind: 'diagonal', name: '对角数独', clue: 'diagonal' },
   { kind: 'jigsaw', name: '不规则数独', clue: 'region' },
@@ -76,8 +87,11 @@ for (const variant of variants) {
       ],
     )
     const apply = hint.getByRole('button', { name: '应用提示', exact: true })
-    for (let step = 0; step < 20 && !(await apply.isVisible()); step++)
+
+    for (let step = 0; step < 20 && !(await apply.isVisible()); step++) {
       await hint.getByRole('button', { name: '下一步', exact: true }).click()
+    }
+
     await apply.click()
     await expect(cell).toHaveAccessibleName(new RegExp(`数字${digit}`))
     await page.getByRole('button', { name: '撤销', exact: true }).click()
@@ -99,6 +113,7 @@ for (const variant of variants) {
       })
     }).toPass({ timeout: 10000 })
     await expect(cell).toHaveAccessibleName(new RegExp(`数字${digit}`))
+
     expect((await readSessions(page))[0].session.assistance).toMatchObject({
       assisted: true,
       hintCount: 1,
@@ -119,9 +134,11 @@ for (const variant of variants) {
     await page.getByRole('button', { name: cellName(0) }).click()
     await enterGameDigit(page, fixture.solution[0])
     await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
+
     expect(await countResults(page)).toBe(1)
     await page.reload()
     await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
+
     expect(await countResults(page)).toBe(1)
     expect((await readSessions(page))[0].session.puzzle.rules.kind).toBe(variant.kind)
   })
@@ -138,6 +155,7 @@ for (const variant of variants) {
         ? page.locator('.sudoku-clues .region')
         : page.locator(`[data-clue="${variant.clue}"]`)
     await expect(page.locator('.sudoku-clues')).toBeVisible()
+
     expect(await clue.count()).toBeGreaterThan(0)
     expect((await readSessions(page))[0].session.puzzle.rules.kind).toBe(variant.kind)
     await page.getByRole('button', { name: '暂停', exact: true }).click()
@@ -153,6 +171,7 @@ for (const variant of variants) {
       })
     }).toPass({ timeout: 10000 })
     await expect(page.locator('.sudoku-clues')).toBeVisible()
+
     expect(await clue.count()).toBeGreaterThan(0)
   })
 }
@@ -232,15 +251,21 @@ test('explains a fixed Arrow combination and highlights the displayed step', asy
   await expect(page.getByRole('button', { name: /提示位置/ })).toHaveCount(2)
   await hint.getByRole('button', { name: '下一步', exact: true }).click()
   await expect(hint).toContainText('箭头组合')
-  for (const deduction of ['第1行第9列排除6', '第4行第6列排除8', '第5行第5列排除4'])
+
+  for (const deduction of ['第1行第9列排除6', '第4行第6列排除8', '第5行第5列排除4']) {
     await expect(hint).toContainText(deduction)
+  }
+
   await expect(hint).toContainText('圆圈第1行第9列：6、7、8、9')
   await expect(hint).toContainText('箭杆第4行第6列：3、4、8')
   await expect(page.getByRole('button', { name: /提示位置/ })).toHaveCount(5)
-  for (const cell of [8, 16, 24, 32, 40])
+
+  for (const cell of [8, 16, 24, 32, 40]) {
     await expect(page.getByRole('button', { name: cellName(cell) })).toHaveAccessibleName(
       /提示位置/,
     )
+  }
+
   await hint.getByRole('button', { name: '下一步', exact: true }).click()
   await expect(page.getByRole('button', { name: /提示位置/ })).toHaveCount(1)
   await expect(page.getByRole('button', { name: cellName(1) })).toHaveAccessibleName(/提示位置/)
@@ -262,6 +287,7 @@ test('keeps the current rules while choosing another type and offers target resu
   await expect(
     page.getByRole('heading', { name: '自由游玩 · 箭头数独', exact: true }),
   ).toBeVisible()
+
   expect(
     (await readSessions(page)).map((record) => record.session.puzzle.rules.kind).sort(),
   ).toEqual(['arrow', 'classic'])
@@ -275,6 +301,7 @@ test('keeps the current rules while choosing another type and offers target resu
   await selectGameMenuAction(page, '新开一局')
   await expect(page.getByRole('dialog')).toContainText('开始游戏将替换此玩法存档')
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+
   expect(
     (await readSessions(page)).find((record) => record.session.puzzle.rules.kind === 'classic')
       ?.session.id,
@@ -297,6 +324,7 @@ test('switches independent daily types and restores the selected type after refr
   ).toBeVisible()
   await expect.poll(async () => (await readSessions(page)).length).toBe(2)
   const records = await readSessions(page)
+
   expect(
     records.find((record) => record.session.puzzle.rules.kind === 'classic')?.session.assistance
       .candidateCount,
@@ -336,10 +364,13 @@ test('starts Easy practice for each variant lesson', async ({ page }) => {
     await page.getByRole('button', { name: '开始游戏', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.or(page.getByRole('group', { name: '数独棋盘' }))).toBeVisible()
-    if (await dialog.isVisible())
+    if (await dialog.isVisible()) {
       await dialog.getByRole('button', { name: '确认开始', exact: true }).click()
+    }
+
     await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
     const practice = (await readSessions(page)).find((record) => record.session.mode === 'learning')
+
     expect(practice?.session.puzzle.rules.kind).toBe(lesson.practiceVariant)
     expect(practice?.session.puzzle.difficulty).toBe('easy')
   }
@@ -363,8 +394,10 @@ test('retains the daily board and selector after a failed save and switches afte
         args[1] === 'readwrite' &&
         transaction.objectStoreNames.contains('sessions') &&
         transaction.objectStoreNames.contains('results')
-      )
+      ) {
         queueMicrotask(() => transaction.abort())
+      }
+
       return transaction
     }
     const restore = () => {
@@ -380,6 +413,7 @@ test('retains the daily board and selector after a failed save and switches afte
   await expect(
     page.getByRole('heading', { name: '每日挑战 · 标准数独', exact: true }),
   ).toBeVisible()
+
   expect((await readSessions(page)).map((record) => record.session.id)).toEqual([session.id])
   await page.evaluate(() => window.dispatchEvent(new Event('restore-test-storage')))
   await page.getByRole('button', { name: '重试保存', exact: true }).click()
@@ -388,6 +422,7 @@ test('retains the daily board and selector after a failed save and switches afte
   await expect(
     page.getByRole('heading', { name: '每日挑战 · 箭头数独', exact: true }),
   ).toBeVisible()
+
   expect(
     (await readSessions(page)).find((record) => record.session.id === session.id)?.session
       .entries[2],

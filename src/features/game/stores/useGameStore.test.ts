@@ -1,8 +1,8 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { expect, it } from 'vitest'
-import { gameRuntimeKey } from '@/infrastructure/runtime'
-import type { GameRuntime } from '@/infrastructure/runtime'
+import { gameRuntimeKey } from '@/runtime'
+import type { GameRuntime } from '@/runtime'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 import type { HintResult } from '@/core/sudoku/hint'
@@ -68,6 +68,7 @@ function setup() {
       revision: 1,
       async enqueue(session) {
         saved = session
+
         return { ok: true, value: { formatVersion: 2, revision: 2, session } }
       },
       async flush() {
@@ -83,6 +84,7 @@ function setup() {
   const pinia = createPinia()
   app.use(pinia).provide(gameRuntimeKey, runtime)
   const store = app.runWithContext(() => useGameStore(pinia))
+
   return {
     store,
     advance: (milliseconds: number) => {
@@ -92,18 +94,23 @@ function setup() {
     reply: (hint: HintResult) => reply({ status: 'completed', value: hint }),
   }
 }
+
 it('restores paused, records elapsed time, and refuses edits while paused', async () => {
   const test = setup()
   await test.store.restoreSession('fixture-free-session')
+
   expect(test.store.phase).toBe('paused')
   test.store.dispatch({ kind: 'enter', cell: 2, digit: 4 })
+
   expect(test.store.board[2]).toBe(0)
   await test.store.resume()
   test.advance(5000)
   await test.store.periodicSave()
+
   expect(test.saved().elapsedMs).toBe(5000)
   test.store.pause()
   test.advance(5000)
+
   expect(test.store.elapsedMs).toBe(5000)
   test.store.dispose()
 })
@@ -115,12 +122,14 @@ it('ignores stale hints and preserves an old session when generation fails', asy
   test.store.dispatch({ kind: 'enter', cell: 2, digit: 4 })
   test.reply({ kind: 'review-entry', cell: 3 })
   await hint
+
   expect(test.store.hint).toBeNull()
   expect(test.store.session?.assistance.hintCount).toBe(0)
   await test.store.startGame(
     { difficulty: 'easy', seed: 'new', variant: 'classic', puzzleVersion: 'sudoku-v1' },
     { kind: 'free' },
   )
+
   expect(test.store.session?.id).toBe('fixture-free-session')
   expect(test.store.board[2]).toBe(4)
   expect(test.store.error).toContain('失败')
@@ -151,10 +160,13 @@ it('counts a shown hint once and applies it through the ordinary undoable action
     placement: { cell: 2, digit: 4 },
   })
   await job
+
   expect(test.store.session?.assistance.hintCount).toBe(1)
   test.store.applyHint()
+
   expect(test.store.board[2]).toBe(4)
   test.store.dispatch({ kind: 'undo' })
+
   expect(test.store.board[2]).toBe(0)
   expect(test.store.session?.assistance.hintCount).toBe(1)
   test.store.dispose()
@@ -164,8 +176,10 @@ it('invalidates check feedback after the checked board changes', async () => {
   await test.store.restoreSession('fixture-free-session')
   await test.store.resume()
   test.store.dispatch({ kind: 'check' })
+
   expect(test.store.checkIsCurrent).toBe(true)
   test.store.dispatch({ kind: 'enter', cell: 2, digit: 1 })
+
   expect(test.store.checkIsCurrent).toBe(false)
   expect(test.store.session?.assistance.checkCount).toBe(1)
   test.store.dispose()
@@ -175,6 +189,7 @@ it('retries a failed generation with the identical seed and metadata', async () 
   const calls: unknown[] = []
   test.runtime.worker.generate = async (input) => {
     calls.push(input)
+
     return { status: 'timed-out' }
   }
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
@@ -185,8 +200,10 @@ it('retries a failed generation with the identical seed and metadata', async () 
     puzzleVersion: 'sudoku-v1',
   } as const
   await game.startGame(input, { kind: 'free' })
+
   expect(game.canRetryGeneration).toBe(true)
   await game.retryGeneration()
+
   expect(calls).toEqual([input, input])
   game.dispose()
   test.dispose()

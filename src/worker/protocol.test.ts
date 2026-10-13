@@ -37,6 +37,7 @@ it.each(Object.entries(VARIANT_FIXTURES))(
       context: compileRules(fixture.rules),
       workBudget: createWorkBudget(1000000),
     })
+
     expect(
       parseWorkerResponse({
         kind: 'hint',
@@ -48,6 +49,7 @@ it.each(Object.entries(VARIANT_FIXTURES))(
 )
 it('rejects unknown types, generation versions, geometry, and contradictory solutions', () => {
   const fixture = VARIANT_FIXTURES.thermo
+
   expect(
     parseWorkerRequest({
       kind: 'generate',
@@ -55,6 +57,7 @@ it('rejects unknown types, generation versions, geometry, and contradictory solu
       input: { ...createGenerationInput('arrow', 'easy', 'test'), puzzleVersion: 'future' },
     }).valid,
   ).toBe(false)
+
   for (const rules of [
     { kind: 'unknown' },
     { kind: 'thermo', paths: [[0, 2]] },
@@ -99,8 +102,10 @@ it.each(['killer', 'thermo', 'arrow'] as const)(
       !result.step ||
       result.step.kind !== 'placement' ||
       result.step.evidence.kind === 'unit'
-    )
+    ) {
       throw new Error('Expected fixed clue placement')
+    }
+
     const hint: HintResult = {
       kind: 'deduction',
       steps: [result.step],
@@ -111,6 +116,7 @@ it.each(['killer', 'thermo', 'arrow'] as const)(
       requestId: 'clue',
       outcome: { status: 'completed', value: hint },
     })
+
     expect(parsed.valid).toBe(true)
     expect(validateHintEvidence(hint, fixture.rules).valid).toBe(true)
     expect(
@@ -133,8 +139,12 @@ it('rejects malformed evidence masks and out-of-range placements', () => {
     context: compileRules(ARROW_REPEAT_RULES),
     workBudget: createWorkBudget(1000000),
   })
-  if (hint.kind !== 'deduction') throw new Error('Missing fixed Arrow proof')
+  if (hint.kind !== 'deduction') {
+    throw new Error('Missing fixed Arrow proof')
+  }
+
   const malformed = { ...hint, placement: { cell: 81, digit: 2 } }
+
   expect(
     parseWorkerResponse({
       kind: 'hint',
@@ -143,7 +153,10 @@ it('rejects malformed evidence masks and out-of-range placements', () => {
     }).valid,
   ).toBe(false)
   expect(validateHintEvidence(hint, { kind: 'classic' }).valid).toBe(false)
-  if (ARROW_REPEAT_RULES.kind !== 'arrow') throw new Error('Expected Arrow rules')
+  if (ARROW_REPEAT_RULES.kind !== 'arrow') {
+    throw new Error('Expected Arrow rules')
+  }
+
   const clue = ARROW_REPEAT_RULES.arrows[0]
   const cells = [clue.circle, ...clue.shaft]
   const malformedMask = {
@@ -166,6 +179,7 @@ it('rejects malformed evidence masks and out-of-range placements', () => {
       },
     ],
   }
+
   expect(
     parseWorkerResponse({
       kind: 'hint',

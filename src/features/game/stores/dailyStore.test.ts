@@ -5,11 +5,12 @@ import { useGameStore } from '@/features/game/stores/useGameStore'
 import { isDigit } from '@/core/sudoku/types'
 import { createApp } from 'vue'
 import { createPinia, disposePinia } from 'pinia'
-import { gameRuntimeKey } from '@/infrastructure/runtime'
+import { gameRuntimeKey } from '@/runtime'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import type { GenerationInput } from '@/core/sudoku/generation'
 import { getDailyIdentity } from '@/features/game/model/daily'
+
 it('restores yesterday and old puzzle versions without generating them again', async () => {
   const test = await createTestRuntime()
   const saved = makeSession({
@@ -19,11 +20,15 @@ it('restores yesterday and old puzzle versions without generating them again', a
   })
   saved.puzzle = { ...saved.puzzle, puzzleVersion: 'older-puzzle' }
   const lease = await test.runtime.ownership.acquireOwnership(saved.id, 'seed-owner')
-  if (!lease.ok || !lease.value) throw new Error('Expected fixture lease')
+  if (!lease.ok || !lease.value) {
+    throw new Error('Expected fixture lease')
+  }
+
   await test.runtime.repository.writeSession(saved, 0, lease.value)
   await test.runtime.ownership.releaseOwnership(lease.value)
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   await game.restoreSession(saved.id)
+
   expect(game.phase).toBe('paused')
   expect(game.session?.puzzle.puzzleVersion).toBe('older-puzzle')
   expect(game.session?.metadata).toEqual(saved.metadata)
@@ -39,19 +44,28 @@ it('uses one stable formal ID and keeps replay results separate', async () => {
   })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   await game.startDaily('2026-10-11', 'classic')
+
   expect(game.session?.id).toBe('daily:2026-10-11:formal')
   const puzzle = game.session?.puzzle
-  if (!puzzle) throw new Error('Expected puzzle')
+  if (!puzzle) {
+    throw new Error('Expected puzzle')
+  }
+
   for (let cell = 0; cell < 81; cell++) {
     const digit = puzzle.solution[cell]
-    if (puzzle.givens[cell] === 0 && isDigit(digit)) game.dispatch({ kind: 'enter', cell, digit })
+    if (puzzle.givens[cell] === 0 && isDigit(digit)) {
+      game.dispatch({ kind: 'enter', cell, digit })
+    }
   }
+
   expect(game.phase).toBe('completed')
   await game.leaveGame()
   await game.startDaily('2026-10-11', 'classic')
+
   expect(game.session?.metadata).toMatchObject({ formalAttempt: false })
   expect(game.session?.id).not.toBe('daily:2026-10-11:formal')
   const results = await test.runtime.repository.listResults()
+
   expect(results.ok && results.value.length).toBe(1)
   await game.leaveGame()
   game.dispose()
@@ -73,6 +87,7 @@ it('converges concurrent starts on a single formal session with one editor', asy
     first.startDaily('2026-10-11', 'classic'),
     second.startDaily('2026-10-11', 'classic'),
   ])
+
   expect(await test.database.count('sessions')).toBe(1)
   expect([first.session?.id, second.session?.id]).toEqual([
     'daily:2026-10-11:formal',
@@ -93,6 +108,7 @@ it('uses six Medium daily inputs and preserves independent formal attempts after
     calls.push(input)
     const fixture =
       input.variant === 'classic' ? makeSession().puzzle : VARIANT_FIXTURES[input.variant]
+
     return { status: 'completed', value: { ...makeSession().puzzle, ...fixture, ...input } }
   }
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
@@ -104,19 +120,26 @@ it('uses six Medium daily inputs and preserves independent formal attempts after
       expect(game.session?.metadata).toMatchObject({ formalAttempt: true })
       if (variant === 'classic') {
         const puzzle = game.session?.puzzle
-        if (!puzzle) throw new Error('Expected daily puzzle')
+        if (!puzzle) {
+          throw new Error('Expected daily puzzle')
+        }
+
         for (let cell = 0; cell < 81; cell++) {
           const digit = puzzle.solution[cell]
-          if (!puzzle.givens[cell] && isDigit(digit)) game.dispatch({ kind: 'enter', cell, digit })
+          if (!puzzle.givens[cell] && isDigit(digit)) {
+            game.dispatch({ kind: 'enter', cell, digit })
+          }
         }
       }
     }
+
     expect(calls.map((input) => input.difficulty)).toEqual(Array(6).fill('medium'))
     expect(await test.database.count('sessions')).toBe(6)
     expect(await game.startDaily('2026-10-11', 'arrow')).toEqual({ status: 'ready' })
     expect(calls).toHaveLength(6)
     expect(game.session?.metadata).toMatchObject({ formalAttempt: true })
     await game.startDaily('2026-10-11', 'classic')
+
     expect(game.session?.metadata).toMatchObject({ formalAttempt: false })
     expect(game.session?.id).not.toBe('daily:2026-10-11:formal')
   } finally {

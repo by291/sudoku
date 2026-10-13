@@ -6,6 +6,7 @@ import type { RuleContext } from '@/core/sudoku/rules'
 
 export type ClassicTechnique =
   'naked-single' | 'hidden-single' | 'locked-candidate' | 'naked-pair' | 'hidden-pair'
+
 export type Technique =
   | ClassicTechnique
   | 'cage-distinct'
@@ -14,7 +15,9 @@ export type Technique =
   | 'thermo-bound'
   | 'arrow-equation'
   | 'arrow-combination'
+
 type ClueEvidence = { constraintId: string; cells: readonly number[]; digits: readonly Digit[] }
+
 export type RuleEvidence = ClueEvidence &
   (
     | { kind: 'cage'; sum: number; domains: readonly { cell: number; mask: NoteMask }[] }
@@ -30,12 +33,14 @@ export type RuleEvidence = ClueEvidence &
         domains: readonly { cell: number; mask: NoteMask }[]
       }
   )
+
 export type LogicalState = {
   board: Board
   candidates: readonly NoteMask[]
   context?: RuleContext
   premises?: readonly RuleEvidence[]
 }
+
 export type LogicalStep = {
   technique: Technique
   evidence:
@@ -52,6 +57,7 @@ export type LogicalStep = {
   | { kind: 'placement'; cell: number; digit: Digit }
   | { kind: 'elimination'; removals: readonly { cell: number; digit: Digit }[] }
 )
+
 export const TECHNIQUES: readonly ClassicTechnique[] = [
   'naked-single',
   'hidden-single',
@@ -72,46 +78,75 @@ export const TECHNIQUE_NAMES: Record<Technique, string> = {
   'arrow-equation': '箭头求和',
   'arrow-combination': '箭头组合',
 }
+
 export function isClassicTechnique(value: Technique): value is ClassicTechnique {
   return TECHNIQUES.some((technique) => technique === value)
 }
+
+export function matchesRuleTechnique(technique: Technique, kind: RuleEvidence['kind']): boolean {
+  switch (kind) {
+    case 'cage':
+      return technique.startsWith('cage-')
+    case 'thermo':
+      return technique === 'thermo-bound'
+    case 'arrow':
+      return technique.startsWith('arrow-')
+  }
+}
+
 function cellPosition(cell: number): string {
   return `第${Math.floor(cell / UNIT_SIZE) + 1}行第${(cell % UNIT_SIZE) + 1}列`
 }
 
 export function explainStepEvidence(step: LogicalStep): readonly string[] {
   const evidence = step.evidence
-  if (evidence.kind === 'unit') return []
+  if (evidence.kind === 'unit') {
+    return []
+  }
+
   if (evidence.kind === 'thermo') {
     return evidence.bounds.map(
       ({ cell, min, max }) =>
         `${cellPosition(cell)}（从圆头起第${evidence.path.indexOf(cell) + 1}格，共${evidence.path.length}格）：${min === max ? min : `${min}–${max}`}`,
     )
   }
+
   const details = evidence.domains.map(({ cell, mask }) => {
     const label = evidence.kind === 'arrow' ? (cell === evidence.circle ? '圆圈' : '箭杆') : ''
+
     return `${label}${cellPosition(cell)}：${digitsIn(mask).join('、')}`
   })
-  if (evidence.kind === 'cage') details.unshift(`目标总和：${evidence.sum}`)
+  if (evidence.kind === 'cage') {
+    details.unshift(`目标总和：${evidence.sum}`)
+  }
 
   // These techniques guarantee one unknown; the other singleton domains are filled values.
-  if (step.kind !== 'placement') return details
+  if (step.kind !== 'placement') {
+    return details
+  }
+
   const known = evidence.domains.filter(({ cell }) => cell !== step.cell)
-  if (known.some(({ mask }) => digitsIn(mask).length !== 1)) return details
+  if (known.some(({ mask }) => digitsIn(mask).length !== 1)) {
+    return details
+  }
+
   const values = known.map(({ mask }) => digitsIn(mask)[0])
   if (evidence.kind === 'cage' && step.technique === 'cage-remainder') {
     details.unshift(`${[evidence.sum, ...values].join(' − ')} = ${step.digit}`)
   }
+
   if (evidence.kind === 'arrow' && step.technique === 'arrow-equation') {
     const circle = evidence.domains.find(({ cell }) => cell === evidence.circle)
-    if (step.cell === evidence.circle) details.unshift(`${values.join(' + ')} = ${step.digit}`)
-    else if (circle) {
+    if (step.cell === evidence.circle) {
+      details.unshift(`${values.join(' + ')} = ${step.digit}`)
+    } else if (circle) {
       const shaftValues = known
         .filter(({ cell }) => cell !== evidence.circle)
         .map(({ mask }) => digitsIn(mask)[0])
       details.unshift(`${[digitsIn(circle.mask)[0], ...shaftValues].join(' − ')} = ${step.digit}`)
     }
   }
+
   return details
 }
 
@@ -140,8 +175,10 @@ export function explainStep(step: LogicalStep): string {
       step.technique === 'cage-combination' || step.technique === 'arrow-combination'
         ? '检查下列范围内满足求和及行、列、宫不重复规则的组合后'
         : '结合下列数字范围'
+
     return `${TECHNIQUE_NAMES[step.technique]}：${reason}，${deduction}，${conclusion}。`
   }
+
   const unitName = { row: '行', column: '列', box: '宫', region: '区域', diagonal: '对角线' }[
     evidence.unit.kind
   ]
@@ -163,11 +200,18 @@ export function explainStep(step: LogicalStep): string {
         ? '温度计递增限制'
         : '箭头求和限制',
   )
-  if (evidence.units?.some((unit) => unit.kind === 'diagonal')) premises.push('对角线不重复限制')
-  if (evidence.units?.some((unit) => unit.kind === 'region')) premises.push('不规则区域不重复限制')
+  if (evidence.units?.some((unit) => unit.kind === 'diagonal')) {
+    premises.push('对角线不重复限制')
+  }
+
+  if (evidence.units?.some((unit) => unit.kind === 'region')) {
+    premises.push('不规则区域不重复限制')
+  }
+
   const prefix = premises.length ? `结合${[...new Set(premises)].join('、')}，` : ''
   const reason = isClassicTechnique(step.technique)
     ? reasons[step.technique]
     : '候选范围受到当前规则限制'
+
   return `${prefix}${TECHNIQUE_NAMES[step.technique]}：第${evidence.unit.index + 1}${unitName}中，${reason}。`
 }

@@ -4,12 +4,14 @@ import { explainStep, TECHNIQUE_NAMES } from '@/core/sudoku/techniques'
 import type { ClassicTechnique } from '@/core/sudoku/techniques'
 import { CLASSIC_RULES } from '@/core/sudoku/rules'
 import type { PuzzleRules, SudokuVariant } from '@/core/sudoku/rules'
-import { VARIANT_NAMES, VARIANT_RULE_TEXT } from '@/features/game/model/variants'
+import { getVariantPresentation } from '@/features/game/model/variants'
 import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
+
 export type Exercise =
   | { kind: 'placement'; expected: { cell: number; digit: Digit } }
   | { kind: 'elimination'; expected: readonly { cell: number; digit: Digit }[] }
+
 export type Lesson = {
   id: string
   title: string
@@ -22,6 +24,7 @@ export type Lesson = {
   rules: PuzzleRules
   practiceVariant: SudokuVariant
 }
+
 const introductions: Record<ClassicTechnique, string> = {
   'naked-single': '逐一排除同一行、列、宫里已出现的数字。如果只剩一个候选数，就可以落笔。',
   'hidden-single':
@@ -33,6 +36,7 @@ const introductions: Record<ClassicTechnique, string> = {
 }
 const techniqueLessons = Object.entries(EXAMPLES).map(([id, example]): Lesson => {
   const step = example.step
+
   return {
     id,
     rules: CLASSIC_RULES,
@@ -80,13 +84,17 @@ export const LESSONS: readonly Lesson[] = [
       ),
   ),
   ...SUDOKU_VARIANTS.flatMap((variant): Lesson[] => {
-    if (variant === 'classic') return []
+    if (variant === 'classic') {
+      return []
+    }
+
     const example = VARIANT_EXAMPLES[variant]
+
     return [
       {
         id: `${variant}-rules`,
-        title: `认识${VARIANT_NAMES[variant]}`,
-        introduction: VARIANT_RULE_TEXT[variant],
+        title: `认识${getVariantPresentation(variant).label}`,
+        introduction: getVariantPresentation(variant).ruleText,
         rules: example.rules,
         practiceVariant: variant,
         board: example.board,
@@ -101,20 +109,24 @@ export const LESSONS: readonly Lesson[] = [
     ]
   }),
 ]
+
 export function checkExercise(
   lesson: Lesson,
   answer: Exercise['expected'],
 ): { correct: boolean; explanation: string } {
   let correct = false
-  if (lesson.exercise.kind === 'placement' && !Array.isArray(answer) && 'cell' in answer)
+  if (lesson.exercise.kind === 'placement' && !Array.isArray(answer) && 'cell' in answer) {
     correct =
       answer.cell === lesson.exercise.expected.cell &&
       answer.digit === lesson.exercise.expected.digit
+  }
+
   if (lesson.exercise.kind === 'elimination' && Array.isArray(answer)) {
     const supplied = new Set(answer.map((pair) => `${pair.cell}:${pair.digit}`))
     const expected = new Set(lesson.exercise.expected.map((pair) => `${pair.cell}:${pair.digit}`))
     correct = supplied.size === expected.size && [...expected].every((pair) => supplied.has(pair))
   }
+
   return {
     correct,
     explanation: correct

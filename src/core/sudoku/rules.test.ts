@@ -16,12 +16,14 @@ describe('rule geometry validation', () => {
   it('compiles both full diagonals and replaces Jigsaw boxes', () => {
     expect(compileRules({ kind: 'diagonal' }).units).toHaveLength(29)
     const context = compileRules({ kind: 'jigsaw', regions: rows })
+
     expect(context.units).toHaveLength(27)
     expect(context.units.some((unit) => unit.kind === 'box')).toBe(false)
     expect(context.units.filter((unit) => unit.kind === 'region')).toHaveLength(9)
   })
   it('separates related arrow cells from duplicate peers', () => {
     const context = compileRules(ARROW_REPEAT_RULES)
+
     expect(context.relatedCells[16]).toContain(40)
     expect(context.duplicatePeers[16]).not.toContain(40)
     expect(context.constraints[0].id).toBe('arrow:0')
@@ -29,6 +31,7 @@ describe('rule geometry validation', () => {
   it('adds cage duplicate peers without treating cages as nine-digit units', () => {
     const cages = [{ cells: [0, 1], sum: 3 }, ...singletonCages.slice(2)]
     const context = compileRules({ kind: 'killer', cages })
+
     expect(context.units).toHaveLength(27)
     expect(context.constraints).toHaveLength(80)
   })

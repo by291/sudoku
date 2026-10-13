@@ -66,7 +66,11 @@ async function seedCompletedRecords(page: Page) {
     })
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction('results', 'readwrite')
-      for (const result of results) transaction.objectStore('results').put(result)
+
+      for (const result of results) {
+        transaction.objectStore('results').put(result)
+      }
+
       transaction.oncomplete = () => resolve()
       transaction.onabort = () => reject(transaction.error)
     })
@@ -121,6 +125,7 @@ test('exposes desktop links and a compact mobile selector at the layout boundary
   await expect(page).toHaveURL(/#\/records\?variant=thermo$/)
   await expect(page.getByRole('heading', { name: '温度计数独', exact: true })).toBeVisible()
   await page.setViewportSize({ width: 360, height: 800 })
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
 })
 

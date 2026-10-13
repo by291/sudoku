@@ -31,9 +31,11 @@ test('chooses the free puzzle in a home dialog before creating a session', async
       animations: 'disabled',
     })
   }
+
   expect(await readSessions(page)).toHaveLength(0)
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect(trigger).toBeFocused()
+
   expect(await readSessions(page)).toHaveLength(0)
   await trigger.click()
   await dialog.getByText('箭头数独', { exact: true }).click()
@@ -43,6 +45,7 @@ test('chooses the free puzzle in a home dialog before creating a session', async
   await expect
     .poll(async () => (await readSessions(page))[0]?.session.puzzle.rules.kind)
     .toBe('arrow')
+
   expect((await readSessions(page))[0].session.puzzle.difficulty).toBe('medium')
   await expect(page.getByRole('radiogroup', { name: '难度', exact: true })).toHaveCount(0)
 })
@@ -66,6 +69,7 @@ test('keeps edits when a new-game dialog is cancelled and yields game shortcuts'
   await expect(
     page.getByRole('heading', { name: '自由游玩 · 标准数独', exact: true }),
   ).toBeVisible()
+
   expect((await readSessions(page))[0].session.id).toBe('fixture-free-session')
 })
 
@@ -76,12 +80,14 @@ test('selects the daily type in a dialog without starting on selection', async (
   await expect(dialog).toBeVisible()
   await dialog.getByText('箭头数独', { exact: true }).click()
   await expect(dialog).toContainText('中等难度')
+
   expect(await readSessions(page)).toHaveLength(0)
   await dialog.getByRole('button', { name: '开始今日挑战', exact: true }).click()
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible({ timeout: 20000 })
   await expect
     .poll(async () => (await readSessions(page))[0]?.session.puzzle.rules.kind)
     .toBe('arrow')
+
   expect((await readSessions(page))[0].session.metadata.kind).toBe('daily')
 })
 
@@ -96,8 +102,10 @@ test('resumes from a standalone home action', async ({ page }, testInfo) => {
       animations: 'disabled',
     })
   }
+
   await page.getByRole('button', { name: '继续上次', exact: true }).click()
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
+
   expect((await readSessions(page))[0].session.id).toBe('fixture-free-session')
 })
 
@@ -130,6 +138,7 @@ test('opens a lesson at the top and restores the course position on browser back
   const lesson = page.getByRole('link', { name: /隐性数对/ })
   await lesson.scrollIntoViewIfNeeded()
   const courseScroll = await page.evaluate(() => window.scrollY)
+
   expect(courseScroll).toBeGreaterThan(300)
   await lesson.click()
   await expect(page).toHaveURL(/#\/learn\/hidden-pair$/)
@@ -150,6 +159,7 @@ test('resets scroll between a lesson and its saved full-board practice', async (
   await page.getByRole('link', { name: '返回本节课程', exact: true }).click()
   const practice = page.getByRole('link', { name: /进入完整棋盘练习/ })
   await practice.scrollIntoViewIfNeeded()
+
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
   await practice.click()
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
@@ -181,6 +191,7 @@ test('uses persistent labelled switches for game preferences', async ({ page }) 
           request.onerror = () => reject(request.error)
         })
         database.close()
+
         return settings
       }),
     )
@@ -194,6 +205,7 @@ test('uses persistent labelled switches for game preferences', async ({ page }) 
 
 test('distinguishes the selected theme in light and dark appearances', async ({ page }) => {
   await page.goto('/#/')
+
   for (const name of ['浅色主题', '深色主题']) {
     const choice = page.getByRole('radio', { name, exact: true })
     await page
@@ -204,12 +216,18 @@ test('distinguishes the selected theme in light and dark appearances', async ({ 
       .poll(() =>
         choice.evaluate((element) => {
           const button = element.closest('.n-radio-button')
-          if (!button) throw new Error('Missing theme choice surface')
+          if (!button) {
+            throw new Error('Missing theme choice surface')
+          }
+
           const selected = getComputedStyle(button)
           const other = button.parentElement?.querySelector(
             '.n-radio-button:not(.n-radio-button--checked)',
           )
-          if (!other) throw new Error('Missing alternate theme choice')
+          if (!other) {
+            throw new Error('Missing alternate theme choice')
+          }
+
           return (
             button.classList.contains('n-radio-button--checked') &&
             selected.backgroundColor !== getComputedStyle(other).backgroundColor

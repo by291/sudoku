@@ -20,6 +20,7 @@ it('names each eliminated cage candidate and exposes its input domains and targe
       domains: [0, 1, 2].map((cell) => ({ cell, mask: 15 })),
     },
   }
+
   expect(explainStep(step)).toContain('第1行第1列排除4')
   expect(explainStep(step)).toContain('第1行第2列排除4')
   expect(explainStepEvidence(step).join('；')).toContain('目标总和：6')
@@ -47,8 +48,10 @@ it('names arrow eliminations and distinguishes the circle and shaft domains', ()
       ],
     },
   }
+
   expect(explainStep(step)).toContain('第2行第8列排除6')
   const details = explainStepEvidence(step).join('；')
+
   expect(details).toContain('圆圈第1行第9列：8')
   expect(details).toContain('箭杆第2行第8列：1、2、6')
 })
@@ -71,6 +74,7 @@ it('explains thermo bounds using path order and specific numeric ranges', () => 
       ],
     },
   }
+
   expect(explainStep(step)).toContain('第1行第1列排除9')
   expect(explainStepEvidence(step).join('；')).toContain('第1行第1列（从圆头起第1格，共3格）：1–7')
 })
@@ -94,5 +98,6 @@ it('shows the subtraction for a cage remainder placement', () => {
       ],
     },
   }
+
   expect(explainStepEvidence(step)).toContain('6 − 2 − 3 = 1')
 })

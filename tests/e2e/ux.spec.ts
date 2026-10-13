@@ -74,11 +74,13 @@ test('offers touch-sized digits and a visible resume entry on small screens', as
   await page.setViewportSize({ width: 360, height: 800 })
   await seedSession(page, makeSession())
   const size = await page.getByRole('button', { name: '输入数字1', exact: true }).boundingBox()
+
   expect(size?.width).toBeGreaterThanOrEqual(30)
   expect(size?.height).toBeGreaterThanOrEqual(44)
   await page.getByRole('link', { name: '返回首页', exact: true }).click()
   const continueButton = page.getByRole('button', { name: '继续上次', exact: true })
   const resume = await continueButton.boundingBox()
+
   expect(resume && resume.y + resume.height).toBeLessThan(800)
   await expect(continueButton).toBeInViewport()
 })
@@ -102,6 +104,7 @@ test('toggles a touch-sized setting from its label without editing the board', a
     .getByRole('checkbox', { name: '显示计时', exact: true })
     .or(page.getByRole('switch', { name: '显示计时', exact: true }))
   const target = await timerSetting.boundingBox()
+
   expect(target?.width).toBeGreaterThanOrEqual(44)
   expect(target?.height).toBeGreaterThanOrEqual(44)
   await page.getByText('显示计时', { exact: true }).click()

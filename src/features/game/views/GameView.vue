@@ -1,19 +1,15 @@
 <script setup lang="ts">
-import { NAlert, NButton, NCard, NModal, NSwitch } from 'naive-ui'
-import { computed, ref, watch, onScopeDispose } from 'vue'
+import { NAlert, NButton, NCard } from 'naive-ui'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import type { LogicalStep } from '@/core/sudoku/techniques'
 import type { Difficulty, Digit } from '@/core/sudoku/types'
-import { isDifficulty } from '@/core/sudoku/types'
 import { compileRules } from '@/core/sudoku/rules'
-import { createGenerationInput } from '@/core/sudoku/generation'
 import type { SudokuVariant } from '@/core/sudoku/rules'
-import { VARIANT_NAMES, VARIANT_RULE_TEXT, parseVariantQuery } from '@/features/game/model/variants'
-import type { SessionRecord } from '@/storage/records'
+import { getVariantPresentation } from '@/features/game/model/variants'
 import type { SessionMetadata } from '@/features/game/model/session'
 import { useGameStore } from '@/features/game/stores/useGameStore'
-import { useGameRuntime } from '@/infrastructure/runtime'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import { useGameKeyboard } from '@/features/game/composables/useGameKeyboard'
 import { useGameLifecycle } from '@/features/game/composables/useGameLifecycle'
@@ -23,6 +19,9 @@ import GameControls from '@/features/game/components/GameControls.vue'
 import HintPanel from '@/features/game/components/HintPanel.vue'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
 import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
+import GameSettingsDialog from '@/features/game/components/GameSettingsDialog.vue'
+import { useGameEntry } from '@/features/game/composables/useGameEntry'
+
 const props = withDefaults(
   defineProps<{
     metadata?: SessionMetadata
@@ -40,9 +39,6 @@ const props = withDefaults(
   },
 )
 const emit = defineEmits<{ chooseDaily: [] }>()
-const route = useRoute()
-const router = useRouter()
-const runtime = useGameRuntime()
 const game = useGameStore()
 const {
   session,
@@ -67,28 +63,32 @@ const {
   activeVariant,
   conflictEvaluation,
 } = storeToRefs(game)
-const difficulty = ref<Difficulty>(props.practiceDifficulty)
-const setupOpen = ref(false)
-const settingsOpen = ref(false)
-const targetLoading = ref(false)
-const nextVariant = ref<SudokuVariant>(props.practiceVariant)
-const queryVariant = computed(() => parseVariantQuery(route.query.variant))
-const targetSession = ref<SessionRecord | null>(null)
-let targetLookup = 0
-async function refreshTarget() {
-  const epoch = ++targetLookup
-  if (props.metadata.kind !== 'free') return
-  targetLoading.value = true
-  const result = await game.findFreeSession(nextVariant.value)
-  if (epoch !== targetLookup) return
-  targetLoading.value = false
-  targetSession.value = result.ok ? result.value : null
-  if (!result.ok)
-    initializationError.value = '目标玩法存档读取失败。新开一局可暂存在内存中，请保持页面打开。'
-}
-watch(nextVariant, () => {
-  void refreshTarget()
+const entry = useGameEntry({
+  metadata: () => props.metadata,
+  autoRestore: () => props.autoRestore,
+  practiceVariant: () => props.practiceVariant,
+  practiceDifficulty: () => props.practiceDifficulty,
+  chooseDaily: () => emit('chooseDaily'),
 })
+const {
+  ready,
+  initializationError,
+  queryVariant,
+  active,
+  nextVariant,
+  difficulty,
+  setupOpen,
+  targetSession,
+  targetLoading,
+  initialize,
+  start,
+  syncSessionRoute,
+  retryGeneration,
+  startSelected,
+  resumeTarget,
+} = entry
+
+const settingsOpen = ref(false)
 const inputEditable = computed(
   () =>
     editable.value &&
@@ -96,11 +96,24 @@ const inputEditable = computed(
     session.value?.puzzle.givens[selectedCell.value] === 0,
 )
 const selectionMessage = computed(() => {
-  if (readOnly.value) return '当前为只读状态，请先取得编辑权。'
-  if (phase.value === 'paused') return '游戏已暂停，继续后可以填写。'
-  if (phase.value === 'completed') return '本局已完成。'
-  if (selectedCell.value === null) return '先选择一个空格，再填写数字。'
+  if (readOnly.value) {
+    return '当前为只读状态，请先取得编辑权。'
+  }
+
+  if (phase.value === 'paused') {
+    return '游戏已暂停，继续后可以填写。'
+  }
+
+  if (phase.value === 'completed') {
+    return '本局已完成。'
+  }
+
+  if (selectedCell.value === null) {
+    return '先选择一个空格，再填写数字。'
+  }
+
   const position = `第${Math.floor(selectedCell.value / 9) + 1}行第${(selectedCell.value % 9) + 1}列`
+
   return inputEditable.value ? `已选 ${position}` : `${position}是题目给定，不能修改。`
 })
 const preferences = usePreferencesStore()
@@ -118,14 +131,16 @@ const highlightConflicts = computed({
 })
 const confirmation = ref<'restart' | 'new' | 'reload' | null>(null)
 const confirmationContent = computed(() => {
-  if (confirmation.value === 'reload')
+  if (confirmation.value === 'reload') {
     return {
       title: '重新载入最新存档？',
       description:
         '将以本机最新存档替换当前页面内容，未保存的填写和笔记会丢失。其他标签页仍在编辑时，本页保持只读。',
       confirmLabel: '确认重新载入',
     }
-  if (confirmation.value === 'restart')
+  }
+
+  if (confirmation.value === 'restart') {
     return {
       title: '重新开始这道题？',
       description:
@@ -134,41 +149,31 @@ const confirmationContent = computed(() => {
           : '将清除本局填写，重新计时。已经完成的成绩仍会保留。',
       confirmLabel: '确认开始',
     }
+  }
+
   return {
     title: '开始新的一局？',
-    description: `新题准备好后将替换${VARIANT_NAMES[nextVariant.value]}的存档。其他玩法会保留。取消或出题失败会保留原局。`,
+    description: `新题准备好后将替换${getVariantPresentation(nextVariant.value).label}的存档。其他玩法会保留。取消或出题失败会保留原局。`,
     confirmLabel: '确认开始',
   }
 })
-const ready = ref(false)
-const replacementAvailable = ref(false)
-const initializationError = ref<string | null>(null)
-let initialization = 0
-let disposed = false
-onScopeDispose(() => {
-  disposed = true
-  initialization++
-  targetLookup++
-})
-const active = computed(
-  () =>
-    session.value &&
-    session.value.mode === props.metadata.kind &&
-    (props.metadata.kind !== 'learning' ||
-      (session.value.metadata.kind === 'learning' &&
-        session.value.metadata.lessonId === props.metadata.lessonId)),
-)
 const displayedHintStep = ref<LogicalStep | null>(null)
 watch(hint, () => {
   displayedHintStep.value = null
 })
-const hintCells = computed(() =>
-  hint.value?.kind === 'review-entry'
-    ? [hint.value.cell]
-    : hint.value?.kind === 'deduction'
-      ? ((displayedHintStep.value ?? hint.value.steps[0])?.evidence.cells ?? [])
-      : [],
-)
+const hintCells = computed(() => {
+  if (hint.value?.kind === 'review-entry') {
+    return [hint.value.cell]
+  }
+
+  if (hint.value?.kind === 'deduction') {
+    const step = displayedHintStep.value ?? hint.value.steps[0]
+
+    return step?.evidence.cells ?? []
+  }
+
+  return []
+})
 const highlightedCells = computed(() => [...new Set([...hintCells.value, ...checkedCells.value])])
 const displayedConflicts = computed(() => (highlightConflicts.value ? conflicts.value : []))
 const relatedCells = computed(() =>
@@ -182,178 +187,69 @@ const saveLabel = computed(
       saveState.value
     ],
 )
-async function initialize() {
-  const current = ++initialization
-  const requestedId = typeof route.query.session === 'string' ? route.query.session : null
-  ready.value = false
-  initializationError.value = null
-  if (!queryVariant.value.valid) {
-    ready.value = true
-    return
-  }
-  // Updating the URL after a successful transition must not pause or reload that session.
-  if (props.autoRestore && requestedId === session.value?.id && active.value) {
-    nextVariant.value = activeVariant.value
-    ready.value = true
-    void refreshTarget()
-    return
-  }
-  nextVariant.value =
-    props.metadata.kind === 'learning' ? props.practiceVariant : queryVariant.value.value
-  if (props.autoRestore && !requestedId && props.metadata.kind === 'free') {
-    // Only an explicit save link resumes a board; ordinary entry waits for the setup dialog.
-    const transition = await game.clearActiveSession()
-    if (current !== initialization) return
-    ready.value = true
-    if (transition.status !== 'ready') return
-    if (route.query.start === '1') {
-      if (!isDifficulty(route.query.difficulty)) {
-        initializationError.value = '无法识别指定的难度，请重新选择。'
-        return
-      }
-      difficulty.value = route.query.difficulty
-      await start()
-    } else void refreshTarget()
-    return
-  }
-  if (props.autoRestore) {
-    const records = requestedId
-      ? await game.findSession(requestedId)
-      : props.metadata.kind === 'free'
-        ? await game.findFreeSession(nextVariant.value)
-        : await game.findPracticeSession()
-    if (current !== initialization) return
-    if (!records.ok)
-      initializationError.value = '读取存档失败。新开一局可暂存在内存中，请保持页面打开。'
-    else {
-      replacementAvailable.value = !!records.value
-      const id = requestedId
-      const record = records.value
-      if (
-        record &&
-        record.session.mode === props.metadata.kind &&
-        (props.metadata.kind !== 'learning' ||
-          (record.session.metadata.kind === 'learning' &&
-            record.session.metadata.lessonId === props.metadata.lessonId))
-      ) {
-        const transition = await game.restoreSession(record.session.id)
-        if (current !== initialization) return
-        if (transition.status === 'ready') nextVariant.value = record.session.puzzle.rules.kind
-      } else {
-        await game.clearActiveSession()
-        if (current !== initialization) return
-        if (id) initializationError.value = '存档与当前模式不匹配，或已被清除。'
-      }
-    }
-  }
-  if (current !== initialization) return
-  ready.value = true
-  void refreshTarget()
-}
-watch(
-  () => [
-    route.query.session,
-    route.query.variant,
-    props.practiceVariant,
-    props.metadata.kind,
-    props.metadata.kind === 'learning' ? props.metadata.lessonId : '',
-  ],
-  () => {
-    void initialize()
-  },
-  { immediate: true },
-)
+
 useGameKeyboard()
 useGameLifecycle()
-async function start() {
-  if (!queryVariant.value.valid) return
-  const transition = await game.startGame(
-    createGenerationInput(nextVariant.value, difficulty.value, runtime.createId()),
-    props.metadata,
-  )
-  if (transition.status === 'ready') await syncSessionRoute()
-  if (disposed) return
-  await refreshTarget()
-}
-async function syncSessionRoute() {
-  if (disposed || props.metadata.kind === 'daily' || !active.value || !session.value) return
-  const query = { ...route.query }
-  delete query.start
-  delete query.difficulty
-  await router.replace({
-    query: { ...query, variant: activeVariant.value, session: session.value.id },
-  })
-}
-async function retryGeneration() {
-  const transition = await game.retryGeneration()
-  if (transition?.status === 'ready') await syncSessionRoute()
-}
+
 async function requestNew(event?: MouseEvent) {
-  if (event?.currentTarget instanceof HTMLElement) event.currentTarget.focus()
-  if (props.metadata.kind === 'daily') {
-    emit('chooseDaily')
-    return
+  if (event?.currentTarget instanceof HTMLElement) {
+    event.currentTarget.focus()
   }
-  if (props.metadata.kind === 'free') {
-    nextVariant.value = active.value ? activeVariant.value : nextVariant.value
-    difficulty.value =
-      active.value && session.value ? session.value.puzzle.difficulty : difficulty.value
-    setupOpen.value = true
-    void refreshTarget()
-    return
-  }
-  await refreshTarget()
-  if (
-    targetSession.value ||
-    (props.metadata.kind === 'learning' && (active.value || replacementAvailable.value))
-  )
+
+  if (await entry.requestNew()) {
     confirmation.value = 'new'
-  else void start()
-}
-function startSelected() {
-  setupOpen.value = false
-  void start()
-}
-async function resumeTarget() {
-  if (!targetSession.value) return
-  setupOpen.value = false
-  const transition = await game.restoreSession(targetSession.value.session.id)
-  if (transition.status === 'ready') {
-    await game.resume()
-    await syncSessionRoute()
   }
 }
+
 function requestReload(event: MouseEvent) {
-  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.focus()
+  }
+
   confirmation.value = 'reload'
 }
+
 function requestRestart(event?: MouseEvent) {
-  if (event?.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  if (event?.currentTarget instanceof HTMLElement) {
+    event.currentTarget.focus()
+  }
+
   confirmation.value = 'restart'
 }
+
 async function confirm() {
   const intention = confirmation.value
   confirmation.value = null
   if (intention === 'reload') {
     await game.reloadLatestSession()
   } else if (intention === 'restart') {
-    if (props.metadata.kind === 'daily') await game.restartDaily()
-    else {
+    if (props.metadata.kind === 'daily') {
+      await game.restartDaily()
+    } else {
       const transition = await game.restartFree()
-      if (transition?.status === 'ready') await syncSessionRoute()
+      if (transition?.status === 'ready') {
+        await syncSessionRoute()
+      }
     }
-  } else await start()
+  } else {
+    await start()
+  }
 }
+
 function enterDigit(digit: Digit) {
-  if (selectedCell.value !== null)
+  if (selectedCell.value !== null) {
     game.dispatch({
       kind: noteMode.value ? 'toggle-note' : 'enter',
       cell: selectedCell.value,
       digit,
     })
+  }
 }
+
 function erase() {
-  if (selectedCell.value !== null) game.dispatch({ kind: 'erase', cell: selectedCell.value })
+  if (selectedCell.value !== null) {
+    game.dispatch({ kind: 'erase', cell: selectedCell.value })
+  }
 }
 </script>
 <template>
@@ -362,7 +258,8 @@ function erase() {
       <div>
         <p v-if="!active" class="eyebrow">一格一念 / {{ heading }}</p>
         <h1>
-          {{ heading }}<template v-if="active"> · {{ VARIANT_NAMES[activeVariant] }}</template>
+          {{ heading
+          }}<template v-if="active"> · {{ getVariantPresentation(activeVariant).label }}</template>
         </h1>
       </div>
     </div>
@@ -544,34 +441,18 @@ function erase() {
       @start="startSelected"
       @resume="resumeTarget"
     />
-    <NModal
+    <GameSettingsDialog
       v-if="settingsOpen && active"
-      :show="true"
-      preset="card"
-      title="对局设置"
-      aria-label="对局设置"
-      role="dialog"
-      aria-modal="true"
-      style="width: min(480px, calc(100vw - 32px)); margin: 24px auto"
-      @update:show="settingsOpen = $event"
+      v-model:show="settingsOpen"
+      v-model:show-timer="showTimer"
+      v-model:highlight-conflicts="highlightConflicts"
     >
-      <div class="preferences-row">
-        <div class="preference" @click="showTimer = !showTimer">
-          <span>显示计时</span
-          ><NSwitch v-model:value="showTimer" aria-label="显示计时" @click.stop />
-        </div>
-        <div class="preference" @click="highlightConflicts = !highlightConflicts">
-          <span>高亮冲突</span
-          ><NSwitch v-model:value="highlightConflicts" aria-label="高亮冲突" @click.stop />
-        </div>
-      </div>
       <h3 class="settings-heading">玩法规则</h3>
-      <p class="rule-summary">{{ VARIANT_RULE_TEXT[activeVariant] }}</p>
+      <p class="rule-summary">{{ getVariantPresentation(activeVariant).ruleText }}</p>
       <h3 class="settings-heading">辅助与成绩</h3>
       <p class="rule-summary">使用逻辑提示、检查填写或生成候选数，会将本局记为「辅助完成」。</p>
       <slot name="settings" />
-      <template #footer><NButton @click="settingsOpen = false">关闭设置</NButton></template>
-    </NModal>
+    </GameSettingsDialog>
     <ConfirmationDialog
       v-if="confirmation"
       :title="confirmationContent.title"
@@ -675,31 +556,6 @@ function erase() {
   color: var(--muted);
   margin-top: 6px;
 }
-.preferences-row {
-  display: grid;
-  gap: 12px;
-}
-.preference {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 12px;
-  border-radius: 8px;
-  background: var(--background);
-  cursor: pointer;
-  justify-content: space-between;
-}
-.preference :deep(.n-switch) {
-  min-height: 44px;
-  min-width: 44px;
-  display: flex;
-  align-items: center;
-}
-.preference:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
-}
 .settings-heading {
   margin: 20px 0 8px;
   font-size: 14px;
@@ -751,9 +607,6 @@ function erase() {
   .board-footer {
     flex-wrap: wrap;
     font-size: 12px;
-  }
-  .preferences-row {
-    gap: 12px;
   }
 }
 @media (pointer: coarse) {

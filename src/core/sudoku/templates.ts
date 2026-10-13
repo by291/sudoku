@@ -4,9 +4,13 @@ import type { Board, Difficulty } from '@/core/sudoku/types'
 export type PuzzleTemplate = { difficulty: Difficulty; givens: Board; solution: Board }
 function literalBoard(text: string): Board {
   const parsed = parseBoard(Array.from(text, Number))
-  if (!parsed.valid) throw new Error(`Invalid template: ${parsed.issues.join('; ')}`)
+  if (!parsed.valid) {
+    throw new Error(`Invalid template: ${parsed.issues.join('; ')}`)
+  }
+
   return parsed.value
 }
+
 const solution = literalBoard(
   '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
 )

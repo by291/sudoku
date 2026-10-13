@@ -20,6 +20,7 @@ const INTERACTIVE_CONTROL = [
 
 export function isKeyboardOwnedByControl(event: KeyboardEvent): boolean {
   const target = event.target
+
   return (
     event.defaultPrevented ||
     // Closed menu transitions must not block board input.

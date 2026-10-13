@@ -7,22 +7,27 @@ import { calculateBaseCandidates, maskOf } from '@/core/sudoku/board'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 
 type PlacementProof = Extract<LogicalStep, { kind: 'placement' }>
+
 type VariantExample = {
   rules: PuzzleRules
   board: Board
   candidates: readonly number[]
   step: PlacementProof
 }
+
 function example(rules: PuzzleRules, board: Board, step: PlacementProof): VariantExample {
   return { rules, board, candidates: calculateBaseCandidates(board, compileRules(rules)), step }
 }
+
 const diagonal = VARIANT_TEMPLATES.diagonal.easy[0]
 const diagonalCells = Array.from({ length: 9 }, (_, index) => index * 10)
 const diagonalBoard = diagonal.solution.map((digit, cell) =>
   cell !== 0 && diagonalCells.includes(cell) ? digit : 0,
 )
 const jigsaw = VARIANT_TEMPLATES.jigsaw.easy[0]
-if (jigsaw.rules.kind !== 'jigsaw') throw new Error('Expected authored Jigsaw rules')
+if (jigsaw.rules.kind !== 'jigsaw') {
+  throw new Error('Expected authored Jigsaw rules')
+}
 const regionCells = jigsaw.rules.regions[0]
 const jigsawBoard = jigsaw.solution.map((digit, cell) =>
   cell !== 0 && regionCells.includes(cell) ? digit : 0,
@@ -36,9 +41,11 @@ const arrowRules: PuzzleRules = { kind: 'arrow', arrows: [{ circle: 8, shaft: [1
 const arrowBoard: Board = Array.from({ length: 81 }, (_, cell) =>
   cell === 8 ? 8 : cell === 16 ? 2 : cell === 24 ? 1 : cell === 32 ? 3 : 0,
 )
+
 function domains(board: Board, cells: readonly number[]) {
   return cells.map((cell) => ({ cell, mask: board[cell] ? maskOf(board[cell]) : ALL_DIGITS_MASK }))
 }
+
 // Proofs are authored from unit contents, arithmetic, and strict path length; no search answer supplies a hint.
 export const VARIANT_EXAMPLES: Record<NewSudokuVariant, VariantExample> = {
   diagonal: example(diagonal.rules, diagonalBoard, {

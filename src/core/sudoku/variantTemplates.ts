@@ -10,9 +10,13 @@ export type VariantTemplate = {
 }
 function literalBoard(text: string): Board {
   const parsed = parseBoard(Array.from(text, Number))
-  if (!parsed.valid) throw new Error('Invalid authored variant board')
+  if (!parsed.valid) {
+    throw new Error('Invalid authored variant board')
+  }
+
   return parsed.value
 }
+
 function tiers(
   rules: PuzzleRules,
   solution: Board,

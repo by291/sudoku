@@ -28,6 +28,7 @@ it('solves a one-unknown arrow equation without excluding permitted repeats', ()
     ['arrow-equation'],
     createWorkBudget(1000000),
   )
+
   expect(step).toMatchObject({
     status: 'complete',
     step: {
@@ -37,7 +38,10 @@ it('solves a one-unknown arrow equation without excluding permitted repeats', ()
       evidence: { kind: 'arrow', constraintId: 'arrow:0' },
     },
   })
-  if (step.status !== 'complete' || !step.step) throw new Error('Missing arrow proof')
+  if (step.status !== 'complete' || !step.step) {
+    throw new Error('Missing arrow proof')
+  }
+
   expect(explainStep(step.step)).toContain('总和')
 })
 it('explains the cage premise before its resulting single', () => {
@@ -60,11 +64,14 @@ it('explains the cage premise before its resulting single', () => {
     ['cage-remainder'],
     createWorkBudget(1000000),
   )
+
   expect(result).toMatchObject({
     status: 'complete',
     step: { kind: 'placement', cell: 1, digit: 2, evidence: { kind: 'cage', sum: 3 } },
   })
-  if (result.status === 'complete' && result.step) expect(explainStep(result.step)).toContain('笼')
+  if (result.status === 'complete' && result.step) {
+    expect(explainStep(result.step)).toContain('笼')
+  }
 })
 it('explains thermo positional bounds with independently known digits', () => {
   const context = compileRules(FULL_LENGTH_THERMO_RULES)
@@ -72,6 +79,7 @@ it('explains thermo positional bounds with independently known digits', () => {
     context,
     workBudget: createWorkBudget(1000000),
   })
+
   expect(result).toMatchObject({ kind: 'deduction', placement: { cell: 0, digit: 1 } })
   if (result.kind === 'deduction') {
     expect(result.steps[0].evidence.kind).toBe('thermo')
@@ -83,9 +91,16 @@ it.each(['diagonal', 'jigsaw'] as const)('uses %s units for hidden singles', (va
   const targetUnit = context.units.find(
     (unit) => unit.kind === (variant === 'diagonal' ? 'diagonal' : 'region'),
   )
-  if (!targetUnit) throw new Error('Missing variant unit')
+  if (!targetUnit) {
+    throw new Error('Missing variant unit')
+  }
+
   const state = createLogicalWorkspace(Array(81).fill(0), context)
-  for (const cell of targetUnit.cells.slice(1)) state.candidates[cell] &= ~1
+
+  for (const cell of targetUnit.cells.slice(1)) {
+    state.candidates[cell] &= ~1
+  }
+
   expect(findLogicalStep(state, ['hidden-single'])).toMatchObject({
     status: 'complete',
     step: {
@@ -98,6 +113,7 @@ it.each(['diagonal', 'jigsaw'] as const)('uses %s units for hidden singles', (va
 })
 it('returns an explicit arithmetic budget outcome rather than a claimed difficulty', () => {
   const fixture = VARIANT_FIXTURES.arrow
+
   expect(
     rateVariantDifficulty(
       ARROW_REPEAT_BOARD,

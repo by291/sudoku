@@ -4,7 +4,7 @@ import App from '@/App.vue'
 import { router } from '@/router/index'
 import '@/styles/theme.css'
 import '@/styles/global.css'
-import { createGameRuntime, gameRuntimeKey } from '@/infrastructure/runtime'
+import { createGameRuntime, gameRuntimeKey } from '@/runtime'
 
 createApp(App)
   .use(createPinia())

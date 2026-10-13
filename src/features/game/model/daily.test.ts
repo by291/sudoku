@@ -8,6 +8,7 @@ import {
 } from '@/features/game/model/daily'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import { makeSession } from '../../../../tests/support/gameFixtures'
+
 it('changes the challenge at Beijing midnight with a versioned stable seed', () => {
   expect(getChallengeDate(new Date('2026-10-11T15:59:59.999Z'))).toBe('2026-10-11')
   expect(getChallengeDate(new Date('2026-10-11T16:00:00.000Z'))).toBe('2026-10-12')
@@ -23,6 +24,7 @@ it('restarts daily entries while retaining identity, accumulated time and assist
     assistance: { assisted: true, hintCount: 2, checkCount: 1, candidateCount: 1 },
   })
   const restarted = restartDailySession(session)
+
   expect(restarted).toMatchObject({
     id: session.id,
     metadata: session.metadata,
@@ -63,6 +65,7 @@ it('reports six independent statuses without counting practice replays', () => {
     metadata: { kind: 'daily' as const, challengeDate: '2026-10-11', formalAttempt: false },
     completion: classic.completion,
   }
+
   expect(
     getDailyStatuses(
       [{ session: arrow }],

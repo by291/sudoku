@@ -13,6 +13,7 @@ const fixture = { formatVersion: 2, revision: 0, session: makeSession() }
 it('accepts valid sessions including wrong player entries and older stored puzzle versions', () => {
   expect(parseSessionRecord(fixture)).toEqual({ valid: true, value: fixture })
   const session = applySessionAction(makeSession(), { kind: 'enter', cell: 2, digit: 1 }).session
+
   expect(
     parseSessionRecord({
       ...fixture,
@@ -54,8 +55,10 @@ it('normalizes legacy history, revisions, assistance, and original puzzle metada
   session = applySessionAction(session, { kind: 'undo' }).session
   session = applySessionAction(session, { kind: 'hint-shown' }).session
   const { rules, ...legacyPuzzle } = session.puzzle
+
   expect(rules.kind).toBe('classic')
   const raw = { formatVersion: 1, revision: 17, session: { ...session, puzzle: legacyPuzzle } }
+
   expect(parseSessionRecord(raw)).toEqual({
     valid: true,
     value: { formatVersion: 2, revision: 17, session },
@@ -74,6 +77,7 @@ it('preserves a legacy formal result without granting another identity', () => {
   )
   session.completion = { completedAt: session.startedAt, elapsedMs: 0 }
   const { rules, ...legacyPuzzle } = session.puzzle
+
   expect(rules.kind).toBe('classic')
   expect(
     parseResultRecord({ formatVersion: 1, session: { ...session, puzzle: legacyPuzzle } }),
@@ -87,6 +91,7 @@ it('accepts complete variant records and rejects mismatched formal identities or
     metadata: { kind: 'daily', challengeDate: '2026-10-11', formalAttempt: true },
     puzzle: { ...makeSession().puzzle, ...VARIANT_FIXTURES.arrow },
   })
+
   expect(parseSessionRecord({ formatVersion: 2, revision: 1, session }).valid).toBe(true)
   expect(
     parseSessionRecord({
@@ -95,7 +100,11 @@ it('accepts complete variant records and rejects mismatched formal identities or
       session: { ...session, id: 'daily:2026-10-11:formal' },
     }).valid,
   ).toBe(false)
-  for (const rules of [{ kind: 'unknown' }, { kind: 'arrow', arrows: [{ circle: 0, shaft: [2] }] }])
+
+  for (const rules of [
+    { kind: 'unknown' },
+    { kind: 'arrow', arrows: [{ circle: 0, shaft: [2] }] },
+  ]) {
     expect(
       parseSessionRecord({
         formatVersion: 2,
@@ -103,10 +112,12 @@ it('accepts complete variant records and rejects mismatched formal identities or
         session: { ...session, puzzle: { ...session.puzzle, rules } },
       }).valid,
     ).toBe(false)
+  }
 })
 it('validates undo and redo endpoints rather than accepting arbitrary snapshots', () => {
   let session = applySessionAction(makeSession(), { kind: 'enter', cell: 2, digit: 4 }).session
   session = applySessionAction(session, { kind: 'undo' }).session
+
   expect(parseSessionRecord({ ...fixture, session }).valid).toBe(true)
   expect(
     parseSessionRecord({
@@ -122,6 +133,7 @@ it('validates settings and lesson records independently', () => {
     highlightConflicts: true,
     currentLessonId: null,
   }
+
   expect(parseSettings(settings)).toEqual({ valid: true, value: settings })
   expect(parseSettings({ ...settings, theme: 'unknown' }).valid).toBe(false)
   expect(parseSettings({ ...settings, currentLessonId: 'missing' }).valid).toBe(false)

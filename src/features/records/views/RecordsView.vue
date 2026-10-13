@@ -2,14 +2,19 @@
 import { NAlert, NButton, NCard, NSelect } from 'naive-ui'
 import { onMounted, onScopeDispose, ref, computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { parseVariantQuery, VARIANT_NAMES, VARIANT_OPTIONS } from '@/features/game/model/variants'
+import {
+  parseVariantQuery,
+  getVariantPresentation,
+  VARIANT_OPTIONS,
+} from '@/features/game/model/variants'
 import { isSudokuVariant } from '@/core/sudoku/rules'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { modeName } from '@/features/records/model/records'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
-const records = useRecordsStore(),
-  confirmation = ref<'clear' | 'quarantine' | null>(null)
+
+const records = useRecordsStore()
+const confirmation = ref<'clear' | 'quarantine' | null>(null)
 const route = useRoute()
 const router = useRouter()
 const variantQuery = computed(() => parseVariantQuery(route.query.variant))
@@ -29,26 +34,40 @@ const summary = computed(() => records.summaries[variant.value])
 const results = computed(() =>
   records.results.filter((record) => record.session.puzzle.rules.kind === variant.value),
 )
+
 function updateVariant(value: unknown) {
-  if (isSudokuVariant(value)) void router.push({ path: '/records', query: { variant: value } })
+  if (isSudokuVariant(value)) {
+    void router.push({ path: '/records', query: { variant: value } })
+  }
 }
+
 function updateNavigationLayout() {
   compactNavigation.value = compactNavigationMedia.matches
   variantMenuOpen.value = false
 }
+
 compactNavigationMedia.addEventListener('change', updateNavigationLayout)
 onScopeDispose(() => compactNavigationMedia.removeEventListener('change', updateNavigationLayout))
 onMounted(records.load)
+
 function requestConfirmation(action: 'clear' | 'quarantine', event: MouseEvent) {
-  if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.focus()
+  }
+
   confirmation.value = action
 }
+
 async function confirm() {
   const action = confirmation.value
   confirmation.value = null
-  if (action === 'clear') await records.clearLocalData()
-  else await records.removeQuarantined()
+  if (action === 'clear') {
+    await records.clearLocalData()
+  } else {
+    await records.removeQuarantined()
+  }
 }
+
 function duration(value: number | null) {
   return value === null ? '—' : formatDuration(value)
 }
@@ -121,10 +140,10 @@ function duration(value: number | null) {
           @update:value="updateVariant"
         />
       </label>
-      <section class="records-content" :aria-label="`${VARIANT_NAMES[variant]}成绩`">
+      <section class="records-content" :aria-label="`${getVariantPresentation(variant).label}成绩`">
         <div class="records-overview">
           <p class="eyebrow">按玩法积累</p>
-          <h2>{{ VARIANT_NAMES[variant] }}</h2>
+          <h2>{{ getVariantPresentation(variant).label }}</h2>
           <p class="completion-count">已完成 {{ results.length }} 局</p>
           <p class="muted">难度与最快成绩按玩法分别计算。</p>
         </div>
@@ -176,7 +195,8 @@ function duration(value: number | null) {
             <li v-for="{ session } in results" :key="session.id">
               <div>
                 <strong
-                  >{{ VARIANT_NAMES[session.puzzle.rules.kind] }} · {{ modeName(session) }}</strong
+                  >{{ getVariantPresentation(session.puzzle.rules.kind).label }} ·
+                  {{ modeName(session) }}</strong
                 >
                 <p class="muted">
                   {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} ·

@@ -1,8 +1,8 @@
 import type { IDBPDatabase, IDBPTransaction } from 'idb'
-import type { SudokuDatabase } from '@/storage/database'
+import type { DatabaseProvider, SudokuDatabase } from '@/storage/database'
 import { commitTransaction } from '@/storage/database'
-import { assertOwnership, StorageConflict } from '@/infrastructure/ownership'
-import type { OwnershipToken } from '@/infrastructure/ownership'
+import { assertOwnership, StorageConflict } from '@/storage/ownership'
+import type { OwnershipToken } from '@/storage/ownership'
 import type { GameSession } from '@/features/game/model/session'
 import type { LessonProgress, ResultRecord, SessionRecord, StorageOutcome } from '@/storage/records'
 import type { ParseResult } from '@/core/sudoku/types'
@@ -16,6 +16,7 @@ import {
 } from '@/storage/records'
 import type { Settings } from '@/features/settings/model/preferences'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
+
 export interface GameRepository {
   writeSession(
     session: GameSession,
@@ -43,33 +44,43 @@ export interface GameRepository {
   removeQuarantined(): Promise<StorageOutcome<void>>
   countQuarantined(): Promise<StorageOutcome<number>>
 }
-export type DatabaseProvider = () => Promise<IDBPDatabase<SudokuDatabase>>
+
+export type { DatabaseProvider } from '@/storage/database'
+
 function isMatchingPrevious(raw: unknown, previous: { id: string; revision: number }): boolean {
   const parsed = parseSessionRecord(raw)
+
   return (
     parsed.valid &&
     parsed.value.session.id === previous.id &&
     parsed.value.revision === previous.revision
   )
 }
+
 function assertActive(signal?: AbortSignal) {
-  if (signal?.aborted) throw new DOMException('Session creation cancelled', 'AbortError')
+  if (signal?.aborted) {
+    throw new DOMException('Session creation cancelled', 'AbortError')
+  }
 }
+
 function belongsToSlot(candidate: GameSession, target: GameSession): boolean {
   return (
     candidate.mode === target.mode &&
     (target.mode !== 'free' || candidate.puzzle.rules.kind === target.puzzle.rules.kind)
   )
 }
+
 async function assertDatasetEpoch(
   transaction: IDBPTransaction<SudokuDatabase, ('meta' | 'settings' | 'lessons')[], 'readwrite'>,
   expectedEpoch: number,
 ) {
   // Every player-data write carries the epoch observed when its workflow began.
   const current = await transaction.objectStore('meta').get('epoch')
-  if (!isNonnegativeInteger(expectedEpoch) || current !== expectedEpoch)
+  if (!isNonnegativeInteger(expectedEpoch) || current !== expectedEpoch) {
     throw new StorageConflict('revision-conflict', 'Local data was cleared during this operation')
+  }
 }
+
 export function storageError(
   error: unknown,
   kind: 'unavailable' | 'write-failed',
@@ -79,6 +90,7 @@ export function storageError(
     error: { kind, message: error instanceof Error ? error.message : 'Storage operation failed' },
   }
 }
+
 export function createGameRepository(
   database: DatabaseProvider,
   options: { now?: () => number; onReset?: () => void } = {},
@@ -96,25 +108,31 @@ export function createGameRepository(
     try {
       return { ok: true, value: await operation(db) }
     } catch (error) {
-      if (error instanceof StorageConflict)
+      if (error instanceof StorageConflict) {
         return { ok: false, error: { kind: error.kind, message: error.message } }
+      }
+
       return storageError(error, write ? 'write-failed' : 'unavailable')
     }
   }
+
   async function list<T>(
     store: 'sessions' | 'results' | 'lessons',
     parse: (value: unknown) => ParseResult<T>,
   ): Promise<StorageOutcome<readonly T[]>> {
     return access(async (db) => {
       const transaction = db.transaction([store, 'quarantine'], 'readwrite')
+
       return commitTransaction(transaction, async () => {
         const objectStore = transaction.objectStore(store)
         const records: T[] = []
         let cursor = await objectStore.openCursor()
+
         while (cursor) {
           const parsed = parse(cursor.value)
-          if (parsed.valid) records.push(parsed.value)
-          else {
+          if (parsed.valid) {
+            records.push(parsed.value)
+          } else {
             await transaction
               .objectStore('quarantine')
               .put(
@@ -123,19 +141,25 @@ export function createGameRepository(
               )
             await cursor.delete()
           }
+
           cursor = await cursor.continue()
         }
+
         return records
       })
     })
   }
+
   return {
     writeSession: (session, expectedRevision, token, signal) =>
       access(async (db) => {
         const parsed = parseSession(session)
-        if (!parsed.valid || token.sessionId !== session.id)
+        if (!parsed.valid || token.sessionId !== session.id) {
           throw new TypeError('Invalid session snapshot')
+        }
+
         const transaction = db.transaction(['sessions', 'results', 'leases', 'meta'], 'readwrite')
+
         return commitTransaction(transaction, async () => {
           assertActive(signal)
           await assertOwnership(transaction, token, (options.now ?? Date.now)())
@@ -145,8 +169,10 @@ export function createGameRepository(
             (raw !== undefined &&
               (!current?.valid || current.value.revision !== expectedRevision)) ||
             (raw === undefined && expectedRevision !== 0)
-          )
+          ) {
             throw new StorageConflict('revision-conflict', 'The saved revision has changed')
+          }
+
           const record: SessionRecord = {
             formatVersion: 2,
             revision: expectedRevision + 1,
@@ -157,24 +183,31 @@ export function createGameRepository(
           if (session.completion) {
             const results = transaction.objectStore('results')
             const existing = await results.get(session.id)
-            if (existing === undefined)
+            if (existing === undefined) {
               await results.put({ formatVersion: 2, session: parsed.value })
-            else {
+            } else {
               // Upgrade the original result rather than replacing its first completion facts.
               const original = parseResultRecord(existing)
-              if (original.valid) await results.put(original.value)
+              if (original.valid) {
+                await results.put(original.value)
+              }
             }
           }
+
           assertActive(signal)
+
           return record
         })
       }, true),
     replaceActiveSession: (session, token, previous, signal) =>
       access(async (db) => {
         const parsed = parseSession(session)
-        if (!parsed.valid || token.sessionId !== session.id || session.mode === 'daily')
+        if (!parsed.valid || token.sessionId !== session.id || session.mode === 'daily') {
           throw new TypeError('Invalid replacement')
+        }
+
         const transaction = db.transaction(['sessions', 'results', 'leases', 'meta'], 'readwrite')
+
         return commitTransaction(transaction, async () => {
           assertActive(signal)
           await assertOwnership(transaction, token, (options.now ?? Date.now)())
@@ -184,19 +217,23 @@ export function createGameRepository(
             .getAll(session.mode)
           const slot = records.filter((raw) => {
             const current = parseSessionRecord(raw)
-            if (!current.valid)
+            if (!current.valid) {
               throw new StorageConflict(
                 'revision-conflict',
                 'The active slot contains invalid data; reload saved games',
               )
+            }
+
             return belongsToSlot(current.value.session, session)
           })
           if (
             (await transaction.objectStore('sessions').get(session.id)) ||
             slot.length > 1 ||
             (slot.length === 1 && (!previous || !isMatchingPrevious(slot[0], previous)))
-          )
+          ) {
             throw new StorageConflict('revision-conflict', 'The active game slot has changed')
+          }
+
           if (previous) {
             await assertOwnership(transaction, previous.token, (options.now ?? Date.now)())
             const raw = await transaction.objectStore('sessions').get(previous.id)
@@ -206,15 +243,19 @@ export function createGameRepository(
               !previousRecord.valid ||
               !belongsToSlot(previousRecord.value.session, session) ||
               previous.token.sessionId !== previous.id
-            )
+            ) {
               throw new StorageConflict('revision-conflict', 'Previous session changed')
+            }
+
             assertActive(signal)
             await transaction.objectStore('sessions').delete(previous.id)
           }
+
           const record: SessionRecord = { formatVersion: 2, revision: 1, session: parsed.value }
           assertActive(signal)
           await transaction.objectStore('sessions').put(record)
           assertActive(signal)
+
           return record
         })
       }, true),
@@ -226,8 +267,10 @@ export function createGameRepository(
         )
         await commitTransaction(transaction, async () => {
           const epoch = await transaction.objectStore('meta').get('epoch')
-          if (typeof epoch !== 'number' || !Number.isSafeInteger(epoch))
+          if (typeof epoch !== 'number' || !Number.isSafeInteger(epoch)) {
             throw new TypeError('Invalid dataset epoch')
+          }
+
           for (const store of [
             'sessions',
             'results',
@@ -235,12 +278,17 @@ export function createGameRepository(
             'settings',
             'quarantine',
             'leases',
-          ] as const)
+          ] as const) {
             await transaction.objectStore(store).clear()
+          }
+
           await transaction.objectStore('meta').put(epoch + 1, 'epoch')
         })
       }, true)
-      if (result.ok) options.onReset?.()
+      if (result.ok) {
+        options.onReset?.()
+      }
+
       return result
     },
     listSessions: () => list('sessions', parseSessionRecord),
@@ -250,17 +298,27 @@ export function createGameRepository(
     readDatasetEpoch: () =>
       access(async (db) => {
         const epoch = await db.get('meta', 'epoch')
-        if (!isNonnegativeInteger(epoch)) throw new TypeError('Invalid dataset epoch')
+        if (!isNonnegativeInteger(epoch)) {
+          throw new TypeError('Invalid dataset epoch')
+        }
+
         return epoch
       }),
     readSettings: () =>
       access(async (db) => {
         const transaction = db.transaction(['settings', 'quarantine'], 'readwrite')
+
         return commitTransaction(transaction, async () => {
           const raw = await transaction.objectStore('settings').get('preferences')
-          if (raw === undefined) return { ...DEFAULT_SETTINGS }
+          if (raw === undefined) {
+            return { ...DEFAULT_SETTINGS }
+          }
+
           const parsed = parseSettings(raw)
-          if (parsed.valid) return parsed.value
+          if (parsed.valid) {
+            return parsed.value
+          }
+
           await transaction
             .objectStore('quarantine')
             .put(
@@ -268,13 +326,17 @@ export function createGameRepository(
               'settings:preferences',
             )
           await transaction.objectStore('settings').delete('preferences')
+
           return { ...DEFAULT_SETTINGS }
         })
       }),
     writeSettings: (settings, expectedEpoch) =>
       access(async (db) => {
         const parsed = parseSettings(settings)
-        if (!parsed.valid) throw new TypeError(parsed.issues.join('; '))
+        if (!parsed.valid) {
+          throw new TypeError(parsed.issues.join('; '))
+        }
+
         const transaction = db.transaction(['settings', 'meta'], 'readwrite')
         await commitTransaction(transaction, async () => {
           await assertDatasetEpoch(transaction, expectedEpoch)
@@ -286,7 +348,10 @@ export function createGameRepository(
     writeLessonProgress: (progress, expectedEpoch) =>
       access(async (db) => {
         const parsed = parseLessonProgress(progress)
-        if (!parsed.valid) throw new TypeError(parsed.issues.join('; '))
+        if (!parsed.valid) {
+          throw new TypeError(parsed.issues.join('; '))
+        }
+
         const transaction = db.transaction(['lessons', 'meta'], 'readwrite')
         await commitTransaction(transaction, async () => {
           await assertDatasetEpoch(transaction, expectedEpoch)

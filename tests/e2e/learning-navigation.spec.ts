@@ -59,6 +59,7 @@ test('recommends the next unfinished lesson and resumes the last visited lesson'
       animations: 'disabled',
     })
   }
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     (await page.viewportSize())?.width ?? 0,
   )
@@ -83,6 +84,7 @@ test('opens a different course at the top and restores the previous path on brow
   await page.goto('/#/learn')
   await page.getByRole('link', { name: /隐性数对/ }).scrollIntoViewIfNeeded()
   const previousScroll = await page.evaluate(() => window.scrollY)
+
   expect(previousScroll).toBeGreaterThan(300)
   await page
     .getByRole('navigation', { name: '学习玩法' })

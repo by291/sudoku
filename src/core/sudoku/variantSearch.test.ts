@@ -10,6 +10,7 @@ import {
   VARIANT_FIXTURES,
 } from '../../../tests/fixtures/variants'
 import type { Board, Digit } from '@/core/sudoku/types'
+
 const digits: readonly Digit[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 const solution: Board = Array.from(
   { length: 81 },
@@ -18,6 +19,7 @@ const solution: Board = Array.from(
 it('solves the fully specified thermo independently', () => {
   const board = [...solution]
   board[0] = 0
+
   expect(referenceCountSolutions(board, FULL_LENGTH_THERMO_RULES)).toEqual({ count: 1, solution })
   expect(
     countSolutions(board, {
@@ -29,6 +31,7 @@ it('solves the fully specified thermo independently', () => {
 })
 it('rejects a filled Classic board that violates an active rule', () => {
   const rules = { kind: 'thermo', paths: [[1, 0]] } as const
+
   expect(referenceCountSolutions(solution, rules).count).toBe(0)
   expect(
     countSolutions(solution, { maxSolutions: 2, nodeBudget: 100, context: compileRules(rules) }),

@@ -33,10 +33,12 @@ test('keeps six tools and nine digits in two single rows inside the phone viewpo
   const digits = page.getByRole('group', { name: '数字输入', exact: true }).getByRole('button')
   await expect(tools).toHaveCount(6)
   await expect(digits).toHaveCount(9)
+
   for (const row of [tools, digits]) {
     const boxes = await row.evaluateAll((elements) =>
       elements.map((element) => {
         const box = element.getBoundingClientRect()
+
         return {
           top: box.top,
           bottom: box.bottom,
@@ -46,7 +48,9 @@ test('keeps six tools and nine digits in two single rows inside the phone viewpo
         }
       }),
     )
+
     expect(new Set(boxes.map((box) => Math.round(box.top))).size).toBe(1)
+
     for (const box of boxes) {
       expect(box.height).toBeGreaterThanOrEqual(44)
       expect(box.left).toBeGreaterThanOrEqual(0)
@@ -54,6 +58,7 @@ test('keeps six tools and nine digits in two single rows inside the phone viewpo
       expect(box.bottom).toBeLessThanOrEqual(800)
     }
   }
+
   await page.getByRole('button', { name: cellName(2) }).click()
   await page.getByRole('button', { name: '输入数字4', exact: true }).click()
   await expect(page.getByRole('button', { name: cellName(2) })).toHaveAccessibleName(/数字4/)
@@ -100,6 +105,7 @@ test('keeps settings and secondary actions in More without leaking keyboard inpu
   await more.click()
   await page.getByRole('menuitem', { name: '新开一局', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+
   expect((await readSessions(page))[0].session.id).toBe('fixture-free-session')
 })
 
@@ -131,10 +137,12 @@ test('keeps a usable board and digit row on a landscape touch screen', async ({
   await seedSession(page, makeSession())
   const board = page.getByRole('group', { name: '数独棋盘', exact: true })
   const box = await board.boundingBox()
+
   expect(box?.width).toBeGreaterThanOrEqual(320)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(844)
-  if (isMobile)
+  if (isMobile) {
     await expect(page.getByRole('group', { name: '数字输入' }).getByRole('button')).toHaveCount(9)
+  }
 })
 
 test('offers other daily challenges while the current save belongs to another editor', async ({
@@ -160,5 +168,6 @@ test('offers other daily challenges while the current save belongs to another ed
   await choose.click()
   await expect(peer.getByRole('dialog', { name: '选择每日挑战', exact: true })).toBeVisible()
   await peer.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+
   expect((await readSessions(page))[0].session.id).toBe('daily:2026-10-11:formal')
 })

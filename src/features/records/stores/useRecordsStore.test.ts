@@ -5,6 +5,7 @@ import { makeSession } from '../../../../tests/support/gameFixtures'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import { useGameStore } from '@/features/game/stores/useGameStore'
+
 it('clears all player stores and resets in-memory preferences only after commit', async () => {
   const test = await createTestRuntime()
   const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
@@ -22,11 +23,14 @@ it('clears all player stores and resets in-memory preferences only after commit'
   await test.database.put('sessions', { formatVersion: 2, revision: 1, session })
   await game.restoreSession(session.id)
   await records.load()
+
   expect(records.sessions).toHaveLength(1)
   await records.clearLocalData()
+
   expect(records.notice).toContain('已清空')
   expect(game.session).toBeNull()
   expect(preferences.settings).toMatchObject({ theme: 'system', currentLessonId: null })
+
   for (const store of [
     'sessions',
     'results',
@@ -34,8 +38,10 @@ it('clears all player stores and resets in-memory preferences only after commit'
     'settings',
     'leases',
     'quarantine',
-  ] as const)
+  ] as const) {
     expect(await test.database.count(store)).toBe(0)
+  }
+
   expect(await test.database.get('meta', 'epoch')).toBe(2)
   records.dispose()
   game.dispose()
@@ -48,15 +54,17 @@ it('retains recoverable records and current preferences when reset aborts', asyn
   await preferences.update({ theme: 'dark' })
   await test.database.put('sessions', { formatVersion: 2, revision: 1, session: makeSession() })
   await records.load()
-  const raw = unwrap(test.database),
-    original = raw.transaction.bind(raw)
+  const raw = unwrap(test.database)
+  const original = raw.transaction.bind(raw)
   const spy = vi.spyOn(raw, 'transaction').mockImplementation((...args) => {
     const transaction = original(...args)
     queueMicrotask(() => transaction.abort())
+
     return transaction
   })
   await records.clearLocalData()
   spy.mockRestore()
+
   expect(records.error).toContain('清空失败')
   expect(records.sessions).toHaveLength(1)
   expect(preferences.settings.theme).toBe('dark')

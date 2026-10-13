@@ -1,7 +1,7 @@
 import { expect, it, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { router } from '@/router/index'
-import { gameRuntimeKey } from '@/infrastructure/runtime'
+import { gameRuntimeKey } from '@/runtime'
 import GameView from '@/features/game/views/GameView.vue'
 import DailyView from '@/features/game/views/DailyView.vue'
 import { deferred } from '../../../../tests/support/deferred'
@@ -14,18 +14,125 @@ import { createGenerationInput } from '@/core/sudoku/generation'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import type { WorkerOutcome } from '@/worker/protocol'
 import type { Puzzle } from '@/core/sudoku/generation'
+
 const runtimes: Awaited<ReturnType<typeof createTestRuntime>>[] = []
+
 async function setup(session = makeSession()) {
   const test = await createTestRuntime()
   runtimes.push(test)
   await test.database.put('sessions', { formatVersion: 2, revision: 1, session })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   await game.restoreSession(session.id)
+
   return { ...test, game }
 }
+
 afterEach(() => {
-  for (const test of runtimes.splice(0)) test.dispose()
+  for (const test of runtimes.splice(0)) {
+    test.dispose()
+  }
 })
+
+it('releases a delayed acquired lease exactly once after cancellation', async () => {
+  const test = await setup()
+  await test.game.leaveGame()
+  const acquire = test.runtime.ownership.acquireOwnership
+  const pending = deferred<void>()
+  const entered = deferred<void>()
+  test.runtime.ownership.acquireOwnership = async (id, owner) => {
+    const result = await acquire(id, owner)
+    entered.resolve()
+    await pending.promise
+
+    return result
+  }
+  const release = vi.spyOn(test.runtime.ownership, 'releaseOwnership')
+
+  const resuming = test.game.resume()
+  await entered.promise
+  test.game.cancelLoading()
+  pending.resolve()
+  await resuming
+
+  expect(release).toHaveBeenCalledTimes(1)
+  expect(test.game.phase).toBe('paused')
+})
+
+it('releases the current editing lease once when replacing its own game', async () => {
+  const test = await setup()
+  const release = vi.spyOn(test.runtime.ownership, 'releaseOwnership')
+  test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
+
+  await test.game.startGame(createGenerationInput('classic', 'easy', 'replacement'), {
+    kind: 'free',
+  })
+
+  expect(release.mock.calls.filter(([token]) => token.sessionId === makeSession().id)).toHaveLength(
+    1,
+  )
+})
+
+it.each(['acquisition-failed', 'acquisition-denied', 'replacement-failed'] as const)(
+  'does not publish %s replacement after reset during old-lease cleanup',
+  async (failure) => {
+    const test = await setup()
+    await test.game.leaveGame()
+    test.game.dropSession()
+
+    const oldSessionId = makeSession().id
+    const acquire = test.runtime.ownership.acquireOwnership
+    const release = test.runtime.ownership.releaseOwnership
+    const cleanupEntered = deferred<void>()
+    const cleanupGate = deferred<void>()
+    test.runtime.worker.generate = async () => ({
+      status: 'completed',
+      value: makeSession().puzzle,
+    })
+    test.runtime.ownership.acquireOwnership = async (id, owner) => {
+      if (id !== oldSessionId && failure === 'acquisition-failed') {
+        return { ok: false, error: { kind: 'unavailable', message: 'Injected lease failure' } }
+      }
+
+      if (id !== oldSessionId && failure === 'acquisition-denied') {
+        return { ok: true, value: null }
+      }
+
+      return acquire(id, owner)
+    }
+    test.runtime.ownership.releaseOwnership = async (token) => {
+      if (token.sessionId === oldSessionId) {
+        cleanupEntered.resolve()
+        await cleanupGate.promise
+      }
+
+      return release(token)
+    }
+    if (failure === 'replacement-failed') {
+      test.runtime.repository.replaceActiveSession = async () => ({
+        ok: false,
+        error: { kind: 'write-failed', message: 'Injected replacement failure' },
+      })
+    }
+
+    const starting = test.game.startGame(
+      createGenerationInput('classic', 'easy', 'cleanup-reset'),
+      {
+        kind: 'free',
+      },
+    )
+    await cleanupEntered.promise
+    await test.runtime.repository.clearAll()
+    test.game.dropSession()
+    cleanupGate.resolve()
+
+    expect(await starting).toEqual({ status: 'cancelled' })
+    expect(test.game.session).toBeNull()
+    expect(test.game.phase).toBe('paused')
+    expect(test.game.saveState).toBe('idle')
+    expect(test.game.canRetryGeneration).toBe(false)
+    expect(await test.database.count('sessions')).toBe(0)
+  },
+)
 
 it('retains an unsaved session after a failed type switch and retries before installing the requested type', async () => {
   const test = await setup()
@@ -44,6 +151,7 @@ it('retains an unsaved session after a failed type switch and retries before ins
   test.game.dispatch({ kind: 'enter', cell: 2, digit: 4 })
   time = 3000
   const input = createGenerationInput('arrow', 'easy', 'switch')
+
   expect(await test.game.startGame(input, { kind: 'free' })).toEqual({
     status: 'blocked',
     reason: 'save',
@@ -54,9 +162,11 @@ it('retains an unsaved session after a failed type switch and retries before ins
   expect(test.game.elapsedMs).toBe(3000)
   expect(test.game.readOnly).toBe(false)
   test.runtime.repository.writeSession = write
+
   expect(await test.game.startGame(input, { kind: 'free' })).toEqual({ status: 'ready' })
   expect(test.game.activeVariant).toBe('arrow')
   const saved = await test.runtime.repository.listSessions()
+
   expect(saved).toMatchObject({
     ok: true,
     value: expect.arrayContaining([
@@ -74,8 +184,10 @@ it('ignores a late previous-type generation', async () => {
   test.runtime.worker.generate = async (input) => {
     if (input.variant === 'arrow') {
       entered.resolve()
+
       return first.promise
     }
+
     return {
       status: 'completed',
       value: { ...makeSession().puzzle, ...VARIANT_FIXTURES.thermo, ...input },
@@ -85,6 +197,7 @@ it('ignores a late previous-type generation', async () => {
     kind: 'free',
   })
   await entered.promise
+
   expect(
     await test.game.startGame(createGenerationInput('thermo', 'easy', 'second'), { kind: 'free' }),
   ).toEqual({ status: 'ready' })
@@ -92,6 +205,7 @@ it('ignores a late previous-type generation', async () => {
     status: 'completed',
     value: { ...makeSession().puzzle, ...VARIANT_FIXTURES.arrow },
   })
+
   expect(await pending).toEqual({ status: 'cancelled' })
   expect(test.game.activeVariant).toBe('thermo')
 })
@@ -113,12 +227,14 @@ it('retains unsaved entries, history, time and assistance across release and res
   await test.game.leaveGame()
   test.runtime.repository.writeSession = write
   await test.game.resume()
+
   expect(test.game.board[2]).toBe(4)
   expect(test.game.session?.undoStack).toHaveLength(1)
   expect(test.game.session?.assistance.checkCount).toBe(1)
   expect(test.game.elapsedMs).toBe(3000)
   await test.game.retrySave()
   const stored = await test.runtime.repository.listSessions()
+
   expect(stored).toMatchObject({
     ok: true,
     value: [{ session: { entries: test.game.session?.entries } }],
@@ -142,6 +258,7 @@ it('retains an unsaved completion after release and retries its result exactly o
   test.runtime.repository.writeSession = write
   await test.game.retrySave()
   await test.game.retrySave()
+
   expect(test.game.phase).toBe('completed')
   expect(await test.database.count('results')).toBe(1)
 })
@@ -156,6 +273,7 @@ it('preserves the dirty game and reports a peer revision conflict instead of ove
   await test.game.leaveGame()
   await test.database.put('sessions', { formatVersion: 2, revision: 2, session: makeSession() })
   await test.game.resume()
+
   expect(test.game.board[2]).toBe(4)
   expect(test.game.readOnly).toBe(true)
   expect(test.game.phase).toBe('paused')
@@ -172,9 +290,13 @@ it.each(['revision-conflict', 'ownership-lost'] as const)(
       entries: makeSession().entries.map((digit, cell) => (cell === 3 ? 6 : digit)),
     })
     await test.database.put('sessions', { formatVersion: 2, revision: 2, session: latest })
-    if (conflict === 'ownership-lost') await test.database.delete('leases', id)
+    if (conflict === 'ownership-lost') {
+      await test.database.delete('leases', id)
+    }
+
     test.game.dispatch({ kind: 'enter', cell: 2, digit: 4 })
     await test.game.periodicSave()
+
     expect(test.game.readOnly).toBe(true)
     expect(test.game.board[2]).toBe(4)
     expect(await test.game.restoreSession(id)).toEqual({ status: 'blocked', reason: 'ownership' })
@@ -187,8 +309,12 @@ it.each(['revision-conflict', 'ownership-lost'] as const)(
     test.game.dispatch({ kind: 'enter', cell: 2, digit: 4 })
     await test.game.periodicSave()
     const records = await test.runtime.repository.listSessions()
-    if (!records.ok) throw new Error('Missing recovered session')
+    if (!records.ok) {
+      throw new Error('Missing recovered session')
+    }
+
     const saved = records.value.find((record) => record.session.id === id)
+
     expect(saved).toMatchObject({
       session: { entries: latest.entries.map((digit, cell) => (cell === 2 ? 4 : digit)) },
     })
@@ -206,6 +332,7 @@ it('keeps unsaved conflicted edits when explicit recovery cannot read storage', 
     ok: false,
     error: { kind: 'unavailable', message: 'Injected read failure' },
   })
+
   expect(await test.game.reloadLatestSession()).toEqual({ status: 'blocked', reason: 'load' })
   expect(test.game.board[2]).toBe(4)
   expect(test.game.readOnly).toBe(true)
@@ -213,12 +340,13 @@ it('keeps unsaved conflicted edits when explicit recovery cannot read storage', 
 })
 it('does not restore after reset during release of the previous lease', async () => {
   const test = await setup()
-  const gate = deferred<void>(),
-    entered = deferred<void>()
+  const gate = deferred<void>()
+  const entered = deferred<void>()
   const release = test.runtime.ownership.releaseOwnership
   test.runtime.ownership.releaseOwnership = async (token) => {
     entered.resolve()
     await gate.promise
+
     return release(token)
   }
   const restoring = test.game.restoreSession(makeSession().id)
@@ -226,18 +354,20 @@ it('does not restore after reset during release of the previous lease', async ()
   test.game.dropSession()
   gate.resolve()
   await restoring
+
   expect(test.game.session).toBeNull()
 })
 
 it('does not resume a game after leaving while its catalog read is pending', async () => {
   const test = await setup()
   await test.game.leaveGame()
-  const gate = deferred<void>(),
-    entered = deferred<void>()
+  const gate = deferred<void>()
+  const entered = deferred<void>()
   const read = test.runtime.repository.listSessions
   test.runtime.repository.listSessions = async () => {
     entered.resolve()
     await gate.promise
+
     return read()
   }
   const resuming = test.game.resume()
@@ -245,6 +375,7 @@ it('does not resume a game after leaving while its catalog read is pending', asy
   await test.game.leaveGame()
   gate.resolve()
   await resuming
+
   expect(test.game.phase).toBe('paused')
 })
 it('keeps a peer-completed game locked when reacquiring its latest save', async () => {
@@ -260,6 +391,7 @@ it('keeps a peer-completed game locked when reacquiring its latest save', async 
   )
   await test.database.put('sessions', { formatVersion: 2, revision: 2, session: completed })
   await test.game.resume()
+
   expect(test.game.phase).toBe('completed')
   expect(test.game.editable).toBe(false)
   expect(test.game.elapsedMs).toBe(1234)
@@ -269,12 +401,13 @@ it('keeps a peer-completed game locked when reacquiring its latest save', async 
 it('does not retry or recreate a game after reset while its catalog read is pending', async () => {
   const test = await setup()
   await test.game.leaveGame()
-  const gate = deferred<void>(),
-    entered = deferred<void>()
+  const gate = deferred<void>()
+  const entered = deferred<void>()
   const read = test.runtime.repository.listSessions
   test.runtime.repository.listSessions = async () => {
     entered.resolve()
     await gate.promise
+
     return read()
   }
   const retrying = test.game.retrySave()
@@ -283,18 +416,20 @@ it('does not retry or recreate a game after reset while its catalog read is pend
   test.game.dropSession()
   gate.resolve()
   await expect(retrying).resolves.toBeUndefined()
+
   expect(test.game.session).toBeNull()
   expect(await test.database.count('sessions')).toBe(0)
 })
 
 it('does not create a daily game after leaving and resetting a pending startup', async () => {
   const test = await setup()
-  const gate = deferred<void>(),
-    entered = deferred<void>()
+  const gate = deferred<void>()
+  const entered = deferred<void>()
   const read = test.runtime.repository.listSessions
   test.runtime.repository.listSessions = async () => {
     entered.resolve()
     await gate.promise
+
     return read()
   }
   test.runtime.worker.generate = async () => ({
@@ -308,6 +443,7 @@ it('does not create a daily game after leaving and resetting a pending startup',
   test.game.dropSession()
   gate.resolve()
   await starting
+
   expect(test.game.session).toBeNull()
   expect(await test.database.count('sessions')).toBe(0)
 })
@@ -325,12 +461,13 @@ for (const component of [GameView, DailyView]) {
     const test = await setup(session)
     test.game.dropSession()
     await router.push(component === GameView ? '/play/free' : '/play/daily')
-    const gate = deferred<void>(),
-      entered = deferred<void>()
+    const gate = deferred<void>()
+    const entered = deferred<void>()
     const snapshot = await test.runtime.repository.listSessions()
     test.runtime.repository.listSessions = async () => {
       entered.resolve()
       await gate.promise
+
       return snapshot
     }
     const restore = vi.spyOn(test.game, 'restoreSession')
@@ -342,6 +479,7 @@ for (const component of [GameView, DailyView]) {
     await flushPromises()
     gate.resolve()
     await flushPromises()
+
     expect(restore).not.toHaveBeenCalled()
     expect(test.game.session).toBeNull()
   })
@@ -364,6 +502,7 @@ it('does not create or install a cancelled game while its catalog read is pendin
   test.runtime.repository.listSessions = async () => {
     entered()
     await gate
+
     return original()
   }
   test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
@@ -381,6 +520,7 @@ it('does not create or install a cancelled game while its catalog read is pendin
   game.cancelLoading()
   unblock()
   await job
+
   expect(game.session).toBeNull()
   expect(game.phase).toBe('failed')
   expect(await test.database.count('sessions')).toBe(0)

@@ -7,7 +7,7 @@ import { isDifficulty } from '@/core/sudoku/types'
 import type { Difficulty } from '@/core/sudoku/types'
 import type { GameSession } from '@/features/game/model/session'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
-import { VARIANT_NAMES, VARIANT_OPTIONS } from '@/features/game/model/variants'
+import { getVariantPresentation, VARIANT_OPTIONS } from '@/features/game/model/variants'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 
 const props = withDefaults(
@@ -27,15 +27,17 @@ const title = computed(() => (props.mode === 'daily' ? '选择每日挑战' : '�
 const dailyState = computed(
   () => props.statuses.find((status) => status.variant === variant.value)?.state,
 )
-const startLabel = computed(() =>
-  props.mode !== 'daily'
-    ? '开始游戏'
-    : dailyState.value === 'completed'
-      ? '再次练习'
-      : dailyState.value === 'in-progress'
-        ? '继续今日挑战'
-        : '开始今日挑战',
-)
+const startLabel = computed(() => {
+  if (props.mode !== 'daily') {
+    return '开始游戏'
+  }
+
+  if (dailyState.value === 'completed') {
+    return '再次练习'
+  }
+
+  return dailyState.value === 'in-progress' ? '继续今日挑战' : '开始今日挑战'
+})
 const descriptions: Record<SudokuVariant, string> = {
   classic: '从行、列与九宫格开始',
   diagonal: '两条对角线也不能重复',
@@ -44,22 +46,37 @@ const descriptions: Record<SudokuVariant, string> = {
   thermo: '沿温度计严格递增',
   arrow: '箭杆之和等于圆圈数字',
 }
+
 function statusLabel(type: SudokuVariant) {
   const state = props.statuses.find((status) => status.variant === type)?.state
-  return state === 'completed' ? '已完成' : state === 'in-progress' ? '进行中' : '待开始'
+
+  if (state === 'completed') {
+    return '已完成'
+  }
+
+  return state === 'in-progress' ? '进行中' : '待开始'
 }
+
 function selectVariant(value: unknown) {
-  if (isSudokuVariant(value)) variant.value = value
+  if (isSudokuVariant(value)) {
+    variant.value = value
+  }
 }
+
 function selectDifficulty(value: unknown) {
-  if (isDifficulty(value)) difficulty.value = value
+  if (isDifficulty(value)) {
+    difficulty.value = value
+  }
 }
+
 const previousFocus = document.activeElement
 const actions = useTemplateRef<HTMLElement>('actions')
 watch(actions, (element) => element?.querySelector('button')?.focus(), { flush: 'post' })
 onUnmounted(async () => {
   await nextTick()
-  if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
+  if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+    previousFocus.focus()
+  }
 })
 </script>
 
@@ -127,7 +144,7 @@ onUnmounted(async () => {
       type="info"
       :show-icon="false"
     >
-      {{ VARIANT_NAMES[variant] }}有未完成的存档（{{
+      {{ getVariantPresentation(variant).label }}有未完成的存档（{{
         DIFFICULTY_NAMES[savedSession.puzzle.difficulty]
       }}
       · {{ formatDuration(savedSession.elapsedMs) }}）。开始游戏将替换此玩法存档，其他玩法会保留。

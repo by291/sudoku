@@ -32,7 +32,9 @@ const emit = defineEmits<{
 }>()
 const menuOpen = ref(false)
 const moreButton = useTemplateRef<InstanceType<typeof NButton>>('moreButton')
+
 type MenuAction = 'check' | 'candidates' | 'settings' | 'new' | 'restart'
+
 const menuId = useId()
 const focusedAction = ref<MenuAction>()
 let initialMenuPosition: 'first' | 'last' = 'first'
@@ -111,6 +113,7 @@ const menuAttributes: DropdownMenuProps = () => ({
   'aria-label': '更多操作',
   'aria-hidden': menuOpen.value ? 'false' : 'true',
 })
+
 function actionOption(key: MenuAction, label: string, disabled = false): DropdownOption {
   return {
     key,
@@ -128,6 +131,7 @@ function actionOption(key: MenuAction, label: string, disabled = false): Dropdow
     },
   }
 }
+
 function menuItems() {
   return [
     ...(document
@@ -135,46 +139,67 @@ function menuItems() {
       ?.querySelectorAll<HTMLElement>('[role="menuitem"][aria-disabled="false"]') ?? []),
   ]
 }
+
 function focusMenuPosition(position: 'first' | 'last') {
   const items = menuItems()
   const item = position === 'first' ? items[0] : items.at(-1)
   item?.focus()
 }
+
 function focusMore() {
   const element: unknown = moreButton.value?.$el
-  if (element instanceof HTMLElement) element.focus()
+  if (element instanceof HTMLElement) {
+    element.focus()
+  }
 }
+
 watch(menuOpen, async (open) => {
-  if (!open) return
+  if (!open) {
+    return
+  }
+
   // NDropdown 2.45 highlights options without DOM focus; expose real focus for assistive input.
   await nextTick()
-  if (menuOpen.value) focusMenuPosition(initialMenuPosition)
+  if (menuOpen.value) {
+    focusMenuPosition(initialMenuPosition)
+  }
+
   initialMenuPosition = 'first'
 })
+
 function handleTriggerKey(event: KeyboardEvent) {
-  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+    return
+  }
+
   event.preventDefault()
   initialMenuPosition = event.key === 'ArrowUp' ? 'last' : 'first'
   menuOpen.value = true
 }
+
 function handleMenuKey(event: KeyboardEvent) {
   const items = menuItems()
   const current = items.findIndex((item) => item === document.activeElement)
   if (event.key === 'Tab') {
     menuOpen.value = false
     focusMore()
+
     return
   }
+
   if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Escape', 'Enter', ' '].includes(event.key)) {
     event.preventDefault()
     event.stopPropagation()
     if (event.key === 'Escape') {
       menuOpen.value = false
       focusMore()
-    } else if (event.key === 'Home') focusMenuPosition('first')
-    else if (event.key === 'End') focusMenuPosition('last')
-    else if (event.key === 'Enter' || event.key === ' ') items[current]?.click()
-    else {
+    } else if (event.key === 'Home') {
+      focusMenuPosition('first')
+    } else if (event.key === 'End') {
+      focusMenuPosition('last')
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      items[current]?.click()
+    } else {
       const direction = event.key === 'ArrowDown' ? 1 : -1
       items[(current + direction + items.length) % items.length]?.focus()
     }
@@ -183,6 +208,7 @@ function handleMenuKey(event: KeyboardEvent) {
     nextItems.find((item) => item.textContent?.trim().startsWith(event.key))?.focus()
   }
 }
+
 function selectAction(key: string | number) {
   menuOpen.value = false
   // Keep a stable focus target when the selected action opens a modal.

@@ -6,6 +6,7 @@ import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import type { WorkerRequest } from '@/worker/protocol'
 import { isRecord } from '@/core/sudoku/types'
 import type { PuzzleRules } from '@/core/sudoku/rules'
+
 export interface SudokuWorkerClient {
   generate(input: GenerationInput, signal?: AbortSignal): Promise<WorkerOutcome<Puzzle>>
   hint(
@@ -16,15 +17,20 @@ export interface SudokuWorkerClient {
   ): Promise<WorkerOutcome<HintResult>>
   dispose(): void
 }
+
 export function createSudokuWorkerClient(): SudokuWorkerClient {
   const cancellations = new Set<() => void>()
   let disposed = false
+
   function run<T>(
     request: WorkerRequest,
     decode: (value: unknown) => WorkerOutcome<T> | null,
     signal?: AbortSignal,
   ): Promise<WorkerOutcome<T>> {
-    if (disposed || signal?.aborted) return Promise.resolve({ status: 'cancelled' })
+    if (disposed || signal?.aborted) {
+      return Promise.resolve({ status: 'cancelled' })
+    }
+
     return new Promise((resolve) => {
       let worker: Worker
       try {
@@ -34,13 +40,19 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
           status: 'failed',
           message: error instanceof Error ? error.message : 'Worker unavailable',
         })
+
         return
       }
       let settled = false
       const timeout = window.setTimeout(() => finish({ status: 'timed-out' }), 15000)
       const cancel = () => finish({ status: 'cancelled' })
+
       function finish(outcome: WorkerOutcome<T>) {
-        if (settled) return
+        // Abort, timeout and reply can race; settle once and dispose the per-job worker together.
+        if (settled) {
+          return
+        }
+
         settled = true
         window.clearTimeout(timeout)
         signal?.removeEventListener('abort', cancel)
@@ -50,14 +62,20 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
         worker.terminate()
         resolve(outcome)
       }
+
       function receive(event: MessageEvent<unknown>) {
-        if (!isRecord(event.data) || event.data.requestId !== request.requestId) return
+        if (!isRecord(event.data) || event.data.requestId !== request.requestId) {
+          return
+        }
+
         const outcome = decode(event.data)
         finish(outcome ?? { status: 'failed', message: 'Worker returned malformed data' })
       }
+
       function fail(event: ErrorEvent) {
         finish({ status: 'failed', message: event.message || 'Worker failed' })
       }
+
       cancellations.add(cancel)
       signal?.addEventListener('abort', cancel, { once: true })
       worker.addEventListener('message', receive)
@@ -72,13 +90,17 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
       }
     })
   }
+
   return {
     generate(input, signal) {
       return run(
         { kind: 'generate', requestId: crypto.randomUUID(), input },
         (value) => {
           const parsed = parseWorkerResponse(value)
-          if (!parsed.valid || parsed.value.kind !== 'generate') return null
+          if (!parsed.valid || parsed.value.kind !== 'generate') {
+            return null
+          }
+
           const outcome = parsed.value.outcome
           if (
             outcome.status === 'completed' &&
@@ -86,8 +108,10 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
               outcome.value.seed !== input.seed ||
               outcome.value.difficulty !== input.difficulty ||
               outcome.value.puzzleVersion !== input.puzzleVersion)
-          )
+          ) {
             return null
+          }
+
           return outcome
         },
         signal,
@@ -98,10 +122,17 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
         { kind: 'hint', requestId: crypto.randomUUID(), board, solution, rules },
         (value) => {
           const parsed = parseWorkerResponse(value)
-          if (!parsed.valid || parsed.value.kind !== 'hint') return null
+          if (!parsed.valid || parsed.value.kind !== 'hint') {
+            return null
+          }
+
           const outcome = parsed.value.outcome
-          if (outcome.status !== 'completed') return outcome
+          if (outcome.status !== 'completed') {
+            return outcome
+          }
+
           const hint = validateHintEvidence(outcome.value, rules)
+
           return hint.valid ? { status: 'completed', value: hint.value } : null
         },
         signal,
@@ -109,7 +140,10 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
     },
     dispose() {
       disposed = true
-      for (const cancel of [...cancellations]) cancel()
+
+      for (const cancel of [...cancellations]) {
+        cancel()
+      }
     },
   }
 }

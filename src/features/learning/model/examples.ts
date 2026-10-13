@@ -1,4 +1,5 @@
 import type { LogicalState, LogicalStep, ClassicTechnique } from '@/core/sudoku/techniques'
+
 export const EXAMPLES = {
   'naked-single': {
     board: [

@@ -7,20 +7,27 @@ import { evaluateCandidates } from '@/core/sudoku/constraints'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { BOARD_SIZE, isDigit } from '@/core/sudoku/types'
+
 export type GameMode = 'free' | 'learning' | 'daily'
+
 export type SessionPhase = 'generating' | 'playing' | 'paused' | 'completed' | 'failed'
+
 export type SessionMetadata =
   | { kind: 'free' }
   | { kind: 'learning'; lessonId: string }
   | { kind: 'daily'; challengeDate: string; formalAttempt: boolean }
+
 export type BoardLayers = { entries: Board; notes: readonly NoteMask[] }
+
 export type HistoryMove = { before: BoardLayers; after: BoardLayers }
+
 export type Assistance = {
   hintCount: number
   checkCount: number
   candidateCount: number
   assisted: boolean
 }
+
 export type GameSession = {
   id: string
   puzzle: Puzzle
@@ -35,6 +42,7 @@ export type GameSession = {
   completion: { completedAt: string; elapsedMs: number } | null
   metadata: SessionMetadata
 }
+
 export type GameAction =
   | { kind: 'enter'; cell: number; digit: Digit }
   | { kind: 'erase'; cell: number }
@@ -44,9 +52,11 @@ export type GameAction =
   | { kind: 'redo' }
   | { kind: 'hint-shown' }
   | { kind: 'check' }
+
 export type SessionActionResult =
   | { status: 'complete'; session: GameSession; changed: boolean; boardComplete: boolean }
   | { status: 'budget-exhausted'; session: GameSession; changed: false; boardComplete: false }
+
 export function createSession(
   puzzle: Puzzle,
   metadata: SessionMetadata,
@@ -54,9 +64,14 @@ export function createSession(
   startedAt: string,
 ): GameSession {
   const parsed = parsePuzzle(puzzle)
-  if (!parsed.valid) throw new TypeError(parsed.issues.join('; '))
-  if (!id || id.length > 200 || !Number.isFinite(Date.parse(startedAt)))
+  if (!parsed.valid) {
+    throw new TypeError(parsed.issues.join('; '))
+  }
+
+  if (!id || id.length > 200 || !Number.isFinite(Date.parse(startedAt))) {
     throw new TypeError('Invalid session identity')
+  }
+
   return {
     id,
     puzzle: parsed.value,
@@ -72,18 +87,22 @@ export function createSession(
     completion: null,
   }
 }
+
 export function sessionBoard(session: GameSession): Board {
   return session.puzzle.givens.map((given, cell) => (given === 0 ? session.entries[cell] : given))
 }
+
 function layers(session: BoardLayers): BoardLayers {
   return { entries: [...session.entries], notes: [...session.notes] }
 }
+
 function sameLayers(first: BoardLayers, second: BoardLayers): boolean {
   return (
     first.entries.every((value, cell) => value === second.entries[cell]) &&
     first.notes.every((mask, cell) => mask === second.notes[cell])
   )
 }
+
 export function applySessionAction(
   session: GameSession,
   action: GameAction,
@@ -95,15 +114,27 @@ export function applySessionAction(
     changed: false,
     boardComplete: false,
   }
-  if (session.completion) return unchanged
-  if ('cell' in action && (!isCellIndex(action.cell) || session.puzzle.givens[action.cell] !== 0))
+  if (session.completion) {
     return unchanged
-  if ('digit' in action && !isDigit(action.digit)) return unchanged
+  }
+
+  if ('cell' in action && (!isCellIndex(action.cell) || session.puzzle.givens[action.cell] !== 0)) {
+    return unchanged
+  }
+
+  if ('digit' in action && !isDigit(action.digit)) {
+    return unchanged
+  }
+
   const context = compileRules(session.puzzle.rules)
   if (action.kind === 'undo' || action.kind === 'redo') {
+    // History restores board layers only. Assistance is a permanent fact of this attempt.
     const source = action.kind === 'undo' ? session.undoStack : session.redoStack
     const move = source.at(-1)
-    if (!move) return unchanged
+    if (!move) {
+      return unchanged
+    }
+
     const restored = layers(action.kind === 'undo' ? move.before : move.after)
     const next = {
       ...session,
@@ -113,6 +144,7 @@ export function applySessionAction(
       redoStack:
         action.kind === 'redo' ? session.redoStack.slice(0, -1) : [...session.redoStack, move],
     }
+
     return {
       status: 'complete',
       session: next,
@@ -120,23 +152,31 @@ export function applySessionAction(
       boardComplete: isComplete(sessionBoard(next), context),
     }
   }
-  const before = layers(session),
-    entries = [...session.entries],
-    notes = [...session.notes]
+
+  // Each move keeps independent before/after layers so later edits cannot rewrite history.
+  const before = layers(session)
+  const entries = [...session.entries]
+  const notes = [...session.notes]
   const assistance = { ...session.assistance }
   switch (action.kind) {
     case 'enter':
-      if (entries[action.cell] === action.digit) return unchanged
+      if (entries[action.cell] === action.digit) {
+        return unchanged
+      }
       entries[action.cell] = action.digit
       notes[action.cell] = 0
-      for (const peer of context.duplicatePeers[action.cell]) notes[peer] &= ~maskOf(action.digit)
+      for (const peer of context.duplicatePeers[action.cell]) {
+        notes[peer] &= ~maskOf(action.digit)
+      }
       break
     case 'erase':
       entries[action.cell] = 0
       notes[action.cell] = 0
       break
     case 'toggle-note':
-      if (entries[action.cell] !== 0) return unchanged
+      if (entries[action.cell] !== 0) {
+        return unchanged
+      }
       notes[action.cell] ^= maskOf(action.digit)
       break
     case 'hint-shown':
@@ -149,8 +189,10 @@ export function applySessionAction(
       break
     case 'generate-notes': {
       const result = evaluateCandidates(sessionBoard(session), context, workBudget)
-      if (result.status === 'budget-exhausted')
+      if (result.status === 'budget-exhausted') {
         return { status: 'budget-exhausted', session, changed: false, boardComplete: false }
+      }
+
       notes.splice(0, BOARD_SIZE, ...result.candidates)
       assistance.candidateCount++
       assistance.assisted = true
@@ -163,7 +205,10 @@ export function applySessionAction(
     assistance.hintCount !== session.assistance.hintCount ||
     assistance.checkCount !== session.assistance.checkCount ||
     assistance.candidateCount !== session.assistance.candidateCount
-  if (!boardChanged && !assistedChanged) return unchanged
+  if (!boardChanged && !assistedChanged) {
+    return unchanged
+  }
+
   const next: GameSession = {
     ...session,
     ...after,
@@ -173,6 +218,7 @@ export function applySessionAction(
       : session.undoStack,
     redoStack: boardChanged ? [] : session.redoStack,
   }
+
   return {
     status: 'complete',
     session: next,
@@ -180,15 +226,24 @@ export function applySessionAction(
     boardComplete: isComplete(sessionBoard(next), context),
   }
 }
+
 export function completeSession(
   session: GameSession,
   completedAt: string,
   elapsedMs: number,
 ): GameSession {
-  if (session.completion || !isComplete(sessionBoard(session), compileRules(session.puzzle.rules)))
+  if (
+    session.completion ||
+    !isComplete(sessionBoard(session), compileRules(session.puzzle.rules))
+  ) {
     return session
-  if (!Number.isFinite(elapsedMs) || elapsedMs < 0 || !Number.isFinite(Date.parse(completedAt)))
+  }
+
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0 || !Number.isFinite(Date.parse(completedAt))) {
     throw new TypeError('Invalid completion metadata')
+  }
+
   const duration = Math.floor(elapsedMs)
+
   return { ...session, elapsedMs: duration, completion: { completedAt, elapsedMs: duration } }
 }

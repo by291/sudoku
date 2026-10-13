@@ -7,9 +7,8 @@ import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import {
   parseVariantQuery,
-  VARIANT_NAMES,
+  getVariantPresentation,
   VARIANT_OPTIONS,
-  VARIANT_RULE_TEXT,
 } from '@/features/game/model/variants'
 
 const route = useRoute()
@@ -26,6 +25,7 @@ const totalCompleted = computed(
 const courseChoices = computed(() =>
   VARIANT_OPTIONS.map((variant) => {
     const lessons = LESSONS.filter((lesson) => lesson.practiceVariant === variant.value)
+
     return {
       ...variant,
       total: lessons.length,
@@ -49,6 +49,7 @@ const suggestedLesson = computed(() => {
   const unfinished = selectedLessons.value.filter(
     (lesson) => !completedLessonIds.value.has(lesson.id),
   )
+
   return (
     unfinished.find((lesson) => lesson.id === preferences.settings.currentLessonId) ??
     unfinished[0] ??
@@ -56,14 +57,25 @@ const suggestedLesson = computed(() => {
   )
 })
 const suggestionLabel = computed(() => {
-  if (suggestedLesson.value && completedLessonIds.value.has(suggestedLesson.value.id))
+  if (suggestedLesson.value && completedLessonIds.value.has(suggestedLesson.value.id)) {
     return '复习课程'
-  if (suggestedLesson.value?.id === preferences.settings.currentLessonId) return '继续学习'
+  }
+
+  if (suggestedLesson.value?.id === preferences.settings.currentLessonId) {
+    return '继续学习'
+  }
+
   return completedCount.value ? '学习下一节' : '开始学习'
 })
 const suggestionCaption = computed(() => {
-  if (suggestionLabel.value === '复习课程') return '全部学完了，再巩固一次'
-  if (suggestionLabel.value === '继续学习') return '接着上次的思路'
+  if (suggestionLabel.value === '复习课程') {
+    return '全部学完了，再巩固一次'
+  }
+
+  if (suggestionLabel.value === '继续学习') {
+    return '接着上次的思路'
+  }
+
   return completedCount.value ? '下一步，试试这节课' : '推荐从这里开始'
 })
 const classicStages: Readonly<Record<string, string>> = {
@@ -140,12 +152,12 @@ onMounted(learning.load)
           <span class="muted">已完成 {{ totalCompleted }} / {{ LESSONS.length }} 节</span>
         </div>
       </aside>
-      <section class="course-content" :aria-label="VARIANT_NAMES[selectedVariant]">
+      <section class="course-content" :aria-label="getVariantPresentation(selectedVariant).label">
         <div class="course-overview">
           <div class="overview-copy">
             <p class="eyebrow">{{ selectedVariant === 'classic' ? '逻辑基础' : '变体入门' }}</p>
-            <h2>{{ VARIANT_NAMES[selectedVariant] }}</h2>
-            <p class="course-description">{{ VARIANT_RULE_TEXT[selectedVariant] }}</p>
+            <h2>{{ getVariantPresentation(selectedVariant).label }}</h2>
+            <p class="course-description">{{ getVariantPresentation(selectedVariant).ruleText }}</p>
             <template v-if="suggestedLesson">
               <p class="suggestion-caption">
                 {{ suggestionCaption }} · {{ suggestedLesson.title }}
@@ -170,7 +182,7 @@ onMounted(learning.load)
               :stroke-width="5"
               color="var(--accent)"
               rail-color="var(--border)"
-              :aria-label="`${VARIANT_NAMES[selectedVariant]}学习进度`"
+              :aria-label="`${getVariantPresentation(selectedVariant).label}学习进度`"
               :aria-valuetext="progressText"
             >
               <span class="progress-count">

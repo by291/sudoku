@@ -3,6 +3,7 @@ import { expect, it } from 'vitest'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 import { makeSession } from '../../../tests/support/gameFixtures'
 import { sessionBoard } from '@/features/game/model/session'
+
 it('labels all cells and removes values and notes from paused presentation', async () => {
   const session = makeSession()
   const notes = Array(81).fill(0)
@@ -21,12 +22,15 @@ it('labels all cells and removes values and notes from paused presentation', asy
       relatedCells: [],
     },
   })
+
   expect(wrapper.findAll('button')).toHaveLength(81)
   expect(wrapper.findAll('button')[0].attributes('aria-label')).toContain('数字5，题目给定')
   expect(wrapper.findAll('button')[2].attributes('aria-label')).toContain('笔记1、3')
   await wrapper.findAll('button')[0].trigger('click')
+
   expect(wrapper.emitted('select')).toEqual([[0]])
   await wrapper.setProps({ obscured: true, disabled: true })
+
   expect(wrapper.text()).not.toMatch(/[1-9]/)
   expect(
     wrapper
@@ -50,10 +54,12 @@ it('explains selected Arrow clues and removes clue details while paused', async 
       relatedCells: [8, 24, 32, 40],
     },
   })
+
   expect(wrapper.findAll('button')[16].attributes('aria-label')).toContain('箭头')
   expect(wrapper.text()).toContain('总和')
   expect(wrapper.findAll('button')[40].classes()).toContain('peer')
   await wrapper.setProps({ obscured: true })
+
   expect(wrapper.text()).not.toContain('箭头')
   expect(wrapper.findAll('button')[16].attributes('aria-label')).not.toContain('箭头')
   wrapper.unmount()

@@ -1,0 +1,2026 @@
+[
+  {
+    "input": {
+      "variant": "classic",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "givens": [
+          0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 5, 6, 0, 9, 0, 4, 0, 0, 8, 4, 0, 0, 3, 0, 6, 6, 0, 4,
+          0, 0, 0, 0, 3, 9, 8, 0, 0, 0, 5, 0, 6, 4, 7, 0, 3, 0, 6, 0, 0, 0, 2, 1, 0, 6, 0, 0, 1, 0,
+          4, 9, 0, 5, 0, 1, 0, 0, 7, 0, 0, 3, 0, 8, 3, 2, 0, 6, 0, 0, 5
+        ],
+        "solution": [
+          4, 9, 6, 7, 3, 8, 1, 5, 2, 3, 7, 2, 5, 6, 1, 9, 8, 4, 1, 5, 8, 4, 2, 9, 3, 7, 6, 6, 1, 4,
+          8, 7, 2, 5, 3, 9, 8, 2, 9, 1, 5, 3, 6, 4, 7, 7, 3, 5, 6, 9, 4, 8, 2, 1, 2, 6, 7, 3, 1, 5,
+          4, 9, 8, 5, 4, 1, 9, 8, 7, 2, 6, 3, 9, 8, 3, 2, 4, 6, 7, 1, 5
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-v1",
+        "rules": {
+          "kind": "classic"
+        }
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "classic",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "difficulty": "easy",
+        "givens": [
+          0, 0, 2, 0, 0, 0, 5, 3, 7, 3, 9, 0, 0, 2, 0, 0, 0, 0, 4, 0, 5, 0, 0, 0, 0, 8, 0, 0, 0, 1,
+          7, 0, 0, 4, 0, 9, 0, 0, 9, 4, 0, 0, 0, 2, 0, 0, 0, 8, 2, 0, 0, 0, 6, 0, 0, 0, 0, 5, 0, 0,
+          3, 7, 1, 2, 0, 0, 0, 9, 6, 0, 0, 0, 0, 0, 0, 3, 8, 0, 0, 9, 0
+        ],
+        "solution": [
+          8, 6, 2, 9, 1, 4, 5, 3, 7, 3, 9, 7, 8, 2, 5, 6, 1, 4, 4, 1, 5, 6, 7, 3, 9, 8, 2, 6, 2, 1,
+          7, 3, 8, 4, 5, 9, 5, 3, 9, 4, 6, 1, 7, 2, 8, 7, 4, 8, 2, 5, 9, 1, 6, 3, 9, 8, 6, 5, 4, 2,
+          3, 7, 1, 2, 7, 3, 1, 9, 6, 8, 4, 5, 1, 5, 4, 3, 8, 7, 2, 9, 6
+        ],
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-v1",
+        "rules": {
+          "kind": "classic"
+        }
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "classic",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "givens": [
+          5, 0, 3, 0, 1, 8, 0, 4, 0, 0, 0, 0, 4, 0, 9, 0, 0, 8, 9, 8, 0, 0, 2, 0, 0, 0, 0, 0, 3, 5,
+          2, 9, 7, 4, 1, 0, 0, 0, 6, 0, 0, 0, 2, 9, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0,
+          3, 0, 0, 0, 2, 0, 0, 3, 6, 0, 0, 0, 3, 5, 9, 8, 0, 0, 6, 0, 0
+        ],
+        "solution": [
+          5, 7, 3, 6, 1, 8, 9, 4, 2, 6, 1, 2, 4, 7, 9, 5, 3, 8, 9, 8, 4, 3, 2, 5, 1, 6, 7, 8, 3, 5,
+          2, 9, 7, 4, 1, 6, 7, 4, 6, 1, 8, 3, 2, 9, 5, 2, 9, 1, 5, 6, 4, 7, 8, 3, 4, 6, 8, 7, 5, 1,
+          3, 2, 9, 1, 2, 7, 9, 3, 6, 8, 5, 4, 3, 5, 9, 8, 4, 2, 6, 7, 1
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-v1",
+        "rules": {
+          "kind": "classic"
+        }
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "classic",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "difficulty": "medium",
+        "givens": [
+          0, 4, 0, 0, 6, 0, 0, 0, 8, 3, 0, 0, 7, 1, 0, 5, 0, 0, 5, 2, 0, 0, 0, 8, 6, 0, 0, 0, 0, 0,
+          0, 0, 6, 0, 0, 0, 0, 0, 5, 4, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 7, 0, 0, 1, 1, 0, 0, 0, 0, 0,
+          0, 5, 2, 2, 5, 4, 0, 0, 0, 0, 8, 6, 0, 0, 6, 1, 0, 0, 7, 0, 4
+        ],
+        "solution": [
+          7, 4, 1, 5, 6, 9, 3, 2, 8, 3, 6, 8, 7, 1, 2, 5, 4, 9, 5, 2, 9, 3, 4, 8, 6, 1, 7, 4, 1, 7,
+          2, 3, 6, 8, 9, 5, 6, 8, 5, 4, 9, 1, 2, 7, 3, 9, 3, 2, 8, 5, 7, 4, 6, 1, 1, 7, 3, 6, 8, 4,
+          9, 5, 2, 2, 5, 4, 9, 7, 3, 1, 8, 6, 8, 9, 6, 1, 2, 5, 7, 3, 4
+        ],
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-v1",
+        "rules": {
+          "kind": "classic"
+        }
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "classic",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "givens": [
+          7, 0, 0, 8, 0, 0, 0, 0, 0, 9, 0, 4, 0, 6, 0, 0, 0, 0, 0, 6, 0, 0, 1, 0, 4, 0, 0, 0, 0, 7,
+          0, 0, 3, 0, 8, 0, 0, 0, 0, 6, 8, 0, 0, 1, 0, 2, 0, 5, 0, 0, 0, 0, 7, 0, 0, 0, 8, 0, 0, 0,
+          0, 0, 5, 0, 4, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 3, 0, 0
+        ],
+        "solution": [
+          7, 3, 1, 8, 4, 5, 2, 6, 9, 9, 5, 4, 7, 6, 2, 8, 3, 1, 8, 6, 2, 3, 1, 9, 4, 5, 7, 6, 1, 7,
+          5, 2, 3, 9, 8, 4, 4, 9, 3, 6, 8, 7, 5, 1, 2, 2, 8, 5, 1, 9, 4, 6, 7, 3, 3, 2, 8, 4, 7, 6,
+          1, 9, 5, 5, 4, 6, 9, 3, 1, 7, 2, 8, 1, 7, 9, 2, 5, 8, 3, 4, 6
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-v1",
+        "rules": {
+          "kind": "classic"
+        }
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "classic",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "difficulty": "hard",
+        "givens": [
+          0, 9, 5, 0, 0, 0, 3, 0, 0, 0, 0, 7, 9, 0, 1, 2, 6, 0, 0, 0, 6, 0, 0, 0, 0, 0, 5, 0, 0, 0,
+          0, 0, 0, 9, 0, 0, 0, 3, 0, 5, 0, 7, 0, 0, 0, 0, 0, 2, 0, 8, 0, 6, 0, 0, 9, 5, 0, 0, 0, 0,
+          4, 0, 0, 0, 0, 1, 0, 0, 4, 0, 0, 0, 0, 4, 0, 0, 9, 5, 0, 3, 2
+        ],
+        "solution": [
+          4, 9, 5, 7, 2, 6, 3, 1, 8, 3, 8, 7, 9, 5, 1, 2, 6, 4, 1, 2, 6, 4, 3, 8, 7, 9, 5, 8, 1, 4,
+          2, 6, 3, 9, 5, 7, 6, 3, 9, 5, 4, 7, 8, 2, 1, 5, 7, 2, 1, 8, 9, 6, 4, 3, 9, 5, 3, 8, 1, 2,
+          4, 7, 6, 2, 6, 1, 3, 7, 4, 5, 8, 9, 7, 4, 8, 6, 9, 5, 1, 3, 2
+        ],
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-v1",
+        "rules": {
+          "kind": "classic"
+        }
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "diagonal",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "diagonal"
+        },
+        "solution": [
+          2, 7, 4, 5, 9, 6, 3, 1, 8, 3, 8, 6, 1, 2, 7, 5, 4, 9, 1, 9, 5, 8, 4, 3, 6, 2, 7, 7, 4, 2,
+          3, 8, 9, 1, 6, 5, 8, 6, 3, 7, 1, 5, 2, 9, 4, 9, 5, 1, 2, 6, 4, 7, 8, 3, 4, 2, 7, 6, 3, 8,
+          9, 5, 1, 6, 3, 8, 9, 5, 1, 4, 7, 2, 5, 1, 9, 4, 7, 2, 8, 3, 6
+        ],
+        "givens": [
+          0, 0, 0, 0, 9, 6, 0, 1, 0, 0, 8, 6, 1, 2, 0, 0, 4, 0, 0, 9, 5, 8, 0, 0, 0, 2, 7, 0, 4, 2,
+          0, 8, 9, 1, 6, 5, 0, 6, 3, 0, 0, 0, 2, 9, 0, 0, 0, 1, 2, 0, 0, 7, 0, 0, 4, 2, 7, 0, 0, 8,
+          9, 5, 1, 6, 3, 8, 9, 5, 1, 4, 7, 2, 0, 1, 0, 4, 0, 2, 0, 0, 0
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "diagonal",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "diagonal"
+        },
+        "givens": [
+          0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 8, 6, 1, 0, 7, 0, 0, 0, 1, 0, 5, 8, 0, 3, 0, 0, 7, 0, 4, 2,
+          0, 8, 0, 0, 6, 0, 8, 6, 0, 7, 1, 0, 2, 9, 4, 0, 0, 0, 0, 0, 4, 0, 8, 0, 4, 2, 7, 6, 3, 8,
+          9, 5, 1, 6, 3, 8, 0, 0, 0, 4, 7, 0, 0, 1, 0, 4, 0, 2, 8, 0, 0
+        ],
+        "solution": [
+          2, 7, 4, 5, 9, 6, 3, 1, 8, 3, 8, 6, 1, 2, 7, 5, 4, 9, 1, 9, 5, 8, 4, 3, 6, 2, 7, 7, 4, 2,
+          3, 8, 9, 1, 6, 5, 8, 6, 3, 7, 1, 5, 2, 9, 4, 9, 5, 1, 2, 6, 4, 7, 8, 3, 4, 2, 7, 6, 3, 8,
+          9, 5, 1, 6, 3, 8, 9, 5, 1, 4, 7, 2, 5, 1, 9, 4, 7, 2, 8, 3, 6
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "diagonal",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "diagonal"
+        },
+        "solution": [
+          1, 6, 9, 3, 2, 8, 5, 7, 4, 5, 7, 4, 1, 6, 9, 3, 2, 8, 3, 2, 8, 5, 7, 4, 1, 6, 9, 9, 3, 6,
+          4, 8, 7, 2, 5, 1, 8, 1, 7, 6, 5, 2, 9, 4, 3, 4, 5, 2, 9, 1, 3, 7, 8, 6, 2, 9, 3, 8, 4, 5,
+          6, 1, 7, 7, 8, 1, 2, 3, 6, 4, 9, 5, 6, 4, 5, 7, 9, 1, 8, 3, 2
+        ],
+        "givens": [
+          1, 6, 0, 3, 2, 8, 0, 7, 0, 0, 7, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0,
+          4, 0, 0, 0, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 7, 0, 0, 2, 9, 0, 8, 0, 0,
+          0, 0, 0, 7, 8, 0, 0, 0, 6, 0, 9, 0, 0, 0, 5, 0, 0, 1, 0, 0, 0
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "diagonal",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "diagonal"
+        },
+        "givens": [
+          0, 0, 1, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 7, 9, 0, 0, 8, 0, 0, 9, 4, 0, 0, 7, 0, 0,
+          0, 9, 0, 3, 2, 0, 6, 8, 0, 0, 0, 0, 7, 0, 0, 2, 0, 0, 0, 1, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 8, 0, 0, 4, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 2, 0, 0, 5
+        ],
+        "solution": [
+          9, 7, 1, 5, 4, 6, 8, 3, 2, 5, 4, 6, 3, 2, 8, 1, 7, 9, 3, 2, 8, 1, 7, 9, 4, 5, 6, 7, 1, 4,
+          6, 9, 5, 3, 2, 8, 6, 8, 5, 2, 3, 4, 7, 9, 1, 2, 9, 3, 8, 1, 7, 5, 6, 4, 4, 5, 9, 7, 6, 1,
+          2, 8, 3, 8, 6, 2, 4, 5, 3, 9, 1, 7, 1, 3, 7, 9, 8, 2, 6, 4, 5
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "diagonal",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "diagonal"
+        },
+        "solution": [
+          9, 4, 8, 6, 7, 3, 2, 5, 1, 6, 7, 3, 2, 5, 1, 9, 4, 8, 2, 5, 1, 9, 4, 8, 6, 7, 3, 1, 8, 7,
+          4, 6, 9, 5, 3, 2, 3, 9, 2, 7, 8, 5, 4, 1, 6, 5, 6, 4, 3, 1, 2, 7, 8, 9, 4, 1, 5, 8, 9, 6,
+          3, 2, 7, 8, 2, 9, 5, 3, 7, 1, 6, 4, 7, 3, 6, 1, 2, 4, 8, 9, 5
+        ],
+        "givens": [
+          9, 0, 0, 0, 0, 0, 0, 5, 1, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 4, 0, 0, 0, 0, 0, 0, 7,
+          4, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 4, 1, 0, 5, 0, 0, 0, 0, 0, 0, 8, 9, 0, 0, 0, 0, 0, 0,
+          0, 0, 7, 0, 0, 0, 0, 3, 7, 1, 0, 0, 0, 3, 0, 0, 2, 0, 0, 0, 0
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "diagonal",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "diagonal"
+        },
+        "givens": [
+          0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 9, 0, 0, 2, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 4,
+          0, 0, 9, 0, 0, 0, 0, 7, 0, 1, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 7, 0, 0,
+          0, 0, 2, 5, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 5, 0, 0, 0, 8, 6
+        ],
+        "solution": [
+          1, 2, 5, 6, 9, 4, 3, 7, 8, 3, 9, 7, 8, 2, 1, 6, 5, 4, 4, 6, 8, 3, 7, 5, 2, 9, 1, 8, 5, 4,
+          2, 6, 9, 1, 3, 7, 2, 7, 9, 1, 3, 8, 4, 6, 5, 6, 3, 1, 4, 5, 7, 8, 2, 9, 9, 8, 6, 7, 4, 3,
+          5, 1, 2, 5, 1, 2, 9, 8, 6, 7, 4, 3, 7, 4, 3, 5, 1, 2, 9, 8, 6
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "jigsaw",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "jigsaw",
+          "regions": [
+            [72, 63, 46, 73, 64, 55, 74, 65, 56],
+            [45, 36, 27, 54, 37, 28, 47, 38, 29],
+            [18, 9, 0, 19, 10, 1, 20, 11, 2],
+            [75, 66, 57, 76, 67, 58, 77, 68, 59],
+            [48, 39, 30, 49, 40, 31, 50, 41, 32],
+            [21, 12, 3, 22, 13, 4, 23, 14, 5],
+            [78, 69, 60, 79, 70, 61, 80, 71, 62],
+            [51, 42, 33, 52, 43, 34, 53, 44, 35],
+            [24, 15, 6, 25, 16, 7, 26, 17, 8]
+          ]
+        },
+        "solution": [
+          4, 7, 8, 5, 3, 2, 6, 9, 1, 1, 9, 6, 4, 8, 7, 5, 3, 2, 2, 3, 5, 1, 6, 9, 4, 8, 7, 9, 6, 1,
+          7, 4, 8, 2, 5, 3, 3, 5, 2, 9, 1, 6, 7, 4, 8, 7, 8, 4, 2, 5, 3, 1, 6, 9, 8, 4, 7, 3, 2, 5,
+          9, 1, 6, 6, 1, 9, 8, 7, 4, 3, 2, 5, 5, 2, 3, 6, 9, 1, 8, 7, 4
+        ],
+        "givens": [
+          0, 0, 0, 0, 0, 2, 0, 9, 0, 1, 9, 0, 0, 0, 7, 0, 0, 2, 2, 0, 5, 1, 6, 9, 0, 8, 0, 0, 6, 1,
+          7, 4, 8, 0, 5, 3, 0, 5, 0, 0, 0, 6, 0, 0, 8, 0, 8, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 3, 0, 0,
+          0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 0, 3, 0, 9, 0, 8, 0, 4
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "jigsaw",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "jigsaw",
+          "regions": [
+            [72, 63, 46, 73, 64, 55, 74, 65, 56],
+            [45, 36, 27, 54, 37, 28, 47, 38, 29],
+            [18, 9, 0, 19, 10, 1, 20, 11, 2],
+            [75, 66, 57, 76, 67, 58, 77, 68, 59],
+            [48, 39, 30, 49, 40, 31, 50, 41, 32],
+            [21, 12, 3, 22, 13, 4, 23, 14, 5],
+            [78, 69, 60, 79, 70, 61, 80, 71, 62],
+            [51, 42, 33, 52, 43, 34, 53, 44, 35],
+            [24, 15, 6, 25, 16, 7, 26, 17, 8]
+          ]
+        },
+        "givens": [
+          0, 7, 8, 0, 0, 0, 6, 0, 0, 1, 0, 6, 0, 0, 0, 0, 0, 0, 2, 0, 5, 0, 0, 0, 4, 8, 0, 9, 0, 0,
+          0, 0, 8, 2, 0, 0, 0, 5, 0, 0, 1, 6, 7, 4, 0, 0, 0, 4, 0, 0, 3, 1, 0, 9, 0, 4, 0, 3, 0, 5,
+          0, 0, 0, 0, 1, 9, 0, 7, 0, 3, 2, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
+        ],
+        "solution": [
+          4, 7, 8, 5, 3, 2, 6, 9, 1, 1, 9, 6, 4, 8, 7, 5, 3, 2, 2, 3, 5, 1, 6, 9, 4, 8, 7, 9, 6, 1,
+          7, 4, 8, 2, 5, 3, 3, 5, 2, 9, 1, 6, 7, 4, 8, 7, 8, 4, 2, 5, 3, 1, 6, 9, 8, 4, 7, 3, 2, 5,
+          9, 1, 6, 6, 1, 9, 8, 7, 4, 3, 2, 5, 5, 2, 3, 6, 9, 1, 8, 7, 4
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "jigsaw",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "jigsaw",
+          "regions": [
+            [0, 1, 12, 9, 10, 11, 18, 19, 20],
+            [3, 4, 5, 2, 13, 14, 21, 22, 23],
+            [6, 7, 8, 15, 16, 17, 24, 25, 26],
+            [27, 28, 29, 36, 37, 38, 45, 46, 47],
+            [30, 31, 32, 39, 40, 41, 48, 49, 50],
+            [33, 34, 35, 42, 43, 44, 51, 52, 53],
+            [54, 55, 56, 63, 64, 65, 72, 73, 74],
+            [57, 58, 59, 66, 67, 68, 75, 76, 77],
+            [60, 61, 62, 69, 70, 71, 78, 79, 80]
+          ]
+        },
+        "solution": [
+          9, 4, 5, 1, 6, 3, 2, 8, 7, 2, 8, 7, 5, 9, 4, 6, 3, 1, 6, 3, 1, 7, 2, 8, 9, 4, 5, 4, 5, 6,
+          2, 3, 1, 8, 7, 9, 3, 1, 2, 9, 8, 7, 4, 5, 6, 8, 7, 9, 6, 4, 5, 3, 1, 2, 5, 6, 3, 8, 1, 2,
+          7, 9, 4, 1, 2, 8, 4, 7, 9, 5, 6, 3, 7, 9, 4, 3, 5, 6, 1, 2, 8
+        ],
+        "givens": [
+          0, 4, 0, 1, 6, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 7, 0, 0, 0, 4, 0, 0, 5, 0,
+          2, 0, 0, 8, 0, 9, 0, 0, 2, 0, 0, 0, 0, 5, 0, 0, 0, 9, 0, 4, 5, 0, 1, 2, 0, 0, 0, 8, 0, 0,
+          7, 0, 4, 0, 2, 0, 0, 0, 0, 5, 0, 0, 7, 9, 0, 0, 0, 6, 1, 0, 8
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "jigsaw",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "jigsaw",
+          "regions": [
+            [0, 1, 12, 9, 10, 11, 18, 19, 20],
+            [3, 4, 5, 2, 13, 14, 21, 22, 23],
+            [6, 7, 8, 15, 16, 17, 24, 25, 26],
+            [27, 28, 29, 36, 37, 38, 45, 46, 47],
+            [30, 31, 32, 39, 40, 41, 48, 49, 50],
+            [33, 34, 35, 42, 43, 44, 51, 52, 53],
+            [54, 55, 56, 63, 64, 65, 72, 73, 74],
+            [57, 58, 59, 66, 67, 68, 75, 76, 77],
+            [60, 61, 62, 69, 70, 71, 78, 79, 80]
+          ]
+        },
+        "givens": [
+          0, 0, 5, 0, 0, 0, 2, 0, 7, 2, 8, 0, 0, 0, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 9, 0, 0, 4, 0, 6,
+          2, 0, 0, 0, 0, 9, 0, 0, 2, 0, 8, 0, 4, 5, 0, 0, 7, 0, 6, 0, 0, 0, 0, 0, 0, 6, 0, 0, 1, 0,
+          0, 0, 0, 0, 0, 8, 4, 0, 9, 5, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0
+        ],
+        "solution": [
+          9, 4, 5, 1, 6, 3, 2, 8, 7, 2, 8, 7, 5, 9, 4, 6, 3, 1, 6, 3, 1, 7, 2, 8, 9, 4, 5, 4, 5, 6,
+          2, 3, 1, 8, 7, 9, 3, 1, 2, 9, 8, 7, 4, 5, 6, 8, 7, 9, 6, 4, 5, 3, 1, 2, 5, 6, 3, 8, 1, 2,
+          7, 9, 4, 1, 2, 8, 4, 7, 9, 5, 6, 3, 7, 9, 4, 3, 5, 6, 1, 2, 8
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "jigsaw",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "jigsaw",
+          "regions": [
+            [80, 79, 68, 71, 70, 69, 62, 61, 60],
+            [77, 76, 75, 78, 67, 66, 59, 58, 57],
+            [74, 73, 72, 65, 64, 63, 56, 55, 54],
+            [53, 52, 51, 44, 43, 42, 35, 34, 33],
+            [50, 49, 48, 41, 40, 39, 32, 31, 30],
+            [47, 46, 45, 38, 37, 36, 29, 28, 27],
+            [26, 25, 24, 17, 16, 15, 8, 7, 6],
+            [23, 22, 21, 14, 13, 12, 5, 4, 3],
+            [20, 19, 18, 11, 10, 9, 2, 1, 0]
+          ]
+        },
+        "solution": [
+          2, 7, 3, 9, 1, 8, 6, 4, 5, 8, 9, 1, 4, 5, 6, 2, 7, 3, 6, 4, 5, 7, 3, 2, 8, 9, 1, 7, 3, 8,
+          1, 6, 9, 4, 5, 2, 9, 1, 6, 5, 2, 4, 7, 3, 8, 4, 5, 2, 3, 8, 7, 9, 1, 6, 1, 6, 4, 2, 7, 5,
+          3, 8, 9, 3, 8, 9, 6, 4, 1, 5, 2, 7, 5, 2, 7, 8, 9, 3, 1, 6, 4
+        ],
+        "givens": [
+          2, 0, 0, 9, 0, 0, 0, 4, 0, 8, 9, 1, 0, 0, 6, 0, 0, 0, 6, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0,
+          0, 6, 9, 0, 0, 2, 0, 1, 0, 0, 0, 4, 7, 0, 0, 0, 5, 0, 0, 0, 0, 0, 1, 6, 0, 0, 0, 0, 0, 0,
+          0, 8, 0, 0, 0, 0, 0, 4, 0, 5, 0, 7, 0, 2, 0, 0, 0, 3, 0, 0, 4
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "jigsaw",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "jigsaw",
+          "regions": [
+            [8, 17, 34, 7, 16, 25, 6, 15, 24],
+            [35, 44, 53, 26, 43, 52, 33, 42, 51],
+            [62, 71, 80, 61, 70, 79, 60, 69, 78],
+            [5, 14, 23, 4, 13, 22, 3, 12, 21],
+            [32, 41, 50, 31, 40, 49, 30, 39, 48],
+            [59, 68, 77, 58, 67, 76, 57, 66, 75],
+            [2, 11, 20, 1, 10, 19, 0, 9, 18],
+            [29, 38, 47, 28, 37, 46, 27, 36, 45],
+            [56, 65, 74, 55, 64, 73, 54, 63, 72]
+          ]
+        },
+        "givens": [
+          2, 0, 0, 8, 0, 0, 0, 4, 0, 0, 0, 7, 2, 9, 0, 0, 8, 0, 1, 8, 0, 6, 4, 7, 9, 0, 0, 3, 0, 0,
+          7, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 3, 9, 5, 0, 3, 1, 0,
+          6, 0, 4, 4, 0, 0, 9, 0, 0, 1, 0, 8, 0, 0, 0, 0, 0, 6, 0, 0, 0
+        ],
+        "solution": [
+          2, 9, 5, 8, 3, 1, 7, 4, 6, 6, 4, 7, 2, 9, 5, 3, 8, 1, 1, 8, 3, 6, 4, 7, 9, 2, 5, 3, 1, 8,
+          7, 6, 4, 2, 5, 9, 5, 2, 9, 1, 8, 3, 4, 6, 7, 7, 6, 4, 5, 2, 9, 8, 1, 3, 9, 5, 2, 3, 1, 8,
+          6, 7, 4, 4, 7, 6, 9, 5, 2, 1, 3, 8, 8, 3, 1, 4, 7, 6, 5, 9, 2
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "killer",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "killer",
+          "cages": [
+            {
+              "cells": [19, 10, 1, 11],
+              "sum": 17
+            },
+            {
+              "cells": [36, 37, 38],
+              "sum": 15
+            },
+            {
+              "cells": [68, 59],
+              "sum": 9
+            },
+            {
+              "cells": [39, 30, 29],
+              "sum": 18
+            },
+            {
+              "cells": [56, 55],
+              "sum": 15
+            },
+            {
+              "cells": [17, 8, 16],
+              "sum": 13
+            },
+            {
+              "cells": [33, 32, 42],
+              "sum": 15
+            },
+            {
+              "cells": [4, 13, 5],
+              "sum": 11
+            },
+            {
+              "cells": [65, 74, 73],
+              "sum": 16
+            },
+            {
+              "cells": [22, 23, 14, 31],
+              "sum": 15
+            },
+            {
+              "cells": [71, 80, 62, 79],
+              "sum": 14
+            },
+            {
+              "cells": [44, 35, 34],
+              "sum": 14
+            },
+            {
+              "cells": [9, 0, 18, 27],
+              "sum": 30
+            },
+            {
+              "cells": [72, 63, 64, 54],
+              "sum": 14
+            },
+            {
+              "cells": [48, 57],
+              "sum": 5
+            },
+            {
+              "cells": [51, 52, 43, 53],
+              "sum": 24
+            },
+            {
+              "cells": [41, 50],
+              "sum": 13
+            },
+            {
+              "cells": [15, 24, 6],
+              "sum": 18
+            },
+            {
+              "cells": [78, 77, 76, 75],
+              "sum": 26
+            },
+            {
+              "cells": [67, 58, 66, 49],
+              "sum": 25
+            },
+            {
+              "cells": [60, 61],
+              "sum": 8
+            },
+            {
+              "cells": [20, 21, 12],
+              "sum": 14
+            },
+            {
+              "cells": [3, 2],
+              "sum": 11
+            },
+            {
+              "cells": [40],
+              "sum": 1
+            },
+            {
+              "cells": [45, 46, 47],
+              "sum": 12
+            },
+            {
+              "cells": [69, 70],
+              "sum": 15
+            },
+            {
+              "cells": [26, 25],
+              "sum": 10
+            },
+            {
+              "cells": [7],
+              "sum": 4
+            },
+            {
+              "cells": [28],
+              "sum": 3
+            }
+          ]
+        },
+        "solution": [
+          9, 6, 3, 8, 5, 2, 7, 4, 1, 8, 5, 2, 7, 4, 1, 6, 3, 9, 7, 4, 1, 6, 3, 9, 5, 2, 8, 6, 3, 9,
+          5, 2, 8, 4, 1, 7, 5, 2, 8, 4, 1, 7, 3, 9, 6, 4, 1, 7, 3, 9, 6, 2, 8, 5, 3, 9, 6, 2, 8, 5,
+          1, 7, 4, 2, 8, 5, 1, 7, 4, 9, 6, 3, 1, 7, 4, 9, 6, 3, 8, 5, 2
+        ],
+        "givens": [
+          0, 0, 3, 8, 0, 0, 7, 0, 1, 8, 5, 0, 7, 4, 0, 6, 3, 9, 7, 4, 1, 6, 3, 0, 5, 2, 0, 6, 3, 9,
+          5, 0, 0, 0, 1, 7, 5, 2, 8, 4, 1, 0, 3, 0, 0, 4, 0, 7, 3, 9, 6, 2, 8, 0, 3, 0, 6, 2, 0, 0,
+          1, 7, 4, 2, 8, 5, 1, 0, 4, 9, 6, 3, 0, 0, 4, 9, 6, 3, 8, 5, 2
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "killer",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "killer",
+          "cages": [
+            {
+              "cells": [0, 9, 18],
+              "sum": 24
+            },
+            {
+              "cells": [27, 36, 45],
+              "sum": 15
+            },
+            {
+              "cells": [54, 63, 72],
+              "sum": 6
+            },
+            {
+              "cells": [1, 10, 19],
+              "sum": 15
+            },
+            {
+              "cells": [28, 37, 46],
+              "sum": 6
+            },
+            {
+              "cells": [55, 64, 73],
+              "sum": 24
+            },
+            {
+              "cells": [2, 11, 20],
+              "sum": 6
+            },
+            {
+              "cells": [29, 38, 47],
+              "sum": 24
+            },
+            {
+              "cells": [56, 65, 74],
+              "sum": 15
+            },
+            {
+              "cells": [3, 12, 21],
+              "sum": 21
+            },
+            {
+              "cells": [30, 39, 48],
+              "sum": 12
+            },
+            {
+              "cells": [57, 66, 75],
+              "sum": 12
+            },
+            {
+              "cells": [4, 13, 22],
+              "sum": 12
+            },
+            {
+              "cells": [31, 40, 49],
+              "sum": 12
+            },
+            {
+              "cells": [58, 67, 76],
+              "sum": 21
+            },
+            {
+              "cells": [5, 14, 23],
+              "sum": 12
+            },
+            {
+              "cells": [32, 41, 50],
+              "sum": 21
+            },
+            {
+              "cells": [59, 68, 77],
+              "sum": 12
+            },
+            {
+              "cells": [6, 15, 24],
+              "sum": 18
+            },
+            {
+              "cells": [33, 42, 51],
+              "sum": 9
+            },
+            {
+              "cells": [60, 69, 78],
+              "sum": 18
+            },
+            {
+              "cells": [7, 16, 25],
+              "sum": 9
+            },
+            {
+              "cells": [34, 43, 52],
+              "sum": 18
+            },
+            {
+              "cells": [61, 70, 79],
+              "sum": 18
+            },
+            {
+              "cells": [8, 17, 26],
+              "sum": 18
+            },
+            {
+              "cells": [35, 44, 53],
+              "sum": 18
+            },
+            {
+              "cells": [62, 71, 80],
+              "sum": 9
+            }
+          ]
+        },
+        "givens": [
+          0, 0, 0, 0, 0, 2, 0, 0, 1, 8, 5, 2, 0, 0, 0, 6, 3, 9, 0, 4, 0, 6, 0, 9, 5, 0, 8, 0, 3, 9,
+          5, 0, 8, 4, 0, 7, 0, 2, 8, 0, 1, 7, 3, 9, 6, 4, 1, 0, 3, 0, 6, 2, 8, 5, 3, 9, 6, 2, 0, 0,
+          1, 7, 4, 2, 8, 5, 0, 0, 0, 9, 0, 0, 1, 7, 4, 0, 0, 0, 8, 0, 0
+        ],
+        "solution": [
+          9, 6, 3, 8, 5, 2, 7, 4, 1, 8, 5, 2, 7, 4, 1, 6, 3, 9, 7, 4, 1, 6, 3, 9, 5, 2, 8, 6, 3, 9,
+          5, 2, 8, 4, 1, 7, 5, 2, 8, 4, 1, 7, 3, 9, 6, 4, 1, 7, 3, 9, 6, 2, 8, 5, 3, 9, 6, 2, 8, 5,
+          1, 7, 4, 2, 8, 5, 1, 7, 4, 9, 6, 3, 1, 7, 4, 9, 6, 3, 8, 5, 2
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "killer",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "killer",
+          "cages": [
+            {
+              "cells": [54, 55, 45],
+              "sum": 13
+            },
+            {
+              "cells": [40, 31, 22, 21],
+              "sum": 15
+            },
+            {
+              "cells": [38, 47],
+              "sum": 9
+            },
+            {
+              "cells": [36, 37, 46],
+              "sum": 16
+            },
+            {
+              "cells": [61, 70, 52],
+              "sum": 14
+            },
+            {
+              "cells": [34, 33, 32],
+              "sum": 15
+            },
+            {
+              "cells": [6, 7, 16, 8],
+              "sum": 15
+            },
+            {
+              "cells": [20, 11, 12],
+              "sum": 8
+            },
+            {
+              "cells": [53, 62],
+              "sum": 13
+            },
+            {
+              "cells": [18, 19, 28, 27],
+              "sum": 16
+            },
+            {
+              "cells": [50, 41],
+              "sum": 12
+            },
+            {
+              "cells": [63, 64],
+              "sum": 11
+            },
+            {
+              "cells": [15, 14, 24],
+              "sum": 16
+            },
+            {
+              "cells": [48, 49, 39, 57],
+              "sum": 20
+            },
+            {
+              "cells": [42, 43, 51],
+              "sum": 17
+            },
+            {
+              "cells": [5, 4, 3],
+              "sum": 18
+            },
+            {
+              "cells": [35, 44],
+              "sum": 9
+            },
+            {
+              "cells": [10, 9, 1],
+              "sum": 16
+            },
+            {
+              "cells": [56, 65, 66, 75],
+              "sum": 14
+            },
+            {
+              "cells": [77, 76],
+              "sum": 9
+            },
+            {
+              "cells": [23],
+              "sum": 2
+            },
+            {
+              "cells": [78, 79, 69],
+              "sum": 14
+            },
+            {
+              "cells": [13],
+              "sum": 9
+            },
+            {
+              "cells": [74, 73, 72],
+              "sum": 24
+            },
+            {
+              "cells": [17, 26, 25],
+              "sum": 22
+            },
+            {
+              "cells": [59, 60],
+              "sum": 13
+            },
+            {
+              "cells": [68, 67, 58],
+              "sum": 11
+            },
+            {
+              "cells": [71, 80],
+              "sum": 8
+            },
+            {
+              "cells": [2],
+              "sum": 8
+            },
+            {
+              "cells": [30, 29],
+              "sum": 17
+            },
+            {
+              "cells": [0],
+              "sum": 1
+            }
+          ]
+        },
+        "solution": [
+          1, 9, 8, 7, 6, 5, 4, 3, 2, 4, 3, 2, 1, 9, 8, 7, 6, 5, 7, 6, 5, 4, 3, 2, 1, 9, 8, 2, 1, 9,
+          8, 7, 6, 5, 4, 3, 5, 4, 3, 2, 1, 9, 8, 7, 6, 8, 7, 6, 5, 4, 3, 2, 1, 9, 3, 2, 1, 9, 8, 7,
+          6, 5, 4, 6, 5, 4, 3, 2, 1, 9, 8, 7, 9, 8, 7, 6, 5, 4, 3, 2, 1
+        ],
+        "givens": [
+          0, 9, 0, 7, 6, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 8, 0, 0, 9,
+          0, 0, 6, 0, 0, 0, 5, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 7,
+          0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "killer",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "killer",
+          "cages": [
+            {
+              "cells": [72, 73, 74],
+              "sum": 24
+            },
+            {
+              "cells": [75, 76, 77],
+              "sum": 15
+            },
+            {
+              "cells": [78, 79, 80],
+              "sum": 6
+            },
+            {
+              "cells": [63, 64, 65],
+              "sum": 15
+            },
+            {
+              "cells": [66, 67, 68],
+              "sum": 6
+            },
+            {
+              "cells": [69, 70, 71],
+              "sum": 24
+            },
+            {
+              "cells": [54, 55, 56],
+              "sum": 6
+            },
+            {
+              "cells": [57, 58, 59],
+              "sum": 24
+            },
+            {
+              "cells": [60, 61, 62],
+              "sum": 15
+            },
+            {
+              "cells": [45, 46, 47],
+              "sum": 21
+            },
+            {
+              "cells": [48, 49, 50],
+              "sum": 12
+            },
+            {
+              "cells": [51, 52, 53],
+              "sum": 12
+            },
+            {
+              "cells": [36, 37, 38],
+              "sum": 12
+            },
+            {
+              "cells": [39, 40, 41],
+              "sum": 12
+            },
+            {
+              "cells": [42, 43, 44],
+              "sum": 21
+            },
+            {
+              "cells": [27, 28, 29],
+              "sum": 12
+            },
+            {
+              "cells": [30, 31, 32],
+              "sum": 21
+            },
+            {
+              "cells": [33, 34, 35],
+              "sum": 12
+            },
+            {
+              "cells": [18, 19, 20],
+              "sum": 18
+            },
+            {
+              "cells": [21, 22, 23],
+              "sum": 9
+            },
+            {
+              "cells": [24, 25, 26],
+              "sum": 18
+            },
+            {
+              "cells": [9, 10, 11],
+              "sum": 9
+            },
+            {
+              "cells": [12, 13, 14],
+              "sum": 18
+            },
+            {
+              "cells": [15, 16, 17],
+              "sum": 18
+            },
+            {
+              "cells": [0, 1, 2],
+              "sum": 18
+            },
+            {
+              "cells": [3, 4, 5],
+              "sum": 18
+            },
+            {
+              "cells": [6, 7, 8],
+              "sum": 9
+            }
+          ]
+        },
+        "givens": [
+          1, 0, 0, 7, 6, 0, 0, 0, 0, 0, 3, 0, 0, 9, 0, 7, 0, 0, 0, 6, 0, 4, 3, 2, 1, 0, 0, 2, 0, 0,
+          8, 7, 6, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 2, 0, 9, 0, 0,
+          6, 5, 4, 0, 5, 4, 0, 0, 0, 0, 0, 7, 0, 8, 0, 0, 0, 4, 0, 2, 0
+        ],
+        "solution": [
+          1, 9, 8, 7, 6, 5, 4, 3, 2, 4, 3, 2, 1, 9, 8, 7, 6, 5, 7, 6, 5, 4, 3, 2, 1, 9, 8, 2, 1, 9,
+          8, 7, 6, 5, 4, 3, 5, 4, 3, 2, 1, 9, 8, 7, 6, 8, 7, 6, 5, 4, 3, 2, 1, 9, 3, 2, 1, 9, 8, 7,
+          6, 5, 4, 6, 5, 4, 3, 2, 1, 9, 8, 7, 9, 8, 7, 6, 5, 4, 3, 2, 1
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "killer",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "killer",
+          "cages": [
+            {
+              "cells": [0, 9, 18],
+              "sum": 24
+            },
+            {
+              "cells": [27, 36, 45],
+              "sum": 15
+            },
+            {
+              "cells": [54, 63, 72],
+              "sum": 6
+            },
+            {
+              "cells": [1, 10, 19],
+              "sum": 15
+            },
+            {
+              "cells": [28, 37, 46],
+              "sum": 6
+            },
+            {
+              "cells": [55, 64, 73],
+              "sum": 24
+            },
+            {
+              "cells": [2, 11, 20],
+              "sum": 6
+            },
+            {
+              "cells": [29, 38, 47],
+              "sum": 24
+            },
+            {
+              "cells": [56, 65, 74],
+              "sum": 15
+            },
+            {
+              "cells": [3, 12, 21],
+              "sum": 21
+            },
+            {
+              "cells": [30, 39, 48],
+              "sum": 12
+            },
+            {
+              "cells": [57, 66, 75],
+              "sum": 12
+            },
+            {
+              "cells": [4, 13, 22],
+              "sum": 12
+            },
+            {
+              "cells": [31, 40, 49],
+              "sum": 12
+            },
+            {
+              "cells": [58, 67, 76],
+              "sum": 21
+            },
+            {
+              "cells": [5, 14, 23],
+              "sum": 12
+            },
+            {
+              "cells": [32, 41, 50],
+              "sum": 21
+            },
+            {
+              "cells": [59, 68, 77],
+              "sum": 12
+            },
+            {
+              "cells": [6, 15, 24],
+              "sum": 18
+            },
+            {
+              "cells": [33, 42, 51],
+              "sum": 9
+            },
+            {
+              "cells": [60, 69, 78],
+              "sum": 18
+            },
+            {
+              "cells": [7, 16, 25],
+              "sum": 9
+            },
+            {
+              "cells": [34, 43, 52],
+              "sum": 18
+            },
+            {
+              "cells": [61, 70, 79],
+              "sum": 18
+            },
+            {
+              "cells": [8, 17, 26],
+              "sum": 18
+            },
+            {
+              "cells": [35, 44, 53],
+              "sum": 18
+            },
+            {
+              "cells": [62, 71, 80],
+              "sum": 9
+            }
+          ]
+        },
+        "givens": [
+          9, 0, 0, 0, 5, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 8, 0, 0, 9,
+          0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0,
+          0, 7, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 7, 0, 0, 0, 0, 8, 0, 2
+        ],
+        "solution": [
+          9, 6, 3, 8, 5, 2, 7, 4, 1, 8, 5, 2, 7, 4, 1, 6, 3, 9, 7, 4, 1, 6, 3, 9, 5, 2, 8, 6, 3, 9,
+          5, 2, 8, 4, 1, 7, 5, 2, 8, 4, 1, 7, 3, 9, 6, 4, 1, 7, 3, 9, 6, 2, 8, 5, 3, 9, 6, 2, 8, 5,
+          1, 7, 4, 2, 8, 5, 1, 7, 4, 9, 6, 3, 1, 7, 4, 9, 6, 3, 8, 5, 2
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "killer",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "killer",
+          "cages": [
+            {
+              "cells": [8, 17, 26],
+              "sum": 24
+            },
+            {
+              "cells": [35, 44, 53],
+              "sum": 15
+            },
+            {
+              "cells": [62, 71, 80],
+              "sum": 6
+            },
+            {
+              "cells": [7, 16, 25],
+              "sum": 15
+            },
+            {
+              "cells": [34, 43, 52],
+              "sum": 6
+            },
+            {
+              "cells": [61, 70, 79],
+              "sum": 24
+            },
+            {
+              "cells": [6, 15, 24],
+              "sum": 6
+            },
+            {
+              "cells": [33, 42, 51],
+              "sum": 24
+            },
+            {
+              "cells": [60, 69, 78],
+              "sum": 15
+            },
+            {
+              "cells": [5, 14, 23],
+              "sum": 21
+            },
+            {
+              "cells": [32, 41, 50],
+              "sum": 12
+            },
+            {
+              "cells": [59, 68, 77],
+              "sum": 12
+            },
+            {
+              "cells": [4, 13, 22],
+              "sum": 12
+            },
+            {
+              "cells": [31, 40, 49],
+              "sum": 12
+            },
+            {
+              "cells": [58, 67, 76],
+              "sum": 21
+            },
+            {
+              "cells": [3, 12, 21],
+              "sum": 12
+            },
+            {
+              "cells": [30, 39, 48],
+              "sum": 21
+            },
+            {
+              "cells": [57, 66, 75],
+              "sum": 12
+            },
+            {
+              "cells": [2, 11, 20],
+              "sum": 18
+            },
+            {
+              "cells": [29, 38, 47],
+              "sum": 9
+            },
+            {
+              "cells": [56, 65, 74],
+              "sum": 18
+            },
+            {
+              "cells": [1, 10, 19],
+              "sum": 9
+            },
+            {
+              "cells": [28, 37, 46],
+              "sum": 18
+            },
+            {
+              "cells": [55, 64, 73],
+              "sum": 18
+            },
+            {
+              "cells": [0, 9, 18],
+              "sum": 18
+            },
+            {
+              "cells": [27, 36, 45],
+              "sum": 18
+            },
+            {
+              "cells": [54, 63, 72],
+              "sum": 9
+            }
+          ]
+        },
+        "givens": [
+          0, 0, 0, 0, 5, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 0, 5, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+          0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 7, 0, 0, 0, 0,
+          6, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 2, 0, 8, 0, 0, 0, 0, 7, 0
+        ],
+        "solution": [
+          1, 4, 7, 2, 5, 8, 3, 6, 9, 9, 3, 6, 1, 4, 7, 2, 5, 8, 8, 2, 5, 9, 3, 6, 1, 4, 7, 7, 1, 4,
+          8, 2, 5, 9, 3, 6, 6, 9, 3, 7, 1, 4, 8, 2, 5, 5, 8, 2, 6, 9, 3, 7, 1, 4, 4, 7, 1, 5, 8, 2,
+          6, 9, 3, 3, 6, 9, 4, 7, 1, 5, 8, 2, 2, 5, 8, 3, 6, 9, 4, 7, 1
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "thermo",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "thermo",
+          "paths": [
+            [80, 71, 62, 53, 44, 35, 26, 17, 8],
+            [27, 18, 9],
+            [39, 30, 21],
+            [50, 60, 70, 61],
+            [53, 44, 35, 26, 17],
+            [32, 33],
+            [54, 55, 65]
+          ]
+        },
+        "solution": [
+          1, 4, 7, 2, 5, 8, 3, 6, 9, 9, 3, 6, 1, 4, 7, 2, 5, 8, 8, 2, 5, 9, 3, 6, 1, 4, 7, 7, 1, 4,
+          8, 2, 5, 9, 3, 6, 6, 9, 3, 7, 1, 4, 8, 2, 5, 5, 8, 2, 6, 9, 3, 7, 1, 4, 4, 7, 1, 5, 8, 2,
+          6, 9, 3, 3, 6, 9, 4, 7, 1, 5, 8, 2, 2, 5, 8, 3, 6, 9, 4, 7, 1
+        ],
+        "givens": [
+          0, 4, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 2, 5, 0, 8, 0, 5, 9, 0, 0, 1, 4, 0, 0, 0, 0,
+          8, 0, 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 0, 0, 5, 0, 0, 6, 0, 3, 7, 1, 0, 4, 0, 1, 0, 0, 2,
+          0, 0, 3, 0, 6, 9, 0, 7, 1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "thermo",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "thermo",
+          "paths": [[80, 71, 62, 53, 44, 35, 26, 17, 8]]
+        },
+        "givens": [
+          1, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3, 6, 0, 4, 0, 2, 5, 8, 0, 0, 0, 9, 0, 6, 0, 4, 0, 7, 0, 4,
+          8, 0, 5, 9, 0, 0, 6, 9, 3, 7, 1, 0, 0, 0, 0, 0, 8, 2, 6, 0, 3, 0, 1, 4, 0, 7, 1, 0, 0, 0,
+          6, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 2, 0, 0, 8, 0, 0, 0, 4, 7, 0
+        ],
+        "solution": [
+          1, 4, 7, 2, 5, 8, 3, 6, 9, 9, 3, 6, 1, 4, 7, 2, 5, 8, 8, 2, 5, 9, 3, 6, 1, 4, 7, 7, 1, 4,
+          8, 2, 5, 9, 3, 6, 6, 9, 3, 7, 1, 4, 8, 2, 5, 5, 8, 2, 6, 9, 3, 7, 1, 4, 4, 7, 1, 5, 8, 2,
+          6, 9, 3, 3, 6, 9, 4, 7, 1, 5, 8, 2, 2, 5, 8, 3, 6, 9, 4, 7, 1
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "thermo",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "thermo",
+          "paths": [[72, 63, 54, 45, 36, 27, 18, 9, 0]]
+        },
+        "givens": [
+          0, 0, 0, 0, 0, 2, 0, 0, 0, 8, 5, 0, 0, 0, 0, 0, 3, 0, 7, 0, 1, 6, 0, 0, 0, 0, 0, 6, 3, 0,
+          5, 0, 0, 0, 0, 7, 5, 0, 8, 4, 0, 0, 0, 0, 6, 0, 0, 0, 3, 0, 6, 0, 0, 5, 3, 0, 6, 2, 0, 0,
+          1, 0, 0, 2, 0, 5, 0, 7, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 8, 0, 0
+        ],
+        "solution": [
+          9, 6, 3, 8, 5, 2, 7, 4, 1, 8, 5, 2, 7, 4, 1, 6, 3, 9, 7, 4, 1, 6, 3, 9, 5, 2, 8, 6, 3, 9,
+          5, 2, 8, 4, 1, 7, 5, 2, 8, 4, 1, 7, 3, 9, 6, 4, 1, 7, 3, 9, 6, 2, 8, 5, 3, 9, 6, 2, 8, 5,
+          1, 7, 4, 2, 8, 5, 1, 7, 4, 9, 6, 3, 1, 7, 4, 9, 6, 3, 8, 5, 2
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "thermo",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "thermo",
+          "paths": [[8, 17, 26, 35, 44, 53, 62, 71, 80]]
+        },
+        "givens": [
+          0, 0, 8, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 7, 0, 5, 0, 2, 0, 0, 1, 0, 0, 2, 6, 0, 3, 5, 0, 0,
+          6, 0, 3, 0, 0, 0, 6, 0, 0, 0, 0, 4, 8, 0, 5, 7, 0, 0, 0, 0, 5, 0, 3, 6, 0, 0, 0, 0, 0, 6,
+          1, 0, 7, 0, 3, 0, 0, 0, 0, 0, 5, 8, 0, 0, 0, 2, 0, 0, 0, 0, 0
+        ],
+        "solution": [
+          2, 5, 8, 3, 6, 9, 4, 7, 1, 3, 6, 9, 4, 7, 1, 5, 8, 2, 4, 7, 1, 5, 8, 2, 6, 9, 3, 5, 8, 2,
+          6, 9, 3, 7, 1, 4, 6, 9, 3, 7, 1, 4, 8, 2, 5, 7, 1, 4, 8, 2, 5, 9, 3, 6, 8, 2, 5, 9, 3, 6,
+          1, 4, 7, 9, 3, 6, 1, 4, 7, 2, 5, 8, 1, 4, 7, 2, 5, 8, 3, 6, 9
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "thermo",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "thermo",
+          "paths": [[8, 7, 6, 5, 4, 3, 2, 1, 0]]
+        },
+        "givens": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 8, 0, 0,
+          0, 4, 3, 0, 0, 9, 0, 0, 0, 2, 0, 9, 0, 7, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 4, 3, 2,
+          0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 5, 1, 9, 0, 0, 0, 0, 0, 0, 2
+        ],
+        "solution": [
+          9, 8, 7, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 9, 8, 7, 3, 2, 1, 9, 8, 7, 6, 5, 4, 8, 7, 6,
+          5, 4, 3, 2, 1, 9, 5, 4, 3, 2, 1, 9, 8, 7, 6, 2, 1, 9, 8, 7, 6, 5, 4, 3, 7, 6, 5, 4, 3, 2,
+          1, 9, 8, 4, 3, 2, 1, 9, 8, 7, 6, 5, 1, 9, 8, 7, 6, 5, 4, 3, 2
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "thermo",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "thermo",
+          "paths": [[8, 17, 26, 35, 44, 53, 62, 71, 80]]
+        },
+        "givens": [
+          9, 0, 0, 0, 0, 2, 7, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 9, 6,
+          0, 8, 0, 0, 0, 0, 0, 0, 7, 0, 0, 6, 0, 8, 0, 0, 0, 8, 0, 1, 7, 0, 0, 0, 0, 0, 0, 5, 0, 0,
+          0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 8, 5, 0, 0, 0, 1, 0, 0, 0
+        ],
+        "solution": [
+          9, 6, 3, 8, 5, 2, 7, 4, 1, 1, 7, 4, 9, 6, 3, 8, 5, 2, 2, 8, 5, 1, 7, 4, 9, 6, 3, 3, 9, 6,
+          2, 8, 5, 1, 7, 4, 4, 1, 7, 3, 9, 6, 2, 8, 5, 5, 2, 8, 4, 1, 7, 3, 9, 6, 6, 3, 9, 5, 2, 8,
+          4, 1, 7, 7, 4, 1, 6, 3, 9, 5, 2, 8, 8, 5, 2, 7, 4, 1, 6, 3, 9
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "arrow",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "arrow",
+          "arrows": [
+            {
+              "circle": 8,
+              "shaft": [16, 24, 32, 40]
+            },
+            {
+              "circle": 61,
+              "shaft": [62, 53]
+            },
+            {
+              "circle": 30,
+              "shaft": [40, 32]
+            },
+            {
+              "circle": 43,
+              "shaft": [53, 44, 34]
+            }
+          ]
+        },
+        "solution": [
+          2, 5, 7, 3, 4, 1, 9, 6, 8, 6, 3, 1, 8, 5, 9, 7, 2, 4, 8, 4, 9, 7, 6, 2, 1, 5, 3, 7, 2, 6,
+          5, 1, 3, 8, 4, 9, 3, 9, 8, 6, 2, 4, 5, 7, 1, 5, 1, 4, 9, 8, 7, 6, 3, 2, 1, 6, 5, 2, 3, 8,
+          4, 9, 7, 4, 7, 2, 1, 9, 5, 3, 8, 6, 9, 8, 3, 4, 7, 6, 2, 1, 5
+        ],
+        "givens": [
+          2, 0, 0, 3, 0, 1, 0, 0, 0, 0, 3, 0, 8, 0, 9, 0, 2, 4, 8, 4, 9, 0, 6, 0, 0, 0, 0, 7, 0, 0,
+          0, 1, 0, 8, 0, 0, 3, 9, 8, 0, 2, 4, 0, 7, 1, 0, 0, 0, 9, 0, 0, 6, 3, 0, 0, 0, 5, 2, 3, 8,
+          4, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 6, 2, 0, 0
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "arrow",
+      "difficulty": "easy",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "arrow",
+          "arrows": [
+            {
+              "circle": 8,
+              "shaft": [16, 24, 32, 40]
+            }
+          ]
+        },
+        "givens": [
+          2, 5, 0, 0, 0, 1, 0, 6, 8, 6, 3, 0, 8, 0, 0, 0, 2, 4, 8, 4, 0, 7, 6, 2, 0, 5, 3, 7, 2, 6,
+          5, 1, 3, 8, 0, 0, 3, 0, 8, 0, 2, 0, 0, 0, 1, 5, 1, 4, 9, 8, 7, 0, 0, 2, 1, 6, 5, 2, 0, 8,
+          0, 9, 0, 4, 7, 2, 1, 0, 5, 3, 8, 0, 9, 0, 0, 4, 0, 6, 2, 0, 5
+        ],
+        "solution": [
+          2, 5, 7, 3, 4, 1, 9, 6, 8, 6, 3, 1, 8, 5, 9, 7, 2, 4, 8, 4, 9, 7, 6, 2, 1, 5, 3, 7, 2, 6,
+          5, 1, 3, 8, 4, 9, 3, 9, 8, 6, 2, 4, 5, 7, 1, 5, 1, 4, 9, 8, 7, 6, 3, 2, 1, 6, 5, 2, 3, 8,
+          4, 9, 7, 4, 7, 2, 1, 9, 5, 3, 8, 6, 9, 8, 3, 4, 7, 6, 2, 1, 5
+        ],
+        "difficulty": "easy",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "arrow",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "arrow",
+          "arrows": [
+            {
+              "circle": 8,
+              "shaft": [16, 24, 32, 40]
+            },
+            {
+              "circle": 21,
+              "shaft": [12, 4, 3]
+            },
+            {
+              "circle": 50,
+              "shaft": [41, 32, 24]
+            },
+            {
+              "circle": 10,
+              "shaft": [9, 19, 20]
+            }
+          ]
+        },
+        "solution": [
+          5, 6, 7, 2, 1, 9, 3, 4, 8, 1, 8, 9, 3, 7, 4, 5, 2, 6, 2, 3, 4, 6, 5, 8, 1, 7, 9, 6, 5, 8,
+          7, 4, 3, 2, 9, 1, 7, 9, 3, 8, 2, 1, 6, 5, 4, 4, 1, 2, 9, 6, 5, 7, 8, 3, 3, 2, 5, 4, 8, 6,
+          9, 1, 7, 8, 7, 6, 1, 9, 2, 4, 3, 5, 9, 4, 1, 5, 3, 7, 8, 6, 2
+        ],
+        "givens": [
+          5, 6, 0, 0, 0, 0, 0, 0, 0, 1, 8, 0, 3, 0, 4, 0, 0, 0, 2, 0, 4, 6, 0, 0, 0, 7, 9, 0, 5, 0,
+          0, 4, 3, 2, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 4, 0, 1, 0, 9, 6, 0, 0, 8, 3, 3, 2, 0, 4, 8, 6,
+          9, 1, 0, 0, 0, 6, 0, 0, 0, 0, 3, 0, 9, 4, 0, 0, 0, 0, 0, 0, 0
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "arrow",
+      "difficulty": "medium",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "arrow",
+          "arrows": [
+            {
+              "circle": 8,
+              "shaft": [16, 24, 32, 40]
+            }
+          ]
+        },
+        "givens": [
+          5, 0, 0, 2, 1, 0, 3, 4, 8, 0, 8, 0, 0, 0, 0, 0, 2, 0, 2, 3, 0, 0, 0, 0, 0, 0, 0, 6, 5, 8,
+          7, 0, 3, 0, 0, 1, 0, 0, 0, 0, 0, 1, 6, 0, 0, 4, 1, 0, 9, 0, 5, 0, 8, 0, 0, 0, 0, 4, 8, 0,
+          0, 0, 0, 0, 0, 6, 0, 0, 2, 0, 0, 0, 9, 4, 1, 5, 3, 0, 8, 6, 0
+        ],
+        "solution": [
+          5, 6, 7, 2, 1, 9, 3, 4, 8, 1, 8, 9, 3, 7, 4, 5, 2, 6, 2, 3, 4, 6, 5, 8, 1, 7, 9, 6, 5, 8,
+          7, 4, 3, 2, 9, 1, 7, 9, 3, 8, 2, 1, 6, 5, 4, 4, 1, 2, 9, 6, 5, 7, 8, 3, 3, 2, 5, 4, 8, 6,
+          9, 1, 7, 8, 7, 6, 1, 9, 2, 4, 3, 5, 9, 4, 1, 5, 3, 7, 8, 6, 2
+        ],
+        "difficulty": "medium",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "arrow",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "expected": {
+      "status": "ready",
+      "source": "generated",
+      "puzzle": {
+        "rules": {
+          "kind": "arrow",
+          "arrows": [
+            {
+              "circle": 72,
+              "shaft": [64, 56, 48, 40]
+            },
+            {
+              "circle": 31,
+              "shaft": [23, 33, 34, 26]
+            },
+            {
+              "circle": 4,
+              "shaft": [14, 24, 34]
+            },
+            {
+              "circle": 50,
+              "shaft": [40, 48]
+            }
+          ]
+        },
+        "solution": [
+          5, 1, 2, 6, 7, 4, 3, 8, 9, 6, 8, 3, 5, 9, 1, 2, 7, 4, 7, 9, 4, 8, 3, 2, 5, 6, 1, 2, 3, 6,
+          7, 8, 9, 4, 1, 5, 1, 7, 5, 4, 2, 6, 8, 9, 3, 9, 4, 8, 3, 1, 5, 6, 2, 7, 3, 5, 1, 2, 6, 7,
+          9, 4, 8, 4, 2, 7, 9, 5, 8, 1, 3, 6, 8, 6, 9, 1, 4, 3, 7, 5, 2
+        ],
+        "givens": [
+          0, 1, 0, 6, 0, 0, 3, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 3, 0, 0, 6, 0, 0, 0, 6,
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1, 5, 0, 2, 0, 0, 5, 0, 0, 0, 0,
+          0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  },
+  {
+    "input": {
+      "variant": "arrow",
+      "difficulty": "hard",
+      "seed": "readability-compatibility-2026-10-13",
+      "puzzleVersion": "sudoku-variants-v1"
+    },
+    "limits": {
+      "maxLayouts": 0,
+      "searchNodes": 0,
+      "logicalSteps": 500,
+      "fallbackNodes": 1000000
+    },
+    "expected": {
+      "status": "ready",
+      "source": "fallback",
+      "puzzle": {
+        "rules": {
+          "kind": "arrow",
+          "arrows": [
+            {
+              "circle": 72,
+              "shaft": [64, 56, 48, 40]
+            }
+          ]
+        },
+        "givens": [
+          5, 0, 2, 6, 0, 4, 0, 0, 9, 0, 0, 3, 5, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 6, 1, 2, 0, 0,
+          7, 0, 9, 4, 0, 5, 0, 0, 0, 0, 0, 0, 8, 0, 3, 0, 0, 0, 0, 0, 5, 0, 2, 0, 3, 0, 0, 0, 6, 0,
+          0, 0, 8, 4, 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0
+        ],
+        "solution": [
+          5, 1, 2, 6, 7, 4, 3, 8, 9, 6, 8, 3, 5, 9, 1, 2, 7, 4, 7, 9, 4, 8, 3, 2, 5, 6, 1, 2, 3, 6,
+          7, 8, 9, 4, 1, 5, 1, 7, 5, 4, 2, 6, 8, 9, 3, 9, 4, 8, 3, 1, 5, 6, 2, 7, 3, 5, 1, 2, 6, 7,
+          9, 4, 8, 4, 2, 7, 9, 5, 8, 1, 3, 6, 8, 6, 9, 1, 4, 3, 7, 5, 2
+        ],
+        "difficulty": "hard",
+        "seed": "readability-compatibility-2026-10-13",
+        "puzzleVersion": "sudoku-variants-v1"
+      }
+    }
+  }
+]

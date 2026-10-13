@@ -29,11 +29,16 @@ const input = {
   variant: 'classic' as const,
   puzzleVersion: PUZZLE_VERSION,
 } satisfies Parameters<ReturnType<typeof createSudokuWorkerClient>['generate']>[0]
+
 function latestWorker(): FakeWorker {
   const worker = FakeWorker.instances.at(-1)
-  if (!worker) throw new Error('No worker was created')
+  if (!worker) {
+    throw new Error('No worker was created')
+  }
+
   return worker
 }
+
 beforeEach(() => {
   FakeWorker.instances = []
   vi.useFakeTimers()
@@ -46,24 +51,30 @@ afterEach(() => {
 it('terminates work after the exact timeout without changing retry input', async () => {
   const client = createSudokuWorkerClient()
   const pending = client.generate(input)
+
   expect(FakeWorker.instances).toHaveLength(1)
   const first = latestWorker()
   await vi.advanceTimersByTimeAsync(14999)
+
   expect(first.terminated).toBe(false)
   await vi.advanceTimersByTimeAsync(1)
+
   expect(await pending).toEqual({ status: 'timed-out' })
   expect(first.terminated).toBe(true)
   const retry = client.generate(input)
+
   expect(latestWorker().requests[0]).toMatchObject({ kind: 'generate', input })
   client.dispose()
+
   expect(await retry).toEqual({ status: 'cancelled' })
 })
 it('ignores unknown IDs and validates success before settling once', async () => {
   const client = createSudokuWorkerClient()
   const pending = client.generate(input)
+
   expect(FakeWorker.instances).toHaveLength(1)
-  const worker = latestWorker(),
-    request = worker.requests[0]
+  const worker = latestWorker()
+  const request = worker.requests[0]
   const outcome = {
     status: 'completed',
     value: {
@@ -76,14 +87,17 @@ it('ignores unknown IDs and validates success before settling once', async () =>
     },
   }
   worker.reply({ kind: 'generate', requestId: 'stale', outcome })
+
   expect(worker.terminated).toBe(false)
   worker.reply({ kind: 'generate', requestId: request.requestId, outcome })
+
   expect(await pending).toEqual(outcome)
   expect(worker.terminated).toBe(true)
 })
 it('rejects malformed replies rather than accepting success-shaped data', async () => {
   const client = createSudokuWorkerClient()
   const pending = client.generate(input)
+
   expect(FakeWorker.instances).toHaveLength(1)
   const worker = latestWorker()
   worker.reply({
@@ -91,15 +105,18 @@ it('rejects malformed replies rather than accepting success-shaped data', async 
     requestId: worker.requests[0].requestId,
     outcome: { status: 'completed', value: {} },
   })
+
   expect(await pending).toMatchObject({ status: 'failed' })
 })
 it('cancels jobs and cannot deliver an old reply to a new job', async () => {
-  const client = createSudokuWorkerClient(),
-    controller = new AbortController()
+  const client = createSudokuWorkerClient()
+  const controller = new AbortController()
   const pending = client.hint(uniqueBoard, solvedBoard, { kind: 'classic' }, controller.signal)
+
   expect(FakeWorker.instances).toHaveLength(1)
   const old = latestWorker()
   controller.abort()
+
   expect(await pending).toEqual({ status: 'cancelled' })
   expect(old.terminated).toBe(true)
   const next = client.hint(uniqueBoard, solvedBoard, { kind: 'classic' })
@@ -108,8 +125,10 @@ it('cancels jobs and cannot deliver an old reply to a new job', async () => {
     requestId: old.requests[0].requestId,
     outcome: { status: 'completed', value: { kind: 'review-entry', cell: 2 } },
   })
+
   expect(latestWorker().terminated).toBe(false)
   client.dispose()
+
   expect(await next).toEqual({ status: 'cancelled' })
 })
 
@@ -118,12 +137,15 @@ it('retains cancellation and timeout outcomes for variants', async () => {
   const variantInput = createGenerationInput('arrow', 'medium', 'variant-worker')
   const pending = client.generate(variantInput)
   await vi.advanceTimersByTimeAsync(15000)
+
   expect(await pending).toEqual({ status: 'timed-out' })
   const controller = new AbortController()
   const fixture = VARIANT_FIXTURES.arrow
   const hint = client.hint(fixture.givens, fixture.solution, fixture.rules, controller.signal)
+
   expect(latestWorker().requests[0]).toMatchObject({ rules: fixture.rules })
   controller.abort()
+
   expect(await hint).toEqual({ status: 'cancelled' })
   expect(latestWorker().terminated).toBe(true)
   client.dispose()
@@ -135,8 +157,10 @@ it('ignores stale variant replies and preserves budget exhaustion', async () => 
   const worker = latestWorker()
   const outcome = { status: 'budget-exhausted', message: 'Bounded work exhausted' }
   worker.reply({ kind: 'generate', requestId: 'stale-variant', outcome })
+
   expect(worker.terminated).toBe(false)
   worker.reply({ kind: 'generate', requestId: worker.requests[0].requestId, outcome })
+
   expect(await pending).toEqual(outcome)
   client.dispose()
 })
@@ -159,6 +183,7 @@ it('rejects a valid puzzle whose type does not match the variant request', async
       },
     },
   })
+
   expect(await pending).toMatchObject({ status: 'failed' })
   client.dispose()
 })

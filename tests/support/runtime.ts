@@ -3,10 +3,11 @@ import { createApp } from 'vue'
 import { createPinia, disposePinia } from 'pinia'
 import { openSudokuDatabase } from '@/storage/database'
 import { createGameRepository } from '@/storage/repository'
-import { createOwnershipCoordinator } from '@/infrastructure/ownership'
+import { createOwnershipCoordinator } from '@/storage/ownership'
 import { createSaveQueue } from '@/storage/saveQueue'
-import { gameRuntimeKey } from '@/infrastructure/runtime'
-import type { GameRuntime } from '@/infrastructure/runtime'
+import { gameRuntimeKey } from '@/runtime'
+import type { GameRuntime } from '@/runtime'
+
 export async function createTestRuntime() {
   const database = await openSudokuDatabase(crypto.randomUUID())
   const provider = () => Promise.resolve(database)
@@ -26,9 +27,10 @@ export async function createTestRuntime() {
       dispose() {},
     },
   }
-  const pinia = createPinia(),
-    app = createApp({})
+  const pinia = createPinia()
+  const app = createApp({})
   app.use(pinia).provide(gameRuntimeKey, runtime)
+
   return {
     database,
     runtime,

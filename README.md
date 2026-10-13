@@ -32,7 +32,17 @@ Open the Local URL printed by Vite. No server account, API keys, or backend serv
 
 Build before running `test:e2e` directly. Playwright starts preview servers on ports 4173 and 4174; its second server builds and tests `/sudoku/` deployment in `dist-subpath/`. Test output, traces, and screenshots are ignored by Git. Tests use isolated browser contexts, fixture records for lengthy completion scenarios, and real production workers for generation and hints.
 
-On the current Windows development host, the pinned Firefox runtime fails before opening a page. A fresh smoke test on 2026-10-12 reported `browserType.launch: spawn UNKNOWN`; an earlier investigation reported a SideBySide error for the `mozglue` assembly. Firefox verification remains pending; `pnpm check` requires a working runtime for every configured project. To run the complete suite for the available engines explicitly, use `pnpm exec playwright test --project desktop --project mobile --project webkit` after building. This does not establish Firefox compatibility.
+On the current Windows development host, Firefox 157.0 (Playwright revision 1555) fails from the default browser cache before opening a page. Windows reports error 14001 and cannot resolve the `mozglue` assembly; Playwright reports `spawn UNKNOWN`. An independent download contained the same 61 files with identical SHA-256 hashes, but launched successfully inside the repository. Recreating the default cache did not resolve the failure. The directory-specific Windows loading cause remains undetermined.
+
+Use Playwright's supported [browser-cache location](https://playwright.dev/docs/browsers#managing-browser-binaries) setting for a project-local installation. From the repository root in PowerShell:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD '.superpowers/playwright-browsers'
+pnpm exec playwright install --no-remove chromium firefox webkit
+pnpm check
+```
+
+Set the variable in the same terminal for installation and subsequent test commands; it applies to that terminal session. The project cache is ignored by Git. This workaround retains every configured browser project and the pinned dependency versions. On 2026-10-13, all 88 Firefox end-to-end tests passed using the project-local installation.
 
 ## Play
 
@@ -83,16 +93,15 @@ Serve that output at the matching path. Changing the host/origin creates a separ
 ## Architecture and development guidance
 
 - `src/core/sudoku/`: Framework-independent board rules, bounded search, deterministic generation, logical techniques, and hints.
-- `src/main.ts`, `src/App.vue`, `src/layouts/`, `src/router/`, and `src/theme/`: Bootstrap, root providers, visual shell, hash routes, and theme synchronization.
+- `src/main.ts`, `src/runtime.ts`, `src/App.vue`, `src/layouts/`, `src/router/`, and `src/theme/`: Bootstrap, injected browser services, root providers, visual shell, hash routes, and theme synchronization.
 - `src/features/game/`: Game/daily views, session controls, composables, pure models, and Pinia orchestration.
 - `src/features/learning/` and `src/features/records/`: Lessons, progress, history, and statistics.
 - `src/features/home/` and `src/features/settings/`: Resume entries, mode selection, preference types/defaults, and shared settings actions.
-- `src/storage/`: Runtime-validated records, IndexedDB transactions, and serialized saves.
+- `src/storage/`: Runtime-validated records, IndexedDB transactions, editing leases, and serialized saves.
 - `src/worker/`: Validated worker messages, computation requests, and cancellation.
-- `src/infrastructure/`: Runtime injection and same-origin editing ownership.
 - `src/shared/components/` and `src/shared/model/`: Feature-independent Sudoku board, clue geometry, digit input, and confirmation dialog.
 
-See [Web Architecture](docs/architecture.md) for module ownership, dependency direction, source aliases, and naming. Tests remain beside their owners; features create only the responsibility directories they need.
+See [Web Architecture](docs/architecture.md) for module ownership, dependency direction, source aliases, and naming. See [Adding a Sudoku Variant](docs/variant-extension.md) for rule, generation, board, evidence, teaching, and compatibility registration. Tests remain beside their owners; features create only the responsibility directories they need.
 
 Common controls use Naive UI 2.45.3 with local imports. The CSS palette in `src/styles/theme.css` supplies its theme overrides, including system-theme changes. The board remains a specialized accessible CSS Grid. Modal cancellation restores focus to its trigger, and the skip link preserves the current hash route. Browser tests are configured for Chromium, Firefox, and WebKit engines; mobile emulation is not a physical-device or Safari certification.
 
