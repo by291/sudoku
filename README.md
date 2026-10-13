@@ -10,6 +10,8 @@ The approved [Local Product Roadmap](docs/superpowers/plans/2026-10-14-sudoku-lo
 
 Use Node.js 26 or later and the repository-pinned pnpm 12.11.2. Development was verified on Windows with Node.js 26.10.0. TypeScript is pinned to 6.0.3 for compatibility with the installed lint tooling.
 
+Repository text uses LF line endings on every platform. Git attributes, EditorConfig, and Prettier enforce the same convention, including Windows checkouts with `core.autocrlf` enabled.
+
 ```sh
 corepack enable
 pnpm install --frozen-lockfile
