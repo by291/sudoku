@@ -12,7 +12,7 @@ The selected stack is Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web 
 
 Repository documentation, code comments, and docstrings are written in English. Player-facing interface copy is written in Chinese.
 
-Deliver the first release as a static website with game computation and data storage in the browser. Accounts, cross-device synchronization, friends, and global leaderboards belong to later releases. Learning, daily challenges, and personal records are part of the first release and must be functional rather than demonstration screens.
+Deliver the application as a static website with game computation and data storage in the browser. The user removed accounts, cloud and cross-device synchronization, friends, global leaderboards, and PWA/offline installation from the product scope on 2026-10-14; these features are not deferred releases. Learning, daily challenges, and personal records are part of the first release and must be functional rather than demonstration screens.
 
 Success means that players can complete a game in all three modes; puzzles have unique solutions and explainable difficulty; undo, pause, saving, and restoration behave consistently; hints are correct; and both mobile layouts and keyboard controls work.
 
@@ -191,4 +191,6 @@ Before delivery, run type checking, lint, engine and session tests, browser test
 
 Details not previously specified are resolved as these first-release defaults: Chinese interface copy; three logically rated difficulties; the six lessons above; Medium daily challenges that change in Beijing time; separate assisted results; resumable progress in each mode; and theme settings.
 
-Later releases may add accounts and synchronization, global leaderboards, advanced techniques, puzzle import, and offline installation. Maintain clear boundaries between the engine, interface, and storage to support future development. Server implementations for those future features are outside the first release.
+Future development may deepen lessons, logical techniques, puzzle generation, and difficulty assessment, and may add puzzle import. The application remains browser-local and statically hosted. Accounts, cloud and cross-device synchronization, friends, global leaderboards, and PWA/offline installation are outside the product scope, rather than postponed work. Maintain clear boundaries between the engine, interface, and storage to support the retained scope.
+
+The [Local Product Roadmap](../plans/2026-10-14-sudoku-local-product-roadmap.md) is approved on 2026-10-14 for engineering consistency, advanced Classic play, expanded courses, generation and difficulty evaluation, and local backup/restore. Difficulty feedback, manual playtest calibration, and the independent release-acceptance milestone are excluded. Necessary automated checks remain part of the retained milestones. These features describe approved follow-up work rather than current behavior.

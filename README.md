@@ -2,6 +2,10 @@
 
 A browser-local Sudoku game with a Chinese interface, built with Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB (`idb`), and native CSS. Repository documentation and code identifiers are in English.
 
+The product remains browser-local and statically hosted. Accounts, cloud and cross-device synchronization, friends, global leaderboards, and PWA/offline installation are outside the product scope.
+
+The approved [Local Product Roadmap](docs/superpowers/plans/2026-10-14-sudoku-local-product-roadmap.md) consolidates follow-up work on engineering consistency, advanced play, teaching, generation, and local backup/restore. Difficulty feedback, manual playtest calibration, and a separate release-acceptance project are outside this roadmap.
+
 ## Requirements and setup
 
 Use Node.js 26 or later and the repository-pinned pnpm 12.11.2. Development was verified on Windows with Node.js 26.10.0. TypeScript is pinned to 6.0.3 for compatibility with the installed lint tooling.
@@ -106,7 +110,7 @@ For a deployment under `/sudoku/`:
 pnpm exec vite build --base /sudoku/
 ```
 
-Serve that output at the matching path. Changing the host/origin creates a separate browser-local data area. There is no service worker or offline-installation promise in this release.
+Serve that output at the matching path. Changing the host/origin creates a separate browser-local data area. There is no service worker; PWA/offline installation is outside the product scope.
 
 ## Architecture and development guidance
 
