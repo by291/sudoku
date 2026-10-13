@@ -397,6 +397,12 @@ h1 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+@media (min-width: 1101px) and (min-height: 960px) {
+  .home-intro {
+    /* Remove top padding on tall desktops to raise the centered content and cards together. */
+    padding: 0 0 80px;
+  }
+}
 @media (max-width: 700px) {
   .home-intro {
     grid-template-columns: 1fr;
