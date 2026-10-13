@@ -44,6 +44,12 @@ pnpm check
 
 Set the variable in the same terminal for installation and subsequent test commands; it applies to that terminal session. The project cache is ignored by Git. This workaround retains every configured browser project and the pinned dependency versions. On 2026-10-13, all 94 Firefox end-to-end tests passed using the project-local installation. The [generation milestone verification report](docs/superpowers/verification/2026-10-13-sudoku-classic-terminal-diversity.md) records the historical checks and browser concurrency used on this host.
 
+## Continuous integration and dependency updates
+
+[CI](.github/workflows/ci.yml) runs on pull requests, pushes to `main`, and manual dispatches. Ubuntu 24.04 jobs install Node.js 26 and the `packageManager`-pinned pnpm with a frozen lockfile. Type checking, lint, formatting, unit tests, and root/subpath builds run before browser jobs. Desktop Chromium, mobile Chromium, Firefox, and WebKit run as separate matrix jobs; WebKit uses one worker. Each job installs its browser with system dependencies and retains its HTML report, failure screenshots, and traces for seven days. Actions use release commit hashes, and superseded runs are cancelled.
+
+[Dependabot](.github/dependabot.yml) checks pnpm/npm packages and GitHub Actions every Monday at 09:00 Asia/Shanghai. Minor and patch version updates are grouped per ecosystem; major updates remain separate. Updates use pull requests and the same CI checks. The current updater includes [pnpm 12 support](https://github.com/dependabot/dependabot-core/pull/16169), even though the published support table may lag behind its implementation. These configurations take effect after they reach the GitHub default branch.
+
 ## Internal assessment
 
 Production workers call the pure TypeScript assessor directly, using `sudoku-rating-v1` and default limits of 500 steps per policy and one million shared work units. No external rater or runtime service is required. Browser tests verify actual emitted workers against authored fixture grades, explicit unavailable outcomes, and request budgets at both deployment roots.
