@@ -34,14 +34,14 @@ it('restarts daily entries while retaining identity, accumulated time and assist
   expect(restarted.entries.every((value) => value === 0)).toBe(true)
   expect(restarted.notes.every((value) => value === 0)).toBe(true)
 })
-it('uses distinct formal daily identities without rewriting Classic', () => {
+it('uses current seeds and stable type-specific formal daily identities', () => {
   expect(getDailyIdentity('2026-10-11', 'classic')).toMatchObject({
-    seed: 'daily:sudoku-v3:2026-10-11',
+    seed: 'daily:sudoku-v4:2026-10-11',
     formalId: 'daily:2026-10-11:formal',
     input: { variant: 'classic', difficulty: 'medium' },
   })
   expect(getDailyIdentity('2026-10-11', 'arrow')).toMatchObject({
-    seed: 'daily:sudoku-variants-v3:arrow:2026-10-11',
+    seed: 'daily:sudoku-variants-v4:arrow:2026-10-11',
     formalId: 'daily:arrow:2026-10-11:formal',
     input: { variant: 'arrow', difficulty: 'medium' },
   })

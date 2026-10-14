@@ -697,15 +697,9 @@ it('does not create or install a cancelled game while its catalog read is pendin
   }
   test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
-  const job = game.startGame(
-    {
-      difficulty: 'easy',
-      seed: 'cancel-before-commit',
-      variant: 'classic',
-      puzzleVersion: 'sudoku-v3',
-    },
-    { kind: 'free' },
-  )
+  const job = game.startGame(createGenerationInput('classic', 'easy', 'cancel-before-commit'), {
+    kind: 'free',
+  })
   await reading
   game.cancelLoading()
   unblock()

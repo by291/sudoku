@@ -9,6 +9,8 @@ import { isComplete } from '@/core/sudoku/board'
 import { CLASSIC_CONTEXT, compileRules, parseRules } from '@/core/sudoku/rules'
 import type { Board, CellValue, Digit } from '@/core/sudoku/types'
 import type { NewSudokuVariant } from '@/core/sudoku/rules'
+import type { RuleContext } from '@/core/sudoku/rules'
+import type { DifficultyAssessment } from '@/core/sudoku/rating'
 import { isDigit } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { countSolutions } from '@/core/sudoku/search'
@@ -126,6 +128,12 @@ export function variantRulesMatter(
 const SYMMETRIES: readonly SpatialSymmetry[] = [0, 1, 2, 3, 4, 5, 6, 7]
 const CELL_INDICES = Array.from({ length: 81 }, (_, cell) => cell)
 
+type RemovalCheck =
+  | { status: 'matching-tier'; assessment: DifficultyAssessment }
+  | { status: 'rejected'; retainRemoval: boolean }
+  | { status: 'budget-exhausted' }
+  | { status: 'failed'; reason: string }
+
 function freshGeometryInput(rules: Puzzle['rules']): Puzzle['rules'] {
   if (rules.kind === 'thermo') {
     return { kind: 'thermo', paths: [] }
@@ -178,6 +186,57 @@ export function generateVariantPuzzle(
   // Geometry, uniqueness, fresh assessment policies, and necessity share work across every layout.
   const generationBudget = createWorkBudget(limits.maxWork)
   let fallbackBudget: WorkBudget | null = null
+
+  function assessRemoval(board: Board, rules: Puzzle['rules']): RemovalCheck {
+    const rating = assessPuzzleWithBudget(
+      createAssessmentInput(board, rules, {
+        maxSteps: limits.maxSteps,
+        maxWork: generationBudget.limit,
+      }),
+      generationBudget,
+    )
+    if (rating.status === 'budget-exhausted') {
+      return rating
+    }
+    if (rating.status === 'invalid') {
+      return { status: 'failed', reason: rating.issues.join('; ') }
+    }
+    if (rating.status !== 'rated') {
+      return { status: 'rejected', retainRemoval: false }
+    }
+    if (rating.summary.difficulty !== input.difficulty) {
+      return { status: 'rejected', retainRemoval: true }
+    }
+    return { status: 'matching-tier', assessment: rating.summary }
+  }
+
+  function checkRemoval(board: Board, context: RuleContext): RemovalCheck {
+    const ratingFirst = input.variant === 'killer' && input.difficulty === 'hard'
+    const earlierRating = ratingFirst ? assessRemoval(board, context.rules) : null
+    if (earlierRating !== null && earlierRating.status !== 'matching-tier') {
+      // Different-tier removals are tentative construction states. Every delivered candidate
+      // still passes the independent exact-count gate below; rating never replaces uniqueness.
+      return earlierRating
+    }
+
+    const unique = countSolutions(board, {
+      maxSolutions: 2,
+      nodeBudget: generationBudget.limit - generationBudget.used,
+      context,
+      workBudget: generationBudget,
+    })
+    if (unique.status === 'budget-exhausted') {
+      return unique
+    }
+    if (unique.count === 0) {
+      return { status: 'failed', reason: 'Constructed variant lost its known solution' }
+    }
+    if (unique.count !== 1) {
+      return { status: 'rejected', retainRemoval: false }
+    }
+    return earlierRating ?? assessRemoval(board, context.rules)
+  }
+
   try {
     for (
       let layout = 0;
@@ -222,55 +281,25 @@ export function generateVariantPuzzle(
       for (const cell of shuffle(CELL_INDICES, random)) {
         const previous = givens[cell]
         givens[cell] = 0
-        const unique = countSolutions(givens, {
-          maxSolutions: 2,
-          nodeBudget: generationBudget.limit - generationBudget.used,
-          context,
-          workBudget: generationBudget,
-        })
-        if (unique.status === 'budget-exhausted') {
+        const check = checkRemoval(givens, context)
+        if (check.status === 'budget-exhausted') {
           givens[cell] = previous
           break
         }
-
-        if (unique.count === 0) {
-          return { status: 'failed', reason: 'Constructed variant lost its known solution' }
+        if (check.status === 'failed') {
+          return check
         }
-
-        if (unique.count !== 1) {
-          givens[cell] = previous
+        if (check.status === 'rejected') {
+          if (!check.retainRemoval) {
+            givens[cell] = previous
+          }
           continue
         }
-
-        const rating = assessPuzzleWithBudget(
-          createAssessmentInput(givens, rules, {
-            maxSteps: limits.maxSteps,
-            maxWork: generationBudget.limit,
-          }),
-          generationBudget,
-        )
-        if (rating.status === 'budget-exhausted') {
-          givens[cell] = previous
-          break
-        }
-
-        if (rating.status === 'invalid') {
-          return { status: 'failed', reason: rating.issues.join('; ') }
-        }
-        if (rating.status !== 'rated') {
-          givens[cell] = previous
-          continue
-        }
-
-        if (rating.summary.difficulty !== input.difficulty) {
-          continue
-        }
-
         const candidate: VariantTemplate = {
           rules,
           solution: terminal.solution,
           givens: [...givens],
-          difficulty: rating.summary.difficulty,
+          difficulty: check.assessment.difficulty,
         }
         const necessity = variantRulesMatter(candidate, generationBudget)
         if (necessity.status === 'budget-exhausted') {
@@ -282,7 +311,7 @@ export function generateVariantPuzzle(
             status: 'ready',
             source: 'generated',
             puzzle: makePuzzle(candidate),
-            assessment: rating.summary,
+            assessment: check.assessment,
           }
         }
       }

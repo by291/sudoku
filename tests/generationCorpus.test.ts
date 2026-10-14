@@ -128,7 +128,7 @@ afterAll(() => {
     rows,
   }
   writeFileSync(
-    `.superpowers/sdd/2026-10-14-sudoku-local-product-roadmap/corpus-${phase}.json`,
+    `${process.env.SUDOKU_CORPUS_OUTPUT ?? '.superpowers/sdd/2026-10-14-sudoku-local-product-roadmap'}/corpus-${phase}.json`,
     JSON.stringify(report, null, 2),
   )
   if (phase === 'current') {

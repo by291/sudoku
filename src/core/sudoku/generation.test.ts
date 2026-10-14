@@ -88,9 +88,18 @@ it('falls back deterministically only after verifying its transformed template',
 
 it('uses only current generation versions and returns an accepted assessment', () => {
   const input = createGenerationInput('classic', 'easy', 'current-generation')
-  expect(input.puzzleVersion).toBe('sudoku-v3')
-  expect(createGenerationInput('arrow', 'easy', 'current-generation').puzzleVersion).toBe(
-    'sudoku-variants-v3',
+  expect(input.puzzleVersion).toBe('sudoku-v4')
+  for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
+    expect(createGenerationInput(variant, 'easy', 'current-generation').puzzleVersion).toBe(
+      'sudoku-variants-v4',
+    )
+  }
+  const killerInput = createGenerationInput('killer', 'hard', 'current-generation')
+
+  expect(killerInput.puzzleVersion).toBe('sudoku-variants-v4')
+  expect(parseGenerationInput(killerInput)).toEqual({ valid: true, value: killerInput })
+  expect(parseGenerationInput({ ...killerInput, puzzleVersion: 'sudoku-variants-v3' }).valid).toBe(
+    false,
   )
   expect(parseGenerationInput({ ...input, puzzleVersion: 'sudoku-v1' }).valid).toBe(false)
   const result = generatePuzzle(input)

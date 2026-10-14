@@ -9,6 +9,7 @@ import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import type { OwnershipNotice } from '@/storage/ownership'
 import { deferred } from '../../../../tests/support/deferred'
+import { createGenerationInput } from '@/core/sudoku/generation'
 
 it('settles dirty game and queued preferences before returning a committed backup', async () => {
   const test = await createTestRuntime()
@@ -88,10 +89,9 @@ it('validates a preview, confirms replacement, resets late worker delivery and r
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   const pending = deferred<Awaited<ReturnType<typeof test.runtime.worker.generate>>>()
   vi.spyOn(test.runtime.worker, 'generate').mockReturnValue(pending.promise)
-  const generating = game.startGame(
-    { variant: 'classic', difficulty: 'easy', seed: 'late-backup', puzzleVersion: 'sudoku-v3' },
-    { kind: 'free' },
-  )
+  const generating = game.startGame(createGenerationInput('classic', 'easy', 'late-backup'), {
+    kind: 'free',
+  })
   await vi.waitFor(() => expect(test.runtime.worker.generate).toHaveBeenCalledOnce())
   const text = JSON.stringify({
     backupVersion: 1,
