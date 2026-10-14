@@ -9,18 +9,15 @@ import { isComplete } from '@/core/sudoku/board'
 import { CLASSIC_CONTEXT, compileRules, parseRules } from '@/core/sudoku/rules'
 import type { Board, CellValue, Digit } from '@/core/sudoku/types'
 import type { NewSudokuVariant } from '@/core/sudoku/rules'
-import type { RuleContext } from '@/core/sudoku/rules'
-import type { DifficultyAssessment } from '@/core/sudoku/rating'
+import type { DifficultyAssessment, PreparedAssessment } from '@/core/sudoku/rating'
 import { isDigit } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { countSolutions } from '@/core/sudoku/search'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import type { VariantTemplate } from '@/core/sudoku/variantTemplates'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
+import { prepareAssessment } from '@/core/sudoku/rating'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
-import { analyzeLogic } from '@/core/sudoku/logic'
-import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
 import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
 import type {
   GenerationInput,
@@ -188,14 +185,8 @@ export function generateVariantPuzzle(
   // Geometry, uniqueness, assessment and necessity share work across every layout.
   const generationBudget = createWorkBudget(limits.maxWork)
 
-  function assessRemoval(board: Board, rules: Puzzle['rules']): RemovalCheck {
-    const rating = assessPuzzleWithBudget(
-      createAssessmentInput(board, rules, {
-        maxSteps: limits.maxSteps,
-        maxWork: generationBudget.limit,
-      }),
-      generationBudget,
-    )
+  function assessRemoval(board: Board, assessment: PreparedAssessment): RemovalCheck {
+    const rating = assessment.screen(board, generationBudget)
     if (rating.status === 'budget-exhausted') {
       return rating
     }
@@ -205,29 +196,20 @@ export function generateVariantPuzzle(
     if (rating.status !== 'rated') {
       return { status: 'rejected', retainRemoval: false }
     }
-    if (rating.summary.difficulty !== input.difficulty) {
+    if (rating.difficulty !== input.difficulty) {
       return { status: 'rejected', retainRemoval: true }
     }
-    return { status: 'matching-tier', assessment: rating.summary }
+    const completed = rating.complete()
+
+    return { status: 'matching-tier', assessment: completed.summary }
   }
 
-  function checkRemoval(board: Board, context: RuleContext): RemovalCheck {
+  function checkRemoval(board: Board, assessment: PreparedAssessment): RemovalCheck {
+    const context = assessment.context
     const ratingFirst = input.variant === 'killer' && input.difficulty === 'hard'
-    if (ratingFirst) {
-      // These givens and cages come from the same verified terminal. An Easy proof can
-      // reject a trial cheaply; accepted Hard candidates still require full assessment.
-      const easy = analyzeLogic(board, RATING_POLICIES.killer.easy, limits.maxSteps, {
-        context,
-        workBudget: generationBudget,
-      })
-      if (easy.status === 'budget-exhausted') {
-        return { status: 'budget-exhausted' }
-      }
-      if (easy.status === 'solved') {
-        return { status: 'rejected', retainRemoval: true }
-      }
-    }
-    const earlierRating = ratingFirst ? assessRemoval(board, context.rules) : null
+    // Screening continues the actual Easy prefix into higher policies once per board.
+    // No candidate workspace survives the next removal, which would widen its domains.
+    const earlierRating = ratingFirst ? assessRemoval(board, assessment) : null
     if (earlierRating !== null && earlierRating.status !== 'matching-tier') {
       // Different-tier removals are tentative construction states. Every delivered candidate
       // still passes the independent exact-count gate below; rating never replaces uniqueness.
@@ -249,7 +231,7 @@ export function generateVariantPuzzle(
     if (unique.count !== 1) {
       return { status: 'rejected', retainRemoval: false }
     }
-    return earlierRating ?? assessRemoval(board, context.rules)
+    return earlierRating ?? assessRemoval(board, assessment)
   }
 
   try {
@@ -289,7 +271,11 @@ export function generateVariantPuzzle(
         continue
       }
 
-      const context = compileRules(rules)
+      const assessment = prepareAssessment(rules, {
+        maxSteps: limits.maxSteps,
+        maxWork: generationBudget.limit,
+      })
+      const context = assessment.context
       if (
         !isComplete(terminal.solution, context) ||
         (rules.kind === 'jigsaw' && !irregularRegions(rules))
@@ -302,7 +288,7 @@ export function generateVariantPuzzle(
       for (const cell of shuffle(CELL_INDICES, random)) {
         const previous = givens[cell]
         givens[cell] = 0
-        const check = checkRemoval(givens, context)
+        const check = checkRemoval(givens, assessment)
         if (check.status === 'budget-exhausted') {
           givens[cell] = previous
           break

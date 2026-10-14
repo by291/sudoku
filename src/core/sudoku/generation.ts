@@ -9,8 +9,8 @@ import type { NewSudokuVariant, PuzzleRules, SudokuVariant } from '@/core/sudoku
 import { generateVariantPuzzle } from '@/core/sudoku/variantGeneration'
 import { supportsDifficulty } from '@/core/sudoku/difficulties'
 
-export const PUZZLE_VERSION = 'sudoku-v7'
-export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v7'
+export const PUZZLE_VERSION = 'sudoku-v8'
+export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v8'
 
 export type Puzzle = {
   givens: Board

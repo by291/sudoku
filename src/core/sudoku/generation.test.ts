@@ -3,6 +3,7 @@ import {
   createGenerationInput,
   generatePuzzle,
   parseGenerationInput,
+  parsePuzzle,
   parseGenerationLimits,
   PUZZLE_VERSION,
   DEFAULT_GENERATION_LIMITS,
@@ -84,15 +85,15 @@ it('returns reproducible construction exhaustion without substituting an authore
 
 it('uses only current generation versions and returns an accepted assessment', () => {
   const input = createGenerationInput('classic', 'easy', 'current-generation')
-  expect(input.puzzleVersion).toBe('sudoku-v7')
+  expect(input.puzzleVersion).toBe('sudoku-v8')
   for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
     expect(createGenerationInput(variant, 'easy', 'current-generation').puzzleVersion).toBe(
-      'sudoku-variants-v7',
+      'sudoku-variants-v8',
     )
   }
   const killerInput = createGenerationInput('killer', 'hard', 'current-generation')
 
-  expect(killerInput.puzzleVersion).toBe('sudoku-variants-v7')
+  expect(killerInput.puzzleVersion).toBe('sudoku-variants-v8')
   expect(parseGenerationInput(killerInput)).toEqual({ valid: true, value: killerInput })
   expect(parseGenerationInput({ ...killerInput, puzzleVersion: 'sudoku-variants-v6' }).valid).toBe(
     false,
@@ -169,4 +170,26 @@ it('rejects unsupported generation versions rather than silently changing the ru
       puzzleVersion: 'unknown',
     }).valid,
   ).toBe(false)
+})
+
+it('retains valid v7 saved puzzles while new generation rejects their historical identity', () => {
+  const fixture = CLASSIC_PUZZLE_FIXTURES.find((item) => item.difficulty === 'easy')
+  if (!fixture) {
+    throw new Error('Missing authored Easy fixture')
+  }
+  const storedPuzzle = {
+    givens: fixture.givens,
+    solution: fixture.solution,
+    difficulty: fixture.difficulty,
+    seed: 'saved-before-lightweight-rating',
+    puzzleVersion: 'sudoku-v7',
+    rules: { kind: 'classic' },
+  }
+  const input = createGenerationInput('classic', 'easy', storedPuzzle.seed)
+
+  expect(parsePuzzle(storedPuzzle)).toEqual({ valid: true, value: storedPuzzle })
+  expect(parseGenerationInput({ ...input, puzzleVersion: storedPuzzle.puzzleVersion }).valid).toBe(
+    false,
+  )
+  expect(input.puzzleVersion).toBe('sudoku-v8')
 })

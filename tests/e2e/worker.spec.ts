@@ -9,24 +9,24 @@ import { createGenerationInput, generatePuzzle } from '@/core/sudoku/generation'
 import { KILLER_HARD_REGRESSION_SEEDS } from '../fixtures/generationCorpus'
 import { explainStep } from '@/core/sudoku/techniques'
 import { referenceCountSolutions } from '../support/referenceVariants'
-import { GENERATION_LATENCY_INPUTS } from '../fixtures/generationLatency'
+import {
+  GENERATION_LATENCY_INPUTS,
+  GENERATION_EXHAUSTION_INPUTS,
+} from '../fixtures/generationLatency'
 
 test('reports construction exhaustion without publishing a replacement puzzle at both roots', async ({
   page,
 }) => {
-  // v7 corpus facts: Expert seed 010 reaches40 layouts; Killer Hard seed 059 spends all 4,000,000 work units.
+  // The v8 corpus records one Killer Hard request exhausting the shared work allowance.
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
-    for (const [variant, difficulty, seed] of [
-      ['classic', 'expert', '010'],
-      ['killer', 'hard', '059'],
-    ] as const) {
+    for (const { variant, difficulty, seed } of GENERATION_EXHAUSTION_INPUTS) {
       const raw = await runWorker(
         page,
         {
           kind: 'generate',
           requestId: `exhausted-${variant}-${base}`,
-          input: createGenerationInput(variant, difficulty, `local-product-corpus-v1:seed:${seed}`),
+          input: createGenerationInput(variant, difficulty, seed),
         },
         base,
       )
@@ -157,7 +157,7 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
   }
 })
 
-test('delivers high-work regional corpus seeds within the production Worker timeout at both roots', async ({
+test('delivers fixed regional regression seeds within the production Worker timeout at both roots', async ({
   page,
 }, testInfo) => {
   const timings: { base: string; difficulty: string; milliseconds: number }[] = []

@@ -6,14 +6,13 @@ import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
 import type { TerminalConstructionResult } from '@/core/sudoku/terminalConstruction'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
 import { BOARD_SIZE } from '@/core/sudoku/types'
-import type { Board } from '@/core/sudoku/types'
 import type {
   GenerationInput,
   GenerationLimits,
   GenerationAttemptResult,
 } from '@/core/sudoku/generation'
 import { countSolutions } from '@/core/sudoku/search'
-import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
+import { prepareAssessment } from '@/core/sudoku/rating'
 
 /** Consumes the supplied seeded stream and node budget; never exposes an incomplete grid. */
 export function constructClassicTerminal(
@@ -37,11 +36,10 @@ export function generateClassicPuzzle(
   const budget = createWorkBudget(limits.maxWork)
   try {
     const rules = { kind: 'classic' } as const
-    const assess = (board: Board, work: WorkBudget) =>
-      assessPuzzleWithBudget(
-        createAssessmentInput(board, rules, { maxSteps: limits.maxSteps, maxWork: work.limit }),
-        work,
-      )
+    const assessment = prepareAssessment(rules, {
+      maxSteps: limits.maxSteps,
+      maxWork: budget.limit,
+    })
 
     for (let layout = 0; layout < limits.maxLayouts && budget.used < budget.limit; layout++) {
       metrics.layouts++
@@ -79,7 +77,7 @@ export function generateClassicPuzzle(
           continue
         }
 
-        const rating = assess(givens, budget)
+        const rating = assessment.screen(givens, budget)
         if (rating.status === 'budget-exhausted') {
           givens[cell] = previous
           break
@@ -89,21 +87,20 @@ export function generateClassicPuzzle(
         }
         if (
           rating.status !== 'rated' ||
-          TIER_ORDER[rating.summary.difficulty] > TIER_ORDER[input.difficulty]
+          TIER_ORDER[rating.difficulty] > TIER_ORDER[input.difficulty]
         ) {
           givens[cell] = previous
           continue
         }
 
         clues--
-        if (
-          clues <= CLUE_TARGETS[input.difficulty] &&
-          rating.summary.difficulty === input.difficulty
-        ) {
+        if (clues <= CLUE_TARGETS[input.difficulty] && rating.difficulty === input.difficulty) {
+          const completed = rating.complete()
+
           return {
             status: 'ready',
             source: 'generated',
-            assessment: rating.summary,
+            assessment: completed.summary,
             puzzle: {
               givens: [...givens],
               solution: terminal.solution,

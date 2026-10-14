@@ -36,12 +36,12 @@ it('restarts daily entries while retaining identity, accumulated time and assist
 })
 it('uses current seeds and stable type-specific formal daily identities', () => {
   expect(getDailyIdentity('2026-10-11', 'classic')).toMatchObject({
-    seed: 'daily:sudoku-v7:2026-10-11',
+    seed: 'daily:sudoku-v8:2026-10-11',
     formalId: 'daily:2026-10-11:formal',
     input: { variant: 'classic', difficulty: 'medium' },
   })
   expect(getDailyIdentity('2026-10-11', 'arrow')).toMatchObject({
-    seed: 'daily:sudoku-variants-v7:arrow:2026-10-11',
+    seed: 'daily:sudoku-variants-v8:arrow:2026-10-11',
     formalId: 'daily:arrow:2026-10-11:formal',
     input: { variant: 'arrow', difficulty: 'medium' },
   })

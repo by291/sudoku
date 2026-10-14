@@ -75,12 +75,15 @@ test('reports exhausted generation without replacing a save or offering an ident
   const original = makeSession()
   await seedSession(page, original)
   await selectGameMenuAction(page, '新开一局')
+  const variantChoices = page.getByRole('radiogroup', { name: '玩法', exact: true })
+  await variantChoices.getByText('杀手数独', { exact: true }).click()
+  await expect(variantChoices.getByRole('radio', { name: '杀手数独', exact: true })).toBeChecked()
   await page
     .getByRole('radiogroup', { name: '难度', exact: true })
-    .getByText('专家', { exact: true })
+    .getByText('困难', { exact: true })
     .click()
-  // This v7 corpus seed exhausts all 40 layouts instead of delivering an authored Expert puzzle.
-  await useNextGenerationSeed(page, 'local-product-corpus-v1:seed:010')
+  // This v8 Killer Hard seed exhausts 4,000,000 shared work units without a replacement.
+  await useNextGenerationSeed(page, 'local-product-corpus-v1:seed:048')
   await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
 
   await expect(

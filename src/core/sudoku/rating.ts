@@ -63,6 +63,23 @@ export type AssessmentResult =
   | { status: 'rated'; summary: DifficultyAssessment; trace: readonly LogicalStep[] }
   | Exclude<AssessmentOutcome, { status: 'rated' }>
 
+export type RatedAssessmentResult = Extract<AssessmentResult, { status: 'rated' }>
+
+/**
+ * A rated trial owns its board and successful trace. Completion replays that trace to
+ * produce full statistics without another policy search or additional charged work.
+ * Changing any clue requires a new trial; candidate domains never cross boards.
+ */
+export type TrialAssessmentResult =
+  | { status: 'rated'; difficulty: Difficulty; complete(): RatedAssessmentResult }
+  | Exclude<AssessmentOutcome, { status: 'rated' }>
+
+export type PreparedAssessment = {
+  readonly context: RuleContext
+  assess(board: Board, budget: WorkBudget): AssessmentResult
+  screen(board: Board, budget: WorkBudget): TrialAssessmentResult
+}
+
 export type PuzzleAssessment =
   | { status: 'rated'; summary: DifficultyAssessment }
   | {
@@ -277,22 +294,91 @@ export function assessPuzzleWithBudget(
   if (!parsed.valid) {
     return { status: 'invalid', issues: parsed.issues }
   }
-  if (
-    !Number.isSafeInteger(budget.limit) ||
-    !Number.isSafeInteger(budget.used) ||
-    budget.limit < 0 ||
-    budget.used < 0 ||
-    budget.used > budget.limit ||
-    budget.limit > parsed.value.limits.maxWork
-  ) {
+  if (!validAssessmentBudget(budget, parsed.value.limits.maxWork)) {
     return { status: 'invalid', issues: ['Invalid caller-owned assessment budget'] }
   }
 
   return assessSnapshot(parsed.value, budget)
 }
 
-function assessSnapshot(snapshot: AssessmentInput, budget: WorkBudget): AssessmentResult {
-  const context = compileRules(snapshot.rules)
+/**
+ * Owns a validated rules/limits snapshot and shares its read-only geometry across boards.
+ * Each call validates/copies its board, owns fresh logical state, and charges the supplied budget.
+ */
+export function prepareAssessment(
+  rules: PuzzleRules,
+  limits: AssessmentLimits = DEFAULT_ASSESSMENT_LIMITS,
+): PreparedAssessment {
+  const parsedRules = parseRules(rules)
+  const parsedLimits = parseAssessmentLimits(limits)
+  if (!parsedRules.valid || !parsedLimits.valid) {
+    const issues = [
+      ...(!parsedRules.valid ? parsedRules.issues : []),
+      ...(!parsedLimits.valid ? parsedLimits.issues : []),
+    ]
+    throw new TypeError(issues.join('; '))
+  }
+
+  // Parsing owns nested clue arrays; caller edits cannot change this prepared layout.
+  const context = compileRules(parsedRules.value)
+  const snapshotLimits = parsedLimits.value
+
+  function screen(board: Board, budget: WorkBudget): TrialAssessmentResult {
+    const parsedBoard = parseBoard(board)
+    if (!parsedBoard.valid) {
+      return { status: 'invalid', issues: parsedBoard.issues }
+    }
+    if (!validAssessmentBudget(budget, snapshotLimits.maxWork)) {
+      return { status: 'invalid', issues: ['Invalid caller-owned assessment budget'] }
+    }
+
+    return screenSnapshot(
+      {
+        board: parsedBoard.value,
+        rules: context.rules,
+        ratingVersion: RATING_VERSION,
+        limits: snapshotLimits,
+      },
+      budget,
+      context,
+    )
+  }
+
+  return {
+    context,
+    screen,
+    assess(board, budget) {
+      const result = screen(board, budget)
+      return result.status === 'rated' ? result.complete() : result
+    },
+  }
+}
+
+function validAssessmentBudget(budget: WorkBudget, maxWork: number): boolean {
+  return (
+    Number.isSafeInteger(budget.limit) &&
+    Number.isSafeInteger(budget.used) &&
+    budget.limit >= 0 &&
+    budget.used >= 0 &&
+    budget.used <= budget.limit &&
+    budget.limit <= maxWork
+  )
+}
+
+function assessSnapshot(
+  snapshot: AssessmentInput,
+  budget: WorkBudget,
+  context = compileRules(snapshot.rules),
+): AssessmentResult {
+  const result = screenSnapshot(snapshot, budget, context)
+  return result.status === 'rated' ? result.complete() : result
+}
+
+function screenSnapshot(
+  snapshot: AssessmentInput,
+  budget: WorkBudget,
+  context: RuleContext,
+): TrialAssessmentResult {
   const identity = { ratingVersion: snapshot.ratingVersion, variant: snapshot.rules.kind }
   const conflicts = evaluateConflicts(snapshot.board, context, budget)
   if (conflicts.violations.length) {
@@ -334,15 +420,23 @@ function assessSnapshot(snapshot: AssessmentInput, budget: WorkBudget): Assessme
       return { status: 'budget-exhausted', ...identity, stage: 'logic', difficulty }
     }
     if (result.status === 'solved') {
-      const workload = summarizeLogicalTrace(snapshot.board, context, result.steps)
-      if (!workload.valid) {
-        throw new Error(workload.issues.join('; '))
-      }
-
+      // This closure owns the board and successful trace from this screening call. A later
+      // clue mask cannot reuse its domains, and final delivery still replays the full trace.
       return {
         status: 'rated',
-        summary: { ...identity, difficulty, workload: workload.value },
-        trace: result.steps,
+        difficulty,
+        complete() {
+          const workload = summarizeLogicalTrace(snapshot.board, context, result.steps)
+          if (!workload.valid) {
+            throw new Error(workload.issues.join('; '))
+          }
+
+          return {
+            status: 'rated',
+            summary: { ...identity, difficulty, workload: workload.value },
+            trace: result.steps,
+          }
+        },
       }
     }
     previousOrder = order

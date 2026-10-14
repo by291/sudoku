@@ -42,8 +42,10 @@ function deduction(
 }
 
 function clueEvidence(state: LogicalState, constraint: RuleConstraint): RuleEvidence {
-  const cells = constraintCells(constraint)
-  const shared = { constraintId: constraint.id, cells, digits: DIGITS }
+  // Returned traces can outlive or be edited independently of a prepared rule context.
+  // Own geometry and digit arrays so evidence cannot corrupt later deductions.
+  const cells = [...constraintCells(constraint)]
+  const shared = { constraintId: constraint.id, cells, digits: [...DIGITS] }
   const domains = cells.map((cell) => ({
     cell,
     mask: state.board[cell] === 0 ? state.candidates[cell] : maskOf(state.board[cell]),
@@ -53,10 +55,16 @@ function clueEvidence(state: LogicalState, constraint: RuleConstraint): RuleEvid
   }
 
   if (constraint.kind === 'arrow') {
-    return { ...shared, kind: 'arrow', circle: constraint.circle, shaft: constraint.shaft, domains }
+    return {
+      ...shared,
+      kind: 'arrow',
+      circle: constraint.circle,
+      shaft: [...constraint.shaft],
+      domains,
+    }
   }
 
-  return { ...shared, kind: 'thermo', path: constraint.cells, bounds: [] }
+  return { ...shared, kind: 'thermo', path: cells, bounds: [] }
 }
 
 function simpleStep(
