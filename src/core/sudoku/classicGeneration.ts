@@ -1,10 +1,13 @@
 import type { GenerationMetrics } from '@/core/sudoku/generation'
-import { calculateCandidates, digitsIn, isComplete } from '@/core/sudoku/board'
-import { consumeWork, createWorkBudget } from '@/core/sudoku/budget'
+import { isComplete } from '@/core/sudoku/board'
+import { createWorkBudget } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
+import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
+import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
+import type { TerminalConstructionResult } from '@/core/sudoku/terminalConstruction'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
 import { BOARD_SIZE, BOX_SIZE, DIGITS, UNIT_SIZE } from '@/core/sudoku/types'
-import type { Board, CellValue } from '@/core/sudoku/types'
+import type { Board } from '@/core/sudoku/types'
 import type {
   GenerationInput,
   GenerationLimits,
@@ -19,52 +22,8 @@ import type { PuzzleTemplate } from '@/core/sudoku/templates'
 export function constructClassicTerminal(
   random: () => number,
   budget: WorkBudget,
-): { status: 'ready'; solution: Board } | { status: 'budget-exhausted' } {
-  const board: CellValue[] = Array(BOARD_SIZE).fill(0)
-  let exhausted = false
-
-  function visit(): boolean {
-    if (!consumeWork(budget)) {
-      exhausted = true
-      return false
-    }
-
-    const candidates = calculateCandidates(board)
-    let target = -1
-    let smallest = 10
-    for (let cell = 0; cell < BOARD_SIZE; cell++) {
-      if (board[cell] !== 0) {
-        continue
-      }
-      const choices = digitsIn(candidates[cell]).length
-      if (choices === 0) {
-        return false
-      }
-      if (choices < smallest) {
-        target = cell
-        smallest = choices
-      }
-    }
-    if (target === -1) {
-      return true
-    }
-
-    // MRV ties use ascending cells; each visited node shuffles its ascending digit choices once.
-    for (const digit of shuffle(digitsIn(candidates[target]), random)) {
-      board[target] = digit
-      if (visit()) {
-        return true
-      }
-      board[target] = 0
-      if (exhausted) {
-        return false
-      }
-    }
-
-    return false
-  }
-
-  return visit() ? { status: 'ready', solution: [...board] } : { status: 'budget-exhausted' }
+): TerminalConstructionResult {
+  return constructUnitTerminal(CLASSIC_CONTEXT, random, budget)
 }
 
 function transformFallback(template: PuzzleTemplate, random: () => number): PuzzleTemplate {
@@ -117,6 +76,9 @@ export function generateClassicPuzzle(
       const terminal = constructClassicTerminal(random, budget)
       if (terminal.status === 'budget-exhausted') {
         break
+      }
+      if (terminal.status === 'failed') {
+        return terminal
       }
       const givens = [...terminal.solution]
       let clues = BOARD_SIZE

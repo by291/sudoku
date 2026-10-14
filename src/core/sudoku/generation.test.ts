@@ -90,7 +90,7 @@ it('uses only current generation versions and returns an accepted assessment', (
   const input = createGenerationInput('classic', 'easy', 'current-generation')
   expect(input.puzzleVersion).toBe('sudoku-v3')
   expect(createGenerationInput('arrow', 'easy', 'current-generation').puzzleVersion).toBe(
-    'sudoku-variants-v2',
+    'sudoku-variants-v3',
   )
   expect(parseGenerationInput({ ...input, puzzleVersion: 'sudoku-v1' }).valid).toBe(false)
   const result = generatePuzzle(input)

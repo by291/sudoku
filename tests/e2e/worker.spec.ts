@@ -8,6 +8,51 @@ import { createGenerationInput } from '@/core/sudoku/generation'
 import { explainStep } from '@/core/sudoku/techniques'
 import { referenceCountSolutions } from '../support/referenceVariants'
 
+test('delivers high-work regional corpus seeds within the production Worker timeout at both roots', async ({
+  page,
+}, testInfo) => {
+  const timings: { base: string; difficulty: string; milliseconds: number }[] = []
+  for (const base of ['/', '/sudoku/'] as const) {
+    await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+    for (const [difficulty, seed] of [
+      ['medium', '036'],
+      ['hard', '013'],
+    ] as const) {
+      const started = performance.now()
+      const response = parseWorkerResponse(
+        await runWorker(
+          page,
+          {
+            kind: 'generate',
+            requestId: `regional-${seed}-${base}`,
+            input: createGenerationInput(
+              'jigsaw',
+              difficulty,
+              `local-product-corpus-v1:seed:${seed}`,
+            ),
+          },
+          base,
+        ),
+      )
+      timings.push({ base, difficulty, milliseconds: performance.now() - started })
+      expect(response).toMatchObject({
+        valid: true,
+        value: {
+          kind: 'generate',
+          outcome: {
+            status: 'completed',
+            assessment: { status: 'rated', summary: { variant: 'jigsaw', difficulty } },
+          },
+        },
+      })
+    }
+  }
+  await testInfo.attach('regional-worker-timings', {
+    body: JSON.stringify(timings),
+    contentType: 'application/json',
+  })
+})
+
 test('verifies fixed production-worker seeds and a known logical conclusion', async ({ page }) => {
   await page.goto('/#/')
 

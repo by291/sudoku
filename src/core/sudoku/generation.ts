@@ -10,7 +10,7 @@ import { generateVariantPuzzle } from '@/core/sudoku/variantGeneration'
 import { supportsDifficulty } from '@/core/sudoku/difficulties'
 
 export const PUZZLE_VERSION = 'sudoku-v3'
-export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v2'
+export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v3'
 
 export type Puzzle = {
   givens: Board

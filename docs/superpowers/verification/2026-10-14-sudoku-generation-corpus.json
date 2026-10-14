@@ -1,0 +1,4101 @@
+{
+  "corpusVersion": "local-product-corpus-v1",
+  "seeds": [
+    "local-product-corpus-v1:seed:000",
+    "local-product-corpus-v1:seed:001",
+    "local-product-corpus-v1:seed:002",
+    "local-product-corpus-v1:seed:003",
+    "local-product-corpus-v1:seed:004",
+    "local-product-corpus-v1:seed:005",
+    "local-product-corpus-v1:seed:006",
+    "local-product-corpus-v1:seed:007",
+    "local-product-corpus-v1:seed:008",
+    "local-product-corpus-v1:seed:009",
+    "local-product-corpus-v1:seed:010",
+    "local-product-corpus-v1:seed:011",
+    "local-product-corpus-v1:seed:012",
+    "local-product-corpus-v1:seed:013",
+    "local-product-corpus-v1:seed:014",
+    "local-product-corpus-v1:seed:015",
+    "local-product-corpus-v1:seed:016",
+    "local-product-corpus-v1:seed:017",
+    "local-product-corpus-v1:seed:018",
+    "local-product-corpus-v1:seed:019",
+    "local-product-corpus-v1:seed:020",
+    "local-product-corpus-v1:seed:021",
+    "local-product-corpus-v1:seed:022",
+    "local-product-corpus-v1:seed:023",
+    "local-product-corpus-v1:seed:024",
+    "local-product-corpus-v1:seed:025",
+    "local-product-corpus-v1:seed:026",
+    "local-product-corpus-v1:seed:027",
+    "local-product-corpus-v1:seed:028",
+    "local-product-corpus-v1:seed:029",
+    "local-product-corpus-v1:seed:030",
+    "local-product-corpus-v1:seed:031",
+    "local-product-corpus-v1:seed:032",
+    "local-product-corpus-v1:seed:033",
+    "local-product-corpus-v1:seed:034",
+    "local-product-corpus-v1:seed:035",
+    "local-product-corpus-v1:seed:036",
+    "local-product-corpus-v1:seed:037",
+    "local-product-corpus-v1:seed:038",
+    "local-product-corpus-v1:seed:039",
+    "local-product-corpus-v1:seed:040",
+    "local-product-corpus-v1:seed:041",
+    "local-product-corpus-v1:seed:042",
+    "local-product-corpus-v1:seed:043",
+    "local-product-corpus-v1:seed:044",
+    "local-product-corpus-v1:seed:045",
+    "local-product-corpus-v1:seed:046",
+    "local-product-corpus-v1:seed:047",
+    "local-product-corpus-v1:seed:048",
+    "local-product-corpus-v1:seed:049",
+    "local-product-corpus-v1:seed:050",
+    "local-product-corpus-v1:seed:051",
+    "local-product-corpus-v1:seed:052",
+    "local-product-corpus-v1:seed:053",
+    "local-product-corpus-v1:seed:054",
+    "local-product-corpus-v1:seed:055",
+    "local-product-corpus-v1:seed:056",
+    "local-product-corpus-v1:seed:057",
+    "local-product-corpus-v1:seed:058",
+    "local-product-corpus-v1:seed:059",
+    "local-product-corpus-v1:seed:060",
+    "local-product-corpus-v1:seed:061",
+    "local-product-corpus-v1:seed:062",
+    "local-product-corpus-v1:seed:063"
+  ],
+  "regressionSeedIndices": [0, 17, 33, 63],
+  "limits": {
+    "maxLayouts": 20,
+    "maxWork": 1000000,
+    "maxSteps": 500,
+    "fallbackWork": 1000000
+  },
+  "host": {
+    "platform": "win32",
+    "release": "10.0.26300",
+    "node": "v26.10.0",
+    "cpu": "Intel(R) Core(TM) Ultra 9 285K"
+  },
+  "baselineVersions": {
+    "classic": "sudoku-v3",
+    "variants": "sudoku-variants-v2",
+    "assessment": "sudoku-rating-v2"
+  },
+  "currentVersions": {
+    "classic": "sudoku-v3",
+    "variants": "sudoku-variants-v3",
+    "assessment": "sudoku-rating-v2"
+  },
+  "checks": {
+    "unique": true,
+    "structure": true,
+    "necessity": true,
+    "traceAgainstIndependentSolution": true,
+    "matchingGrade": true,
+    "boundedWork": true,
+    "subsetDeterminism": true
+  },
+  "classicContractsUnchanged": true,
+  "total": {
+    "baseline": {
+      "requests": 1216,
+      "generated": 959,
+      "fallback": 257,
+      "failed": 0,
+      "exhausted": 0,
+      "terminalFamilies": 25,
+      "geometryFamilies": 350,
+      "constructionWork": {
+        "min": 394,
+        "median": 62670,
+        "p95": 1000000,
+        "max": 1000000,
+        "mean": 285372.06
+      },
+      "fallbackWork": {
+        "min": 0,
+        "median": 0,
+        "p95": 102235,
+        "max": 472260,
+        "mean": 13841.03
+      },
+      "layouts": {
+        "min": 1,
+        "median": 1,
+        "p95": 10,
+        "max": 20,
+        "mean": 2.56
+      },
+      "milliseconds": {
+        "min": 4.032999999995809,
+        "median": 68.51370000001043,
+        "p95": 504.7075000000041,
+        "max": 2821.7606000000014,
+        "mean": 132.13
+      },
+      "steps": {
+        "min": 15,
+        "median": 57,
+        "p95": 112,
+        "max": 113,
+        "mean": 57.33
+      },
+      "variantSteps": {
+        "min": 0,
+        "median": 5,
+        "p95": 60,
+        "max": 69,
+        "mean": 15.71
+      },
+      "techniqueCounts": {
+        "naked-single": 48865,
+        "hidden-single": 12050,
+        "locked-candidate": 4193,
+        "naked-pair": 350,
+        "hidden-pair": 168,
+        "naked-triple": 9,
+        "hidden-triple": 3,
+        "x-wing": 10,
+        "swordfish": 3,
+        "xy-wing": 51,
+        "simple-coloring": 43,
+        "cage-distinct": 106,
+        "cage-remainder": 1037,
+        "cage-combination": 1306,
+        "thermo-bound": 879,
+        "arrow-equation": 290,
+        "arrow-combination": 353
+      },
+      "highestTechniques": {
+        "naked-single": 136,
+        "hidden-single": 56,
+        "locked-candidate": 262,
+        "naked-pair": 248,
+        "hidden-pair": 136,
+        "xy-wing": 33,
+        "simple-coloring": 30,
+        "naked-triple": 1,
+        "cage-remainder": 57,
+        "cage-distinct": 7,
+        "cage-combination": 60,
+        "thermo-bound": 64,
+        "arrow-equation": 64,
+        "arrow-combination": 62
+      }
+    },
+    "current": {
+      "requests": 1216,
+      "generated": 982,
+      "fallback": 234,
+      "failed": 0,
+      "exhausted": 0,
+      "terminalFamilies": 31,
+      "geometryFamilies": 382,
+      "constructionWork": {
+        "min": 1128,
+        "median": 63090,
+        "p95": 1000000,
+        "max": 1000000,
+        "mean": 275759.54
+      },
+      "fallbackWork": {
+        "min": 0,
+        "median": 0,
+        "p95": 102235,
+        "max": 472260,
+        "mean": 13131.42
+      },
+      "layouts": {
+        "min": 1,
+        "median": 1,
+        "p95": 9,
+        "max": 20,
+        "mean": 2.43
+      },
+      "milliseconds": {
+        "min": 4.504799999995157,
+        "median": 68.15750000000116,
+        "p95": 541.6838999999964,
+        "max": 6447.867100000003,
+        "mean": 140.48
+      },
+      "steps": {
+        "min": 15,
+        "median": 57,
+        "p95": 112,
+        "max": 113,
+        "mean": 57.4
+      },
+      "variantSteps": {
+        "min": 0,
+        "median": 6,
+        "p95": 59,
+        "max": 73,
+        "mean": 15.54
+      },
+      "techniqueCounts": {
+        "naked-single": 48932,
+        "hidden-single": 12228,
+        "locked-candidate": 4102,
+        "naked-pair": 367,
+        "hidden-pair": 161,
+        "naked-triple": 9,
+        "hidden-triple": 3,
+        "x-wing": 10,
+        "swordfish": 3,
+        "xy-wing": 51,
+        "simple-coloring": 43,
+        "cage-distinct": 104,
+        "cage-remainder": 1040,
+        "cage-combination": 1321,
+        "thermo-bound": 783,
+        "arrow-equation": 300,
+        "arrow-combination": 336
+      },
+      "highestTechniques": {
+        "naked-single": 140,
+        "hidden-single": 52,
+        "locked-candidate": 264,
+        "naked-pair": 255,
+        "hidden-pair": 129,
+        "xy-wing": 33,
+        "simple-coloring": 30,
+        "naked-triple": 1,
+        "cage-remainder": 61,
+        "cage-distinct": 3,
+        "cage-combination": 61,
+        "thermo-bound": 64,
+        "arrow-equation": 64,
+        "arrow-combination": 59
+      }
+    }
+  },
+  "variants": [
+    {
+      "variant": "classic",
+      "baseline": {
+        "requests": 256,
+        "generated": 247,
+        "fallback": 9,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 24,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 2197,
+          "median": 36980,
+          "p95": 208663,
+          "max": 336262,
+          "mean": 59029.87
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 558,
+          "mean": 9.76
+        },
+        "layouts": {
+          "min": 1,
+          "median": 3,
+          "p95": 15,
+          "max": 20,
+          "mean": 4.59
+        },
+        "milliseconds": {
+          "min": 11.996699999999919,
+          "median": 89.4926000000005,
+          "p95": 577.2775999999994,
+          "max": 968.2308999999987,
+          "mean": 162.36
+        },
+        "steps": {
+          "min": 45,
+          "median": 57,
+          "p95": 64,
+          "max": 69,
+          "mean": 55
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 10844,
+          "hidden-single": 2445,
+          "locked-candidate": 528,
+          "naked-pair": 110,
+          "hidden-pair": 35,
+          "naked-triple": 9,
+          "hidden-triple": 3,
+          "x-wing": 10,
+          "swordfish": 3,
+          "xy-wing": 51,
+          "simple-coloring": 43,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 55,
+          "hidden-single": 9,
+          "locked-candidate": 64,
+          "naked-pair": 51,
+          "hidden-pair": 13,
+          "xy-wing": 33,
+          "simple-coloring": 30,
+          "naked-triple": 1
+        }
+      },
+      "current": {
+        "requests": 256,
+        "generated": 247,
+        "fallback": 9,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 24,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 2197,
+          "median": 36980,
+          "p95": 208663,
+          "max": 336262,
+          "mean": 59029.87
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 558,
+          "mean": 9.76
+        },
+        "layouts": {
+          "min": 1,
+          "median": 3,
+          "p95": 15,
+          "max": 20,
+          "mean": 4.59
+        },
+        "milliseconds": {
+          "min": 13.078599999999938,
+          "median": 91.24709999999686,
+          "p95": 599.9117999999999,
+          "max": 968.5413000000008,
+          "mean": 165.79
+        },
+        "steps": {
+          "min": 45,
+          "median": 57,
+          "p95": 64,
+          "max": 69,
+          "mean": 55
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 10844,
+          "hidden-single": 2445,
+          "locked-candidate": 528,
+          "naked-pair": 110,
+          "hidden-pair": 35,
+          "naked-triple": 9,
+          "hidden-triple": 3,
+          "x-wing": 10,
+          "swordfish": 3,
+          "xy-wing": 51,
+          "simple-coloring": 43,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 55,
+          "hidden-single": 9,
+          "locked-candidate": 64,
+          "naked-pair": 51,
+          "hidden-pair": 13,
+          "xy-wing": 33,
+          "simple-coloring": 30,
+          "naked-triple": 1
+        }
+      }
+    },
+    {
+      "variant": "diagonal",
+      "baseline": {
+        "requests": 192,
+        "generated": 191,
+        "fallback": 1,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 394,
+          "median": 6142,
+          "p95": 198851,
+          "max": 1000000,
+          "mean": 46126.96
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 417,
+          "mean": 2.17
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 4,
+          "max": 9,
+          "mean": 1.71
+        },
+        "milliseconds": {
+          "min": 4.032999999995809,
+          "median": 33.45270000000892,
+          "p95": 636.7856000000029,
+          "max": 2821.7606000000014,
+          "mean": 153.53
+        },
+        "steps": {
+          "min": 15,
+          "median": 59,
+          "p95": 71,
+          "max": 78,
+          "mean": 54.86
+        },
+        "variantSteps": {
+          "min": 2,
+          "median": 13,
+          "p95": 20,
+          "max": 24,
+          "mean": 12.93
+        },
+        "techniqueCounts": {
+          "naked-single": 7615,
+          "hidden-single": 2214,
+          "locked-candidate": 616,
+          "naked-pair": 59,
+          "hidden-pair": 30,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 64,
+          "locked-candidate": 64,
+          "hidden-pair": 22,
+          "naked-pair": 42
+        }
+      },
+      "current": {
+        "requests": 192,
+        "generated": 192,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 26,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 1128,
+          "median": 5503,
+          "p95": 340893,
+          "max": 739437,
+          "mean": 57554.44
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 6,
+          "max": 9,
+          "mean": 1.86
+        },
+        "milliseconds": {
+          "min": 7.891800000004878,
+          "median": 31.4971000000005,
+          "p95": 1105.6205000000045,
+          "max": 2527.0545000000056,
+          "mean": 205.19
+        },
+        "steps": {
+          "min": 25,
+          "median": 60,
+          "p95": 71,
+          "max": 77,
+          "mean": 55.13
+        },
+        "variantSteps": {
+          "min": 3,
+          "median": 13,
+          "p95": 19,
+          "max": 25,
+          "mean": 12.92
+        },
+        "techniqueCounts": {
+          "naked-single": 7710,
+          "hidden-single": 2213,
+          "locked-candidate": 570,
+          "naked-pair": 63,
+          "hidden-pair": 29,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 62,
+          "hidden-single": 2,
+          "locked-candidate": 64,
+          "naked-pair": 41,
+          "hidden-pair": 23
+        }
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "baseline": {
+        "requests": 192,
+        "generated": 183,
+        "fallback": 9,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 7,
+        "constructionWork": {
+          "min": 2841,
+          "median": 22877,
+          "p95": 361993,
+          "max": 928308,
+          "mean": 84065.02
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 439,
+          "mean": 14.74
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 19,
+          "max": 20,
+          "mean": 4.63
+        },
+        "milliseconds": {
+          "min": 16.549499999993714,
+          "median": 81.98179999999411,
+          "p95": 1053.3701,
+          "max": 2236.9008999999933,
+          "mean": 256.98
+        },
+        "steps": {
+          "min": 40,
+          "median": 57,
+          "p95": 66,
+          "max": 69,
+          "mean": 56.71
+        },
+        "variantSteps": {
+          "min": 40,
+          "median": 57,
+          "p95": 66,
+          "max": 69,
+          "mean": 56.71
+        },
+        "techniqueCounts": {
+          "naked-single": 8137,
+          "hidden-single": 2164,
+          "locked-candidate": 507,
+          "naked-pair": 48,
+          "hidden-pair": 32,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 17,
+          "hidden-single": 47,
+          "locked-candidate": 64,
+          "hidden-pair": 31,
+          "naked-pair": 33
+        }
+      },
+      "current": {
+        "requests": 192,
+        "generated": 183,
+        "fallback": 9,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 29,
+        "geometryFamilies": 17,
+        "constructionWork": {
+          "min": 1657,
+          "median": 23463,
+          "p95": 407014,
+          "max": 1000000,
+          "mean": 77397.19
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 2730,
+          "mean": 26.35
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 15,
+          "max": 20,
+          "mean": 3.72
+        },
+        "milliseconds": {
+          "min": 11.273600000000442,
+          "median": 86.52300000000105,
+          "p95": 1172.584600000002,
+          "max": 6447.867100000003,
+          "mean": 266.21
+        },
+        "steps": {
+          "min": 31,
+          "median": 56,
+          "p95": 68,
+          "max": 73,
+          "mean": 55.84
+        },
+        "variantSteps": {
+          "min": 31,
+          "median": 56,
+          "p95": 68,
+          "max": 73,
+          "mean": 55.84
+        },
+        "techniqueCounts": {
+          "naked-single": 8045,
+          "hidden-single": 2127,
+          "locked-candidate": 465,
+          "naked-pair": 49,
+          "hidden-pair": 35,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "hidden-single": 41,
+          "naked-single": 23,
+          "locked-candidate": 64,
+          "hidden-pair": 31,
+          "naked-pair": 33
+        }
+      }
+    },
+    {
+      "variant": "killer",
+      "baseline": {
+        "requests": 192,
+        "generated": 107,
+        "fallback": 85,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 108,
+        "constructionWork": {
+          "min": 48763,
+          "median": 813284,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 655760.62
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 378578,
+          "max": 472260,
+          "mean": 82509.83
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 9.968499999988126,
+          "median": 74.41800000000512,
+          "p95": 122.30309999999008,
+          "max": 146.50930000000517,
+          "mean": 69.06
+        },
+        "steps": {
+          "min": 23,
+          "median": 63,
+          "p95": 113,
+          "max": 113,
+          "mean": 71.36
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 17,
+          "p95": 48,
+          "max": 48,
+          "mean": 21.02
+        },
+        "techniqueCounts": {
+          "naked-single": 7897,
+          "hidden-single": 1457,
+          "locked-candidate": 1835,
+          "naked-pair": 64,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 106,
+          "cage-remainder": 1037,
+          "cage-combination": 1306,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "cage-remainder": 57,
+          "cage-distinct": 7,
+          "cage-combination": 60,
+          "locked-candidate": 4,
+          "naked-pair": 64
+        }
+      },
+      "current": {
+        "requests": 192,
+        "generated": 107,
+        "fallback": 85,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 22,
+        "geometryFamilies": 108,
+        "constructionWork": {
+          "min": 26923,
+          "median": 826380,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 661173.52
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 378749,
+          "max": 472260,
+          "mean": 79557.13
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 7.616599999979371,
+          "median": 78.04450000001816,
+          "p95": 108.95780000000377,
+          "max": 292.1042000000016,
+          "mean": 68.41
+        },
+        "steps": {
+          "min": 18,
+          "median": 65,
+          "p95": 113,
+          "max": 113,
+          "mean": 71.35
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 17,
+          "p95": 48,
+          "max": 48,
+          "mean": 21.06
+        },
+        "techniqueCounts": {
+          "naked-single": 7853,
+          "hidden-single": 1472,
+          "locked-candidate": 1845,
+          "naked-pair": 64,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 104,
+          "cage-remainder": 1040,
+          "cage-combination": 1321,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "cage-remainder": 61,
+          "cage-distinct": 3,
+          "cage-combination": 61,
+          "locked-candidate": 3,
+          "naked-pair": 64
+        }
+      }
+    },
+    {
+      "variant": "thermo",
+      "baseline": {
+        "requests": 192,
+        "generated": 87,
+        "fallback": 105,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 88,
+        "constructionWork": {
+          "min": 21849,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 621504.34
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 3625,
+          "p95": 13956,
+          "max": 13958,
+          "mean": 3660.28
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 4,
+          "mean": 1.55
+        },
+        "milliseconds": {
+          "min": 8.929200000013225,
+          "median": 91.86590000000433,
+          "p95": 145.17130000001634,
+          "max": 192.32779999999912,
+          "mean": 77.86
+        },
+        "steps": {
+          "min": 27,
+          "median": 59,
+          "p95": 70,
+          "max": 77,
+          "mean": 55.29
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 2,
+          "p95": 15,
+          "max": 23,
+          "mean": 4.88
+        },
+        "techniqueCounts": {
+          "naked-single": 7148,
+          "hidden-single": 2215,
+          "locked-candidate": 308,
+          "naked-pair": 4,
+          "hidden-pair": 61,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 879,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "thermo-bound": 64,
+          "locked-candidate": 64,
+          "naked-pair": 3,
+          "hidden-pair": 61
+        }
+      },
+      "current": {
+        "requests": 192,
+        "generated": 106,
+        "fallback": 86,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 24,
+        "geometryFamilies": 107,
+        "constructionWork": {
+          "min": 4147,
+          "median": 607118,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 552589.33
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 8567,
+          "max": 13956,
+          "mean": 2528.23
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 4,
+          "mean": 1.46
+        },
+        "milliseconds": {
+          "min": 4.504799999995157,
+          "median": 79.2949999999837,
+          "p95": 145.6032000000123,
+          "max": 188.5734999999986,
+          "mean": 71.67
+        },
+        "steps": {
+          "min": 15,
+          "median": 58,
+          "p95": 67,
+          "max": 74,
+          "mean": 56.05
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 3,
+          "p95": 11,
+          "max": 19,
+          "mean": 4.63
+        },
+        "techniqueCounts": {
+          "naked-single": 7246,
+          "hidden-single": 2381,
+          "locked-candidate": 285,
+          "naked-pair": 12,
+          "hidden-pair": 54,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 783,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "thermo-bound": 64,
+          "locked-candidate": 64,
+          "hidden-pair": 54,
+          "naked-pair": 10
+        }
+      }
+    },
+    {
+      "variant": "arrow",
+      "baseline": {
+        "requests": 192,
+        "generated": 144,
+        "fallback": 48,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 145,
+        "constructionWork": {
+          "min": 2959,
+          "median": 55693,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 321192.98
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 8330,
+          "max": 11559,
+          "mean": 1459.84
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 3,
+          "mean": 1.22
+        },
+        "milliseconds": {
+          "min": 4.120999999984633,
+          "median": 23.678899999998976,
+          "p95": 197.33819999999832,
+          "max": 246.5691999999981,
+          "mean": 62.89
+        },
+        "steps": {
+          "min": 15,
+          "median": 52,
+          "p95": 73,
+          "max": 83,
+          "mean": 51.54
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 3,
+          "p95": 13,
+          "max": 20,
+          "mean": 3.96
+        },
+        "techniqueCounts": {
+          "naked-single": 7224,
+          "hidden-single": 1555,
+          "locked-candidate": 399,
+          "naked-pair": 65,
+          "hidden-pair": 10,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 290,
+          "arrow-combination": 353
+        },
+        "highestTechniques": {
+          "arrow-equation": 64,
+          "arrow-combination": 62,
+          "locked-candidate": 2,
+          "naked-pair": 55,
+          "hidden-pair": 9
+        }
+      },
+      "current": {
+        "requests": 192,
+        "generated": 147,
+        "fallback": 45,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 23,
+        "geometryFamilies": 148,
+        "constructionWork": {
+          "min": 5785,
+          "median": 58094,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 319056.13
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 5615,
+          "max": 11559,
+          "mean": 1040.92
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 4,
+          "mean": 1.23
+        },
+        "milliseconds": {
+          "min": 6.170099999988452,
+          "median": 25.082499999989523,
+          "p95": 160.26339999999618,
+          "max": 275.5719000000099,
+          "mean": 57.17
+        },
+        "steps": {
+          "min": 21,
+          "median": 52,
+          "p95": 72,
+          "max": 89,
+          "mean": 51.8
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 3,
+          "p95": 11,
+          "max": 23,
+          "mean": 3.96
+        },
+        "techniqueCounts": {
+          "naked-single": 7234,
+          "hidden-single": 1590,
+          "locked-candidate": 409,
+          "naked-pair": 69,
+          "hidden-pair": 8,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 300,
+          "arrow-combination": 336
+        },
+        "highestTechniques": {
+          "arrow-equation": 64,
+          "arrow-combination": 59,
+          "locked-candidate": 5,
+          "naked-pair": 56,
+          "hidden-pair": 8
+        }
+      }
+    }
+  ],
+  "combinations": [
+    {
+      "variant": "classic",
+      "difficulty": "easy",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 19,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 2197,
+          "median": 2293,
+          "p95": 2387,
+          "max": 2532,
+          "mean": 2299.94
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 11.996699999999919,
+          "median": 13.37869999999998,
+          "p95": 14.877199999999903,
+          "max": 24.821600000000018,
+          "mean": 13.67
+        },
+        "steps": {
+          "min": 45,
+          "median": 45,
+          "p95": 45,
+          "max": 45,
+          "mean": 45
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2827,
+          "hidden-single": 53,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 55,
+          "hidden-single": 9
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 19,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 2197,
+          "median": 2293,
+          "p95": 2387,
+          "max": 2532,
+          "mean": 2299.94
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 13.078599999999938,
+          "median": 14.20659999999998,
+          "p95": 15.486499999999978,
+          "max": 27.734899999999982,
+          "mean": 14.5
+        },
+        "steps": {
+          "min": 45,
+          "median": 45,
+          "p95": 45,
+          "max": 45,
+          "mean": 45
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2827,
+          "hidden-single": 53,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 55,
+          "hidden-single": 9
+        }
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "medium",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 20,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 2931,
+          "median": 30426,
+          "p95": 115213,
+          "max": 188277,
+          "mean": 45259.7
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 3,
+          "p95": 10,
+          "max": 12,
+          "mean": 3.91
+        },
+        "milliseconds": {
+          "min": 15.734000000000378,
+          "median": 90.89899999999943,
+          "p95": 344.4519,
+          "max": 577.2775999999994,
+          "mean": 140.66
+        },
+        "steps": {
+          "min": 51,
+          "median": 57,
+          "p95": 60,
+          "max": 64,
+          "mean": 56.61
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2660,
+          "hidden-single": 801,
+          "locked-candidate": 162,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 20,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 2931,
+          "median": 30426,
+          "p95": 115213,
+          "max": 188277,
+          "mean": 45259.7
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 3,
+          "p95": 10,
+          "max": 12,
+          "mean": 3.91
+        },
+        "milliseconds": {
+          "min": 16.70849999999973,
+          "median": 94.54409999999916,
+          "p95": 368.3903,
+          "max": 599.9117999999999,
+          "mean": 148.97
+        },
+        "steps": {
+          "min": 51,
+          "median": 57,
+          "p95": 60,
+          "max": 64,
+          "mean": 56.61
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2660,
+          "hidden-single": 801,
+          "locked-candidate": 162,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "hard",
+      "baseline": {
+        "requests": 64,
+        "generated": 55,
+        "fallback": 9,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 20,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 3200,
+          "median": 87239,
+          "p95": 262020,
+          "max": 336262,
+          "mean": 109438.17
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 212,
+          "max": 558,
+          "mean": 39.05
+        },
+        "layouts": {
+          "min": 1,
+          "median": 6,
+          "p95": 20,
+          "max": 20,
+          "mean": 8.17
+        },
+        "milliseconds": {
+          "min": 15.337299999999232,
+          "median": 251.30279999999948,
+          "p95": 708.8051999999989,
+          "max": 968.2308999999987,
+          "mean": 302.59
+        },
+        "steps": {
+          "min": 52,
+          "median": 59,
+          "p95": 64,
+          "max": 66,
+          "mean": 59.38
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2833,
+          "hidden-single": 667,
+          "locked-candidate": 216,
+          "naked-pair": 69,
+          "hidden-pair": 15,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-pair": 51,
+          "hidden-pair": 13
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 55,
+        "fallback": 9,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 20,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 3200,
+          "median": 87239,
+          "p95": 262020,
+          "max": 336262,
+          "mean": 109438.17
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 212,
+          "max": 558,
+          "mean": 39.05
+        },
+        "layouts": {
+          "min": 1,
+          "median": 6,
+          "p95": 20,
+          "max": 20,
+          "mean": 8.17
+        },
+        "milliseconds": {
+          "min": 15.378700000001118,
+          "median": 265.60280000000057,
+          "p95": 700.1046000000024,
+          "max": 968.5413000000008,
+          "mean": 309.17
+        },
+        "steps": {
+          "min": 52,
+          "median": 59,
+          "p95": 64,
+          "max": 66,
+          "mean": 59.38
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2833,
+          "hidden-single": 667,
+          "locked-candidate": 216,
+          "naked-pair": 69,
+          "hidden-pair": 15,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-pair": 51,
+          "hidden-pair": 13
+        }
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "expert",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 18,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 8709,
+          "median": 68470,
+          "p95": 180128,
+          "max": 274274,
+          "mean": 79121.66
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 4,
+          "p95": 13,
+          "max": 20,
+          "mean": 5.27
+        },
+        "milliseconds": {
+          "min": 23.01640000000043,
+          "median": 151.7468000000008,
+          "p95": 473.03399999999965,
+          "max": 746.9444000000003,
+          "mean": 192.54
+        },
+        "steps": {
+          "min": 54,
+          "median": 58,
+          "p95": 65,
+          "max": 69,
+          "mean": 59.03
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2524,
+          "hidden-single": 924,
+          "locked-candidate": 150,
+          "naked-pair": 41,
+          "hidden-pair": 20,
+          "naked-triple": 9,
+          "hidden-triple": 3,
+          "x-wing": 10,
+          "swordfish": 3,
+          "xy-wing": 51,
+          "simple-coloring": 43,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "xy-wing": 33,
+          "simple-coloring": 30,
+          "naked-triple": 1
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 18,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 8709,
+          "median": 68470,
+          "p95": 180128,
+          "max": 274274,
+          "mean": 79121.66
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 4,
+          "p95": 13,
+          "max": 20,
+          "mean": 5.27
+        },
+        "milliseconds": {
+          "min": 23.674699999995937,
+          "median": 157.99200000000565,
+          "p95": 461.8090000000011,
+          "max": 740.4369000000006,
+          "mean": 190.52
+        },
+        "steps": {
+          "min": 54,
+          "median": 58,
+          "p95": 65,
+          "max": 69,
+          "mean": 59.03
+        },
+        "variantSteps": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "techniqueCounts": {
+          "naked-single": 2524,
+          "hidden-single": 924,
+          "locked-candidate": 150,
+          "naked-pair": 41,
+          "hidden-pair": 20,
+          "naked-triple": 9,
+          "hidden-triple": 3,
+          "x-wing": 10,
+          "swordfish": 3,
+          "xy-wing": 51,
+          "simple-coloring": 43,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "xy-wing": 33,
+          "simple-coloring": 30,
+          "naked-triple": 1
+        }
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "easy",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 394,
+          "median": 2305,
+          "p95": 3880,
+          "max": 4244,
+          "mean": 2341.7
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 4.032999999995809,
+          "median": 12.877399999997579,
+          "p95": 19.629300000000512,
+          "max": 20.9571999999971,
+          "mean": 13.1
+        },
+        "steps": {
+          "min": 15,
+          "median": 38,
+          "p95": 49,
+          "max": 52,
+          "mean": 37.25
+        },
+        "variantSteps": {
+          "min": 2,
+          "median": 8,
+          "p95": 11,
+          "max": 14,
+          "mean": 7.78
+        },
+        "techniqueCounts": {
+          "naked-single": 2384,
+          "hidden-single": 0,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 18,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 1128,
+          "median": 2640,
+          "p95": 3700,
+          "max": 4479,
+          "mean": 2585.38
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 7.891800000004878,
+          "median": 14.574199999995471,
+          "p95": 19.171000000002095,
+          "max": 21.155500000000757,
+          "mean": 14.38
+        },
+        "steps": {
+          "min": 25,
+          "median": 40,
+          "p95": 47,
+          "max": 51,
+          "mean": 38.59
+        },
+        "variantSteps": {
+          "min": 3,
+          "median": 9,
+          "p95": 12,
+          "max": 13,
+          "mean": 8.61
+        },
+        "techniqueCounts": {
+          "naked-single": 2454,
+          "hidden-single": 16,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 62,
+          "hidden-single": 2
+        }
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "medium",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 3333,
+          "median": 8937,
+          "p95": 100210,
+          "max": 258405,
+          "mean": 30976.38
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 4,
+          "mean": 1.52
+        },
+        "milliseconds": {
+          "min": 20.766499999997905,
+          "median": 42.049999999995634,
+          "p95": 328.2201999999961,
+          "max": 755.0355999999956,
+          "mean": 110.18
+        },
+        "steps": {
+          "min": 54,
+          "median": 61,
+          "p95": 67,
+          "max": 67,
+          "mean": 60.86
+        },
+        "variantSteps": {
+          "min": 7,
+          "median": 14,
+          "p95": 18,
+          "max": 22,
+          "mean": 14.05
+        },
+        "techniqueCounts": {
+          "naked-single": 2506,
+          "hidden-single": 1174,
+          "locked-candidate": 215,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 19,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 3137,
+          "median": 8573,
+          "p95": 117576,
+          "max": 241427,
+          "mean": 27403.16
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 4,
+          "mean": 1.48
+        },
+        "milliseconds": {
+          "min": 20.256999999997788,
+          "median": 39.17369999999937,
+          "p95": 402.13499999999476,
+          "max": 827.6126000000004,
+          "mean": 106.94
+        },
+        "steps": {
+          "min": 48,
+          "median": 61,
+          "p95": 65,
+          "max": 68,
+          "mean": 60.75
+        },
+        "variantSteps": {
+          "min": 8,
+          "median": 13,
+          "p95": 18,
+          "max": 19,
+          "mean": 13.91
+        },
+        "techniqueCounts": {
+          "naked-single": 2598,
+          "hidden-single": 1086,
+          "locked-candidate": 204,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "hard",
+      "baseline": {
+        "requests": 64,
+        "generated": 63,
+        "fallback": 1,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 3827,
+          "median": 52486,
+          "p95": 301410,
+          "max": 1000000,
+          "mean": 105062.8
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 417,
+          "mean": 6.52
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 5,
+          "max": 9,
+          "mean": 2.63
+        },
+        "milliseconds": {
+          "min": 23.165399999998044,
+          "median": 197.6608999999953,
+          "p95": 902.140999999996,
+          "max": 2821.7606000000014,
+          "mean": 337.32
+        },
+        "steps": {
+          "min": 53,
+          "median": 66,
+          "p95": 74,
+          "max": 78,
+          "mean": 66.48
+        },
+        "variantSteps": {
+          "min": 11,
+          "median": 17,
+          "p95": 22,
+          "max": 24,
+          "mean": 16.97
+        },
+        "techniqueCounts": {
+          "naked-single": 2725,
+          "hidden-single": 1040,
+          "locked-candidate": 401,
+          "naked-pair": 59,
+          "hidden-pair": 30,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "hidden-pair": 22,
+          "naked-pair": 42
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 22,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 3294,
+          "median": 78828,
+          "p95": 471323,
+          "max": 739437,
+          "mean": 142674.8
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 7,
+          "max": 9,
+          "mean": 3.11
+        },
+        "milliseconds": {
+          "min": 20.743900000001304,
+          "median": 288.16070000000764,
+          "p95": 1458.9320000000007,
+          "max": 2527.0545000000056,
+          "mean": 494.25
+        },
+        "steps": {
+          "min": 53,
+          "median": 66,
+          "p95": 74,
+          "max": 77,
+          "mean": 66.05
+        },
+        "variantSteps": {
+          "min": 9,
+          "median": 16,
+          "p95": 23,
+          "max": 25,
+          "mean": 16.25
+        },
+        "techniqueCounts": {
+          "naked-single": 2658,
+          "hidden-single": 1111,
+          "locked-candidate": 366,
+          "naked-pair": 63,
+          "hidden-pair": 29,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-pair": 41,
+          "hidden-pair": 23
+        }
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "easy",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 4,
+        "constructionWork": {
+          "min": 2841,
+          "median": 5898,
+          "p95": 27809,
+          "max": 88499,
+          "mean": 12268.84
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 3,
+          "mean": 1.33
+        },
+        "milliseconds": {
+          "min": 16.549499999993714,
+          "median": 26.05130000000645,
+          "p95": 96.05819999999949,
+          "max": 222.57850000000326,
+          "mean": 45.11
+        },
+        "steps": {
+          "min": 40,
+          "median": 51,
+          "p95": 57,
+          "max": 58,
+          "mean": 50.72
+        },
+        "variantSteps": {
+          "min": 40,
+          "median": 51,
+          "p95": 57,
+          "max": 58,
+          "mean": 50.72
+        },
+        "techniqueCounts": {
+          "naked-single": 2816,
+          "hidden-single": 430,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-single": 17,
+          "hidden-single": 47
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 23,
+        "geometryFamilies": 9,
+        "constructionWork": {
+          "min": 1657,
+          "median": 5974,
+          "p95": 36316,
+          "max": 88447,
+          "mean": 13605.81
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 5,
+          "mean": 1.41
+        },
+        "milliseconds": {
+          "min": 11.273600000000442,
+          "median": 27.282500000001164,
+          "p95": 123.88640000000305,
+          "max": 290.11539999999513,
+          "mean": 53.26
+        },
+        "steps": {
+          "min": 31,
+          "median": 51,
+          "p95": 56,
+          "max": 58,
+          "mean": 49.23
+        },
+        "variantSteps": {
+          "min": 31,
+          "median": 51,
+          "p95": 56,
+          "max": 58,
+          "mean": 49.23
+        },
+        "techniqueCounts": {
+          "naked-single": 2742,
+          "hidden-single": 409,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "hidden-single": 41,
+          "naked-single": 23
+        }
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "medium",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 4,
+        "constructionWork": {
+          "min": 2971,
+          "median": 18966,
+          "p95": 101525,
+          "max": 376771,
+          "mean": 38707.06
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 7,
+          "max": 13,
+          "mean": 2.78
+        },
+        "milliseconds": {
+          "min": 19.110800000009476,
+          "median": 71.420100000003,
+          "p95": 347.059500000003,
+          "max": 893.3049000000028,
+          "mean": 127.67
+        },
+        "steps": {
+          "min": 52,
+          "median": 59,
+          "p95": 64,
+          "max": 68,
+          "mean": 59.03
+        },
+        "variantSteps": {
+          "min": 52,
+          "median": 59,
+          "p95": 64,
+          "max": 68,
+          "mean": 59.03
+        },
+        "techniqueCounts": {
+          "naked-single": 2637,
+          "hidden-single": 924,
+          "locked-candidate": 217,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 63,
+        "fallback": 1,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 22,
+        "geometryFamilies": 8,
+        "constructionWork": {
+          "min": 3256,
+          "median": 18113,
+          "p95": 133788,
+          "max": 1000000,
+          "mean": 49801.05
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 2730,
+          "mean": 42.66
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 5,
+          "max": 10,
+          "mean": 2.22
+        },
+        "milliseconds": {
+          "min": 20.002699999997276,
+          "median": 73.62720000000263,
+          "p95": 338.63959999999497,
+          "max": 6447.867100000003,
+          "mean": 219.84
+        },
+        "steps": {
+          "min": 49,
+          "median": 57,
+          "p95": 62,
+          "max": 67,
+          "mean": 57.36
+        },
+        "variantSteps": {
+          "min": 49,
+          "median": 57,
+          "p95": 62,
+          "max": 67,
+          "mean": 57.36
+        },
+        "techniqueCounts": {
+          "naked-single": 2645,
+          "hidden-single": 871,
+          "locked-candidate": 155,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "hard",
+      "baseline": {
+        "requests": 64,
+        "generated": 55,
+        "fallback": 9,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 3,
+        "constructionWork": {
+          "min": 4172,
+          "median": 134448,
+          "p95": 495286,
+          "max": 928308,
+          "mean": 201219.16
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 308,
+          "max": 439,
+          "mean": 44.23
+        },
+        "layouts": {
+          "min": 1,
+          "median": 8,
+          "p95": 20,
+          "max": 20,
+          "mean": 9.78
+        },
+        "milliseconds": {
+          "min": 23.522100000001956,
+          "median": 413.4091000000044,
+          "p95": 1436.385500000004,
+          "max": 2236.9008999999933,
+          "mean": 598.16
+        },
+        "steps": {
+          "min": 50,
+          "median": 61,
+          "p95": 67,
+          "max": 69,
+          "mean": 60.38
+        },
+        "variantSteps": {
+          "min": 50,
+          "median": 61,
+          "p95": 67,
+          "max": 69,
+          "mean": 60.38
+        },
+        "techniqueCounts": {
+          "naked-single": 2684,
+          "hidden-single": 810,
+          "locked-candidate": 290,
+          "naked-pair": 48,
+          "hidden-pair": 32,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "hidden-pair": 31,
+          "naked-pair": 33
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 56,
+        "fallback": 8,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 19,
+        "geometryFamilies": 4,
+        "constructionWork": {
+          "min": 3438,
+          "median": 112890,
+          "p95": 430608,
+          "max": 1000000,
+          "mean": 168784.72
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 251,
+          "max": 439,
+          "mean": 36.39
+        },
+        "layouts": {
+          "min": 1,
+          "median": 5,
+          "p95": 20,
+          "max": 20,
+          "mean": 7.53
+        },
+        "milliseconds": {
+          "min": 22.025600000008126,
+          "median": 330.5198000000091,
+          "p95": 1288.131400000013,
+          "max": 3721.676800000001,
+          "mean": 525.52
+        },
+        "steps": {
+          "min": 48,
+          "median": 61,
+          "p95": 71,
+          "max": 73,
+          "mean": 60.92
+        },
+        "variantSteps": {
+          "min": 48,
+          "median": 61,
+          "p95": 71,
+          "max": 73,
+          "mean": 60.92
+        },
+        "techniqueCounts": {
+          "naked-single": 2658,
+          "hidden-single": 847,
+          "locked-candidate": 310,
+          "naked-pair": 49,
+          "hidden-pair": 35,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "hidden-pair": 31,
+          "naked-pair": 33
+        }
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "easy",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 64,
+        "constructionWork": {
+          "min": 48763,
+          "median": 167918,
+          "p95": 280240,
+          "max": 343357,
+          "mean": 168107.88
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 9.968499999988126,
+          "median": 25.5964999999851,
+          "p95": 36.77170000001206,
+          "max": 55.710599999991246,
+          "mean": 25.62
+        },
+        "steps": {
+          "min": 23,
+          "median": 40,
+          "p95": 50,
+          "max": 52,
+          "mean": 38.97
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 6,
+          "mean": 1.39
+        },
+        "techniqueCounts": {
+          "naked-single": 2275,
+          "hidden-single": 130,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 12,
+          "cage-remainder": 77,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "cage-remainder": 57,
+          "cage-distinct": 7
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 18,
+        "geometryFamilies": 64,
+        "constructionWork": {
+          "min": 26923,
+          "median": 151300,
+          "p95": 296665,
+          "max": 336270,
+          "mean": 164921.56
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 7.616599999979371,
+          "median": 23.883499999996275,
+          "p95": 37.81510000000708,
+          "max": 54.54130000001169,
+          "mean": 24.65
+        },
+        "steps": {
+          "min": 18,
+          "median": 38,
+          "p95": 49,
+          "max": 54,
+          "mean": 37.75
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 3,
+          "mean": 1.19
+        },
+        "techniqueCounts": {
+          "naked-single": 2186,
+          "hidden-single": 155,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 7,
+          "cage-remainder": 68,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "cage-remainder": 61,
+          "cage-distinct": 3
+        }
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "medium",
+      "baseline": {
+        "requests": 64,
+        "generated": 43,
+        "fallback": 21,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 44,
+        "constructionWork": {
+          "min": 350612,
+          "median": 813284,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 799173.98
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 23332,
+          "max": 24995,
+          "mean": 7198.05
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 34.17280000000028,
+          "median": 74.41800000000512,
+          "p95": 88.01989999998477,
+          "max": 94.14379999999073,
+          "mean": 72.25
+        },
+        "steps": {
+          "min": 47,
+          "median": 63,
+          "p95": 74,
+          "max": 80,
+          "mean": 62.91
+        },
+        "variantSteps": {
+          "min": 5,
+          "median": 17,
+          "p95": 24,
+          "max": 28,
+          "mean": 14.38
+        },
+        "techniqueCounts": {
+          "naked-single": 2215,
+          "hidden-single": 766,
+          "locked-candidate": 157,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 94,
+          "cage-remainder": 704,
+          "cage-combination": 90,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "cage-combination": 60,
+          "locked-candidate": 4
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 43,
+        "fallback": 21,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 19,
+        "geometryFamilies": 44,
+        "constructionWork": {
+          "min": 407456,
+          "median": 826380,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 818598.98
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 23332,
+          "max": 24995,
+          "mean": 7022.41
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 49.22320000000764,
+          "median": 78.04450000001816,
+          "p95": 94.15520000000834,
+          "max": 292.1042000000016,
+          "mean": 79.48
+        },
+        "steps": {
+          "min": 55,
+          "median": 65,
+          "p95": 75,
+          "max": 79,
+          "mean": 64.05
+        },
+        "variantSteps": {
+          "min": 6,
+          "median": 17,
+          "p95": 24,
+          "max": 29,
+          "mean": 14.72
+        },
+        "techniqueCounts": {
+          "naked-single": 2262,
+          "hidden-single": 754,
+          "locked-candidate": 165,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 97,
+          "cage-remainder": 716,
+          "cage-combination": 105,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "cage-combination": 61,
+          "locked-candidate": 3
+        }
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "hard",
+      "baseline": {
+        "requests": 64,
+        "generated": 0,
+        "fallback": 64,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 1000000,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 1000000
+        },
+        "fallbackWork": {
+          "min": 102235,
+          "median": 157896,
+          "p95": 472260,
+          "max": 472260,
+          "mean": 240331.44
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 86.16460000001825,
+          "median": 106.87400000001071,
+          "p95": 133.66030000001774,
+          "max": 146.50930000000517,
+          "mean": 109.32
+        },
+        "steps": {
+          "min": 112,
+          "median": 112,
+          "p95": 113,
+          "max": 113,
+          "mean": 112.22
+        },
+        "variantSteps": {
+          "min": 47,
+          "median": 47,
+          "p95": 48,
+          "max": 48,
+          "mean": 47.28
+        },
+        "techniqueCounts": {
+          "naked-single": 3407,
+          "hidden-single": 561,
+          "locked-candidate": 1678,
+          "naked-pair": 64,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 256,
+          "cage-combination": 1216,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-pair": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 0,
+        "fallback": 64,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 1,
+        "constructionWork": {
+          "min": 1000000,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 1000000
+        },
+        "fallbackWork": {
+          "min": 102235,
+          "median": 157896,
+          "p95": 472162,
+          "max": 472260,
+          "mean": 231648.98
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 83.47709999998915,
+          "median": 100.19459999998799,
+          "p95": 115.83090000000084,
+          "max": 125.5057000000088,
+          "mean": 101.1
+        },
+        "steps": {
+          "min": 112,
+          "median": 112,
+          "p95": 113,
+          "max": 113,
+          "mean": 112.25
+        },
+        "variantSteps": {
+          "min": 47,
+          "median": 47,
+          "p95": 48,
+          "max": 48,
+          "mean": 47.27
+        },
+        "techniqueCounts": {
+          "naked-single": 3405,
+          "hidden-single": 563,
+          "locked-candidate": 1680,
+          "naked-pair": 64,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 256,
+          "cage-combination": 1216,
+          "thermo-bound": 0,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-pair": 64
+        }
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "easy",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 64,
+        "constructionWork": {
+          "min": 21849,
+          "median": 53163,
+          "p95": 87287,
+          "max": 106565,
+          "mean": 56229.36
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 8.929200000013225,
+          "median": 17.605299999995623,
+          "p95": 23.698200000013458,
+          "max": 27.80429999998887,
+          "mean": 17.4
+        },
+        "steps": {
+          "min": 27,
+          "median": 41,
+          "p95": 50,
+          "max": 52,
+          "mean": 40.36
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 4,
+          "mean": 1.2
+        },
+        "techniqueCounts": {
+          "naked-single": 2393,
+          "hidden-single": 114,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 76,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "thermo-bound": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 21,
+        "geometryFamilies": 64,
+        "constructionWork": {
+          "min": 4147,
+          "median": 52202,
+          "p95": 88938,
+          "max": 312039,
+          "mean": 55619.5
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 2,
+          "mean": 1.02
+        },
+        "milliseconds": {
+          "min": 4.504799999995157,
+          "median": 20.29759999999078,
+          "p95": 25.997299999988172,
+          "max": 74.2905000000028,
+          "mean": 19.95
+        },
+        "steps": {
+          "min": 15,
+          "median": 46,
+          "p95": 53,
+          "max": 55,
+          "mean": 43.5
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 5,
+          "mean": 1.31
+        },
+        "techniqueCounts": {
+          "naked-single": 2435,
+          "hidden-single": 269,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 80,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "thermo-bound": 64
+        }
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "medium",
+      "baseline": {
+        "requests": 64,
+        "generated": 19,
+        "fallback": 45,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 20,
+        "constructionWork": {
+          "min": 139488,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 840305.7
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 3687,
+          "p95": 4790,
+          "max": 5615,
+          "mean": 2913.05
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 3,
+          "max": 3,
+          "mean": 1.77
+        },
+        "milliseconds": {
+          "min": 30.950500000006286,
+          "median": 114.83759999999893,
+          "p95": 150.18529999998282,
+          "max": 168.0752999999968,
+          "mean": 103.64
+        },
+        "steps": {
+          "min": 56,
+          "median": 59,
+          "p95": 72,
+          "max": 75,
+          "mean": 60.83
+        },
+        "variantSteps": {
+          "min": 2,
+          "median": 2,
+          "p95": 18,
+          "max": 23,
+          "mean": 5.61
+        },
+        "techniqueCounts": {
+          "naked-single": 2484,
+          "hidden-single": 855,
+          "locked-candidate": 233,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 321,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 28,
+        "fallback": 36,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 17,
+        "geometryFamilies": 29,
+        "constructionWork": {
+          "min": 57442,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 742319.73
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 2561,
+          "p95": 4431,
+          "max": 4790,
+          "mean": 2055.06
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 3,
+          "mean": 1.59
+        },
+        "milliseconds": {
+          "min": 21.152300000016112,
+          "median": 90.82639999999083,
+          "p95": 143.17919999998412,
+          "max": 188.1490000000049,
+          "mean": 90.41
+        },
+        "steps": {
+          "min": 56,
+          "median": 58,
+          "p95": 67,
+          "max": 70,
+          "mean": 59.95
+        },
+        "variantSteps": {
+          "min": 2,
+          "median": 2,
+          "p95": 12,
+          "max": 14,
+          "mean": 4.83
+        },
+        "techniqueCounts": {
+          "naked-single": 2526,
+          "hidden-single": 878,
+          "locked-candidate": 178,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 255,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "locked-candidate": 64
+        }
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "hard",
+      "baseline": {
+        "requests": 64,
+        "generated": 4,
+        "fallback": 60,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 5,
+        "constructionWork": {
+          "min": 289730,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 967977.95
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 8116,
+          "p95": 13956,
+          "max": 13958,
+          "mean": 8067.8
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 3,
+          "max": 4,
+          "mean": 1.89
+        },
+        "milliseconds": {
+          "min": 41.72959999999148,
+          "median": 117.32640000001993,
+          "p95": 136.53880000000936,
+          "max": 192.32779999999912,
+          "mean": 112.53
+        },
+        "steps": {
+          "min": 64,
+          "median": 64,
+          "p95": 64,
+          "max": 77,
+          "mean": 64.67
+        },
+        "variantSteps": {
+          "min": 7,
+          "median": 7,
+          "p95": 7,
+          "max": 23,
+          "mean": 7.81
+        },
+        "techniqueCounts": {
+          "naked-single": 2271,
+          "hidden-single": 1246,
+          "locked-candidate": 75,
+          "naked-pair": 4,
+          "hidden-pair": 61,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 482,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "naked-pair": 3,
+          "hidden-pair": 61
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 14,
+        "fallback": 50,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 11,
+        "geometryFamilies": 15,
+        "constructionWork": {
+          "min": 129134,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 859828.75
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 5345,
+          "p95": 12152,
+          "max": 13956,
+          "mean": 5529.64
+        },
+        "layouts": {
+          "min": 1,
+          "median": 2,
+          "p95": 3,
+          "max": 4,
+          "mean": 1.78
+        },
+        "milliseconds": {
+          "min": 29.112200000003213,
+          "median": 109.03449999997974,
+          "p95": 155.902700000006,
+          "max": 188.5734999999986,
+          "mean": 104.66
+        },
+        "steps": {
+          "min": 62,
+          "median": 64,
+          "p95": 69,
+          "max": 74,
+          "mean": 64.69
+        },
+        "variantSteps": {
+          "min": 3,
+          "median": 7,
+          "p95": 13,
+          "max": 19,
+          "mean": 7.75
+        },
+        "techniqueCounts": {
+          "naked-single": 2285,
+          "hidden-single": 1234,
+          "locked-candidate": 107,
+          "naked-pair": 12,
+          "hidden-pair": 54,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 448,
+          "arrow-equation": 0,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "hidden-pair": 54,
+          "naked-pair": 10
+        }
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "easy",
+      "baseline": {
+        "requests": 64,
+        "generated": 61,
+        "fallback": 3,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 62,
+        "constructionWork": {
+          "min": 2959,
+          "median": 30526,
+          "p95": 513891,
+          "max": 1000000,
+          "mean": 104665.59
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 372,
+          "mean": 16.13
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 3,
+          "mean": 1.08
+        },
+        "milliseconds": {
+          "min": 4.120999999984633,
+          "median": 17.616399999998976,
+          "p95": 106.08780000000843,
+          "max": 192.71899999998277,
+          "mean": 27.7
+        },
+        "steps": {
+          "min": 15,
+          "median": 40,
+          "p95": 51,
+          "max": 53,
+          "mean": 38.56
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.13
+        },
+        "techniqueCounts": {
+          "naked-single": 2225,
+          "hidden-single": 171,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 72,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "arrow-equation": 64
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 57,
+        "fallback": 7,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 17,
+        "geometryFamilies": 58,
+        "constructionWork": {
+          "min": 5785,
+          "median": 34814,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 168364.38
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 365,
+          "max": 407,
+          "mean": 39.81
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.11
+        },
+        "milliseconds": {
+          "min": 7.001199999998789,
+          "median": 19.197400000004563,
+          "p95": 125.30290000000969,
+          "max": 174.35509999998612,
+          "mean": 34.96
+        },
+        "steps": {
+          "min": 22,
+          "median": 43,
+          "p95": 51,
+          "max": 53,
+          "mean": 39.77
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.09
+        },
+        "techniqueCounts": {
+          "naked-single": 2288,
+          "hidden-single": 187,
+          "locked-candidate": 0,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 70,
+          "arrow-combination": 0
+        },
+        "highestTechniques": {
+          "arrow-equation": 64
+        }
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "medium",
+      "baseline": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 64,
+        "constructionWork": {
+          "min": 23093,
+          "median": 53573,
+          "p95": 68551,
+          "max": 125257,
+          "mean": 51878.72
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 14.628400000015972,
+          "median": 22.04189999998198,
+          "p95": 25.63190000000759,
+          "max": 30.115399999980582,
+          "mean": 22
+        },
+        "steps": {
+          "min": 40,
+          "median": 52,
+          "p95": 58,
+          "max": 61,
+          "mean": 51.45
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 3,
+          "p95": 6,
+          "max": 7,
+          "mean": 3.39
+        },
+        "techniqueCounts": {
+          "naked-single": 2418,
+          "hidden-single": 597,
+          "locked-candidate": 68,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 129,
+          "arrow-combination": 81
+        },
+        "highestTechniques": {
+          "arrow-combination": 62,
+          "locked-candidate": 2
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 19,
+        "geometryFamilies": 64,
+        "constructionWork": {
+          "min": 6033,
+          "median": 46403,
+          "p95": 75786,
+          "max": 100035,
+          "mean": 48393.31
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 1,
+          "max": 1,
+          "mean": 1
+        },
+        "milliseconds": {
+          "min": 6.170099999988452,
+          "median": 21.605699999985518,
+          "p95": 28.25539999999455,
+          "max": 33.205199999996694,
+          "mean": 21.45
+        },
+        "steps": {
+          "min": 21,
+          "median": 51,
+          "p95": 60,
+          "max": 65,
+          "mean": 50.64
+        },
+        "variantSteps": {
+          "min": 1,
+          "median": 3,
+          "p95": 5,
+          "max": 6,
+          "mean": 3.09
+        },
+        "techniqueCounts": {
+          "naked-single": 2348,
+          "hidden-single": 601,
+          "locked-candidate": 97,
+          "naked-pair": 0,
+          "hidden-pair": 0,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 121,
+          "arrow-combination": 74
+        },
+        "highestTechniques": {
+          "arrow-combination": 59,
+          "locked-candidate": 5
+        }
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "hard",
+      "baseline": {
+        "requests": 64,
+        "generated": 19,
+        "fallback": 45,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 1,
+        "geometryFamilies": 20,
+        "constructionWork": {
+          "min": 67128,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 807034.64
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 3478,
+          "p95": 11559,
+          "max": 11559,
+          "mean": 4363.41
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 3,
+          "mean": 1.58
+        },
+        "milliseconds": {
+          "min": 32.4482999999891,
+          "median": 138.50889999998617,
+          "p95": 211.7619999999879,
+          "max": 246.5691999999981,
+          "mean": 138.97
+        },
+        "steps": {
+          "min": 52,
+          "median": 61,
+          "p95": 77,
+          "max": 83,
+          "mean": 64.61
+        },
+        "variantSteps": {
+          "min": 5,
+          "median": 5,
+          "p95": 15,
+          "max": 20,
+          "mean": 7.36
+        },
+        "techniqueCounts": {
+          "naked-single": 2581,
+          "hidden-single": 787,
+          "locked-candidate": 331,
+          "naked-pair": 65,
+          "hidden-pair": 10,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 89,
+          "arrow-combination": 272
+        },
+        "highestTechniques": {
+          "naked-pair": 55,
+          "hidden-pair": 9
+        }
+      },
+      "current": {
+        "requests": 64,
+        "generated": 26,
+        "fallback": 38,
+        "failed": 0,
+        "exhausted": 0,
+        "terminalFamilies": 14,
+        "geometryFamilies": 27,
+        "constructionWork": {
+          "min": 62903,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "mean": 740410.7
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 3477,
+          "p95": 8330,
+          "max": 11559,
+          "mean": 3082.95
+        },
+        "layouts": {
+          "min": 1,
+          "median": 1,
+          "p95": 3,
+          "max": 4,
+          "mean": 1.59
+        },
+        "milliseconds": {
+          "min": 32.76019999998971,
+          "median": 114.12840000001597,
+          "p95": 197.64019999999437,
+          "max": 275.5719000000099,
+          "mean": 115.09
+        },
+        "steps": {
+          "min": 61,
+          "median": 61,
+          "p95": 77,
+          "max": 89,
+          "mean": 65
+        },
+        "variantSteps": {
+          "min": 4,
+          "median": 5,
+          "p95": 15,
+          "max": 23,
+          "mean": 7.7
+        },
+        "techniqueCounts": {
+          "naked-single": 2598,
+          "hidden-single": 802,
+          "locked-candidate": 312,
+          "naked-pair": 69,
+          "hidden-pair": 8,
+          "naked-triple": 0,
+          "hidden-triple": 0,
+          "x-wing": 0,
+          "swordfish": 0,
+          "xy-wing": 0,
+          "simple-coloring": 0,
+          "cage-distinct": 0,
+          "cage-remainder": 0,
+          "cage-combination": 0,
+          "thermo-bound": 0,
+          "arrow-equation": 109,
+          "arrow-combination": 262
+        },
+        "highestTechniques": {
+          "naked-pair": 56,
+          "hidden-pair": 8
+        }
+      }
+    }
+  ],
+  "optimizationPreservesMeasuredContracts": true
+}

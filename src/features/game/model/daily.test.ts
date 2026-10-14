@@ -41,7 +41,7 @@ it('uses distinct formal daily identities without rewriting Classic', () => {
     input: { variant: 'classic', difficulty: 'medium' },
   })
   expect(getDailyIdentity('2026-10-11', 'arrow')).toMatchObject({
-    seed: 'daily:sudoku-variants-v2:arrow:2026-10-11',
+    seed: 'daily:sudoku-variants-v3:arrow:2026-10-11',
     formalId: 'daily:arrow:2026-10-11:formal',
     input: { variant: 'arrow', difficulty: 'medium' },
   })

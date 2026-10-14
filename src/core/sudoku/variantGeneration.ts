@@ -8,6 +8,7 @@ import { irregularRegions } from '@/core/sudoku/variants/jigsaw'
 import { isComplete } from '@/core/sudoku/board'
 import { CLASSIC_CONTEXT, compileRules, parseRules } from '@/core/sudoku/rules'
 import type { Board, CellValue, Digit } from '@/core/sudoku/types'
+import type { NewSudokuVariant } from '@/core/sudoku/rules'
 import { isDigit } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { countSolutions } from '@/core/sudoku/search'
@@ -16,6 +17,7 @@ import type { VariantTemplate } from '@/core/sudoku/variantTemplates'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
+import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
 import type {
   GenerationInput,
   GenerationLimits,
@@ -124,6 +126,16 @@ export function variantRulesMatter(
 const SYMMETRIES: readonly SpatialSymmetry[] = [0, 1, 2, 3, 4, 5, 6, 7]
 const CELL_INDICES = Array.from({ length: 81 }, (_, cell) => cell)
 
+function freshGeometryInput(rules: Puzzle['rules']): Puzzle['rules'] {
+  if (rules.kind === 'thermo') {
+    return { kind: 'thermo', paths: [] }
+  }
+  if (rules.kind === 'arrow') {
+    return { kind: 'arrow', arrows: [] }
+  }
+  return rules
+}
+
 function seededTransform(template: VariantTemplate, random: () => number): VariantTemplate {
   const symmetry = SYMMETRIES[Math.floor(random() * SYMMETRIES.length)]
   if (template.rules.kind === 'classic') {
@@ -146,7 +158,7 @@ function seededTransform(template: VariantTemplate, random: () => number): Varia
 }
 
 export function generateVariantPuzzle(
-  input: Extract<GenerationInput, { puzzleVersion: 'sudoku-variants-v2' }>,
+  input: Extract<GenerationInput, { variant: NewSudokuVariant }>,
   limits: GenerationLimits,
   metrics: GenerationMetrics,
 ): GenerationAttemptResult {
@@ -174,20 +186,38 @@ export function generateVariantPuzzle(
     ) {
       metrics.layouts++
       const base = seededTransform(templates[Math.floor(random() * templates.length)], random)
-      const rules = createVariantGeometry(base.rules, base.solution, random, generationBudget)
+      const terminalContext =
+        base.rules.kind === 'diagonal' || base.rules.kind === 'jigsaw'
+          ? compileRules(base.rules)
+          : CLASSIC_CONTEXT
+      const terminal = constructUnitTerminal(terminalContext, random, generationBudget)
+      if (terminal.status === 'budget-exhausted') {
+        break
+      }
+      if (terminal.status === 'failed') {
+        return terminal
+      }
+      // Authored arithmetic paths belong to the fallback solution. Rebuild their geometry
+      // from scratch for the new terminal instead of retaining incompatible clue values.
+      const rules = createVariantGeometry(
+        freshGeometryInput(base.rules),
+        terminal.solution,
+        random,
+        generationBudget,
+      )
       if (!rules || !parseRules(rules).valid) {
         continue
       }
 
       const context = compileRules(rules)
       if (
-        !isComplete(base.solution, context) ||
+        !isComplete(terminal.solution, context) ||
         (rules.kind === 'jigsaw' && !irregularRegions(rules))
       ) {
         continue
       }
 
-      const givens = [...base.solution]
+      const givens = [...terminal.solution]
 
       for (const cell of shuffle(CELL_INDICES, random)) {
         const previous = givens[cell]
@@ -238,7 +268,7 @@ export function generateVariantPuzzle(
 
         const candidate: VariantTemplate = {
           rules,
-          solution: base.solution,
+          solution: terminal.solution,
           givens: [...givens],
           difficulty: rating.summary.difficulty,
         }
