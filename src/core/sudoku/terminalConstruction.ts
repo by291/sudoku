@@ -1,4 +1,4 @@
-import { calculateBaseCandidates, digitsIn, isComplete } from '@/core/sudoku/board'
+import { digitsIn, isComplete } from '@/core/sudoku/board'
 import { consumeWork } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import type { RuleContext } from '@/core/sudoku/rules'
@@ -39,23 +39,18 @@ export function constructUnitTerminal(
   function assign(cell: number, digit: CellValue) {
     const previous = board[cell]
     board[cell] = digit
-    if (regional) {
-      // A candidate never duplicates a unit digit, so undo removes only this cell's bit.
-      for (const index of memberships[cell]) {
-        if (previous !== 0) {
-          unitMasks[index] &= ~(1 << (previous - 1))
-        }
-        if (digit !== 0) {
-          unitMasks[index] |= 1 << (digit - 1)
-        }
+    // A candidate never duplicates a unit digit, so undo removes only this cell's bit.
+    for (const index of memberships[cell]) {
+      if (previous !== 0) {
+        unitMasks[index] &= ~(1 << (previous - 1))
+      }
+      if (digit !== 0) {
+        unitMasks[index] |= 1 << (digit - 1)
       }
     }
   }
 
   function candidatesForTerminal() {
-    if (!regional) {
-      return calculateBaseCandidates(board, context)
-    }
     return board.map((value, cell) => {
       if (value !== 0) {
         return 0
@@ -126,7 +121,7 @@ export function constructUnitTerminal(
       }
     }
 
-    // Preserve Classic v3 ordering: ascending MRV ties and one shuffle per visited node.
+    // Retain ascending MRV ties and one shuffle per visited node across mask updates.
     for (const { cell, digit } of shuffle(assignments, random)) {
       assign(cell, digit)
       if (visit()) {
