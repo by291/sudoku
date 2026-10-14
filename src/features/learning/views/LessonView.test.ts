@@ -6,6 +6,8 @@ import LessonView from '@/features/learning/views/LessonView.vue'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { deferred } from '../../../../tests/support/deferred'
 import { createTestRuntime } from '../../../../tests/support/runtime'
+import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
+import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 
 const cleanups: (() => void)[] = []
 
@@ -39,8 +41,79 @@ async function setup(visitSaveGate?: Promise<void>) {
     )
   }
 
-  return { wrapper, learning }
+  return { ...test, wrapper, learning }
 }
+
+async function restoreEmptyDataset(test: Awaited<ReturnType<typeof setup>>) {
+  const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
+  cleanups.push(records.dispose)
+  await records.previewRestore(
+    JSON.stringify({
+      backupVersion: 1,
+      exportedAt: '2026-10-14T03:00:00.000Z',
+      sessions: [],
+      results: [],
+      lessons: [],
+      settings: DEFAULT_SETTINGS,
+    }),
+  )
+  await records.restoreBackup()
+  await flushPromises()
+}
+
+it('reinitializes a mounted lesson from the restored cursor and clears its old feedback', async () => {
+  const test = await setup()
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '5' }))
+  await vi.waitFor(() => expect(test.wrapper.get('[role="status"]').text()).toContain('推理正确'))
+  const next = test.wrapper.findAll('button').find((button) => button.text() === '下一阶段')
+  if (!next) {
+    throw new Error('Missing next-stage action')
+  }
+  await next.trigger('click')
+  await flushPromises()
+  expect(test.wrapper.text()).toContain('练习阶段 2 / 2')
+
+  await restoreEmptyDataset(test)
+
+  await vi.waitFor(() => expect(test.wrapper.text()).toContain('练习阶段 1 / 2'))
+  expect(test.wrapper.find('[role="status"]').exists()).toBe(false)
+  expect(await test.runtime.repository.readSettings()).toMatchObject({
+    ok: true,
+    value: { currentLessonId: null },
+  })
+  await test.wrapper.get('button[aria-label^="第5行第5列"]').trigger('click')
+  await vi.waitFor(() =>
+    expect(
+      test.wrapper.get('button[aria-label="填写数字5"]').attributes('disabled'),
+    ).toBeUndefined(),
+  )
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '5' }))
+  await vi.waitFor(() => expect(test.wrapper.get('[role="status"]').text()).toContain('推理正确'))
+  expect(test.learning.exerciseStage('rules')).toBe(1)
+})
+
+it('ignores an answer completing after dataset restoration on the same lesson', async () => {
+  const test = await setup()
+  const answer = deferred<{
+    correct: boolean
+    explanation: string
+    advance: boolean
+    completed: boolean
+  }>()
+  vi.spyOn(test.learning, 'submitExercise').mockReturnValue(answer.promise)
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '5' }))
+
+  await restoreEmptyDataset(test)
+  answer.resolve({
+    correct: true,
+    explanation: 'Stale restore answer',
+    advance: true,
+    completed: true,
+  })
+  await flushPromises()
+
+  expect(test.wrapper.text()).not.toContain('Stale restore answer')
+})
 
 it('waits for the last-visited write before accepting a stage answer', async () => {
   const gate = deferred<void>()

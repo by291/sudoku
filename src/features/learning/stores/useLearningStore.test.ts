@@ -1,9 +1,89 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { deferred } from '../../../../tests/support/deferred'
+import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
+import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
+
+it('invalidates an old exercise when settings detect a restored epoch and resumes after rereading', async () => {
+  const test = await createTestRuntime()
+  await test.runtime.repository.writeSettings(
+    { ...DEFAULT_SETTINGS, lessonStages: { 'killer-combined': 2 } },
+    1,
+  )
+  const preferences = test.app.runWithContext(() => usePreferencesStore(test.pinia))
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  const restored = { ...DEFAULT_SETTINGS, lessonStages: { 'killer-combined': 4 } }
+  await test.runtime.repository.restoreBackup(
+    JSON.stringify({
+      backupVersion: 1,
+      exportedAt: '2026-10-14T03:00:00.000Z',
+      sessions: [],
+      results: [],
+      lessons: [],
+      settings: restored,
+    }),
+    1,
+  )
+
+  await preferences.update({ theme: 'dark' })
+  expect(learning.readyGeneration).toBeNull()
+  await preferences.retry()
+  await vi.waitFor(() => expect(learning.exerciseStage('killer-combined')).toBe(4))
+  expect(learning.readyGeneration).toBe(learning.datasetGeneration)
+  test.dispose()
+})
+
+it('refreshes exercise progress when settings read a different actual dataset epoch', async () => {
+  const test = await createTestRuntime()
+  await test.runtime.repository.writeSettings(
+    { ...DEFAULT_SETTINGS, lessonStages: { 'killer-combined': 2 } },
+    1,
+  )
+  const preferences = test.app.runWithContext(() => usePreferencesStore(test.pinia))
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  const restored = { ...DEFAULT_SETTINGS, lessonStages: { 'killer-combined': 4 } }
+  await test.runtime.repository.restoreBackup(
+    JSON.stringify({
+      backupVersion: 1,
+      exportedAt: '2026-10-14T03:00:00.000Z',
+      sessions: [],
+      results: [],
+      lessons: [],
+      settings: restored,
+    }),
+    1,
+  )
+
+  await preferences.reset()
+  await preferences.load()
+  await vi.waitFor(() => expect(learning.exerciseStage('killer-combined')).toBe(4))
+  test.dispose()
+})
+
+it('keeps exercises unready when the settings containing their cursor cannot be read', async () => {
+  const test = await createTestRuntime()
+  await test.runtime.repository.writeSettings(
+    { ...DEFAULT_SETTINGS, lessonStages: { 'killer-combined': 4 } },
+    1,
+  )
+  const read = vi.spyOn(test.runtime.repository, 'readSettings').mockResolvedValue({
+    ok: false,
+    error: { kind: 'unavailable', message: 'Injected read failure' },
+  })
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+
+  await learning.load()
+  expect(learning.readyGeneration).toBeNull()
+  read.mockRestore()
+  await learning.load()
+  expect(learning.exerciseStage('killer-combined')).toBe(4)
+  test.dispose()
+})
 
 it('allows retries, persists progress once, and retains it across lesson selection', async () => {
   const test = await createTestRuntime()

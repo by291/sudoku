@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 import { useGameRuntime } from '@/runtime'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import type { LessonProgress } from '@/storage/records'
@@ -14,13 +14,46 @@ export const useLearningStore = defineStore('learning', () => {
   const progress = shallowRef<readonly LessonProgress[]>([])
   const error = ref<string | null>(null)
   const exerciseStages = shallowRef<Readonly<Record<string, number>>>({})
+  const datasetGeneration = ref(0)
+  const readyGeneration = ref<number | null>(null)
   let operation = 0
   let datasetEpoch: number | null = null
+  let awaitingPreferencesReload = false
+
+  watch(
+    () => [preferences.datasetEpoch, preferences.needsReload] as const,
+    ([nextEpoch, needsReload]) => {
+      // Settings own exercise cursors. Their epoch recovery must invalidate this consumer
+      // even when no reset broadcast arrived; it must not let an old answer borrow new metadata.
+      if (needsReload) {
+        if (datasetEpoch !== null || readyGeneration.value !== null) {
+          reset()
+        }
+        awaitingPreferencesReload = true
+        return
+      }
+      if (nextEpoch === null) {
+        return
+      }
+      if (awaitingPreferencesReload) {
+        awaitingPreferencesReload = false
+        void load()
+      } else if (datasetEpoch !== null && datasetEpoch !== nextEpoch) {
+        reset()
+        void load()
+      }
+    },
+    { flush: 'sync' },
+  )
 
   async function load() {
     const current = ++operation
     await preferences.load()
     if (current !== operation) {
+      return
+    }
+    if (preferences.error) {
+      error.value = '学习设置尚未读取，请重试。'
       return
     }
 
@@ -45,6 +78,7 @@ export const useLearningStore = defineStore('learning', () => {
       progress.value = result.value
       exerciseStages.value = preferences.settings.lessonStages ?? {}
       error.value = null
+      readyGeneration.value = datasetGeneration.value
     } else {
       error.value = '学习进度读取失败，请重试。'
     }
@@ -96,7 +130,10 @@ export const useLearningStore = defineStore('learning', () => {
     }
     if (stageIndex < stages.length - 1) {
       const next = { ...exerciseStages.value, [id]: stageIndex + 1 }
-      const saved = await preferences.update({ lessonStages: next }, { optimistic: false })
+      const saved = await preferences.update(
+        { lessonStages: next },
+        { optimistic: false, expectedEpoch: datasetEpoch ?? undefined },
+      )
       if (current !== operation) {
         return { ...result, advance: false, completed: false }
       }
@@ -145,7 +182,10 @@ export const useLearningStore = defineStore('learning', () => {
     const next = { ...exerciseStages.value }
     delete next[id]
     exerciseStages.value = next
-    await preferences.update({ lessonStages: next }, { optimistic: false })
+    await preferences.update(
+      { lessonStages: next },
+      { optimistic: false, expectedEpoch: datasetEpoch ?? undefined },
+    )
     if (current !== operation) {
       return { ...result, advance: false, completed: false }
     }
@@ -154,11 +194,24 @@ export const useLearningStore = defineStore('learning', () => {
 
   function reset() {
     operation++
+    datasetGeneration.value++
+    readyGeneration.value = null
     datasetEpoch = null
     progress.value = []
     error.value = null
     exerciseStages.value = {}
+    awaitingPreferencesReload = false
   }
 
-  return { progress, error, exerciseStage, load, selectLesson, submitExercise, reset }
+  return {
+    progress,
+    error,
+    datasetGeneration,
+    readyGeneration,
+    exerciseStage,
+    load,
+    selectLesson,
+    submitExercise,
+    reset,
+  }
 })

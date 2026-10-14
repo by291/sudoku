@@ -9,6 +9,8 @@ import { summarizeRecords } from '@/features/records/model/records'
 import type { SudokuVariant } from '@/core/sudoku/rules'
 import type { RecordSummary } from '@/features/records/model/records'
 import type { SessionRecord, ResultRecord } from '@/storage/records'
+import { parseBackup, previewBackup } from '@/storage/backup'
+import type { BackupPreview } from '@/storage/backup'
 
 export const useRecordsStore = defineStore('records', () => {
   const runtime = useGameRuntime()
@@ -21,6 +23,10 @@ export const useRecordsStore = defineStore('records', () => {
   const notice = ref<string | null>(null)
   const quarantined = ref(0)
   const busy = ref(false)
+  const backupError = ref<string | null>(null)
+  const backupPreview = shallowRef<BackupPreview | null>(null)
+  let restoreCandidate: { text: string; epoch: number } | null = null
+  let backupOperation = 0
   const today = ref(getChallengeDate(runtime.wallNow()))
   let operation = 0
   const summaries = computed<Readonly<Record<SudokuVariant, RecordSummary>>>(() => {
@@ -79,6 +85,9 @@ export const useRecordsStore = defineStore('records', () => {
 
   function resetCatalog() {
     operation++
+    backupOperation++
+    restoreCandidate = null
+    backupPreview.value = null
     sessions.value = []
     results.value = []
     quarantined.value = 0
@@ -86,7 +95,132 @@ export const useRecordsStore = defineStore('records', () => {
     error.value = null
     game.dropSession()
     learning.reset()
-    void preferences.reset()
+    return preferences.reset()
+  }
+
+  async function reloadDataset() {
+    const reset = resetCatalog()
+    const current = operation
+    busy.value = true
+    await reset
+    if (current !== operation) {
+      return
+    }
+    await preferences.load()
+    if (current !== operation) {
+      return
+    }
+    await learning.load()
+    if (current !== operation) {
+      return
+    }
+    await load()
+  }
+
+  async function settleForBackup(): Promise<boolean> {
+    if (!(await game.prepareBackup())) {
+      backupError.value = '当前游戏尚未保存，请重试保存后再处理备份。'
+      return false
+    }
+    await preferences.load()
+    await preferences.flush()
+    if (preferences.error) {
+      backupError.value = '设置尚未保存，请重试保存设置后再处理备份。'
+      return false
+    }
+    return true
+  }
+
+  async function exportBackup(): Promise<string | null> {
+    if (busy.value) {
+      return null
+    }
+    const current = ++backupOperation
+    busy.value = true
+    backupError.value = null
+    notice.value = null
+    try {
+      if (!(await settleForBackup()) || current !== backupOperation) {
+        return null
+      }
+      const result = await runtime.repository.exportBackup(runtime.wallNow().toISOString())
+      if (current !== backupOperation) {
+        return null
+      }
+      if (!result.ok) {
+        backupError.value = '备份读取失败或数据超出文件限制，请重试。'
+        return null
+      }
+      notice.value = `备份已准备：${result.value.backup.sessions.length} 个存档、${result.value.backup.results.length} 条成绩、${result.value.backup.lessons.length} 条课程进度。已隔离 ${result.value.quarantined} 条，另排除 ${result.value.excluded} 条无效记录。`
+      return JSON.stringify(result.value.backup)
+    } finally {
+      if (current === backupOperation) {
+        busy.value = false
+      }
+    }
+  }
+
+  function cancelRestore() {
+    restoreCandidate = null
+    backupPreview.value = null
+  }
+
+  async function previewRestore(text: string) {
+    if (busy.value) {
+      return
+    }
+    cancelRestore()
+    backupError.value = null
+    const current = ++backupOperation
+    const parsed = parseBackup(text)
+    if (!parsed.valid) {
+      backupError.value = '备份文件无效、不兼容或超出限制，本机数据没有改变。'
+      return
+    }
+    busy.value = true
+    const epoch = await runtime.repository.readDatasetEpoch()
+    if (current !== backupOperation) {
+      return
+    }
+    busy.value = false
+    if (!epoch.ok) {
+      backupError.value = '无法读取本机数据状态，请重试。'
+      return
+    }
+    restoreCandidate = { text, epoch: epoch.value }
+    backupPreview.value = previewBackup(parsed.value)
+  }
+
+  async function restoreBackup() {
+    if (busy.value || !restoreCandidate) {
+      return
+    }
+    const candidate = restoreCandidate
+    const current = ++backupOperation
+    busy.value = true
+    backupError.value = null
+    notice.value = null
+    if (!(await settleForBackup()) || current !== backupOperation) {
+      if (current === backupOperation) {
+        busy.value = false
+      }
+      return
+    }
+    const result = await runtime.repository.restoreBackup(candidate.text, candidate.epoch)
+    if (!result.ok) {
+      if (current === backupOperation) {
+        busy.value = false
+        backupError.value =
+          result.error.kind === 'revision-conflict'
+            ? '预览后本机数据已被替换，请重新选择备份文件。'
+            : '恢复失败，本机数据仍然保留，请重试。'
+      }
+      return
+    }
+
+    // The committed reset cancels in-memory saves and late Worker installs before reloading.
+    await reloadDataset()
+    notice.value = '备份已恢复，存档以暂停状态保留。其他标签页的旧游戏已停止。'
   }
 
   async function clearLocalData() {
@@ -96,7 +230,7 @@ export const useRecordsStore = defineStore('records', () => {
     await preferences.flush()
     const result = await runtime.repository.clearAll()
     if (result.ok) {
-      resetCatalog()
+      await resetCatalog()
       notice.value = '本机数据已清空。'
     } else {
       busy.value = false
@@ -116,11 +250,13 @@ export const useRecordsStore = defineStore('records', () => {
 
   const unsubscribe = runtime.ownership.subscribe((notice) => {
     if (notice.kind === 'reset') {
-      resetCatalog()
+      void reloadDataset()
     }
   })
 
   function dispose() {
+    operation++
+    backupOperation++
     unsubscribe()
   }
 
@@ -134,6 +270,12 @@ export const useRecordsStore = defineStore('records', () => {
     error,
     notice,
     busy,
+    backupError,
+    backupPreview,
+    exportBackup,
+    previewRestore,
+    restoreBackup,
+    cancelRestore,
     load,
     clearLocalData,
     removeQuarantined,

@@ -38,6 +38,14 @@ function setup() {
       dispose() {},
     },
     repository: {
+      exportBackup: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'No backup fixture configured' },
+      }),
+      restoreBackup: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'No backup fixture configured' },
+      }),
       listSessions: async () => ({
         ok: true,
         value: [{ formatVersion: 2, revision: 1, session: saved }],

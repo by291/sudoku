@@ -13,6 +13,7 @@ import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { modeName } from '@/features/records/model/records'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
+import LocalBackupPanel from '@/features/records/components/LocalBackupPanel.vue'
 
 const records = useRecordsStore()
 const confirmation = ref<'clear' | 'quarantine' | null>(null)
@@ -78,7 +79,7 @@ function duration(value: number | null) {
     <header class="records-heading">
       <p class="eyebrow">一点积累 / RECORDS</p>
       <h1>我的数独足迹</h1>
-      <p class="muted">成绩和存档只属于当前浏览器。清空浏览器数据后将无法恢复。</p>
+      <p class="muted">成绩和存档只属于当前浏览器。定期导出备份，可以在数据丢失后恢复。</p>
     </header>
     <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
       {{ records.error }} <NButton @click="records.load">重试读取</NButton>
@@ -220,6 +221,7 @@ function duration(value: number | null) {
           <NButton @click="requestConfirmation('quarantine', $event)">清理损坏记录</NButton>
         </NCard>
         <div class="data-actions">
+          <LocalBackupPanel />
           <NButton :disabled="records.busy" @click="requestConfirmation('clear', $event)"
             >清空本机数据</NButton
           >

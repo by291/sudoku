@@ -325,6 +325,14 @@ export const useGameStore = defineStore('game', () => {
     await release()
   }
 
+  async function prepareBackup() {
+    if (phase.value === 'generating') {
+      cancelLoading()
+    }
+    const result = await transitions.prepareTransition()
+    return result.status === 'ready'
+  }
+
   function dropSession() {
     cancelOperation()
     persistence.reset()
@@ -399,6 +407,7 @@ export const useGameStore = defineStore('game', () => {
     periodicSave,
     renewLease,
     leaveGame,
+    prepareBackup,
     dropSession,
     dispose,
   }

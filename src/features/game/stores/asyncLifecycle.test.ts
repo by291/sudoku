@@ -14,6 +14,7 @@ import { createGenerationInput } from '@/core/sudoku/generation'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
 import type { Puzzle } from '@/core/sudoku/generation'
+import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 
 const runtimes: Awaited<ReturnType<typeof createTestRuntime>>[] = []
 
@@ -32,6 +33,117 @@ afterEach(() => {
     test.dispose()
   }
 })
+
+it.each(['free', 'learning', 'daily'] as const)(
+  'does not replace a restored %s dataset with a Worker response when broadcasts are absent',
+  async (mode) => {
+    const test = await createTestRuntime()
+    runtimes.push(test)
+    const game = test.app.runWithContext(() => useGameStore(test.pinia))
+    const metadata =
+      mode === 'free'
+        ? ({ kind: 'free' } as const)
+        : mode === 'learning'
+          ? ({ kind: 'learning', lessonId: 'rules' } as const)
+          : ({ kind: 'daily', challengeDate: '2026-10-11', formalAttempt: true } as const)
+    const restored = makeSession({
+      id: mode === 'daily' ? 'daily:2026-10-11:formal' : 'restored-important-save',
+      mode,
+      metadata,
+    })
+    const pending = deferred<GenerateOutcome>()
+    const entered = deferred<void>()
+    test.runtime.worker.generate = () => {
+      entered.resolve()
+      return pending.promise
+    }
+    const generating = game.startGame(
+      createGenerationInput('classic', 'easy', 'pre-restore'),
+      metadata,
+      undefined,
+      mode === 'daily' ? restored.id : undefined,
+    )
+    await entered.promise
+
+    expect(
+      await test.runtime.repository.restoreBackup(
+        JSON.stringify({
+          backupVersion: 1,
+          exportedAt: '2026-10-14T03:00:00.000Z',
+          sessions: [{ formatVersion: 2, revision: 7, session: restored }],
+          results: [],
+          lessons: [],
+          settings: DEFAULT_SETTINGS,
+        }),
+        1,
+      ),
+    ).toMatchObject({ ok: true })
+    pending.resolve({ status: 'completed', value: { ...restored.puzzle, seed: 'stale-worker' } })
+
+    expect(await generating).toEqual({ status: 'cancelled' })
+    expect(game.session).toBeNull()
+    expect(await test.runtime.repository.listSessions()).toEqual({
+      ok: true,
+      value: [{ formatVersion: 2, revision: 1, session: restored }],
+    })
+    game.dispose()
+  },
+)
+
+it.each(['acquire', 'write'] as const)(
+  'preserves restoration that races with generation %s before a delayed broadcast arrives',
+  async (stage) => {
+    const test = await createTestRuntime()
+    runtimes.push(test)
+    const game = test.app.runWithContext(() => useGameStore(test.pinia))
+    const entered = deferred<void>()
+    const gate = deferred<void>()
+    test.runtime.worker.generate = async () => ({
+      status: 'completed',
+      value: makeSession().puzzle,
+    })
+    if (stage === 'acquire') {
+      const acquire = test.runtime.ownership.acquireOwnership
+      test.runtime.ownership.acquireOwnership = async (...args) => {
+        entered.resolve()
+        await gate.promise
+        return acquire(...args)
+      }
+    } else {
+      const write = test.runtime.repository.replaceActiveSession
+      test.runtime.repository.replaceActiveSession = async (...args) => {
+        entered.resolve()
+        await gate.promise
+        return write(...args)
+      }
+    }
+    const generating = game.startGame(createGenerationInput('classic', 'easy', 'racing-restore'), {
+      kind: 'free',
+    })
+    await entered.promise
+    const restored = makeSession({ id: 'restored-after-catalogue' })
+    await test.runtime.repository.restoreBackup(
+      JSON.stringify({
+        backupVersion: 1,
+        exportedAt: '2026-10-14T03:00:00.000Z',
+        sessions: [{ formatVersion: 2, revision: 1, session: restored }],
+        results: [],
+        lessons: [],
+        settings: DEFAULT_SETTINGS,
+      }),
+      1,
+    )
+
+    gate.resolve()
+    expect((await generating).status).not.toBe('ready')
+    expect(game.session).toBeNull()
+    expect(await test.runtime.repository.listSessions()).toEqual({
+      ok: true,
+      value: [{ formatVersion: 2, revision: 1, session: restored }],
+    })
+    game.dispose()
+  },
+)
 
 it.each(['rated', 'unavailable'] as const)(
   'installs %s metadata, retains it on restart, and restores without assessment work',

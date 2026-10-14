@@ -81,10 +81,25 @@ export function useLessonExercise(
   // Local feedback belongs to a lesson and route mode, independently of durable progress writes.
   let ownerGeneration = 0
   let disposed = false
+  let initializingRoute = false
 
   watch(
-    () => [currentLesson.value?.id, inPractice.value],
-    async () => {
+    () =>
+      [
+        currentLesson.value?.id,
+        inPractice.value,
+        learning.datasetGeneration,
+        learning.readyGeneration,
+      ] as const,
+    async (values, previous) => {
+      const routeChanged = !previous || values[0] !== previous[0] || values[1] !== previous[1]
+      const datasetChanged = previous && values[2] !== previous[2]
+      // The route initializer owns its awaited load/visit. Its own readiness publication
+      // must not start a second initializer that clears a player's selected cell.
+      if (!routeChanged && !datasetChanged && initializingRoute) {
+        return
+      }
+      initializingRoute = routeChanged
       const owner = ++ownerGeneration
       const id = currentLesson.value?.id
       selected.value = null
@@ -97,14 +112,28 @@ export function useLessonExercise(
       canAdvance.value = false
       completed.value = false
 
-      await learning.load()
+      if (routeChanged) {
+        await learning.load()
+      }
+      // Reset invalidates pending answers immediately. The committed reload then supplies
+      // the new cursor; ordinary stage writes do not trigger this watcher or skip Next.
+      if (learning.readyGeneration !== learning.datasetGeneration) {
+        if (owner === ownerGeneration) {
+          initializingRoute = false
+        }
+        return
+      }
       if (!disposed && owner === ownerGeneration && id) {
         stageIndex.value = Math.min(learning.exerciseStage(id), stages.value.length - 1)
-        // Settle the visit write before answers can enqueue a stage write in the same settings queue.
-        await learning.selectLesson(id)
+        if (routeChanged) {
+          // Settle the visit write before answers enqueue stages. A dataset-only reload
+          // must preserve the imported last-visited preference in other open tabs.
+          await learning.selectLesson(id)
+        }
       }
       if (!disposed && owner === ownerGeneration) {
         busy.value = false
+        initializingRoute = false
       }
     },
     { immediate: true },

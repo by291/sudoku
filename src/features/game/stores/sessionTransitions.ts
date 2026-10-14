@@ -397,11 +397,25 @@ export function createSessionTransitions(
       epoch?: number
       signal?: AbortSignal
       assessment?: PuzzleAssessment
+      datasetEpoch?: number | null
     } = {},
   ): Promise<GameTransition> {
     const id = options.id ?? runtime.createId()
     const epoch = options.epoch ?? operationGeneration
     const signal = options.signal
+    const fence = await runtime.repository.readDatasetEpoch()
+    if (epoch !== operationGeneration) {
+      return { status: 'cancelled' }
+    }
+    const datasetEpoch =
+      options.datasetEpoch === undefined
+        ? (persistence.capture().token?.epoch ?? (fence.ok ? fence.value : null))
+        : options.datasetEpoch
+    if (datasetEpoch !== null && fence.ok && fence.value !== datasetEpoch) {
+      host.dropSession()
+      error.value = '本机数据已被替换，请重新选择游戏。'
+      return { status: 'cancelled' }
+    }
     const next = createSession(
       puzzle,
       metadata,
@@ -409,6 +423,32 @@ export function createSessionTransitions(
       runtime.wallNow().toISOString(),
       options.assessment,
     )
+    if (datasetEpoch === null) {
+      if (fence.ok) {
+        host.dropSession()
+        error.value = '本机存档状态已变化，请重新选择游戏。'
+        return { status: 'cancelled' }
+      }
+      if (session.value || metadata.kind === 'daily') {
+        phase.value = session.value ? 'paused' : 'failed'
+        error.value = '无法确认本机存档状态，请重试。'
+        return { status: 'blocked', reason: 'load' }
+      }
+      // A first game started without storage remains memory-only. An unknown initial
+      // epoch cannot authorize adopting a recovered or restored dataset's fresh lease.
+      readOnly.value = false
+      install(next, null, 0, false)
+      handleSave({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Initial dataset epoch unavailable' },
+      })
+      return { status: 'ready' }
+    }
+    if (!fence.ok) {
+      phase.value = session.value ? 'paused' : 'failed'
+      error.value = '无法确认本机存档状态，请重试。'
+      return { status: 'blocked', reason: 'load' }
+    }
     const catalog = await runtime.repository.listSessions()
     if (epoch !== operationGeneration) {
       return { status: 'cancelled' }
@@ -416,15 +456,6 @@ export function createSessionTransitions(
 
     if (!catalog.ok) {
       error.value = '读取存档失败，原局已保留。请重试。'
-      if (!session.value) {
-        error.value = null
-        readOnly.value = false
-        install(next, null, 0, false)
-        handleSave(catalog)
-
-        return { status: 'ready' }
-      }
-
       phase.value = session.value ? 'paused' : 'failed'
 
       return { status: 'blocked', reason: 'load' }
@@ -503,6 +534,18 @@ export function createSessionTransitions(
       return { status: 'cancelled' }
     }
 
+    // Old computation cannot borrow a lease from a restored dataset. Repository writes
+    // assert this token's epoch atomically, closing resets between this check and commit.
+    if (acquired.ok && acquired.value && acquired.value.epoch !== datasetEpoch) {
+      await runtime.ownership.releaseOwnership(acquired.value)
+      if (previousToken && ownsPreviousLease) {
+        await runtime.ownership.releaseOwnership(previousToken)
+      }
+      host.dropSession()
+      error.value = '本机数据已被替换，请重新选择游戏。'
+      return { status: 'cancelled' }
+    }
+
     if (!acquired.ok) {
       if (previousToken && ownsPreviousLease) {
         await runtime.ownership.releaseOwnership(previousToken)
@@ -514,19 +557,24 @@ export function createSessionTransitions(
       }
 
       handleSave(acquired)
-      if (!session.value) {
-        readOnly.value = false
-        install(next, null, 0, false)
-
-        return { status: 'ready' }
-      }
-
       phase.value = session.value ? 'paused' : 'failed'
 
       return { status: 'blocked', reason: 'ownership' }
     }
 
     if (!acquired.value) {
+      const latest = await runtime.repository.readDatasetEpoch()
+      if (epoch !== operationGeneration) {
+        return { status: 'cancelled' }
+      }
+      if (!latest.ok || latest.value !== datasetEpoch) {
+        if (previousToken && ownsPreviousLease) {
+          await runtime.ownership.releaseOwnership(previousToken)
+        }
+        host.dropSession()
+        error.value = '本机存档状态已变化，请重新选择游戏。'
+        return { status: 'cancelled' }
+      }
       if (metadata.kind === 'daily') {
         return restoreSession(next.id)
       }
@@ -593,6 +641,25 @@ export function createSessionTransitions(
       return { status: 'cancelled' }
     }
 
+    const committedFence = await runtime.repository.readDatasetEpoch()
+    if (epoch !== operationGeneration) {
+      await runtime.ownership.releaseOwnership(acquired.value)
+      return { status: 'cancelled' }
+    }
+    if (!committedFence.ok) {
+      await runtime.ownership.releaseOwnership(acquired.value)
+      readOnly.value = true
+      phase.value = session.value ? 'paused' : 'failed'
+      error.value = '存档已创建，但无法读取本机状态，请重新选择存档。'
+      return { status: 'blocked', reason: 'load' }
+    }
+    if (committedFence.value !== datasetEpoch) {
+      await runtime.ownership.releaseOwnership(acquired.value)
+      host.dropSession()
+      error.value = '本机数据已改变，请重新载入存档。'
+      return { status: 'cancelled' }
+    }
+
     readOnly.value = false
     install(next, acquired.value, persisted.value.revision, false)
     handleSave(persisted)
@@ -611,6 +678,20 @@ export function createSessionTransitions(
       return prepared
     }
 
+    const operation = operationGeneration
+    const fence = await runtime.repository.readDatasetEpoch()
+    if (operation !== operationGeneration) {
+      return { status: 'cancelled' }
+    }
+    return generatePreparedGame(input, metadata, id, fence.ok ? fence.value : null)
+  }
+
+  async function generatePreparedGame(
+    input: GenerationInput,
+    metadata: SessionMetadata,
+    id: string | undefined,
+    datasetEpoch: number | null,
+  ): Promise<GameTransition> {
     failedGeneration.value = null
     error.value = null
     phase.value = 'generating'
@@ -646,6 +727,7 @@ export function createSessionTransitions(
       epoch,
       signal: job.signal,
       assessment: result.assessment,
+      datasetEpoch,
     })
     if (controller === job) {
       controller = null
@@ -791,6 +873,14 @@ export function createSessionTransitions(
     }
 
     const epoch = operationGeneration
+    const fence = await runtime.repository.readDatasetEpoch()
+    if (epoch !== operationGeneration) {
+      return { status: 'cancelled' }
+    }
+    if (!fence.ok) {
+      error.value = '读取每日挑战失败，请重试。'
+      return { status: 'blocked', reason: 'load' }
+    }
     const { input, formalId } = getDailyIdentity(date, variant)
     const [catalog, results] = await Promise.all([
       runtime.repository.listSessions(),
@@ -819,11 +909,11 @@ export function createSessionTransitions(
     const formalAttempt =
       !existing && !results.value.some((record) => record.session.id === formalId)
 
-    return startGame(
+    return generatePreparedGame(
       input,
       { kind: 'daily', challengeDate: date, formalAttempt },
-      undefined,
       formalAttempt ? formalId : runtime.createId(),
+      fence.value,
     )
   }
 

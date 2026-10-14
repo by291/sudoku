@@ -16,6 +16,8 @@ import {
 } from '@/storage/records'
 import type { Settings } from '@/features/settings/model/preferences'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
+import { parseBackup, readBackupSnapshot, replaceBackupSnapshot } from '@/storage/backup'
+import type { BackupExport } from '@/storage/backup'
 
 export interface GameRepository {
   writeSession(
@@ -31,6 +33,8 @@ export interface GameRepository {
     signal?: AbortSignal,
   ): Promise<StorageOutcome<SessionRecord>>
   clearAll(): Promise<StorageOutcome<void>>
+  exportBackup(exportedAt: string): Promise<StorageOutcome<BackupExport>>
+  restoreBackup(text: string, expectedEpoch: number): Promise<StorageOutcome<void>>
   listSessions(): Promise<StorageOutcome<readonly SessionRecord[]>>
   listResults(): Promise<StorageOutcome<readonly ResultRecord[]>>
   readSettings(): Promise<StorageOutcome<Settings>>
@@ -151,6 +155,21 @@ export function createGameRepository(
   }
 
   return {
+    exportBackup: (exportedAt) => access((db) => readBackupSnapshot(db, exportedAt)),
+    restoreBackup: async (text, expectedEpoch) => {
+      const parsed = parseBackup(text)
+      if (!parsed.valid) {
+        return storageError(new TypeError(parsed.issues.join('; ')), 'write-failed')
+      }
+      const result = await access(
+        (db) => replaceBackupSnapshot(db, parsed.value, expectedEpoch),
+        true,
+      )
+      if (result.ok) {
+        options.onReset?.()
+      }
+      return result
+    },
     writeSession: (session, expectedRevision, token, signal) =>
       access(async (db) => {
         const parsed = parseSession(session)

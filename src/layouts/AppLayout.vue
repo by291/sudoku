@@ -65,7 +65,10 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
       </NRadioGroup>
     </header>
     <NAlert v-if="preferences.error" class="feedback-message" type="error" :show-icon="false">
-      {{ preferences.error }} <NButton @click="preferences.update({})">重试保存设置</NButton>
+      {{ preferences.error }}
+      <NButton @click="preferences.retry">{{
+        preferences.needsReload ? '重新读取设置' : '重试保存设置'
+      }}</NButton>
     </NAlert>
     <main id="main-content" ref="mainContent" tabindex="-1" aria-label="数独游戏">
       <nav v-if="backTarget" class="page-navigation" aria-label="页面导航">
