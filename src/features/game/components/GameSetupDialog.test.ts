@@ -1,0 +1,83 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, expect, it } from 'vitest'
+import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
+import { makeSession } from '../../../../tests/support/gameFixtures'
+
+const cleanups: (() => void)[] = []
+
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) {
+    cleanup()
+  }
+
+  await flushPromises()
+})
+
+function action(label: string) {
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+    (element) => element.textContent?.trim() === label,
+  )
+  if (!button) {
+    throw new Error(`Missing action: ${label}`)
+  }
+
+  return button
+}
+
+it.each(['free', 'daily'] as const)(
+  'announces saved-record loading in the %s setup without suggesting generation has started',
+  async (mode) => {
+    const wrapper = mount(GameSetupDialog, {
+      attachTo: document.body,
+      props: { mode, variant: 'classic', difficulty: 'easy', busy: true },
+    })
+    cleanups.push(() => wrapper.unmount())
+    await flushPromises()
+
+    const status = document.querySelector('[role="status"]')
+    expect(status).not.toBeNull()
+    expect(status?.textContent).toContain('正在读取存档')
+    expect(status?.textContent).not.toContain('正在生成题目')
+    expect(status?.getAttribute('aria-live')).toBe('polite')
+    expect(document.querySelector('[role="dialog"] [aria-busy="true"]')).not.toBeNull()
+    expect(action(mode === 'free' ? '开始游戏' : '开始今日挑战').disabled).toBe(true)
+    expect(action('取消').disabled).toBe(false)
+
+    await wrapper.setProps({ busy: false })
+
+    expect(document.querySelector('[role="status"]')).toBeNull()
+    expect(action(mode === 'free' ? '开始游戏' : '开始今日挑战').disabled).toBe(false)
+  },
+)
+
+it('announces generation once and prevents restarting or changing its pending selection', async () => {
+  const wrapper = mount(GameSetupDialog, {
+    attachTo: document.body,
+    props: {
+      variant: 'classic',
+      difficulty: 'easy',
+      savedSession: makeSession(),
+      generating: true,
+    },
+  })
+  cleanups.push(() => wrapper.unmount())
+  await flushPromises()
+
+  const statuses = document.querySelectorAll('[role="status"]')
+  expect(statuses).toHaveLength(1)
+  expect(statuses[0]?.textContent).toContain('正在生成题目…')
+  expect(statuses[0]?.querySelector('.n-spin-body')?.getAttribute('aria-hidden')).toBe('true')
+  expect(action('开始游戏').disabled).toBe(true)
+  expect(action('继续存档').disabled).toBe(true)
+  const radios = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]'))
+  expect(radios.length).toBeGreaterThan(0)
+  expect(radios.every((radio) => radio.disabled)).toBe(true)
+
+  action('开始游戏').click()
+  action('继续存档').click()
+
+  expect(wrapper.emitted('start')).toBeUndefined()
+  expect(wrapper.emitted('resume')).toBeUndefined()
+  action('取消').click()
+  expect(wrapper.emitted('cancel')).toEqual([[]])
+})

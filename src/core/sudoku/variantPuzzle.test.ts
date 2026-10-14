@@ -46,20 +46,19 @@ it.each(
   },
   60000,
 )
-it('validates fallback independently and never returns an unverified puzzle after exhaustion', () => {
+it('returns construction exhaustion without substituting an authored variant puzzle', () => {
   const input = {
     variant: 'arrow',
     difficulty: 'hard',
     puzzleVersion: VARIANT_PUZZLE_VERSION,
-    seed: 'forced-fallback',
+    seed: 'forced-exhaustion',
   } as const
-  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500, fallbackWork: 1000000 }
+  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500 }
 
-  expect(generatePuzzle(input, limits)).toMatchObject({ status: 'ready', source: 'fallback' })
-  expect(generatePuzzle(input, { ...limits, fallbackWork: 0 })).toEqual({
+  expect(generatePuzzle(input, limits)).toEqual({
     status: 'budget-exhausted',
-    stage: 'fallback-validation',
-    metrics: { constructionWork: 0, fallbackWork: 0, layouts: 0 },
+    stage: 'construction',
+    metrics: { constructionWork: 0, layouts: 0 },
   })
 })
 it('rejects missing rules and solutions that violate their clues', () => {

@@ -1,4 +1,5 @@
 import { runWorker } from './workerHarness'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { test, expect, makeVariantHintSession } from './support'
 import { parseWorkerResponse } from '@/worker/protocol'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
@@ -8,6 +9,109 @@ import { createGenerationInput, generatePuzzle } from '@/core/sudoku/generation'
 import { KILLER_HARD_REGRESSION_SEEDS } from '../fixtures/generationCorpus'
 import { explainStep } from '@/core/sudoku/techniques'
 import { referenceCountSolutions } from '../support/referenceVariants'
+import { GENERATION_LATENCY_INPUTS } from '../fixtures/generationLatency'
+
+test('reports construction exhaustion without publishing a replacement puzzle at both roots', async ({
+  page,
+}) => {
+  // v7 corpus facts: Expert seed 010 reaches40 layouts; Killer Hard seed 059 spends all 4,000,000 work units.
+  for (const base of ['/', '/sudoku/'] as const) {
+    await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+    for (const [variant, difficulty, seed] of [
+      ['classic', 'expert', '010'],
+      ['killer', 'hard', '059'],
+    ] as const) {
+      const raw = await runWorker(
+        page,
+        {
+          kind: 'generate',
+          requestId: `exhausted-${variant}-${base}`,
+          input: createGenerationInput(variant, difficulty, `local-product-corpus-v1:seed:${seed}`),
+        },
+        base,
+      )
+
+      expect(raw).not.toHaveProperty('outcome.value')
+      expect(raw).not.toHaveProperty('outcome.assessment')
+      expect(parseWorkerResponse(raw)).toMatchObject({
+        valid: true,
+        value: {
+          kind: 'generate',
+          outcome: {
+            status: 'budget-exhausted',
+            message: 'No qualifying puzzle found within the generation limits',
+          },
+        },
+      })
+    }
+  }
+})
+
+test('delivers the slowest observed request from every type and tier within three seconds', async ({
+  page,
+  browser,
+}, testInfo) => {
+  const timings: {
+    base: string
+    variant: string
+    difficulty: string
+    seed: string
+    milliseconds: number
+  }[] = []
+  for (const base of ['/', '/sudoku/'] as const) {
+    await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+    for (const { variant, difficulty, seed, expectedStatus } of GENERATION_LATENCY_INPUTS) {
+      const started = performance.now()
+      const response = parseWorkerResponse(
+        await runWorker(
+          page,
+          {
+            kind: 'generate',
+            requestId: `latency-${variant}-${difficulty}-${base}`,
+            input: createGenerationInput(variant, difficulty, seed),
+          },
+          base,
+        ),
+      )
+      const milliseconds = performance.now() - started
+      timings.push({ base, variant, difficulty, seed, milliseconds })
+
+      expect(milliseconds, `${variant}/${difficulty}/${base}`).toBeLessThan(3000)
+      if (expectedStatus === 'completed') {
+        expect(response).toMatchObject({
+          valid: true,
+          value: {
+            kind: 'generate',
+            outcome: {
+              status: 'completed',
+              assessment: { status: 'rated', summary: { variant, difficulty } },
+            },
+          },
+        })
+      } else {
+        expect(response).toMatchObject({
+          valid: true,
+          value: { kind: 'generate', outcome: { status: 'budget-exhausted' } },
+        })
+        expect(response).not.toHaveProperty('value.outcome.value')
+        expect(response).not.toHaveProperty('value.outcome.assessment')
+      }
+    }
+  }
+  await testInfo.attach('all-type-worker-timings', {
+    body: JSON.stringify(timings),
+    contentType: 'application/json',
+  })
+  mkdirSync('.superpowers', { recursive: true })
+  writeFileSync(
+    `.superpowers/generation-worker-timings-${testInfo.project.name}.json`,
+    JSON.stringify(
+      { project: testInfo.project.name, browserVersion: browser.version(), timings },
+      null,
+      2,
+    ),
+  )
+})
 
 test('delivers a freshly constructed Killer Hard puzzle from the real Worker at both roots', async ({
   page,
@@ -60,8 +164,8 @@ test('delivers high-work regional corpus seeds within the production Worker time
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
     for (const [difficulty, seed] of [
-      ['medium', '019'],
-      ['hard', '020'],
+      ['medium', '006'],
+      ['hard', '010'],
     ] as const) {
       const started = performance.now()
       const response = parseWorkerResponse(

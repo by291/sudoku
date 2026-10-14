@@ -704,12 +704,16 @@ export function createSessionTransitions(
     }
 
     if (result.status !== 'completed') {
-      if (result.status !== 'cancelled') {
+      // Work-bound exhaustion repeats deterministically for the same input. A new choice
+      // can start a new request; timeout and transport failure still support identical retry.
+      if (result.status !== 'cancelled' && result.status !== 'budget-exhausted') {
         failedGeneration.value = { input, metadata, id }
       }
 
       if (result.status === 'timed-out') {
         error.value = '出题超时，请重试。'
+      } else if (result.status === 'budget-exhausted') {
+        error.value = '未能生成符合要求的题目，请重新选择。'
       } else if (result.status === 'cancelled') {
         error.value = '已取消出题。'
       } else {

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { TEMPLATES } from '@/core/sudoku/templates'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { analyzeLogic } from '@/core/sudoku/logic'
 import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
@@ -13,10 +13,10 @@ import { validateHintEvidence, parseHint } from '@/worker/hintEvidence'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 import { referenceRatingState } from '../../../tests/support/referenceRatingState'
 
-it('has a uniquely solvable authored Expert fallback requiring a deduction beyond Hard', () => {
-  const template = TEMPLATES.find((item) => item.difficulty === 'expert')
+it('has a uniquely solvable authored Expert fixture requiring a deduction beyond Hard', () => {
+  const template = CLASSIC_PUZZLE_FIXTURES.find((item) => item.difficulty === 'expert')
   if (!template) {
-    throw new Error('Missing Expert fallback')
+    throw new Error('Missing Expert fixture')
   }
   const rules = { kind: 'classic' } as const
   expect(referenceCountSolutions(template.givens, rules)).toEqual({
@@ -52,26 +52,24 @@ it('has a uniquely solvable authored Expert fallback requiring a deduction beyon
   }
 })
 
-it.each(['expert-fallback-a', 'expert-fallback-b', 'expert-fallback-c', 'expert-fallback-d'])(
-  'delivers a verified Expert fallback for %s',
+it.each(['expert-limited-a', 'expert-limited-b', 'expert-limited-c', 'expert-limited-d'])(
+  'does not substitute an authored Expert puzzle when layouts are exhausted for %s',
   (seed) => {
     const result = generatePuzzle(createGenerationInput('classic', 'expert', seed), {
       ...DEFAULT_GENERATION_LIMITS,
       maxLayouts: 0,
     })
     expect(result).toMatchObject({
-      status: 'ready',
-      source: 'fallback',
-      assessment: { difficulty: 'expert' },
-      puzzle: { difficulty: 'expert' },
+      status: 'budget-exhausted',
+      stage: 'construction',
     })
   },
 )
 
 it('validates every advanced proof against the actual replayed board and rejects forged domains', () => {
-  const template = TEMPLATES.find((item) => item.difficulty === 'expert')
+  const template = CLASSIC_PUZZLE_FIXTURES.find((item) => item.difficulty === 'expert')
   if (!template) {
-    throw new Error('Missing Expert fallback')
+    throw new Error('Missing Expert fixture')
   }
   const result = analyzeLogic(template.givens, RATING_POLICIES.classic.hard, 500)
   const hint = analyzeHint(result.board, template.solution, 500)

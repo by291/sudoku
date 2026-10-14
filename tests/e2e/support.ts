@@ -11,6 +11,20 @@ import type { NewSudokuVariant } from '@/core/sudoku/rules'
 
 export { expect }
 
+export async function useNextGenerationSeed(page: Page, seed: string) {
+  await page.evaluate((seed) => {
+    const original = crypto.randomUUID.bind(crypto)
+    Object.defineProperty(crypto, 'randomUUID', {
+      configurable: true,
+      value() {
+        // Fix only the next UI seed; later request and session identities remain independent.
+        Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: original })
+        return seed
+      },
+    })
+  }, seed)
+}
+
 export async function enterGameDigit(page: Page, digit: number) {
   const touchDigit = page.getByRole('button', { name: `输入数字${digit}`, exact: true })
   if (await touchDigit.isVisible()) {

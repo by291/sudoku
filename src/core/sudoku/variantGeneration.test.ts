@@ -5,6 +5,47 @@ import { createWorkBudget } from '@/core/sudoku/budget'
 import { compileRules } from '@/core/sudoku/rules'
 import { isComplete } from '@/core/sudoku/board'
 import { VARIANT_GENERATION_STRATEGIES } from '@/core/sudoku/generationStrategies'
+import { seededRandom } from '@/core/sudoku/random'
+import { solvedBoard } from '../../../tests/fixtures/sudoku'
+import { structureIssues } from '../../../tests/support/variantStructure'
+
+it.each(Array.from({ length: 8 }, (_, index) => `crowded-cage-${index}`))(
+  'avoids trapped singleton cages while preserving complete geometry for %s',
+  (seed) => {
+    const strategy = VARIANT_GENERATION_STRATEGIES.killer
+    const rules = { kind: 'killer' as const, cages: [] }
+    const budget = createWorkBudget(10000)
+
+    const geometry = strategy.createGeometry(rules, solvedBoard, seededRandom(seed), budget)
+
+    expect(geometry).not.toBeNull()
+    if (!geometry) {
+      throw new Error('Missing complete cage geometry')
+    }
+    expect(structureIssues(solvedBoard, geometry)).toEqual([])
+    expect(geometry.cages.filter((cage) => cage.cells.length === 1).length).toBeLessThanOrEqual(1)
+    expect(
+      strategy.createGeometry(rules, solvedBoard, seededRandom(seed), createWorkBudget(10000)),
+    ).toEqual(geometry)
+    expect(budget.used).toBeLessThanOrEqual(budget.limit)
+    expect(rules.cages).toEqual([])
+  },
+)
+
+it('discards incomplete cage geometry after exhausting a shared allowance', () => {
+  const budget = createWorkBudget(20)
+  budget.used = 10
+
+  const geometry = VARIANT_GENERATION_STRATEGIES.killer.createGeometry(
+    { kind: 'killer', cages: [] },
+    solvedBoard,
+    seededRandom('crowded-cage-0'),
+    budget,
+  )
+
+  expect(geometry).toBeNull()
+  expect(budget.used).toBeLessThanOrEqual(budget.limit)
+})
 
 it('advertises only rule-preserving digit transformations', () => {
   for (const [kind, strategy] of Object.entries(VARIANT_GENERATION_STRATEGIES)) {

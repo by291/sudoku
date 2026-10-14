@@ -8,6 +8,15 @@ import { isRecord } from '@/core/sudoku/types'
 import type { PuzzleRules } from '@/core/sudoku/rules'
 import type { AssessmentInput, AssessmentOutcome } from '@/core/sudoku/rating'
 
+const GENERATION_TIMEOUT_MILLISECONDS = 3000
+const COMPUTATION_TIMEOUT_MILLISECONDS = 15000
+
+interface PreparedWorker {
+  worker: Worker
+  failure: string | null
+  observeError: (event: ErrorEvent) => void
+}
+
 export interface SudokuWorkerClient {
   generate(input: GenerationInput, signal?: AbortSignal): Promise<GenerateOutcome>
   assess(input: AssessmentInput, signal?: AbortSignal): Promise<WorkerOutcome<AssessmentOutcome>>
@@ -20,14 +29,65 @@ export interface SudokuWorkerClient {
   dispose(): void
 }
 
+/** Owns idle and active Workers; dispose the client when its application runtime ends. */
 export function createSudokuWorkerClient(): SudokuWorkerClient {
   const cancellations = new Set<() => void>()
   let disposed = false
+  let preparedWorker: PreparedWorker | null = null
+  let preparationFailure: string | null = null
+
+  function createWorker(): Worker {
+    return new Worker(new URL('./sudoku.worker.ts', import.meta.url), { type: 'module' })
+  }
+
+  function prepareWorker() {
+    if (disposed || preparedWorker || preparationFailure) {
+      return
+    }
+
+    try {
+      const worker = createWorker()
+      const prepared: PreparedWorker = {
+        worker,
+        failure: null,
+        observeError(event) {
+          prepared.failure = event.message || 'Worker failed to start'
+          worker.terminate()
+        },
+      }
+      worker.addEventListener('error', prepared.observeError)
+      preparedWorker = prepared
+    } catch (error) {
+      preparationFailure = error instanceof Error ? error.message : 'Worker unavailable'
+    }
+  }
+
+  function takeWorker(): Worker {
+    const prepared = preparedWorker
+    preparedWorker = null
+    if (prepared) {
+      prepared.worker.removeEventListener('error', prepared.observeError)
+      if (prepared.failure) {
+        throw new Error(prepared.failure)
+      }
+
+      return prepared.worker
+    }
+
+    if (preparationFailure) {
+      const message = preparationFailure
+      preparationFailure = null
+      throw new Error(message)
+    }
+
+    return createWorker()
+  }
 
   function run<T>(
     request: WorkerRequest,
     decode: (value: unknown) => WorkerOutcome<T> | null,
     signal?: AbortSignal,
+    timeoutMilliseconds = COMPUTATION_TIMEOUT_MILLISECONDS,
   ): Promise<WorkerOutcome<T>> {
     if (disposed || signal?.aborted) {
       return Promise.resolve({ status: 'cancelled' })
@@ -36,17 +96,18 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
     return new Promise((resolve) => {
       let worker: Worker
       try {
-        worker = new Worker(new URL('./sudoku.worker.ts', import.meta.url), { type: 'module' })
+        worker = takeWorker()
       } catch (error) {
         resolve({
           status: 'failed',
           message: error instanceof Error ? error.message : 'Worker unavailable',
         })
+        prepareWorker()
 
         return
       }
       let settled = false
-      const timeout = window.setTimeout(() => finish({ status: 'timed-out' }), 15000)
+      const timeout = window.setTimeout(() => finish({ status: 'timed-out' }), timeoutMilliseconds)
       const cancel = () => finish({ status: 'cancelled' })
 
       function finish(outcome: WorkerOutcome<T>) {
@@ -63,6 +124,7 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
         cancellations.delete(cancel)
         worker.terminate()
         resolve(outcome)
+        prepareWorker()
       }
 
       function receive(event: MessageEvent<unknown>) {
@@ -93,6 +155,10 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
     })
   }
 
+  // Load one idle worker ahead of interaction to reduce cold startup within the job's deadline.
+  // It computes nothing before a validated request and remains owned by this client's disposal.
+  prepareWorker()
+
   return {
     generate(input, signal) {
       return run(
@@ -117,6 +183,7 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
           return outcome
         },
         signal,
+        GENERATION_TIMEOUT_MILLISECONDS,
       )
     },
     assess(input, signal) {
@@ -168,6 +235,12 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
     },
     dispose() {
       disposed = true
+      if (preparedWorker) {
+        preparedWorker.worker.removeEventListener('error', preparedWorker.observeError)
+        preparedWorker.worker.terminate()
+        preparedWorker = null
+      }
+      preparationFailure = null
 
       for (const cancel of [...cancellations]) {
         cancel()

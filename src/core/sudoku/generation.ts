@@ -9,8 +9,8 @@ import type { NewSudokuVariant, PuzzleRules, SudokuVariant } from '@/core/sudoku
 import { generateVariantPuzzle } from '@/core/sudoku/variantGeneration'
 import { supportsDifficulty } from '@/core/sudoku/difficulties'
 
-export const PUZZLE_VERSION = 'sudoku-v4'
-export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v4'
+export const PUZZLE_VERSION = 'sudoku-v7'
+export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v7'
 
 export type Puzzle = {
   givens: Board
@@ -68,19 +68,18 @@ export type GenerationLimits = {
   maxLayouts: number
   maxWork: number
   maxSteps: number
-  fallbackWork: number
 }
 
-export type GenerationMetrics = { constructionWork: number; fallbackWork: number; layouts: number }
+export type GenerationMetrics = { constructionWork: number; layouts: number }
 
 export type GenerationAttemptResult =
   | {
       status: 'ready'
       puzzle: Puzzle
-      source: 'generated' | 'fallback'
+      source: 'generated'
       assessment: DifficultyAssessment
     }
-  | { status: 'budget-exhausted'; stage: 'fallback-validation' }
+  | { status: 'budget-exhausted'; stage: 'construction' }
   | { status: 'failed'; reason: string }
 
 export type GenerationResult = GenerationAttemptResult & { metrics: Readonly<GenerationMetrics> }
@@ -129,19 +128,18 @@ export function parsePuzzle(value: unknown): ParseResult<Puzzle> {
 }
 
 export const DEFAULT_GENERATION_LIMITS: GenerationLimits = {
-  maxLayouts: 20,
-  maxWork: 1000000,
+  maxLayouts: 40,
+  maxWork: 4000000,
   maxSteps: 500,
-  fallbackWork: 1000000,
 }
 
 export function parseGenerationLimits(value: unknown): ParseResult<GenerationLimits> {
-  if (!isRecord(value) || Object.keys(value).length !== 4) {
-    return { valid: false, issues: ['Generation limits require exactly four known fields'] }
+  if (!isRecord(value) || Object.keys(value).length !== 3) {
+    return { valid: false, issues: ['Generation limits require exactly three known fields'] }
   }
 
   const limits = { ...DEFAULT_GENERATION_LIMITS }
-  for (const key of ['maxLayouts', 'maxWork', 'maxSteps', 'fallbackWork'] as const) {
+  for (const key of ['maxLayouts', 'maxWork', 'maxSteps'] as const) {
     const limit = value[key]
     if (
       typeof limit !== 'number' ||
@@ -161,7 +159,7 @@ export function generatePuzzle(
   input: GenerationInput,
   limits = DEFAULT_GENERATION_LIMITS,
 ): GenerationResult {
-  const metrics: GenerationMetrics = { constructionWork: 0, fallbackWork: 0, layouts: 0 }
+  const metrics: GenerationMetrics = { constructionWork: 0, layouts: 0 }
   const parsed = parseGenerationInput(input)
   const parsedLimits = parseGenerationLimits(limits)
   if (!parsed.valid) {

@@ -1,5 +1,13 @@
-import { analyzeLogic, applyLogicalStep, createLogicalWorkspace } from '@/core/sudoku/logic'
-import { isClassicTechnique, isAdvancedEvidence } from '@/core/sudoku/techniques'
+import {
+  analyzeLogicalWorkspace,
+  applyLogicalStep,
+  createLogicalWorkspace,
+} from '@/core/sudoku/logic'
+import {
+  isClassicTechnique,
+  isAdvancedEvidence,
+  ALL_CLASSIC_TECHNIQUES,
+} from '@/core/sudoku/techniques'
 import { supportedDifficulties, supportsDifficulty } from '@/core/sudoku/difficulties'
 import type { LogicalStep, Technique } from '@/core/sudoku/techniques'
 import { RATING_POLICIES, RATING_VERSION, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
@@ -73,7 +81,7 @@ export type AssessmentIdentity = { variant: SudokuVariant; difficulty: Difficult
 
 export const DEFAULT_ASSESSMENT_LIMITS: Readonly<AssessmentLimits> = {
   maxSteps: 500,
-  maxWork: DEFAULT_WORK_LIMIT,
+  maxWork: DEFAULT_WORK_LIMIT * 4,
 }
 
 export function createAssessmentInput(
@@ -250,7 +258,7 @@ export function summarizeLogicalTrace(
   }
 }
 
-/** Uses fresh policy workspaces and one bounded budget; does not establish uniqueness. */
+/** Uses isolated request state and one bounded budget; does not establish uniqueness. */
 export function assessPuzzle(input: AssessmentInput): AssessmentResult {
   const parsed = parseAssessmentInput(input)
   if (!parsed.valid) {
@@ -299,13 +307,28 @@ function assessSnapshot(snapshot: AssessmentInput, budget: WorkBudget): Assessme
     return { status: 'budget-exhausted', ...identity, stage: 'validation', difficulty: null }
   }
 
+  let workspace = createLogicalWorkspace(snapshot.board, context)
+  let previousOrder: readonly Technique[] = []
+  let previousSteps: readonly LogicalStep[] = []
+
   for (const difficulty of supportedDifficulties(identity.variant)) {
-    // Failed policy state and trace are discarded; only its consumed work carries forward.
-    const result = analyzeLogic(
-      snapshot.board,
-      RATING_POLICIES[identity.variant][difficulty],
+    const policy = RATING_POLICIES[identity.variant][difficulty]
+    const order =
+      identity.variant === 'classic'
+        ? ALL_CLASSIC_TECHNIQUES.filter((technique) => policy.includes(technique))
+        : policy
+    // A higher policy repeats the same deterministic deductions until its added techniques
+    // become necessary. Changed priorities invalidate that prefix and require a fresh state.
+    if (!previousOrder.every((technique, index) => order[index] === technique)) {
+      workspace = createLogicalWorkspace(snapshot.board, context)
+      previousSteps = []
+    }
+    const result = analyzeLogicalWorkspace(
+      workspace,
+      policy,
       snapshot.limits.maxSteps,
-      { context, workBudget: budget },
+      budget,
+      previousSteps,
     )
     if (result.status === 'budget-exhausted') {
       return { status: 'budget-exhausted', ...identity, stage: 'logic', difficulty }
@@ -322,6 +345,8 @@ function assessSnapshot(snapshot: AssessmentInput, budget: WorkBudget): Assessme
         trace: result.steps,
       }
     }
+    previousOrder = order
+    previousSteps = result.steps
   }
 
   return { status: 'ungraded', ...identity }

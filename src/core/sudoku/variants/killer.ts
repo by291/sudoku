@@ -71,6 +71,15 @@ export const KILLER_RULE_DEFINITION: VariantRuleDefinition<'killer'> = {
 }
 
 const CELL_INDICES = Array.from({ length: 81 }, (_, cell) => cell)
+const CELL_NEIGHBOURS = CELL_INDICES.map((cell) =>
+  CELL_INDICES.filter((other) => cellsTouch(cell, other, false)),
+)
+const MIN_GENERATED_CAGE_SIZE = 2
+const MAX_GENERATED_CAGE_SIZE = 4
+
+function unusedNeighbourCount(cell: number, remaining: ReadonlySet<number>): number {
+  return CELL_NEIGHBOURS[cell].filter((other) => remaining.has(other)).length
+}
 
 export const KILLER_GENERATION_STRATEGY: VariantGenerationStrategy<'killer'> = {
   allowsDigitMap: false,
@@ -85,26 +94,55 @@ export const KILLER_GENERATION_STRATEGY: VariantGenerationStrategy<'killer'> = {
         return null
       }
 
-      const first = remaining.values().next().value
+      let first: number | undefined
+      let fewestOpenSides = Infinity
+      // Grow out of narrow corners first. Random starting cells can seal off several
+      // neighbours, forcing singleton cages which disclose digits and simplify the puzzle.
+      for (const cell of remaining) {
+        if (!consumeWork(budget)) {
+          return null
+        }
+        const openSides = unusedNeighbourCount(cell, remaining)
+        if (openSides < fewestOpenSides) {
+          first = cell
+          fewestOpenSides = openSides
+        }
+      }
       if (first === undefined) {
-        break
+        throw new Error('Missing unused cage cell')
       }
 
       const cells = [first]
       remaining.delete(first)
-      const size = 2 + Math.floor(random() * 3)
+      const size =
+        MIN_GENERATED_CAGE_SIZE +
+        Math.floor(random() * (MAX_GENERATED_CAGE_SIZE - MIN_GENERATED_CAGE_SIZE + 1))
 
       while (cells.length < size) {
-        const choices = [...remaining].filter(
-          (cell) =>
-            cells.some((other) => cellsTouch(cell, other, false)) &&
-            !cells.some((other) => solution[other] === solution[cell]),
-        )
+        const choices: number[] = []
+        const crowded: number[] = []
+        for (const cell of remaining) {
+          if (!consumeWork(budget)) {
+            return null
+          }
+          if (
+            !cells.some((other) => CELL_NEIGHBOURS[other].includes(cell)) ||
+            cells.some((other) => solution[other] === solution[cell])
+          ) {
+            continue
+          }
+          choices.push(cell)
+          if (unusedNeighbourCount(cell, remaining) <= 1) {
+            crowded.push(cell)
+          }
+        }
         if (!choices.length) {
           break
         }
 
-        const next = choices[Math.floor(random() * choices.length)]
+        // Absorb a neighbour about to lose its last free connection before other choices.
+        const eligible = crowded.length ? crowded : choices
+        const next = eligible[Math.floor(random() * eligible.length)]
         cells.push(next)
         remaining.delete(next)
       }

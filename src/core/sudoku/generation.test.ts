@@ -5,8 +5,9 @@ import {
   parseGenerationInput,
   parseGenerationLimits,
   PUZZLE_VERSION,
+  DEFAULT_GENERATION_LIMITS,
 } from '@/core/sudoku/generation'
-import { TEMPLATES } from '@/core/sudoku/templates'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { analyzeLogic } from '@/core/sudoku/logic'
 import { ALL_CLASSIC_TECHNIQUES, TECHNIQUES } from '@/core/sudoku/techniques'
@@ -15,8 +16,8 @@ import { isComplete } from '@/core/sudoku/board'
 import type { Difficulty } from '@/core/sudoku/types'
 import { countIntercalates } from '../../../tests/support/terminalDiversity'
 
-it.each(TEMPLATES)(
-  'verifies the frozen $difficulty template independently',
+it.each(CLASSIC_PUZZLE_FIXTURES)(
+  'verifies the authored $difficulty fixture independently',
   ({ givens, solution, difficulty }) => {
     expect(countReferenceSolutions(givens, 2)).toBe(1)
     expect(isComplete(solution)).toBe(true)
@@ -63,42 +64,37 @@ it.each(
     ),
   ).toBe(true)
 })
-it('falls back deterministically only after verifying its transformed template', () => {
+it('returns reproducible construction exhaustion without substituting an authored puzzle', () => {
   const input = {
     variant: 'classic',
-    seed: 'fallback',
+    seed: 'exhausted',
     difficulty: 'hard',
     puzzleVersion: PUZZLE_VERSION,
   } satisfies Parameters<typeof generatePuzzle>[0]
-  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500, fallbackWork: 1000000 }
+  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500 }
   const result = generatePuzzle(input, limits)
 
-  expect(result).toMatchObject({ status: 'ready', source: 'fallback' })
-  expect(generatePuzzle(input, limits)).toEqual(result)
-  if (result.status === 'ready') {
-    expect(countReferenceSolutions(result.puzzle.givens, 2)).toBe(1)
-  }
-
-  expect(generatePuzzle(input, { ...limits, fallbackWork: 0 })).toEqual({
+  expect(result).toEqual({
     status: 'budget-exhausted',
-    stage: 'fallback-validation',
-    metrics: { constructionWork: 0, fallbackWork: 0, layouts: 0 },
+    stage: 'construction',
+    metrics: { constructionWork: 0, layouts: 0 },
   })
+  expect(generatePuzzle(input, limits)).toEqual(result)
 })
 
 it('uses only current generation versions and returns an accepted assessment', () => {
   const input = createGenerationInput('classic', 'easy', 'current-generation')
-  expect(input.puzzleVersion).toBe('sudoku-v4')
+  expect(input.puzzleVersion).toBe('sudoku-v7')
   for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
     expect(createGenerationInput(variant, 'easy', 'current-generation').puzzleVersion).toBe(
-      'sudoku-variants-v4',
+      'sudoku-variants-v7',
     )
   }
   const killerInput = createGenerationInput('killer', 'hard', 'current-generation')
 
-  expect(killerInput.puzzleVersion).toBe('sudoku-variants-v4')
+  expect(killerInput.puzzleVersion).toBe('sudoku-variants-v7')
   expect(parseGenerationInput(killerInput)).toEqual({ valid: true, value: killerInput })
-  expect(parseGenerationInput({ ...killerInput, puzzleVersion: 'sudoku-variants-v3' }).valid).toBe(
+  expect(parseGenerationInput({ ...killerInput, puzzleVersion: 'sudoku-variants-v6' }).valid).toBe(
     false,
   )
   expect(parseGenerationInput({ ...input, puzzleVersion: 'sudoku-v1' }).valid).toBe(false)
@@ -111,7 +107,7 @@ it('uses only current generation versions and returns an accepted assessment', (
 })
 
 it('validates exact current work limits without accepting historical field names', () => {
-  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500, fallbackWork: 1000000 }
+  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500 }
 
   expect(parseGenerationLimits(limits)).toEqual({ valid: true, value: limits })
   expect(parseGenerationLimits({ ...limits, maxWork: Infinity }).valid).toBe(false)
@@ -125,6 +121,19 @@ it('validates exact current work limits without accepting historical field names
     }).valid,
   ).toBe(false)
   expect(parseGenerationLimits({ ...limits, extra: 0 }).valid).toBe(false)
+  expect(parseGenerationLimits({ ...limits, fallbackWork: 1000000 }).valid).toBe(false)
+})
+
+it('uses only construction limits for every type and retains the logical step ceiling', () => {
+  expect(DEFAULT_GENERATION_LIMITS).toEqual({
+    maxLayouts: 40,
+    maxWork: 4000000,
+    maxSteps: 500,
+  })
+  expect(parseGenerationLimits(DEFAULT_GENERATION_LIMITS).valid).toBe(true)
+  expect(parseGenerationLimits({ ...DEFAULT_GENERATION_LIMITS, maxWork: 4000001 }).valid).toBe(
+    false,
+  )
 })
 
 it('delivers generated puzzles from independently different terminal classes', () => {
@@ -144,12 +153,12 @@ it('delivers generated puzzles from independently different terminal classes', (
   expect(counts.size).toBeGreaterThan(1)
 })
 
-it('never delivers a puzzle when fallback assessment cannot finish', () => {
-  const input = createGenerationInput('classic', 'hard', 'incomplete-fallback')
+it('never delivers a puzzle when construction assessment cannot finish', () => {
+  const input = createGenerationInput('classic', 'hard', 'incomplete-assessment')
 
   expect(
-    generatePuzzle(input, { maxLayouts: 0, maxWork: 0, maxSteps: 0, fallbackWork: 1000000 }),
-  ).toMatchObject({ status: 'budget-exhausted', stage: 'fallback-validation' })
+    generatePuzzle(input, { ...DEFAULT_GENERATION_LIMITS, maxLayouts: 1, maxSteps: 0 }),
+  ).toMatchObject({ status: 'budget-exhausted', stage: 'construction' })
 })
 it('rejects unsupported generation versions rather than silently changing the rules', () => {
   expect(

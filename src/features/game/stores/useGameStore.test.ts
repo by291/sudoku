@@ -210,3 +210,31 @@ it('retries a failed generation with the identical seed and metadata', async () 
   game.dispose()
   test.dispose()
 })
+
+it('reports deterministic generation exhaustion while keeping the old save and requiring a new request', async () => {
+  const test = await createTestRuntime()
+  const original = makeSession()
+  await test.database.put('sessions', { formatVersion: 2, revision: 1, session: original })
+  test.runtime.worker.generate = async () => ({
+    status: 'budget-exhausted',
+    message: 'No qualifying puzzle found within the generation limits',
+  })
+  const game = test.app.runWithContext(() => useGameStore(test.pinia))
+  await game.restoreSession(original.id)
+
+  const outcome = await game.startGame(createGenerationInput('classic', 'hard', 'exhausted'), {
+    kind: 'free',
+  })
+
+  expect(outcome).toEqual({ status: 'blocked', reason: 'generation' })
+  expect(game.error).toBe('未能生成符合要求的题目，请重新选择。')
+  expect(game.canRetryGeneration).toBe(false)
+  expect(game.session?.id).toBe(original.id)
+  expect(game.session?.puzzle).toEqual(original.puzzle)
+  expect(await test.database.get('sessions', original.id)).toMatchObject({
+    session: { puzzle: original.puzzle },
+  })
+  expect(await test.database.count('sessions')).toBe(1)
+  game.dispose()
+  test.dispose()
+})

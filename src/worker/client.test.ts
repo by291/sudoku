@@ -50,6 +50,49 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+it('prepares one idle worker without starting the request timeout or computing a puzzle', async () => {
+  const client = createSudokuWorkerClient()
+
+  expect(FakeWorker.instances).toHaveLength(1)
+  const prepared = latestWorker()
+  await vi.advanceTimersByTimeAsync(5000)
+
+  expect(prepared.requests).toEqual([])
+  expect(prepared.terminated).toBe(false)
+  const pending = client.generate(input)
+
+  expect(FakeWorker.instances).toHaveLength(1)
+  expect(prepared.requests[0]).toMatchObject({ kind: 'generate', input })
+  await vi.advanceTimersByTimeAsync(3000)
+
+  expect(await pending).toEqual({ status: 'timed-out' })
+  expect(prepared.terminated).toBe(true)
+  expect(FakeWorker.instances).toHaveLength(2)
+  expect(latestWorker().requests).toEqual([])
+  client.dispose()
+
+  expect(FakeWorker.instances.every((worker) => worker.terminated)).toBe(true)
+})
+
+it('reports an idle worker startup failure and prepares a fresh worker for retry', async () => {
+  const client = createSudokuWorkerClient()
+  const prepared = latestWorker()
+  prepared.dispatchEvent(new ErrorEvent('error', { message: 'Worker script unavailable' }))
+
+  expect(prepared.terminated).toBe(true)
+  expect(await client.generate(input)).toEqual({
+    status: 'failed',
+    message: 'Worker script unavailable',
+  })
+  const retry = client.generate(input)
+
+  expect(latestWorker().requests[0]).toMatchObject({ kind: 'generate', input })
+  client.dispose()
+
+  expect(await retry).toEqual({ status: 'cancelled' })
+  expect(FakeWorker.instances.every((worker) => worker.terminated)).toBe(true)
+})
+
 it('assesses with the same timeout, stale reply fence, cancellation, and disposal', async () => {
   const client = createSudokuWorkerClient()
   const assessmentInput = createAssessmentInput(uniqueBoard, { kind: 'classic' })
@@ -110,19 +153,19 @@ it('rejects assessment identities that differ from the submitted rules', async (
   expect(worker.terminated).toBe(true)
   client.dispose()
 })
-it('terminates work after the exact timeout without changing retry input', async () => {
+it('terminates generation after three seconds without changing retry input', async () => {
   const client = createSudokuWorkerClient()
   const pending = client.generate(input)
 
   expect(FakeWorker.instances).toHaveLength(1)
   const first = latestWorker()
-  await vi.advanceTimersByTimeAsync(14999)
+  await vi.advanceTimersByTimeAsync(2999)
 
   expect(first.terminated).toBe(false)
   await vi.advanceTimersByTimeAsync(1)
 
-  expect(await pending).toEqual({ status: 'timed-out' })
   expect(first.terminated).toBe(true)
+  expect(await pending).toEqual({ status: 'timed-out' })
   const retry = client.generate(input)
 
   expect(latestWorker().requests[0]).toMatchObject({ kind: 'generate', input })
@@ -204,12 +247,13 @@ it('retains cancellation and timeout outcomes for variants', async () => {
   const controller = new AbortController()
   const fixture = VARIANT_FIXTURES.arrow
   const hint = client.hint(fixture.givens, fixture.solution, fixture.rules, controller.signal)
+  const hintWorker = latestWorker()
 
-  expect(latestWorker().requests[0]).toMatchObject({ rules: fixture.rules })
+  expect(hintWorker.requests[0]).toMatchObject({ rules: fixture.rules })
   controller.abort()
 
   expect(await hint).toEqual({ status: 'cancelled' })
-  expect(latestWorker().terminated).toBe(true)
+  expect(hintWorker.terminated).toBe(true)
   client.dispose()
 })
 

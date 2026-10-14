@@ -20,6 +20,16 @@ test('rejects a pre-restore Worker result when reset broadcasting is unavailable
 }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, 'BroadcastChannel', { configurable: true, value: undefined })
+    const originalTimeout = window.setTimeout.bind(window)
+    Object.defineProperty(window, 'setTimeout', {
+      configurable: true,
+      value(handler: TimerHandler, milliseconds?: number, ...arguments_: unknown[]) {
+        // This fixture holds generation across a peer restore to test epoch fencing.
+        // Normal three-second interruption is verified separately in generation-loading.spec.ts.
+        const delay = milliseconds === 3000 ? 60000 : milliseconds
+        return originalTimeout(handler, delay, ...arguments_)
+      },
+    })
     const OriginalWorker = window.Worker
     window.Worker = class extends OriginalWorker {
       postMessage(message: unknown) {

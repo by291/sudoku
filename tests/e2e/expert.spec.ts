@@ -9,14 +9,14 @@ import {
   selectGameMenuAction,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
-import { TEMPLATES } from '@/core/sudoku/templates'
+import { CLASSIC_PUZZLE_FIXTURES } from '../fixtures/classicPuzzles'
 import { PUZZLE_VERSION, createGenerationInput } from '@/core/sudoku/generation'
 import { analyzeLogic } from '@/core/sudoku/logic'
 import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
 import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import { runWorker } from './workerHarness'
 
-const authored = TEMPLATES.find((template) => template.difficulty === 'expert')
+const authored = CLASSIC_PUZZLE_FIXTURES.find((template) => template.difficulty === 'expert')
 if (!authored) {
   throw new Error('Missing Expert fixture')
 }

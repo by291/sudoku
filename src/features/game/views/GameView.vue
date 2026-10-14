@@ -20,6 +20,7 @@ import HintPanel from '@/features/game/components/HintPanel.vue'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
 import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
 import GameSettingsDialog from '@/features/game/components/GameSettingsDialog.vue'
+import GenerationStatus from '@/features/game/components/GenerationStatus.vue'
 import { useGameEntry } from '@/features/game/composables/useGameEntry'
 
 const props = withDefaults(
@@ -89,6 +90,7 @@ const {
 } = entry
 
 const settingsOpen = ref(false)
+const generating = computed(() => phase.value === 'generating')
 const inputEditable = computed(
   () =>
     editable.value &&
@@ -98,6 +100,10 @@ const inputEditable = computed(
 const selectionMessage = computed(() => {
   if (readOnly.value) {
     return '当前为只读状态，请先取得编辑权。'
+  }
+
+  if (generating.value) {
+    return '正在生成题目，请稍候。'
   }
 
   if (phase.value === 'paused') {
@@ -283,9 +289,9 @@ function erase() {
       <NButton v-if="canRetryGeneration" @click="retryGeneration">重试出题</NButton>
     </NAlert>
     <p v-if="!ready" role="status">正在读取存档…</p>
-    <NCard v-if="phase === 'generating'" class="feedback-message" size="small" role="status">
-      正在为你准备一道有唯一解的题目… <NButton @click="game.cancelLoading">取消出题</NButton>
-    </NCard>
+    <GenerationStatus v-if="generating && !setupOpen" class="generation-feedback">
+      <NButton @click="game.cancelLoading">取消出题</NButton>
+    </GenerationStatus>
     <template v-if="active && session">
       <NAlert
         v-if="conflictEvaluation.status === 'budget-exhausted'"
@@ -355,6 +361,7 @@ function erase() {
             :editable="editable"
             :input-editable="inputEditable"
             :selection-message="selectionMessage"
+            :announce-selection="!generating"
             :note-mode="noteMode"
             :can-undo="canUndo"
             :can-redo="canRedo"
@@ -436,6 +443,7 @@ function erase() {
       v-model:difficulty="difficulty"
       :saved-session="targetSession?.session"
       :busy="targetLoading"
+      :generating="generating"
       :error="initializationError"
       @cancel="setupOpen = false"
       @start="startSelected"
@@ -467,6 +475,10 @@ function erase() {
 <style scoped>
 .game-page {
   padding-top: 16px;
+}
+.generation-feedback {
+  max-width: 640px;
+  margin: 16px auto;
 }
 .rule-summary {
   color: var(--muted);

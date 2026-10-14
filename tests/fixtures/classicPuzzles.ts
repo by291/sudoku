@@ -1,11 +1,11 @@
 import { parseBoard } from '@/core/sudoku/board'
 import type { Board, Difficulty } from '@/core/sudoku/types'
 
-export type PuzzleTemplate = { difficulty: Difficulty; givens: Board; solution: Board }
+export type ClassicPuzzleFixture = { difficulty: Difficulty; givens: Board; solution: Board }
 function literalBoard(text: string): Board {
   const parsed = parseBoard(Array.from(text, Number))
   if (!parsed.valid) {
-    throw new Error(`Invalid template: ${parsed.issues.join('; ')}`)
+    throw new Error(`Invalid fixture: ${parsed.issues.join('; ')}`)
   }
 
   return parsed.value
@@ -14,9 +14,9 @@ function literalBoard(text: string): Board {
 const solution = literalBoard(
   '534678912672195348198342567859761423426853791713924856961537284287419635345286179',
 )
-// Authored fallback fixtures, independently unique. Medium requires locked candidates;
+// Authored grading fixtures, independently unique. Medium requires locked candidates;
 // Hard additionally requires the row-4 pair {2, 4} in cells 33 and 34.
-export const TEMPLATES: readonly PuzzleTemplate[] = [
+export const CLASSIC_PUZZLE_FIXTURES: readonly ClassicPuzzleFixture[] = [
   {
     difficulty: 'easy',
     solution,

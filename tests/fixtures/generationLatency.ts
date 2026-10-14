@@ -1,0 +1,117 @@
+// Slowest observed v7 requests in the fixed 1,216-request corpus, including explicit exhaustion.
+export const GENERATION_LATENCY_INPUTS = [
+  {
+    variant: 'classic',
+    difficulty: 'easy',
+    seed: 'local-product-corpus-v1:seed:000',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'classic',
+    difficulty: 'medium',
+    seed: 'local-product-corpus-v1:seed:050',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'classic',
+    difficulty: 'hard',
+    seed: 'local-product-corpus-v1:seed:011',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'classic',
+    difficulty: 'expert',
+    seed: 'local-product-corpus-v1:seed:010',
+    expectedStatus: 'budget-exhausted',
+  },
+  {
+    variant: 'diagonal',
+    difficulty: 'easy',
+    seed: 'local-product-corpus-v1:seed:000',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'diagonal',
+    difficulty: 'medium',
+    seed: 'local-product-corpus-v1:seed:030',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'diagonal',
+    difficulty: 'hard',
+    seed: 'local-product-corpus-v1:seed:025',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'jigsaw',
+    difficulty: 'easy',
+    seed: 'local-product-corpus-v1:seed:058',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'jigsaw',
+    difficulty: 'medium',
+    seed: 'local-product-corpus-v1:seed:004',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'jigsaw',
+    difficulty: 'hard',
+    seed: 'local-product-corpus-v1:seed:056',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'killer',
+    difficulty: 'easy',
+    seed: 'local-product-corpus-v1:seed:001',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'killer',
+    difficulty: 'medium',
+    seed: 'local-product-corpus-v1:seed:046',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'killer',
+    difficulty: 'hard',
+    seed: 'local-product-corpus-v1:seed:027',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'thermo',
+    difficulty: 'easy',
+    seed: 'local-product-corpus-v1:seed:021',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'thermo',
+    difficulty: 'medium',
+    seed: 'local-product-corpus-v1:seed:007',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'thermo',
+    difficulty: 'hard',
+    seed: 'local-product-corpus-v1:seed:048',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'arrow',
+    difficulty: 'easy',
+    seed: 'local-product-corpus-v1:seed:060',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'arrow',
+    difficulty: 'medium',
+    seed: 'local-product-corpus-v1:seed:063',
+    expectedStatus: 'completed',
+  },
+  {
+    variant: 'arrow',
+    difficulty: 'hard',
+    seed: 'local-product-corpus-v1:seed:042',
+    expectedStatus: 'completed',
+  },
+] as const

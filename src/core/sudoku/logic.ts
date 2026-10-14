@@ -342,7 +342,23 @@ export function analyzeLogic(
 ): LogicResult {
   const state = createLogicalWorkspace(board, options?.context)
   const budget = options?.workBudget ?? createWorkBudget(DEFAULT_WORK_LIMIT)
-  const steps: LogicalStep[] = []
+
+  return analyzeLogicalWorkspace(state, allowed, stepBudget, budget)
+}
+
+/**
+ * Mutates a caller-owned workspace. Prior steps must describe that workspace; the step
+ * limit includes them. The returned board aliases the workspace; the trace is copied.
+ * Callers may resume only when technique priorities retain the prefix.
+ */
+export function analyzeLogicalWorkspace(
+  state: LogicalWorkspace,
+  allowed: readonly Technique[],
+  stepBudget: number,
+  budget: WorkBudget,
+  previousSteps: readonly LogicalStep[] = [],
+): LogicResult {
+  const steps = [...previousSteps]
 
   while (!isComplete(state.board, state.context)) {
     if (steps.length >= stepBudget) {

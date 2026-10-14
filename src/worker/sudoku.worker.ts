@@ -37,7 +37,10 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
                 assessment: { status: 'rated', summary: result.assessment },
               }
             : result.status === 'budget-exhausted'
-              ? { status: 'budget-exhausted', message: 'Fallback verification budget exhausted' }
+              ? {
+                  status: 'budget-exhausted',
+                  message: 'No qualifying puzzle found within the generation limits',
+                }
               : { status: 'failed', message: result.reason },
       }
     } else if (request.kind === 'assess') {

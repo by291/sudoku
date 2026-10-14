@@ -30,7 +30,8 @@ function tiers(
   })
   return { easy: [make('easy')], medium: [make('medium')], hard: [make('hard')], expert: [] }
 }
-// Original fixtures authored for this project; uniqueness is independently checked in tests.
+// Authored teaching/grading examples and region presets. Generation never delivers these boards.
+// Their uniqueness is independently checked in tests.
 // Difficulty follows the explained rule-aware trace, and removing variant rules changes solvability.
 const diagonalRules: PuzzleRules = { kind: 'diagonal' }
 const diagonalSolution = literalBoard(

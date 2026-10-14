@@ -12,12 +12,12 @@ import { compileRules } from '@/core/sudoku/rules'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { TEMPLATES } from '@/core/sudoku/templates'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
 
 const propagationFixtures = [
-  ...TEMPLATES.filter((fixture) => ['hard', 'expert'].includes(fixture.difficulty)).map(
-    (fixture) => ({ ...fixture, rules: { kind: 'classic' as const } }),
-  ),
+  ...CLASSIC_PUZZLE_FIXTURES.filter((fixture) =>
+    ['hard', 'expert'].includes(fixture.difficulty),
+  ).map((fixture) => ({ ...fixture, rules: { kind: 'classic' as const } })),
   ...Object.values(VARIANT_TEMPLATES).map((tiers) => tiers.hard[0]),
 ]
 

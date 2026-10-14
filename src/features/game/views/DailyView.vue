@@ -96,6 +96,7 @@ const challengeRules =
         mode="daily"
         :statuses="statuses"
         :busy="switching || statusesLoading"
+        :generating="game.phase === 'generating'"
         :error="localError"
         @cancel="setupOpen = false"
         @start="start()"

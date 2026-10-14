@@ -1,0 +1,1203 @@
+{
+  "reportVersion": "killer-guided-generation-v1",
+  "baselineCommit": "80cb17f",
+  "corpusVersion": "local-product-corpus-v1",
+  "seeds": [
+    "local-product-corpus-v1:seed:000",
+    "local-product-corpus-v1:seed:001",
+    "local-product-corpus-v1:seed:002",
+    "local-product-corpus-v1:seed:003",
+    "local-product-corpus-v1:seed:004",
+    "local-product-corpus-v1:seed:005",
+    "local-product-corpus-v1:seed:006",
+    "local-product-corpus-v1:seed:007",
+    "local-product-corpus-v1:seed:008",
+    "local-product-corpus-v1:seed:009",
+    "local-product-corpus-v1:seed:010",
+    "local-product-corpus-v1:seed:011",
+    "local-product-corpus-v1:seed:012",
+    "local-product-corpus-v1:seed:013",
+    "local-product-corpus-v1:seed:014",
+    "local-product-corpus-v1:seed:015",
+    "local-product-corpus-v1:seed:016",
+    "local-product-corpus-v1:seed:017",
+    "local-product-corpus-v1:seed:018",
+    "local-product-corpus-v1:seed:019",
+    "local-product-corpus-v1:seed:020",
+    "local-product-corpus-v1:seed:021",
+    "local-product-corpus-v1:seed:022",
+    "local-product-corpus-v1:seed:023",
+    "local-product-corpus-v1:seed:024",
+    "local-product-corpus-v1:seed:025",
+    "local-product-corpus-v1:seed:026",
+    "local-product-corpus-v1:seed:027",
+    "local-product-corpus-v1:seed:028",
+    "local-product-corpus-v1:seed:029",
+    "local-product-corpus-v1:seed:030",
+    "local-product-corpus-v1:seed:031",
+    "local-product-corpus-v1:seed:032",
+    "local-product-corpus-v1:seed:033",
+    "local-product-corpus-v1:seed:034",
+    "local-product-corpus-v1:seed:035",
+    "local-product-corpus-v1:seed:036",
+    "local-product-corpus-v1:seed:037",
+    "local-product-corpus-v1:seed:038",
+    "local-product-corpus-v1:seed:039",
+    "local-product-corpus-v1:seed:040",
+    "local-product-corpus-v1:seed:041",
+    "local-product-corpus-v1:seed:042",
+    "local-product-corpus-v1:seed:043",
+    "local-product-corpus-v1:seed:044",
+    "local-product-corpus-v1:seed:045",
+    "local-product-corpus-v1:seed:046",
+    "local-product-corpus-v1:seed:047",
+    "local-product-corpus-v1:seed:048",
+    "local-product-corpus-v1:seed:049",
+    "local-product-corpus-v1:seed:050",
+    "local-product-corpus-v1:seed:051",
+    "local-product-corpus-v1:seed:052",
+    "local-product-corpus-v1:seed:053",
+    "local-product-corpus-v1:seed:054",
+    "local-product-corpus-v1:seed:055",
+    "local-product-corpus-v1:seed:056",
+    "local-product-corpus-v1:seed:057",
+    "local-product-corpus-v1:seed:058",
+    "local-product-corpus-v1:seed:059",
+    "local-product-corpus-v1:seed:060",
+    "local-product-corpus-v1:seed:061",
+    "local-product-corpus-v1:seed:062",
+    "local-product-corpus-v1:seed:063"
+  ],
+  "previousVersions": {
+    "classic": "sudoku-v4",
+    "variants": "sudoku-variants-v4",
+    "assessment": "sudoku-rating-v2"
+  },
+  "currentVersions": {
+    "classic": "sudoku-v5",
+    "variants": "sudoku-variants-v5",
+    "assessment": "sudoku-rating-v2"
+  },
+  "limits": {
+    "maxLayouts": 20,
+    "maxWork": 1000000,
+    "maxSteps": 500,
+    "fallbackWork": 1000000
+  },
+  "workerTimeoutMilliseconds": 15000,
+  "host": {
+    "platform": "win32",
+    "release": "10.0.26300",
+    "node": "v26.10.0",
+    "cpu": "Intel(R) Core(TM) Ultra 9 285K"
+  },
+  "percentileMethod": "Sorted zero-based index min(n-1, floor(n*p)); same convention as the preceding report.",
+  "interpretation": "Paired Killer Hard uses identical v5 requests in sequential phases in one process. Whole-corpus v4/v5 comparisons include changed layouts and seed streams. All timings are host- and run-specific.",
+  "previous": {
+    "requests": 1216,
+    "ready": 1216,
+    "generated": 1163,
+    "fallback": 53,
+    "milliseconds": {
+      "median": 39.980200000005425,
+      "p95": 320.70560000000114,
+      "max": 3828.1849,
+      "total": 111452.11949999994
+    },
+    "terminalFamilyLowerBound": 32,
+    "canonicalGeometries": 556,
+    "maxConstructionWork": 1000000,
+    "maxFallbackWork": 24664
+  },
+  "current": {
+    "requests": 1216,
+    "ready": 1216,
+    "generated": 1182,
+    "fallback": 34,
+    "milliseconds": {
+      "median": 32.97380000000703,
+      "p95": 287.65690000000177,
+      "max": 4666.124000000003,
+      "total": 111641.16750000003
+    },
+    "terminalFamilyLowerBound": 30,
+    "canonicalGeometries": 572,
+    "maxConstructionWork": 1000000,
+    "maxFallbackWork": 16500
+  },
+  "comparison": [
+    {
+      "variant": "classic",
+      "difficulty": "easy",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 12.165899999999965,
+          "p95": 15.22539999999998,
+          "max": 26.662500000000023,
+          "total": 813.0160999999998
+        },
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 9700,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 12.755699999999933,
+          "p95": 16.544399999999996,
+          "max": 25.406300000000016,
+          "total": 850.2845000000008
+        },
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 13006,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "medium",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 65.92740000000003,
+          "p95": 243.9378999999999,
+          "max": 415.04359999999997,
+          "total": 5142.841800000004
+        },
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 441495,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 54.37109999999984,
+          "p95": 184.64600000000019,
+          "max": 342.1714000000002,
+          "total": 4643.996700000003
+        },
+        "terminalFamilyLowerBound": 21,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 328296,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "hard",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 58,
+        "fallback": 6,
+        "milliseconds": {
+          "median": 156.01380000000063,
+          "p95": 410.5211999999992,
+          "max": 427.8251999999993,
+          "total": 11176.536699999997
+        },
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 446697,
+        "maxFallbackWork": 539
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 59,
+        "fallback": 5,
+        "milliseconds": {
+          "median": 121.85839999999916,
+          "p95": 432.1854000000003,
+          "max": 456.97160000000076,
+          "total": 10511.200200000012
+        },
+        "terminalFamilyLowerBound": 17,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 454029,
+        "maxFallbackWork": 566
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "expert",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 62,
+        "fallback": 2,
+        "milliseconds": {
+          "median": 94.47520000000077,
+          "p95": 303.83790000000226,
+          "max": 430.6923999999999,
+          "total": 7649.190800000004
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 422749,
+        "maxFallbackWork": 9298
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 63,
+        "fallback": 1,
+        "milliseconds": {
+          "median": 89.58749999999782,
+          "p95": 293.10080000000016,
+          "max": 421.5878999999986,
+          "total": 7425.142999999989
+        },
+        "terminalFamilyLowerBound": 21,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 413646,
+        "maxFallbackWork": 8783
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "easy",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 17.016700000000128,
+          "p95": 22.314399999999296,
+          "max": 23.534100000000763,
+          "total": 1036.807600000011
+        },
+        "terminalFamilyLowerBound": 21,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 16681,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 17.188600000001315,
+          "p95": 21.692399999999907,
+          "max": 25.9874000000018,
+          "total": 1071.27919999999
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 15844,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "medium",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 32.04520000000048,
+          "p95": 152.09979999999996,
+          "max": 237.21830000000045,
+          "total": 3738.989199999978
+        },
+        "terminalFamilyLowerBound": 17,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 176520,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 40.39570000000094,
+          "p95": 142.20060000000376,
+          "max": 235.7006999999976,
+          "total": 3714.3740999999827
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 151518,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "hard",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 91.16370000000461,
+          "p95": 395.0764999999956,
+          "max": 737.5751999999993,
+          "total": 8972.481500000009
+        },
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 543595,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 71.92929999999615,
+          "p95": 230.46330000000307,
+          "max": 360.269100000005,
+          "total": 5605.025400000006
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 1,
+        "maxConstructionWork": 302735,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "easy",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 24.280800000000454,
+          "p95": 82.09130000000005,
+          "max": 92.5225999999966,
+          "total": 2036.164199999992
+        },
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 7,
+        "maxConstructionWork": 81509,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 63,
+        "fallback": 1,
+        "milliseconds": {
+          "median": 23.836499999997613,
+          "p95": 87.48720000000321,
+          "max": 4325.391899999995,
+          "total": 6277.2726999999795
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 4,
+        "maxConstructionWork": 1000000,
+        "maxFallbackWork": 594
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "medium",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 53.05159999999887,
+          "p95": 148.8475000000035,
+          "max": 233.74950000000536,
+          "total": 3897.92710000003
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 6,
+        "maxConstructionWork": 161650,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 49.82610000000568,
+          "p95": 110.96830000000045,
+          "max": 182.11329999999725,
+          "total": 3406.6884000000136
+        },
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 9,
+        "maxConstructionWork": 136720,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "hard",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 58,
+        "fallback": 6,
+        "milliseconds": {
+          "median": 132.45580000000336,
+          "p95": 607.5714000000007,
+          "max": 3828.1849,
+          "total": 15795.424400000047
+        },
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 4,
+        "maxConstructionWork": 1000000,
+        "maxFallbackWork": 844
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 59,
+        "fallback": 5,
+        "milliseconds": {
+          "median": 158.63390000000072,
+          "p95": 3358.435599999997,
+          "max": 4666.124000000003,
+          "total": 28692.934900000022
+        },
+        "terminalFamilyLowerBound": 23,
+        "canonicalGeometries": 4,
+        "maxConstructionWork": 1000000,
+        "maxFallbackWork": 717
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "easy",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 20.638099999996484,
+          "p95": 27.193299999999,
+          "max": 33.37829999999667,
+          "total": 1301.9419999999373
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 28202,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 63,
+        "fallback": 1,
+        "milliseconds": {
+          "median": 18.45199999999022,
+          "p95": 24.643400000000838,
+          "max": 141.1747000000032,
+          "total": 1235.6940000000031
+        },
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 1000000,
+        "maxFallbackWork": 589
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "medium",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 44.059699999997974,
+          "p95": 57.325499999991735,
+          "max": 62.21809999999823,
+          "total": 2870.6132999999827
+        },
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 133567,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 33.51429999999527,
+          "p95": 40.16929999999411,
+          "max": 43.90080000000307,
+          "total": 2154.735600000029
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 76227,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "hard",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 26,
+        "fallback": 38,
+        "milliseconds": {
+          "median": 164.45610000001034,
+          "p95": 334.80569999999716,
+          "max": 368.8793000000005,
+          "total": 12183.884900000048
+        },
+        "terminalFamilyLowerBound": 15,
+        "canonicalGeometries": 27,
+        "maxConstructionWork": 1000000,
+        "maxFallbackWork": 24664
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 43,
+        "fallback": 21,
+        "milliseconds": {
+          "median": 109.46370000000752,
+          "p95": 179.13720000001194,
+          "max": 253.9768999999942,
+          "total": 7303.22540000001
+        },
+        "terminalFamilyLowerBound": 17,
+        "canonicalGeometries": 44,
+        "maxConstructionWork": 1000000,
+        "maxFallbackWork": 16500
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "easy",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 18.471400000009453,
+          "p95": 25.945999999996275,
+          "max": 29.465100000001257,
+          "total": 1198.0655000000552
+        },
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 23600,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 18.151799999992363,
+          "p95": 23.862300000007963,
+          "max": 27.483600000006845,
+          "total": 1133.9497999999876
+        },
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 23175,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "medium",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 107.74139999999898,
+          "p95": 313.3894,
+          "max": 495.10050000000047,
+          "total": 8142.96879999993
+        },
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 454229,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 72.277700000006,
+          "p95": 261.8138999999792,
+          "max": 620.2441000000108,
+          "total": 6319.413699999932
+        },
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 595190,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "hard",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 63,
+        "fallback": 1,
+        "milliseconds": {
+          "median": 150.87249999999767,
+          "p95": 489.4231,
+          "max": 728.0641999999934,
+          "total": 12359.018199999919
+        },
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 729484,
+        "maxFallbackWork": 1347
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 106.3859999999986,
+          "p95": 359.3908999999985,
+          "max": 640.7884999999951,
+          "total": 9311.005799999897
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 639650,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "easy",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 19.003499999991618,
+          "p95": 83.0277999999962,
+          "max": 118.81660000000556,
+          "total": 1775.9060000000172
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 120979,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 20.865399999980582,
+          "p95": 87.17880000002333,
+          "max": 100.63649999999325,
+          "total": 1767.7431000000797
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 79034,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "medium",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 19.912900000010268,
+          "p95": 24.816500000000815,
+          "max": 25.676500000001397,
+          "total": 1256.4644000000117
+        },
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 15744,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 20.929100000008475,
+          "p95": 27.13980000000447,
+          "max": 32.97380000000703,
+          "total": 1342.261200000008
+        },
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 21456,
+        "maxFallbackWork": 0
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "hard",
+      "previous": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 107.58890000000247,
+          "p95": 415.60130000000936,
+          "max": 861.4017000000167,
+          "total": 10103.876999999964
+        },
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 806316,
+        "maxFallbackWork": 0
+      },
+      "current": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 110.02979999998934,
+          "p95": 390.06909999999334,
+          "max": 479.95530000000144,
+          "total": 8874.93980000008
+        },
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 64,
+        "maxConstructionWork": 440539,
+        "maxFallbackWork": 0
+      }
+    }
+  ],
+  "pairedKillerHard": {
+    "generationVersion": "sudoku-variants-v5",
+    "baseline": {
+      "requests": 64,
+      "ready": 64,
+      "generated": 25,
+      "fallback": 39,
+      "milliseconds": {
+        "median": 270.58480000000054,
+        "p95": 391.2078999999999,
+        "max": 437.98489999999947,
+        "total": 16158.841700000014
+      },
+      "terminalFamilyLowerBound": 12,
+      "canonicalGeometries": 26,
+      "maxConstructionWork": 1000000,
+      "maxFallbackWork": 24664,
+      "generatedSingletonMedian": 5,
+      "generatedSingletonMax": 9
+    },
+    "shipping": {
+      "requests": 64,
+      "ready": 64,
+      "generated": 43,
+      "fallback": 21,
+      "milliseconds": {
+        "median": 128.38179999999556,
+        "p95": 256.7140999999974,
+        "max": 314.41419999999925,
+        "total": 9064.369100000007
+      },
+      "terminalFamilyLowerBound": 17,
+      "canonicalGeometries": 44,
+      "maxConstructionWork": 1000000,
+      "maxFallbackWork": 16500,
+      "generatedSingletonMedian": 1,
+      "generatedSingletonMax": 2
+    },
+    "independentVerifiedRequests": 128
+  },
+  "assessment": {
+    "cases": 76,
+    "equivalentCompleteResults": true,
+    "workNeverIncreased": true,
+    "casesByFixture": [
+      {
+        "variant": "classic",
+        "difficulty": "easy",
+        "added": 0,
+        "oldWork": 51,
+        "newWork": 51
+      },
+      {
+        "variant": "classic",
+        "difficulty": "medium",
+        "added": 0,
+        "oldWork": 68,
+        "newWork": 54
+      },
+      {
+        "variant": "classic",
+        "difficulty": "hard",
+        "added": 0,
+        "oldWork": 87,
+        "newWork": 59
+      },
+      {
+        "variant": "classic",
+        "difficulty": "expert",
+        "added": 0,
+        "oldWork": 8542,
+        "newWork": 8489
+      },
+      {
+        "variant": "diagonal",
+        "difficulty": "easy",
+        "added": 0,
+        "oldWork": 40,
+        "newWork": 40
+      },
+      {
+        "variant": "diagonal",
+        "difficulty": "medium",
+        "added": 0,
+        "oldWork": 76,
+        "newWork": 62
+      },
+      {
+        "variant": "diagonal",
+        "difficulty": "hard",
+        "added": 0,
+        "oldWork": 96,
+        "newWork": 73
+      },
+      {
+        "variant": "jigsaw",
+        "difficulty": "easy",
+        "added": 0,
+        "oldWork": 51,
+        "newWork": 51
+      },
+      {
+        "variant": "jigsaw",
+        "difficulty": "medium",
+        "added": 0,
+        "oldWork": 62,
+        "newWork": 58
+      },
+      {
+        "variant": "jigsaw",
+        "difficulty": "hard",
+        "added": 0,
+        "oldWork": 97,
+        "newWork": 53
+      },
+      {
+        "variant": "killer",
+        "difficulty": "easy",
+        "added": 0,
+        "oldWork": 167,
+        "newWork": 167
+      },
+      {
+        "variant": "killer",
+        "difficulty": "medium",
+        "added": 0,
+        "oldWork": 1035,
+        "newWork": 958
+      },
+      {
+        "variant": "killer",
+        "difficulty": "hard",
+        "added": 0,
+        "oldWork": 19756,
+        "newWork": 11592
+      },
+      {
+        "variant": "thermo",
+        "difficulty": "easy",
+        "added": 0,
+        "oldWork": 66,
+        "newWork": 66
+      },
+      {
+        "variant": "thermo",
+        "difficulty": "medium",
+        "added": 0,
+        "oldWork": 92,
+        "newWork": 75
+      },
+      {
+        "variant": "thermo",
+        "difficulty": "hard",
+        "added": 0,
+        "oldWork": 208,
+        "newWork": 133
+      },
+      {
+        "variant": "arrow",
+        "difficulty": "easy",
+        "added": 0,
+        "oldWork": 36,
+        "newWork": 36
+      },
+      {
+        "variant": "arrow",
+        "difficulty": "medium",
+        "added": 0,
+        "oldWork": 96,
+        "newWork": 70
+      },
+      {
+        "variant": "arrow",
+        "difficulty": "hard",
+        "added": 0,
+        "oldWork": 368,
+        "newWork": 253
+      }
+    ]
+  },
+  "budgetSensitivity": {
+    "verifiedRequests": 276,
+    "productionLimitsChanged": false,
+    "method": "Same current v5 algorithm and seed identities. Internal generators called from an ignored Node test; only its rating validation ceiling was temporarily widened. Every result independently unique, structurally valid, and replayed with the original 500-step/1000000-work assessment. Fallback allowance remains 1000000. No production source/decoder/Worker changes.",
+    "killerHard": [
+      {
+        "maxWork": 1000000,
+        "maxLayouts": 20,
+        "requests": 64,
+        "generated": 43,
+        "fallback": 21,
+        "milliseconds": {
+          "median": 95.11460000000079,
+          "p95": 170.31069999999997,
+          "max": 189.83800000000156,
+          "total": 6462.8102000000035
+        },
+        "maxConstructionWork": 1000000,
+        "maxLayoutsUsed": 2
+      },
+      {
+        "maxWork": 2000000,
+        "maxLayouts": 20,
+        "requests": 64,
+        "generated": 58,
+        "fallback": 6,
+        "milliseconds": {
+          "median": 98.00760000000446,
+          "p95": 207.98099999999977,
+          "max": 253.72619999999733,
+          "total": 7246.15659999998
+        },
+        "maxConstructionWork": 2000000,
+        "maxLayoutsUsed": 2
+      },
+      {
+        "maxWork": 4000000,
+        "maxLayouts": 20,
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 97.52089999998861,
+          "p95": 280.7095999999874,
+          "max": 357.935799999992,
+          "total": 7701.024999999936
+        },
+        "maxConstructionWork": 3790895,
+        "maxLayoutsUsed": 3
+      },
+      {
+        "maxWork": 8000000,
+        "maxLayouts": 20,
+        "requests": 64,
+        "generated": 64,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 102.41029999998864,
+          "p95": 292.8448999999964,
+          "max": 353.97669999999925,
+          "total": 7991.165000000008
+        },
+        "maxConstructionWork": 3790895,
+        "maxLayoutsUsed": 3
+      }
+    ],
+    "layoutLimitedOtherCases": [
+      {
+        "maxLayouts": 40,
+        "maxWork": 1000000,
+        "requests": 7,
+        "generated": 7,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 632.3663000000233,
+          "p95": 971.280700000003,
+          "max": 971.280700000003,
+          "total": 4398.210500000016
+        },
+        "maxConstructionWork": 738000,
+        "maxLayoutsUsed": 35
+      },
+      {
+        "maxLayouts": 60,
+        "maxWork": 1000000,
+        "requests": 7,
+        "generated": 7,
+        "fallback": 0,
+        "milliseconds": {
+          "median": 629.3559999999998,
+          "p95": 943.3018000000156,
+          "max": 943.3018000000156,
+          "total": 4322.550400000007
+        },
+        "maxConstructionWork": 738000,
+        "maxLayoutsUsed": 35
+      }
+    ],
+    "otherWorkLimitedCases": [
+      {
+        "variant": "jigsaw",
+        "difficulty": "easy",
+        "seed": "local-product-corpus-v1:seed:060",
+        "limits": {
+          "maxLayouts": 20,
+          "maxWork": 2000000,
+          "maxSteps": 500,
+          "fallbackWork": 1000000
+        },
+        "source": "fallback",
+        "metrics": {
+          "constructionWork": 2000000,
+          "fallbackWork": 599,
+          "layouts": 1
+        },
+        "milliseconds": 7509.350299999991
+      },
+      {
+        "variant": "jigsaw",
+        "difficulty": "hard",
+        "seed": "local-product-corpus-v1:seed:010",
+        "limits": {
+          "maxLayouts": 20,
+          "maxWork": 2000000,
+          "maxSteps": 500,
+          "fallbackWork": 1000000
+        },
+        "source": "fallback",
+        "metrics": {
+          "constructionWork": 2000000,
+          "fallbackWork": 816,
+          "layouts": 2
+        },
+        "milliseconds": 8700.164099999995
+      },
+      {
+        "variant": "jigsaw",
+        "difficulty": "hard",
+        "seed": "local-product-corpus-v1:seed:018",
+        "limits": {
+          "maxLayouts": 20,
+          "maxWork": 2000000,
+          "maxSteps": 500,
+          "fallbackWork": 1000000
+        },
+        "source": "fallback",
+        "metrics": {
+          "constructionWork": 2000000,
+          "fallbackWork": 709,
+          "layouts": 3
+        },
+        "milliseconds": 8721.607300000003
+      },
+      {
+        "variant": "jigsaw",
+        "difficulty": "hard",
+        "seed": "local-product-corpus-v1:seed:058",
+        "limits": {
+          "maxLayouts": 20,
+          "maxWork": 2000000,
+          "maxSteps": 500,
+          "fallbackWork": 1000000
+        },
+        "source": "generated",
+        "metrics": {
+          "constructionWork": 1886192,
+          "fallbackWork": 0,
+          "layouts": 7
+        },
+        "milliseconds": 7665.695299999992
+      },
+      {
+        "variant": "jigsaw",
+        "difficulty": "hard",
+        "seed": "local-product-corpus-v1:seed:060",
+        "limits": {
+          "maxLayouts": 20,
+          "maxWork": 2000000,
+          "maxSteps": 500,
+          "fallbackWork": 1000000
+        },
+        "source": "generated",
+        "metrics": {
+          "constructionWork": 1074289,
+          "fallbackWork": 0,
+          "layouts": 6
+        },
+        "milliseconds": 4021.3446000000113
+      },
+      {
+        "variant": "killer",
+        "difficulty": "easy",
+        "seed": "local-product-corpus-v1:seed:029",
+        "limits": {
+          "maxLayouts": 20,
+          "maxWork": 2000000,
+          "maxSteps": 500,
+          "fallbackWork": 1000000
+        },
+        "source": "generated",
+        "metrics": {
+          "constructionWork": 1698633,
+          "fallbackWork": 0,
+          "layouts": 2
+        },
+        "milliseconds": 197.21229999998468
+      }
+    ]
+  }
+}

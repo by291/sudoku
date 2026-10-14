@@ -16,7 +16,7 @@ import { RATING_POLICIES, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
 import { analyzeLogic } from '@/core/sudoku/logic'
 import { compileRules } from '@/core/sudoku/rules'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import type { LogicalStep } from '@/core/sudoku/techniques'
+import type { LogicalStep, Technique } from '@/core/sudoku/techniques'
 import type { Board } from '@/core/sudoku/types'
 import { RATING_FIXTURES } from '../../../tests/fixtures/rating'
 import {
@@ -56,7 +56,7 @@ it.each([
   { limit: -1, used: 0 },
   { limit: 1, used: -1 },
   { limit: 1, used: 2 },
-  { limit: 1000001, used: 0 },
+  { limit: 4000001, used: 0 },
   { limit: 1, used: NaN },
   { limit: 1.5, used: 0 },
 ])('rejects invalid caller-owned assessment budgets %j', (budget) => {
@@ -173,15 +173,77 @@ it.each(RATING_FIXTURES)(
   20000,
 )
 
-it('summarizes only the successful policy trace and starts each policy with fresh candidates', () => {
+it.each(RATING_FIXTURES)('matches a fresh successful-policy trace for $id', (fixture) => {
+  const result = rated(assessPuzzle(createAssessmentInput(fixture.board, fixture.rules)))
+  const independentRun = analyzeLogic(
+    fixture.board,
+    RATING_POLICIES[fixture.rules.kind][fixture.difficulty],
+    500,
+    { context: compileRules(fixture.rules), workBudget: createWorkBudget(1000000) },
+  )
+
+  expect(result.trace).toEqual(independentRun.steps)
+  expect(result.summary.workload.steps).toBe(independentRun.steps.length)
+})
+
+it('finishes the authored Killer Hard trace without repeating lower-policy work', () => {
+  const fixture = RATING_FIXTURES.find((item) => item.id === 'killer-hard')
+  if (!fixture) {
+    throw new Error('Missing known Killer Hard fixture')
+  }
+  const input = createAssessmentInput(fixture.board, fixture.rules)
+  const budget = createWorkBudget(15000)
+
+  const result = rated(assessPuzzleWithBudget(input, budget))
+
+  expect(result.summary.difficulty).toBe('hard')
+  expect(result.trace).toEqual(
+    analyzeLogic(fixture.board, RATING_POLICIES.killer.hard, 500, {
+      context: compileRules(fixture.rules),
+      workBudget: createWorkBudget(1000000),
+    }).steps,
+  )
+  expect(budget.used).toBeLessThanOrEqual(budget.limit)
+})
+
+it('restarts from original candidates when a higher policy changes technique priorities', () => {
+  const fixture = RATING_FIXTURES.find((item) => item.id === 'killer-medium')
+  if (!fixture) {
+    throw new Error('Missing known Killer Medium fixture')
+  }
+  const policies = RATING_POLICIES.killer
+  const descriptor = Object.getOwnPropertyDescriptor(policies, 'medium')
+  if (!descriptor) {
+    throw new Error('Missing policy descriptor')
+  }
+  const changedPriority = [
+    'cage-combination',
+    ...policies.medium.filter((technique) => technique !== 'cage-combination'),
+  ] satisfies readonly Technique[]
+
+  try {
+    Object.defineProperty(policies, 'medium', { ...descriptor, value: changedPriority })
+    const result = rated(assessPuzzle(createAssessmentInput(fixture.board, fixture.rules)))
+    const fresh = analyzeLogic(fixture.board, changedPriority, 500, {
+      context: compileRules(fixture.rules),
+      workBudget: createWorkBudget(1000000),
+    })
+
+    expect(fresh.status).toBe('solved')
+    expect(result.summary.difficulty).toBe('medium')
+    expect(result.trace).toEqual(fresh.steps)
+  } finally {
+    Object.defineProperty(policies, 'medium', descriptor)
+  }
+})
+
+it('retains the independently authored Classic Hard pair in the complete trace', () => {
   const fixture = RATING_FIXTURES.find((item) => item.id === 'classic-hard')
   if (!fixture) {
     throw new Error('Missing known hard fixture')
   }
   const result = rated(assessPuzzle(createAssessmentInput(fixture.board, fixture.rules)))
-  const independentRun = analyzeLogic(fixture.board, RATING_POLICIES.classic.hard, 500)
 
-  expect(result.trace).toEqual(independentRun.steps)
   // The authored hard fixture requires the row-4 pair {2, 4} in cells 33 and 34.
   expect(result.trace).toContainEqual(
     expect.objectContaining({
@@ -189,7 +251,6 @@ it('summarizes only the successful policy trace and starts each policy with fres
       evidence: expect.objectContaining({ cells: [33, 34], digits: [2, 4] }),
     }),
   )
-  expect(result.summary.workload.steps).toBe(independentRun.steps.length)
 })
 
 it.each(

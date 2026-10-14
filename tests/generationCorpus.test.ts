@@ -30,20 +30,29 @@ const rows: Record<string, unknown>[] = []
 it.each(CORPUS_COMBINATIONS)(
   'verifies the fixed $variant/$difficulty corpus',
   ({ variant, difficulty }) => {
+    let generated = 0
     for (const seed of seeds) {
       const input = createGenerationInput(variant, difficulty, seed)
       const start = performance.now()
       const result = generatePuzzle(input)
       const milliseconds = performance.now() - start
       expect(result.metrics.constructionWork).toBeLessThanOrEqual(DEFAULT_GENERATION_LIMITS.maxWork)
-      expect(result.metrics.fallbackWork).toBeLessThanOrEqual(
-        DEFAULT_GENERATION_LIMITS.fallbackWork,
-      )
+      expect(result.metrics.layouts).toBeLessThanOrEqual(DEFAULT_GENERATION_LIMITS.maxLayouts)
       if (result.status !== 'ready') {
+        expect(result, `${variant}/${difficulty}/${seed}`).toMatchObject({
+          status: 'budget-exhausted',
+          stage: 'construction',
+        })
+        expect(result).not.toHaveProperty('puzzle')
+        expect(result).not.toHaveProperty('assessment')
+        if (!phase) {
+          expect(generatePuzzle(input)).toEqual(result)
+        }
         rows.push({ variant, difficulty, seed, status: result.status, result, milliseconds })
-        expect(result.status, `${variant}/${difficulty}/${seed}`).toBe('ready')
         continue
       }
+      generated++
+      expect(result.source).toBe('generated')
       const { puzzle } = result
       expect(structureIssues(puzzle.solution, puzzle.rules)).toEqual([])
       const independent = referenceCountSolutions(puzzle.givens, puzzle.rules)
@@ -96,6 +105,7 @@ it.each(CORPUS_COMBINATIONS)(
         milliseconds,
       })
     }
+    expect(generated, `Fresh generation for ${variant}/${difficulty}`).toBeGreaterThan(0)
     if (phase) {
       console.info(`${phase}: verified ${variant}/${difficulty} (${seeds.length} seeds)`)
     }

@@ -9,7 +9,7 @@ import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { makeSession, makeAssessment } from '../../tests/support/gameFixtures'
 import { CORPUS_COMBINATIONS } from '../../tests/fixtures/generationCorpus'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
-import { TEMPLATES } from '@/core/sudoku/templates'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../tests/fixtures/classicPuzzles'
 import { applySessionAction } from '@/features/game/model/session'
 import { createSaveQueue } from '@/storage/saveQueue'
 import { deferred } from '../../tests/support/deferred'
@@ -50,7 +50,7 @@ it.each(CORPUS_COMBINATIONS)(
     const { database, repository, reset } = await setup()
     const template =
       variant === 'classic'
-        ? TEMPLATES.find((item) => item.difficulty === difficulty)
+        ? CLASSIC_PUZZLE_FIXTURES.find((item) => item.difficulty === difficulty)
         : VARIANT_TEMPLATES[variant][difficulty][0]
     if (!template) {
       throw new Error('Missing backup fixture')

@@ -6,16 +6,20 @@ import { shuffle } from '@/core/sudoku/random'
 import { BOARD_SIZE, UNIT_SIZE, DIGITS, ALL_DIGITS_MASK } from '@/core/sudoku/types'
 import type { Board, CellValue } from '@/core/sudoku/types'
 
+const REGIONAL_TERMINAL_NODE_LIMIT = BOARD_SIZE * BOARD_SIZE
+
 export type TerminalConstructionResult =
   | { status: 'ready'; solution: Board }
   | { status: 'budget-exhausted' }
+  | { status: 'attempt-exhausted' }
   | { status: 'failed'; reason: string }
 
-/** Constructs complete-unit terminals using the caller's stream and aggregate node allowance. */
+/** Uses the caller's stream and aggregate work; local exhaustion leaves allowance for retry. */
 export function constructUnitTerminal(
   context: RuleContext,
   random: () => number,
   budget: WorkBudget,
+  nodeLimit?: number,
 ): TerminalConstructionResult {
   if (
     !['classic', 'diagonal', 'jigsaw'].includes(context.rules.kind) ||
@@ -30,11 +34,17 @@ export function constructUnitTerminal(
 
   const board: CellValue[] = Array(BOARD_SIZE).fill(0)
   const regional = context.rules.kind === 'jigsaw'
+  const maxNodes = nodeLimit ?? (regional ? REGIONAL_TERMINAL_NODE_LIMIT : Infinity)
+  if (maxNodes < 0 || (!Number.isSafeInteger(maxNodes) && maxNodes !== Infinity)) {
+    throw new RangeError('Terminal node limit must be a nonnegative integer')
+  }
   const unitMasks = context.units.map(() => 0)
   const memberships = Array.from({ length: BOARD_SIZE }, (_, cell) =>
     context.units.flatMap((unit, index) => (unit.cells.includes(cell) ? [index] : [])),
   )
   let exhausted = false
+  let attemptExhausted = false
+  let nodes = 0
 
   function assign(cell: number, digit: CellValue) {
     const previous = board[cell]
@@ -64,10 +74,15 @@ export function constructUnitTerminal(
   }
 
   function visit(): boolean {
+    if (nodes >= maxNodes) {
+      attemptExhausted = true
+      return false
+    }
     if (!consumeWork(budget)) {
       exhausted = true
       return false
     }
+    nodes++
 
     const candidates = candidatesForTerminal()
     let target = -1
@@ -128,7 +143,7 @@ export function constructUnitTerminal(
         return true
       }
       assign(cell, 0)
-      if (exhausted) {
+      if (exhausted || attemptExhausted) {
         return false
       }
     }
@@ -136,8 +151,25 @@ export function constructUnitTerminal(
     return false
   }
 
+  if (regional) {
+    // Any full unit can be relabelled to this permutation, so fixing it removes only
+    // digit-label symmetry. It does not exclude regional solution families.
+    const digits = shuffle(DIGITS, random)
+    const unit = context.units[0]
+    for (let index = 0; index < unit.cells.length; index++) {
+      if (!consumeWork(budget)) {
+        return { status: 'budget-exhausted' }
+      }
+      assign(unit.cells[index], digits[index])
+    }
+  }
+
   if (visit()) {
     return { status: 'ready', solution: [...board] }
+  }
+  if (attemptExhausted) {
+    // A slow terminal must leave aggregate allowance for a different regional layout.
+    return { status: 'attempt-exhausted' }
   }
   return exhausted
     ? { status: 'budget-exhausted' }

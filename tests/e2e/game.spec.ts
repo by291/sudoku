@@ -9,6 +9,7 @@ import {
   selectGameMenuAction,
   openGameSettings,
   closeGameSettings,
+  useNextGenerationSeed,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
 
@@ -28,6 +29,7 @@ for (const [value, name] of [
       .getByRole('radiogroup', { name: '难度', exact: true })
       .getByText(name, { exact: true })
       .click()
+    await useNextGenerationSeed(page, 'local-product-corpus-v1:seed:000')
     await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
     const board = page.getByRole('group', { name: '数独棋盘' })
     await expect(board.getByRole('button')).toHaveCount(81)
@@ -193,11 +195,8 @@ test('pauses on hiding and never resumes just because the page becomes visible',
 test('cancels a delayed generation without replacing the old save', async ({ page }) => {
   await seedSession(page, makeSession())
   await page.evaluate(() => {
-    const OriginalWorker = window.Worker
-    window.Worker = class extends OriginalWorker {
-      override postMessage() {
-        /* Deliberately leave the job awaiting input in this isolated test. */
-      }
+    Worker.prototype.postMessage = () => {
+      // Hold prepared and newly constructed workers in this isolated browser context.
     }
   })
   await selectGameMenuAction(page, '新开一局')

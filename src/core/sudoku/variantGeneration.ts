@@ -19,6 +19,8 @@ import type { VariantTemplate } from '@/core/sudoku/variantTemplates'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
+import { analyzeLogic } from '@/core/sudoku/logic'
+import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
 import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
 import type {
   GenerationInput,
@@ -173,9 +175,9 @@ export function generateVariantPuzzle(
   const random = seededRandom(
     `${input.puzzleVersion}:${input.variant}:${input.difficulty}:${input.seed}`,
   )
-  const templates = VARIANT_TEMPLATES[input.variant][input.difficulty]
-  if (!templates.length) {
-    return { status: 'failed', reason: 'No verified fallback for this type and difficulty' }
+  const geometryExamples = VARIANT_TEMPLATES[input.variant][input.difficulty]
+  if (!geometryExamples.length) {
+    return { status: 'failed', reason: 'No geometry example for this type and difficulty' }
   }
 
   const makePuzzle = (template: VariantTemplate): Puzzle => ({
@@ -183,9 +185,8 @@ export function generateVariantPuzzle(
     seed: input.seed,
     puzzleVersion: input.puzzleVersion,
   })
-  // Geometry, uniqueness, fresh assessment policies, and necessity share work across every layout.
+  // Geometry, uniqueness, assessment and necessity share work across every layout.
   const generationBudget = createWorkBudget(limits.maxWork)
-  let fallbackBudget: WorkBudget | null = null
 
   function assessRemoval(board: Board, rules: Puzzle['rules']): RemovalCheck {
     const rating = assessPuzzleWithBudget(
@@ -212,6 +213,20 @@ export function generateVariantPuzzle(
 
   function checkRemoval(board: Board, context: RuleContext): RemovalCheck {
     const ratingFirst = input.variant === 'killer' && input.difficulty === 'hard'
+    if (ratingFirst) {
+      // These givens and cages come from the same verified terminal. An Easy proof can
+      // reject a trial cheaply; accepted Hard candidates still require full assessment.
+      const easy = analyzeLogic(board, RATING_POLICIES.killer.easy, limits.maxSteps, {
+        context,
+        workBudget: generationBudget,
+      })
+      if (easy.status === 'budget-exhausted') {
+        return { status: 'budget-exhausted' }
+      }
+      if (easy.status === 'solved') {
+        return { status: 'rejected', retainRemoval: true }
+      }
+    }
     const earlierRating = ratingFirst ? assessRemoval(board, context.rules) : null
     if (earlierRating !== null && earlierRating.status !== 'matching-tier') {
       // Different-tier removals are tentative construction states. Every delivered candidate
@@ -244,7 +259,10 @@ export function generateVariantPuzzle(
       layout++
     ) {
       metrics.layouts++
-      const base = seededTransform(templates[Math.floor(random() * templates.length)], random)
+      const base = seededTransform(
+        geometryExamples[Math.floor(random() * geometryExamples.length)],
+        random,
+      )
       const terminalContext =
         base.rules.kind === 'diagonal' || base.rules.kind === 'jigsaw'
           ? compileRules(base.rules)
@@ -253,10 +271,13 @@ export function generateVariantPuzzle(
       if (terminal.status === 'budget-exhausted') {
         break
       }
+      if (terminal.status === 'attempt-exhausted') {
+        continue
+      }
       if (terminal.status === 'failed') {
         return terminal
       }
-      // Authored arithmetic paths belong to the fallback solution. Rebuild their geometry
+      // Example arithmetic paths belong to a different solution. Rebuild their geometry
       // from scratch for the new terminal instead of retaining incompatible clue values.
       const rules = createVariantGeometry(
         freshGeometryInput(base.rules),
@@ -317,53 +338,8 @@ export function generateVariantPuzzle(
       }
     }
 
-    const fallback = seededTransform(templates[Math.floor(random() * templates.length)], random)
-    fallbackBudget = createWorkBudget(limits.fallbackWork)
-    const context = compileRules(fallback.rules)
-    const unique = countSolutions(fallback.givens, {
-      maxSolutions: 2,
-      nodeBudget: fallbackBudget.limit,
-      context,
-      workBudget: fallbackBudget,
-    })
-    if (unique.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', stage: 'fallback-validation' }
-    }
-
-    const rating = assessPuzzleWithBudget(
-      createAssessmentInput(fallback.givens, fallback.rules, {
-        maxSteps: limits.maxSteps,
-        maxWork: fallbackBudget.limit,
-      }),
-      fallbackBudget,
-    )
-    if (rating.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', stage: 'fallback-validation' }
-    }
-
-    const necessity = variantRulesMatter(fallback, fallbackBudget)
-    if (necessity.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', stage: 'fallback-validation' }
-    }
-
-    if (
-      unique.count !== 1 ||
-      rating.status !== 'rated' ||
-      rating.summary.difficulty !== input.difficulty ||
-      !necessity.matters ||
-      !isComplete(fallback.solution, context)
-    ) {
-      return { status: 'failed', reason: 'Fallback validation failed' }
-    }
-
-    return {
-      status: 'ready',
-      source: 'fallback',
-      puzzle: makePuzzle(fallback),
-      assessment: rating.summary,
-    }
+    return { status: 'budget-exhausted', stage: 'construction' }
   } finally {
     metrics.constructionWork = generationBudget.used
-    metrics.fallbackWork = fallbackBudget?.used ?? 0
   }
 }

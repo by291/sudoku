@@ -1,4 +1,4 @@
-import { TEMPLATES } from '@/core/sudoku/templates'
+import { CLASSIC_PUZZLE_FIXTURES } from './classicPuzzles'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
 import type { PuzzleRules } from '@/core/sudoku/rules'
@@ -16,7 +16,7 @@ export type RatingFixture = {
 export const RATING_FIXTURES: readonly RatingFixture[] = SUDOKU_VARIANTS.flatMap<RatingFixture>(
   (variant) => {
     if (variant === 'classic') {
-      return TEMPLATES.map((template) => ({
+      return CLASSIC_PUZZLE_FIXTURES.map((template) => ({
         id: `classic-${template.difficulty}`,
         board: template.givens,
         rules: { kind: 'classic' } as const,

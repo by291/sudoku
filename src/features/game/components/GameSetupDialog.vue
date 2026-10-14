@@ -10,6 +10,7 @@ import type { GameSession } from '@/features/game/model/session'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
 import { getVariantPresentation, VARIANT_OPTIONS } from '@/features/game/model/variants'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
+import GenerationStatus from '@/features/game/components/GenerationStatus.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -17,10 +18,19 @@ const props = withDefaults(
     savedSession?: GameSession | null
     statuses?: readonly DailyVariantStatus[]
     busy?: boolean
+    generating?: boolean
     error?: string | null
   }>(),
-  { mode: 'free', savedSession: null, statuses: () => [], busy: false, error: null },
+  {
+    mode: 'free',
+    savedSession: null,
+    statuses: () => [],
+    busy: false,
+    generating: false,
+    error: null,
+  },
 )
+const processing = computed(() => props.busy || props.generating)
 const variant = defineModel<SudokuVariant>('variant', { required: true })
 const difficulty = defineModel<Difficulty>('difficulty', { required: true })
 const difficultyChoices = computed(() => supportedDifficulties(variant.value))
@@ -65,13 +75,13 @@ function statusLabel(type: SudokuVariant) {
 }
 
 function selectVariant(value: unknown) {
-  if (isSudokuVariant(value)) {
+  if (!processing.value && isSudokuVariant(value)) {
     variant.value = value
   }
 }
 
 function selectDifficulty(value: unknown) {
-  if (isDifficulty(value) && supportsDifficulty(variant.value, value)) {
+  if (!processing.value && isDifficulty(value) && supportsDifficulty(variant.value, value)) {
     difficulty.value = value
   }
 }
@@ -103,7 +113,7 @@ onUnmounted(async () => {
     @esc="$emit('cancel')"
   >
     <NAlert v-if="error" type="error" :show-icon="false" class="setup-error">{{ error }}</NAlert>
-    <div>
+    <div :aria-busy="processing">
       <p class="field-label">选择玩法</p>
       <NRadioGroup
         :value="variant"
@@ -111,7 +121,7 @@ onUnmounted(async () => {
         role="radiogroup"
         aria-label="玩法"
         class="variant-grid"
-        :disabled="busy"
+        :disabled="processing"
         @update:value="selectVariant"
       >
         <NRadio
@@ -136,7 +146,7 @@ onUnmounted(async () => {
           name="puzzle-difficulty"
           role="radiogroup"
           aria-label="难度"
-          :disabled="busy"
+          :disabled="processing"
           @update:value="selectDifficulty"
         >
           <NRadioButton v-for="value in difficultyChoices" :key="value" :value="value">
@@ -160,16 +170,25 @@ onUnmounted(async () => {
       今日正式成绩已保留，再次游玩记为练习。
     </p>
     <template #footer>
+      <GenerationStatus v-if="generating" class="setup-status" />
+      <GenerationStatus
+        v-else-if="busy"
+        class="setup-status"
+        message="正在读取存档…"
+        description="读取完成后即可选择并开始。"
+      />
       <div ref="actions" class="setup-actions">
         <NButton @click="$emit('cancel')">取消</NButton>
         <NButton
           v-if="mode === 'free' && savedSession && !savedSession.completion"
           type="info"
-          :disabled="busy"
+          :disabled="processing"
           @click="$emit('resume')"
           >继续存档</NButton
         >
-        <NButton type="primary" :disabled="busy" @click="$emit('start')">{{ startLabel }}</NButton>
+        <NButton type="primary" :disabled="processing" @click="$emit('start')">
+          {{ startLabel }}
+        </NButton>
       </div>
     </template>
   </NModal>
@@ -232,6 +251,9 @@ onUnmounted(async () => {
   gap: 8px;
 }
 .setup-error {
+  margin-bottom: 16px;
+}
+.setup-status {
   margin-bottom: 16px;
 }
 @media (max-width: 440px) {

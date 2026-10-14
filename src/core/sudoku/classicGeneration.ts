@@ -1,12 +1,11 @@
 import type { GenerationMetrics } from '@/core/sudoku/generation'
-import { isComplete } from '@/core/sudoku/board'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
 import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
 import type { TerminalConstructionResult } from '@/core/sudoku/terminalConstruction'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
-import { BOARD_SIZE, BOX_SIZE, DIGITS, UNIT_SIZE } from '@/core/sudoku/types'
+import { BOARD_SIZE } from '@/core/sudoku/types'
 import type { Board } from '@/core/sudoku/types'
 import type {
   GenerationInput,
@@ -15,8 +14,6 @@ import type {
 } from '@/core/sudoku/generation'
 import { countSolutions } from '@/core/sudoku/search'
 import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
-import { TEMPLATES } from '@/core/sudoku/templates'
-import type { PuzzleTemplate } from '@/core/sudoku/templates'
 
 /** Consumes the supplied seeded stream and node budget; never exposes an incomplete grid. */
 export function constructClassicTerminal(
@@ -24,30 +21,6 @@ export function constructClassicTerminal(
   budget: WorkBudget,
 ): TerminalConstructionResult {
   return constructUnitTerminal(CLASSIC_CONTEXT, random, budget)
-}
-
-function transformFallback(template: PuzzleTemplate, random: () => number): PuzzleTemplate {
-  const digits = shuffle(DIGITS, random)
-  const axis = () =>
-    shuffle([0, 1, 2], random).flatMap((group) =>
-      shuffle([0, 1, 2], random).map((offset) => group * BOX_SIZE + offset),
-    )
-  const rows = axis()
-  const columns = axis()
-  const transpose = random() < 0.5
-  const map = (board: Board): Board =>
-    board.map((_, cell) => {
-      const row = rows[Math.floor(cell / UNIT_SIZE)]
-      const column = columns[cell % UNIT_SIZE]
-      const value = board[transpose ? column * UNIT_SIZE + row : row * UNIT_SIZE + column]
-      return value === 0 ? 0 : digits[value - 1]
-    })
-
-  return {
-    difficulty: template.difficulty,
-    givens: map(template.givens),
-    solution: map(template.solution),
-  }
 }
 
 const CLUE_TARGETS = { easy: 36, medium: 32, hard: 30, expert: 28 } as const
@@ -60,9 +33,8 @@ export function generateClassicPuzzle(
   metrics: GenerationMetrics,
 ): GenerationAttemptResult {
   const random = seededRandom(`${input.puzzleVersion}:${input.difficulty}:${input.seed}`)
-  // All layouts and checks consume this one allowance; only fallback validation gets a fresh one.
+  // Every layout and validation shares this allowance; exhaustion cannot install another puzzle.
   const budget = createWorkBudget(limits.maxWork)
-  let fallbackBudget: WorkBudget | null = null
   try {
     const rules = { kind: 'classic' } as const
     const assess = (board: Board, work: WorkBudget) =>
@@ -76,6 +48,9 @@ export function generateClassicPuzzle(
       const terminal = constructClassicTerminal(random, budget)
       if (terminal.status === 'budget-exhausted') {
         break
+      }
+      if (terminal.status === 'attempt-exhausted') {
+        continue
       }
       if (terminal.status === 'failed') {
         return terminal
@@ -142,41 +117,8 @@ export function generateClassicPuzzle(
       }
     }
 
-    const authored = TEMPLATES.find((template) => template.difficulty === input.difficulty)
-    if (!authored) {
-      return { status: 'failed', reason: 'No authored fallback for the requested difficulty' }
-    }
-    const fallback = transformFallback(authored, random)
-    fallbackBudget = createWorkBudget(limits.fallbackWork)
-    const unique = countSolutions(fallback.givens, {
-      maxSolutions: 2,
-      nodeBudget: fallbackBudget.limit,
-      workBudget: fallbackBudget,
-    })
-    if (unique.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', stage: 'fallback-validation' }
-    }
-    const rating = assess(fallback.givens, fallbackBudget)
-    if (rating.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', stage: 'fallback-validation' }
-    }
-    if (
-      unique.count !== 1 ||
-      rating.status !== 'rated' ||
-      rating.summary.difficulty !== input.difficulty ||
-      !isComplete(fallback.solution)
-    ) {
-      return { status: 'failed', reason: 'Fallback validation failed' }
-    }
-
-    return {
-      status: 'ready',
-      source: 'fallback',
-      assessment: rating.summary,
-      puzzle: { ...fallback, seed: input.seed, puzzleVersion: input.puzzleVersion, rules },
-    }
+    return { status: 'budget-exhausted', stage: 'construction' }
   } finally {
     metrics.constructionWork = budget.used
-    metrics.fallbackWork = fallbackBudget?.used ?? 0
   }
 }

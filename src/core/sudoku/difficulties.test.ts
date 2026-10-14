@@ -7,7 +7,7 @@ import {
   PUZZLE_VERSION,
   VARIANT_PUZZLE_VERSION,
 } from '@/core/sudoku/generation'
-import { TEMPLATES } from '@/core/sudoku/templates'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { parseAssessmentOutcome } from '@/core/sudoku/rating'
 import { RATING_VERSION } from '@/core/sudoku/ratingPolicies'
@@ -55,7 +55,7 @@ it('accepts Classic Expert without interpreting a stored board as a generation r
       puzzleVersion: PUZZLE_VERSION,
     }).valid,
   ).toBe(true)
-  const template = TEMPLATES[0]
+  const template = CLASSIC_PUZZLE_FIXTURES[0]
   expect(
     parsePuzzle({
       ...template,

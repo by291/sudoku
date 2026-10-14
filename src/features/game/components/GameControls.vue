@@ -5,18 +5,22 @@ import type { DropdownProps, DropdownMenuProps, DropdownOption } from 'naive-ui'
 import type { Digit } from '@/core/sudoku/types'
 import NumberPad from '@/shared/components/NumberPad.vue'
 
-const props = defineProps<{
-  editable: boolean
-  inputEditable: boolean
-  selectionMessage: string
-  noteMode: boolean
-  canUndo: boolean
-  canRedo: boolean
-  hintLoading: boolean
-  canRestart: boolean
-  canStartNew: boolean
-  newGameLabel: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    editable: boolean
+    inputEditable: boolean
+    selectionMessage: string
+    announceSelection?: boolean
+    noteMode: boolean
+    canUndo: boolean
+    canRedo: boolean
+    hintLoading: boolean
+    canRestart: boolean
+    canStartNew: boolean
+    newGameLabel: string
+  }>(),
+  { announceSelection: true },
+)
 const emit = defineEmits<{
   digit: [digit: Digit]
   erase: []
@@ -299,7 +303,9 @@ function selectAction(key: string | number) {
       <NumberPad layout="row" :disabled="!inputEditable" @digit="$emit('digit', $event)" />
     </div>
     <div class="input-status">
-      <p class="selection-message" role="status">{{ selectionMessage }}</p>
+      <p class="selection-message" :role="announceSelection ? 'status' : undefined">
+        {{ selectionMessage }}
+      </p>
       <span class="input-mode">{{ noteMode ? '笔记模式' : '填写模式' }}</span>
     </div>
     <p class="keyboard-guide">1–9 填写 · N 切换笔记 · Delete 擦除 · Ctrl / ⌘ + Z 撤销</p>

@@ -45,6 +45,21 @@ it('does not reset an existing allowance or reveal an incomplete grid', () => {
   expect(budget.used).toBe(5)
 })
 
+it('abandons a regional terminal attempt without consuming the remaining aggregate allowance', () => {
+  const context = compileRules(VARIANT_TEMPLATES.jigsaw.easy[0].rules)
+  const budget = createWorkBudget(1000000)
+  budget.used = 100
+
+  const result = constructUnitTerminal(context, seededRandom('local-cap'), budget, 1)
+
+  expect(result).toEqual({ status: 'attempt-exhausted' })
+  expect(budget.used).toBeGreaterThan(100)
+  expect(budget.used).toBeLessThan(120)
+  expect(constructUnitTerminal(context, seededRandom('local-cap-retry'), budget).status).toBe(
+    'ready',
+  )
+})
+
 it('rejects partial units and arithmetic constraints as terminal construction inputs', () => {
   const incomplete = {
     ...CLASSIC_CONTEXT,

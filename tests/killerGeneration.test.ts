@@ -8,8 +8,7 @@ import {
 import { KILLER_HARD_REGRESSION_SEEDS } from './fixtures/generationCorpus'
 import { referenceCountSolutions } from './support/referenceVariants'
 
-it('constructs fresh matching Killer Hard puzzles in the fixed corpus instead of only falling back', () => {
-  let constructed = 0
+it('constructs fresh matching Killer Hard puzzles across the fixed regression seeds', () => {
   for (const seed of KILLER_HARD_REGRESSION_SEEDS) {
     const result = generatePuzzle(createGenerationInput('killer', 'hard', seed))
     expect(result.status).toBe('ready')
@@ -22,10 +21,24 @@ it('constructs fresh matching Killer Hard puzzles in the fixed corpus instead of
       count: 1,
       solution: result.puzzle.solution,
     })
-    if (result.source === 'generated') {
-      constructed++
-    }
+    expect(result.source).toBe('generated')
   }
-
-  expect(constructed).toBeGreaterThan(0)
 }, 30000)
+
+it.each([KILLER_HARD_REGRESSION_SEEDS[0], KILLER_HARD_REGRESSION_SEEDS[2]])(
+  'constructs a fresh difficulty-guided Hard puzzle for %s',
+  (seed) => {
+    const result = generatePuzzle(createGenerationInput('killer', 'hard', seed))
+
+    expect(result).toMatchObject({ status: 'ready', source: 'generated' })
+    if (result.status !== 'ready') {
+      throw new Error('Missing difficulty-guided puzzle')
+    }
+    expect(referenceCountSolutions(result.puzzle.givens, result.puzzle.rules)).toEqual({
+      count: 1,
+      solution: result.puzzle.solution,
+    })
+    expect(result.assessment.difficulty).toBe('hard')
+    expect(result.metrics.constructionWork).toBeLessThanOrEqual(DEFAULT_GENERATION_LIMITS.maxWork)
+  },
+)
