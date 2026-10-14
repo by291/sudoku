@@ -42,6 +42,8 @@ Use fixed fixtures to prove valid and invalid assignments, candidates, conflicts
 
 Random call order, legal transforms, template order, and fallback selection determine current seeded output. Pin current determinism and independent solution/tier facts. The user removed historical-generation compatibility requirements: no old generator dispatch, frozen old-output corpus, or daily cutoff is required. Bump current generation identity when algorithm semantics change; do not silently regrade or regenerate saved boards.
 
+Current variants use `sudoku-variants-v3`. Complete-unit variants can use `terminalConstruction.ts`; arithmetic variants construct a Classic terminal and build compatible clues without retaining an authored path from another solution. Keep all abandoned work in the caller budget. Extend the fixed corpus and independent structural/necessity/trace checks for new generation semantics, and prove terminal diversity beyond digit/spatial/given-mask changes. Add a forced fallback case and local backup round trip for every newly supported type/tier. Backup decoding must retain stored facts and epoch fencing rather than construct a new puzzle.
+
 Run relevant engine, worker, lifecycle, storage, and presentation tests during implementation. Before completion, run type checking, lint, formatting, all unit tests, root and `/sudoku/` builds, and the configured Playwright projects. Verify real worker assets, modal keyboard ownership, touch controls, pauses, saves, lessons, and completion. Report actual unavailable browser runtimes; mobile emulation does not certify a physical device.
 
 ## Advanced play and course contracts

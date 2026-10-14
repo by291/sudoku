@@ -4,6 +4,8 @@ Date: 2026-10-11
 
 Status: Approved by the user on 2026-10-11. Implementation planning follows this design.
 
+Continuation (2026-10-14): The approved [local product roadmap](../plans/2026-10-14-sudoku-local-product-roadmap.md) extends Classic with Expert, deepens the 32-unit catalogue, broadens variant generation and adds versioned [local backup and restoration](../../local-backup.md). These delivered contracts supersede the first-release depth below while preserving saved domain facts. Retain only data protection from milestone 5; difficulty feedback, manual calibration and the independent release-acceptance project are excluded.
+
 ## 1. Goals and approved scope
 
 Build a Chinese-language web Sudoku game that supports casual play, guided learning, and timed challenges. Keyboard interaction on desktop and touch interaction on mobile must be comfortable. Players must be able to resume interrupted sessions, and learning hints must explain the reasoning behind a move.

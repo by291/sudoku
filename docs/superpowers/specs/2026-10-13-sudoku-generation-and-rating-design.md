@@ -26,6 +26,12 @@ The current assessment identity is `sudoku-rating-v2`, and Classic generation is
 
 Learning has 32 freely selectable units: 12 Classic units and four per variant. Keep the original 11 IDs, use two validated exercises per unit, and require three ordered stages in each variant combined exercise. Optional settings `lessonStages` stores committed incomplete-stage cursors; completion records keep their existing format. Database schema 1 remains unchanged.
 
+## Continuation amendment: broader variants and local backup
+
+The retained roadmap expands variants to `sudoku-variants-v3`. Diagonal and Jigsaw construct terminals under complete units; Killer, Thermo and Arrow construct Classic terminals before compatible clue geometry. Construction, geometry, clue removal and acceptance share the unchanged work limits; authored fallback remains separately verified. Classic stays `sudoku-v3`, and assessment stays `sudoku-rating-v2` because their semantics are unchanged. A fixed 64-seed corpus for each of the 19 supported combinations measures independent uniqueness, structure, rule necessity, trace conclusions, terminal invariants, canonical geometry, budgets and fallback rates. Equal terminal invariants do not prove equivalence; timing is host-specific and does not grade a puzzle.
+
+The records workflow now supports versioned local backup and replacement restoration under the [Local Backup contract](../../local-backup.md). Preserve all original domain facts and database schema 1, validate the complete bounded file before mutation, replace collections and epoch atomically, invalidate old leases/writes, and restore games paused. Accounts, cloud synchronization, telemetry, difficulty feedback and manual calibration remain outside scope.
+
 ## 1. Intent and decisions
 
 Improve puzzle generation and difficulty assessment for the existing Chinese-language Sudoku application. A delivered puzzle must have a unique solution, be solvable with the techniques supported for its type and difficulty, and carry an explainable assessment. Development tools and production must execute the same assessment code with the same policies.

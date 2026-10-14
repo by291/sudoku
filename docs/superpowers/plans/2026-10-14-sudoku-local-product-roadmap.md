@@ -10,9 +10,9 @@
 
 **Spec:** [First-release design](../specs/2026-10-11-sudoku-design.md), [variant design](../specs/2026-10-11-sudoku-variants-design.md), and [generation and assessment design](../specs/2026-10-13-sudoku-generation-and-rating-design.md), including its continuation amendments. Follow [Web Architecture](../../architecture.md) and [Adding a Sudoku Variant](../../variant-extension.md).
 
-**Status:** Approved by the user on 2026-10-14 with narrowed scope: retain milestones 1–4 and local data protection from milestone 5. Remove difficulty feedback, manual playtest calibration, and the independent release-acceptance milestone. Approval does not authorize commits, pushes, or remote publication.
+**Status:** Approved by the user on 2026-10-14 with narrowed scope: retain milestones 1–4 and local data protection from milestone 5. Remove difficulty feedback, manual playtest calibration, and the independent release-acceptance milestone. Local commits were subsequently authorized; pushes and remote publication remain unauthorized.
 
-**Progress (2026-10-14):** Milestones 1–3 are implemented and verified. See [Advanced and Learning Verification](../verification/2026-10-14-sudoku-advanced-and-learning.md). Milestones 4–5 remain pending.
+**Progress (2026-10-14):** All five milestones are implemented and locally verified. Milestones 1–3 were locally committed in `59668e5`; milestone 4 in `26c51f2`; milestone 5 and final recovery fixes in `378d465`, following explicit user authorization. Public documentation and the final delivery record form a separate commit. See the [complete delivery report](../verification/2026-10-14-sudoku-local-roadmap.md), [Advanced and Learning Verification](../verification/2026-10-14-sudoku-advanced-and-learning.md), and [Generation Corpus Verification](../verification/2026-10-14-sudoku-generation-corpus.md). Work stays on main without a new branch or worktree; no push or remote publication is authorized.
 
 ## Product scope
 
@@ -136,12 +136,12 @@ Establish a versioned corpus with 64 fixed seeds for each supported type/tier co
 
 Compare the current and proposed generator on the same corpus and limits. A seed has no historical reproduction requirement after a version change. Record the new version's repeatability, retained saved attempts, and current daily identity rules.
 
-- [ ] Define the corpus and independent diversity/structure checks before changing generation. Measure the existing baseline under identical limits.
-- [ ] Implement broader Diagonal and Jigsaw construction and independently validate terminals, regions, necessity, and fallback paths.
-- [ ] Implement broader Killer, Thermo, and Arrow terminal/geometry construction. Exercise forbidden digit transforms, arithmetic collisions, incomplete construction, and budget consumption.
-- [ ] Provide verified fallback coverage for all 19 supported type/tier combinations and advance affected generation identities. Verify saved-attempt precedence and unchanged formal daily eligibility.
-- [ ] Run the complete corpus and real Worker subset at both deployment roots. Require valid matching assessments for every delivered puzzle and explicit outcomes for incomplete requests.
-- [ ] Publish the per-type/tier corpus report. The initial diversity gate is at least four independently distinguished terminal families per variant across its corpus, plus multiple legal geometry signatures where geometry varies. Keep the seed set fixed when judging the gate.
+- [x] Define the corpus and independent diversity/structure checks before changing generation. Measure the existing baseline under identical limits.
+- [x] Implement broader Diagonal and Jigsaw construction and independently validate terminals, regions, necessity, and fallback paths.
+- [x] Implement broader Killer, Thermo, and Arrow terminal/geometry construction. Exercise forbidden digit transforms, arithmetic collisions, incomplete construction, and budget consumption.
+- [x] Provide verified fallback coverage for all 19 supported type/tier combinations and advance affected generation identities. Verify saved-attempt precedence and unchanged formal daily eligibility.
+- [x] Run the complete corpus and real Worker subset at both deployment roots. Require valid matching assessments for every delivered puzzle and explicit outcomes for incomplete requests.
+- [x] Publish the per-type/tier corpus report. The initial diversity gate is at least four independently distinguished terminal families per variant across its corpus, plus multiple legal geometry signatures where geometry varies. Keep the seed set fixed when judging the gate.
 
 **Difficulty evaluation:** Technique tiers remain the primary grade. Workload vectors describe differences within a tier; clue count or machine search time does not assign human difficulty. Review unusually long/short traces and concentration in one technique against authored fixtures and independently checked deduction traces. Numeric scoring, player-feedback collection, and human calibration are outside this scope.
 
@@ -163,11 +163,11 @@ The first restore mode replaces the local dataset after confirmation. Commit all
 
 Importing a result must not inflate an existing daily attempt or turn a practice result into a formal one.
 
-- [ ] Define and document the backup format, collection boundaries, and validation limits. Test round-trip fixtures for every type, Classic Expert, all modes, old lesson progress, and optional assessment outcomes.
-- [ ] Implement consistent export and error feedback, including pending saves and quarantined records.
-- [ ] Implement full-file validation and transactional replacement behind a narrow storage contract. Test rollback and dataset epoch fencing before adding restore controls.
-- [ ] Add accessible download/restore preview and confirmation controls, with explicit Cancel focus and clear local-storage consequences.
-- [ ] Verify restore during another tab's editing, a pending Worker response, a queued save, hidden-page pause, and a failed transaction. Verify unsupported and oversized files without partial writes.
+- [x] Define and document the backup format, collection boundaries, and validation limits. Test round-trip fixtures for every type, Classic Expert, all modes, old lesson progress, and optional assessment outcomes.
+- [x] Implement consistent export and error feedback, including pending saves and quarantined records.
+- [x] Implement full-file validation and transactional replacement behind a narrow storage contract. Test rollback and dataset epoch fencing before adding restore controls.
+- [x] Add accessible download/restore preview and confirmation controls, with explicit Cancel focus and clear local-storage consequences.
+- [x] Verify restore during another tab's editing, a pending Worker response, a queued save, hidden-page pause, and a failed transaction. Verify unsupported and oversized files without partial writes.
 
 **Acceptance:** Backup/restore preserves domain facts and can recover a refreshed or empty browser-local dataset. Failed or invalid imports leave data intact; old tabs cannot recreate the replaced dataset. No backup data leaves the browser automatically.
 

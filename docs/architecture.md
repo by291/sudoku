@@ -21,7 +21,7 @@ src/
     home/views/
     game/{views,components,composables,model,stores}/
     learning/{views,composables,model,stores}/
-    records/{views,model,stores}/
+    records/{views,components,model,stores}/
     settings/{model,stores}/
   core/sudoku/
   storage/
@@ -51,6 +51,7 @@ src/
 | `worker/`                    | Validated messages, cancellation, budgets, and engine execution                                                          |
 | `storage/`                   | Database schema, record validation, transactions, editing leases, and ordered saves                                      |
 | `storage/ownership.ts`       | Editing leases and dataset-reset coordination                                                                            |
+| `storage/backup.ts`          | Bounded backup decoding, committed readonly snapshots, and atomic dataset replacement with epoch/revision rebasing       |
 | `styles/`                    | CSS palette, reset, focus, reduced-motion rules, and shared presentation utilities                                       |
 
 ## Dependency Direction
@@ -88,9 +89,15 @@ AppLayout renders the common parent link: workflow pages return home, lessons re
 
 `features/game/model/variants.ts` owns the complete Chinese catalogue and ordered choices. `shared/model/boardGeometry.ts` composes typed board adapters to format actual regions and clues without solving. Engine definitions contain no framework or presentation dependencies. `SudokuClues` draws decorative SVG in board coordinates, while the CSS Grid retains buttons, notes, digits, and focus. Accessible cell labels and selected-rule text explain the geometry; pause removes clue presentation as well as values.
 
-`GenerationInput` pairs each type with its current generation version: Classic `sudoku-v3`, variants `sudoku-variants-v2`. `generation.ts` owns input/limit decoding and one current dispatcher. `classicGeneration.ts` owns seeded MRV terminal construction, clue removal, and authored fallback. Typed strategies in `generationStrategies.ts` and variant modules declare geometry and legal digit/complement transforms; `variantGeneration.ts` owns variant uniqueness, assessment, necessity, and fallback. Every construction check shares the same work budget; fallback validation has one separate budget. Ready results include the accepted compact assessment. Historical generators and frozen historical-output fixtures are removed; stored puzzles remain data snapshots. `worker/protocol.ts` validates envelopes; `hintEvidence.ts` checks actual clue evidence; clients retain identity and stale-reply checks.
+Session construction captures the dataset epoch before Worker computation and retains it through fresh lease acquisition and atomic creation. A peer's restored epoch cannot authorize an older operation, even when BroadcastChannel notification is absent or delayed. Daily eligibility reads carry the same pre-computation fence. Learning exposes dataset/reset readiness generations so a mounted lesson clears old answers and resumes restored cursors after reload, while ordinary completion writes retain explicit Next interaction and imported last-visited preferences remain intact.
+
+Preferences merge initial updates into the committed settings base rather than persisting unread defaults. A dataset conflict blocks further writes until canonical settings are reloaded; retry does not attach an old snapshot to a new epoch. Lesson cursor writes carry the learning dataset epoch, and exercise readiness waits for recovered preferences and progress. This protects imported cursors even without prompt reset broadcasting.
+
+`GenerationInput` pairs each type with its current generation version: Classic `sudoku-v3`, variants `sudoku-variants-v3`. `generation.ts` owns input/limit decoding and one current dispatcher. `terminalConstruction.ts` owns bounded complete-unit construction, retaining Classic random ordering and using additional missing-digit branching for Jigsaw. `classicGeneration.ts` owns clue removal and authored fallback. Typed strategies in `generationStrategies.ts` and variant modules declare geometry and legal digit/complement transforms; `variantGeneration.ts` composes terminal/geometry construction, uniqueness, assessment, necessity, and fallback. Arithmetic paths are created from scratch for fresh terminals. All abandoned attempts consume the same request work budget; fallback validation has one separate budget. Ready results include the accepted compact assessment and results expose consumed work diagnostics. Historical generators and frozen historical-output fixtures are removed; stored puzzles remain data snapshots. `worker/protocol.ts` validates envelopes; `hintEvidence.ts` checks actual clue evidence; clients retain identity and stale-reply checks.
 
 Storage writes format-2 sessions/results and normalizes validated format-1 records to Classic without rewriting historical facts. The database schema stays at version 1. Free replacement is transactional and scoped by type, learning retains one practice slot, and leases/revisions/dataset epochs continue to fence stale writes. Formal daily identities and eligibility are independent by type/date; Classic IDs remain compatible. Pure aggregation produces six daily statuses and six separate record summaries.
+
+`storage/backup.ts` owns format-1 local backups, preflight bounds, complete collection decoding, readonly export snapshots and atomic replacement. The repository supplies its connection and committed reset notification. `useRecordsStore` settles game/preferences before export/restore, owns preview epochs and recovery feedback, and reloads settings/progress/catalogues after current or peer replacement. `LocalBackupPanel` owns file selection/download and confirmation presentation. Game's `prepareBackup` action reuses save-before-transition ordering and cancellation. Imported revisions start at 1; leases are cleared and the local dataset epoch advances. Stored facts and the database schema remain unchanged. See [Local Backup](local-backup.md).
 
 `core/sudoku/ratingPolicies.ts` owns explicit per-type ordered policies and `sudoku-rating-v2`; `rating.ts` owns bounded assessment, successful-trace summaries, and runtime decoders. Standalone assessment creates its own budget; `assessPuzzleWithBudget` consumes a validated caller-owned budget without resetting it. `logic.ts` charges each detector pass for every type. Fresh policy workspaces share work but retain only the successful trace. There are no legacy rating wrappers. Neither grading nor statistics substitute for uniqueness validation.
 
