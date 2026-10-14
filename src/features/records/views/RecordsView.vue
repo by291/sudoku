@@ -8,6 +8,7 @@ import {
   VARIANT_OPTIONS,
 } from '@/features/game/model/variants'
 import { isSudokuVariant } from '@/core/sudoku/rules'
+import { supportedDifficulties } from '@/core/sudoku/difficulties'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { modeName } from '@/features/records/model/records'
@@ -177,10 +178,10 @@ function duration(value: number | null) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(best, difficulty) in summary.freeBests" :key="difficulty">
+              <tr v-for="difficulty in supportedDifficulties(variant)" :key="difficulty">
                 <th scope="row">{{ DIFFICULTY_NAMES[difficulty] }}</th>
-                <td>{{ duration(best.unassisted) }}</td>
-                <td>{{ duration(best.assisted) }}</td>
+                <td>{{ duration(summary.freeBests[difficulty].unassisted) }}</td>
+                <td>{{ duration(summary.freeBests[difficulty].assisted) }}</td>
               </tr>
             </tbody>
           </table>

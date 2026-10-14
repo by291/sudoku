@@ -5,6 +5,7 @@ export type Settings = {
   showTimer: boolean
   highlightConflicts: boolean
   currentLessonId: string | null
+  lessonStages?: Readonly<Record<string, number>>
 }
 
 export const DEFAULT_SETTINGS: Settings = {

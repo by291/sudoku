@@ -358,8 +358,9 @@ test('restores an explicit saved type even when the query chooses Classic and fi
     page.getByRole('heading', { name: '完成记录', exact: true }).locator('..'),
   ).toContainText('箭头数独 · 自由游玩')
 })
-test('starts Easy practice for each variant lesson', async ({ page }) => {
-  for (const lesson of LESSONS.slice(6)) {
+test('starts the supported practice tier for every course unit', async ({ page }) => {
+  test.setTimeout(180000)
+  for (const lesson of LESSONS) {
     await page.goto(`/#/learn/${lesson.id}?practice=1`)
     await page.getByRole('button', { name: '开始游戏', exact: true }).click()
     const dialog = page.getByRole('dialog')
@@ -372,7 +373,7 @@ test('starts Easy practice for each variant lesson', async ({ page }) => {
     const practice = (await readSessions(page)).find((record) => record.session.mode === 'learning')
 
     expect(practice?.session.puzzle.rules.kind).toBe(lesson.practiceVariant)
-    expect(practice?.session.puzzle.difficulty).toBe('easy')
+    expect(practice?.session.puzzle.difficulty).toBe(lesson.practiceDifficulty)
   }
 })
 test('retains the daily board and selector after a failed save and switches after recovery', async ({

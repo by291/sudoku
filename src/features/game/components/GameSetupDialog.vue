@@ -4,6 +4,7 @@ import { NAlert, NButton, NModal, NRadio, NRadioButton, NRadioGroup } from 'naiv
 import { isSudokuVariant } from '@/core/sudoku/rules'
 import type { SudokuVariant } from '@/core/sudoku/rules'
 import { isDifficulty } from '@/core/sudoku/types'
+import { supportedDifficulties, supportsDifficulty } from '@/core/sudoku/difficulties'
 import type { Difficulty } from '@/core/sudoku/types'
 import type { GameSession } from '@/features/game/model/session'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
@@ -22,6 +23,12 @@ const props = withDefaults(
 )
 const variant = defineModel<SudokuVariant>('variant', { required: true })
 const difficulty = defineModel<Difficulty>('difficulty', { required: true })
+const difficultyChoices = computed(() => supportedDifficulties(variant.value))
+watch(variant, (value) => {
+  if (!supportsDifficulty(value, difficulty.value)) {
+    difficulty.value = 'hard'
+  }
+})
 defineEmits<{ start: []; resume: []; cancel: [] }>()
 const title = computed(() => (props.mode === 'daily' ? '选择每日挑战' : '开始一局数独'))
 const dailyState = computed(
@@ -64,7 +71,7 @@ function selectVariant(value: unknown) {
 }
 
 function selectDifficulty(value: unknown) {
-  if (isDifficulty(value)) {
+  if (isDifficulty(value) && supportsDifficulty(variant.value, value)) {
     difficulty.value = value
   }
 }
@@ -132,8 +139,8 @@ onUnmounted(async () => {
           :disabled="busy"
           @update:value="selectDifficulty"
         >
-          <NRadioButton v-for="(name, value) in DIFFICULTY_NAMES" :key="value" :value="value">
-            {{ name }}
+          <NRadioButton v-for="value in difficultyChoices" :key="value" :value="value">
+            {{ DIFFICULTY_NAMES[value] }}
           </NRadioButton>
         </NRadioGroup>
       </template>

@@ -7,7 +7,8 @@ export type Board = readonly CellValue[]
 // Bits 0–8 represent digits 1–9; zero means no notes/candidates, never the digit zero.
 export type NoteMask = number
 
-export type Difficulty = 'easy' | 'medium' | 'hard'
+export type StandardDifficulty = 'easy' | 'medium' | 'hard'
+export type Difficulty = StandardDifficulty | 'expert'
 
 export type ParseResult<T> = { valid: true; value: T } | { valid: false; issues: readonly string[] }
 
@@ -36,5 +37,5 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isDifficulty(value: unknown): value is Difficulty {
-  return value === 'easy' || value === 'medium' || value === 'hard'
+  return value === 'easy' || value === 'medium' || value === 'hard' || value === 'expert'
 }

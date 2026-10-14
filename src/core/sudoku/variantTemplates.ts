@@ -1,5 +1,5 @@
 import { parseBoard } from '@/core/sudoku/board'
-import type { Board, Difficulty } from '@/core/sudoku/types'
+import type { Board, Difficulty, StandardDifficulty } from '@/core/sudoku/types'
 import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules'
 
 export type VariantTemplate = {
@@ -20,15 +20,15 @@ function literalBoard(text: string): Board {
 function tiers(
   rules: PuzzleRules,
   solution: Board,
-  givens: Record<Difficulty, string>,
+  givens: Record<StandardDifficulty, string>,
 ): Record<Difficulty, readonly VariantTemplate[]> {
-  const make = (difficulty: Difficulty): VariantTemplate => ({
+  const make = (difficulty: StandardDifficulty): VariantTemplate => ({
     rules,
     solution,
     difficulty,
     givens: literalBoard(givens[difficulty]),
   })
-  return { easy: [make('easy')], medium: [make('medium')], hard: [make('hard')] }
+  return { easy: [make('easy')], medium: [make('medium')], hard: [make('hard')], expert: [] }
 }
 // Original fixtures authored for this project; uniqueness is independently checked in tests.
 // Difficulty follows the explained rule-aware trace, and removing variant rules changes solvability.

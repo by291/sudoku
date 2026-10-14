@@ -1,9 +1,23 @@
-import type { Digit, ParseResult } from '@/core/sudoku/types'
+import type { Board, Digit, ParseResult } from '@/core/sudoku/types'
 import type { HintResult } from '@/core/sudoku/hint'
 import { isCellIndex } from '@/core/sudoku/board'
 import { ALL_DIGITS_MASK, isDigit, isRecord } from '@/core/sudoku/types'
-import { TECHNIQUE_NAMES, isClassicTechnique, matchesRuleTechnique } from '@/core/sudoku/techniques'
-import type { LogicalStep, Technique, RuleEvidence } from '@/core/sudoku/techniques'
+import {
+  TECHNIQUE_NAMES,
+  isClassicTechnique,
+  matchesRuleTechnique,
+  isAdvancedEvidence,
+  isAdvancedTechnique,
+} from '@/core/sudoku/techniques'
+import type {
+  AdvancedEvidence,
+  LogicalStep,
+  Technique,
+  RuleEvidence,
+} from '@/core/sudoku/techniques'
+import { validateAdvancedStep } from '@/core/sudoku/advancedTechniques'
+import { createLogicalWorkspace, findLogicalStep, applyLogicalStep } from '@/core/sudoku/logic'
+import { createWorkBudget, consumeWork, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import { compileRules, constraintCells, parseRules } from '@/core/sudoku/rules'
 import type { PuzzleRules, Unit } from '@/core/sudoku/rules'
 
@@ -155,6 +169,15 @@ function parseLogicalEvidence(value: unknown): LogicalStep['evidence'] | null {
     return null
   }
 
+  if (
+    value.kind === 'subset' ||
+    value.kind === 'fish' ||
+    value.kind === 'wing' ||
+    value.kind === 'coloring'
+  ) {
+    return parseAdvancedEvidence(value)
+  }
+
   if (value.kind !== 'unit') {
     return parseRuleEvidence(value)
   }
@@ -201,6 +224,99 @@ function parseLogicalEvidence(value: unknown): LogicalStep['evidence'] | null {
   return { kind: 'unit', unit, cells: value.cells, digits: value.digits, premises, units }
 }
 
+function parseAdvancedEvidence(value: Record<string, unknown>): AdvancedEvidence | null {
+  if (
+    !Array.isArray(value.cells) ||
+    value.cells.length < 1 ||
+    value.cells.length > 81 ||
+    !value.cells.every(isIndex) ||
+    new Set(value.cells).size !== value.cells.length ||
+    !isDigitList(value.digits) ||
+    !Array.isArray(value.domains) ||
+    value.domains.length !== 81
+  ) {
+    return null
+  }
+  const domains: { cell: number; mask: number }[] = []
+  for (const raw of value.domains) {
+    if (
+      !isRecord(raw) ||
+      raw.cell !== domains.length ||
+      typeof raw.mask !== 'number' ||
+      !Number.isInteger(raw.mask) ||
+      raw.mask < 0 ||
+      raw.mask > ALL_DIGITS_MASK
+    ) {
+      return null
+    }
+    domains.push({ cell: domains.length, mask: raw.mask })
+  }
+  const common = { cells: value.cells, digits: value.digits, domains }
+  if (value.kind === 'subset') {
+    const unit = parseUnit(value.unit)
+    return unit && typeof value.hidden === 'boolean'
+      ? { ...common, kind: 'subset', unit, hidden: value.hidden }
+      : null
+  }
+  if (value.kind === 'fish') {
+    if (
+      !Array.isArray(value.bases) ||
+      !Array.isArray(value.covers) ||
+      value.bases.length < 2 ||
+      value.bases.length > 3 ||
+      value.covers.length !== value.bases.length
+    ) {
+      return null
+    }
+    const bases = value.bases.map(parseUnit)
+    const covers = value.covers.map(parseUnit)
+    return bases.every((unit) => unit !== null) && covers.every((unit) => unit !== null)
+      ? { ...common, kind: 'fish', bases, covers }
+      : null
+  }
+  if (value.kind === 'wing') {
+    return isIndex(value.pivot) && isCellList(value.wings) && value.wings.length === 2
+      ? { ...common, kind: 'wing', pivot: value.pivot, wings: [value.wings[0], value.wings[1]] }
+      : null
+  }
+  if (
+    value.kind !== 'coloring' ||
+    (value.mode !== 'trap' && value.mode !== 'wrap') ||
+    !Array.isArray(value.colors) ||
+    value.colors.length !== 2 ||
+    !Array.isArray(value.links) ||
+    !value.links.length ||
+    value.links.length > 27
+  ) {
+    return null
+  }
+  const groups: number[][] = []
+  for (const group of value.colors) {
+    if (
+      !Array.isArray(group) ||
+      !group.length ||
+      group.length > 81 ||
+      !group.every(isIndex) ||
+      new Set(group).size !== group.length
+    ) {
+      return null
+    }
+    groups.push(group)
+  }
+  const links: Extract<AdvancedEvidence, { kind: 'coloring' }>['links'][number][] = []
+  for (const link of value.links) {
+    if (!isRecord(link) || !isCellList(link.cells) || link.cells.length !== 2) {
+      return null
+    }
+    const unit = parseUnit(link.unit)
+    if (!unit) {
+      return null
+    }
+    links.push({ unit, cells: [link.cells[0], link.cells[1]] })
+  }
+  return { ...common, kind: 'coloring', mode: value.mode, colors: [groups[0], groups[1]], links }
+}
+
 function parseStep(value: unknown): LogicalStep | null {
   if (!isRecord(value) || !isTechnique(value.technique)) {
     return null
@@ -211,9 +327,10 @@ function parseStep(value: unknown): LogicalStep | null {
     return null
   }
 
-  const matches =
-    evidence.kind === 'unit'
-      ? isClassicTechnique(value.technique)
+  const matches = isAdvancedEvidence(evidence)
+    ? isAdvancedTechnique(value.technique)
+    : evidence.kind === 'unit'
+      ? isClassicTechnique(value.technique) && !isAdvancedTechnique(value.technique)
       : matchesRuleTechnique(value.technique, evidence.kind)
   if (!matches) {
     return null
@@ -224,7 +341,12 @@ function parseStep(value: unknown): LogicalStep | null {
     return { ...common, kind: 'placement', cell: value.cell, digit: value.digit }
   }
 
-  if (value.kind !== 'elimination' || !Array.isArray(value.removals) || !value.removals.length) {
+  if (
+    value.kind !== 'elimination' ||
+    !Array.isArray(value.removals) ||
+    !value.removals.length ||
+    value.removals.length > 81 * 9
+  ) {
     return null
   }
 
@@ -299,6 +421,7 @@ export function parseHint(value: unknown): HintResult | null {
 export function validateHintEvidence(
   hint: HintResult,
   rules: PuzzleRules,
+  board?: Board,
 ): ParseResult<HintResult> {
   const parsed = parseHint(hint)
   const invalid: ParseResult<HintResult> = {
@@ -315,6 +438,8 @@ export function validateHintEvidence(
 
   // Valid shape is insufficient: evidence must name the exact clue and ordered geometry requested.
   const context = compileRules(rules)
+  const state = board ? createLogicalWorkspace(board, context) : null
+  const budget = createWorkBudget(DEFAULT_WORK_LIMIT)
   const equalCells = (first: readonly number[], second: readonly number[]) =>
     first.length === second.length && first.every((cell, index) => cell === second[index])
 
@@ -348,7 +473,11 @@ export function validateHintEvidence(
 
   for (const step of parsed.steps) {
     const evidence = step.evidence
-    if (evidence.kind === 'unit') {
+    if (isAdvancedEvidence(evidence)) {
+      if (!state || !consumeWork(budget, 81 * 81) || !validateAdvancedStep(state, step)) {
+        return invalid
+      }
+    } else if (evidence.kind === 'unit') {
       const unit = context.units.find(
         (candidate) =>
           candidate.kind === evidence.unit.kind && candidate.index === evidence.unit.index,
@@ -392,6 +521,27 @@ export function validateHintEvidence(
       if (!affected.every((cell) => evidence.cells.includes(cell))) {
         return invalid
       }
+    }
+
+    if (state) {
+      if (!isAdvancedEvidence(evidence)) {
+        const expected = findLogicalStep(state, [step.technique], budget)
+        if (expected.status !== 'complete' || !expected.step || expected.step.kind !== step.kind) {
+          return invalid
+        }
+        const actual = expected.step
+        if (
+          step.kind === 'placement'
+            ? actual.kind !== 'placement' ||
+              actual.cell !== step.cell ||
+              actual.digit !== step.digit
+            : actual.kind !== 'elimination' ||
+              JSON.stringify(actual.removals) !== JSON.stringify(step.removals)
+        ) {
+          return invalid
+        }
+      }
+      applyLogicalStep(state, step)
     }
   }
 

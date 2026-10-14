@@ -7,8 +7,9 @@ import type { ParseResult } from '@/core/sudoku/types'
 import { compileRules, isSudokuVariant, parseRules } from '@/core/sudoku/rules'
 import type { NewSudokuVariant, PuzzleRules, SudokuVariant } from '@/core/sudoku/rules'
 import { generateVariantPuzzle } from '@/core/sudoku/variantGeneration'
+import { supportsDifficulty } from '@/core/sudoku/difficulties'
 
-export const PUZZLE_VERSION = 'sudoku-v2'
+export const PUZZLE_VERSION = 'sudoku-v3'
 export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v2'
 
 export type Puzzle = {
@@ -30,6 +31,9 @@ export function createGenerationInput(
   difficulty: Difficulty,
   seed: string,
 ): GenerationInput {
+  if (!supportsDifficulty(variant, difficulty)) {
+    throw new TypeError('Expert difficulty is supported only for Classic')
+  }
   return variant === 'classic'
     ? { variant, difficulty, seed, puzzleVersion: PUZZLE_VERSION }
     : { variant, difficulty, seed, puzzleVersion: VARIANT_PUZZLE_VERSION }
@@ -46,6 +50,13 @@ export function parseGenerationInput(value: unknown): ParseResult<GenerationInpu
     return { valid: false, issues: ['Invalid generation input'] }
   }
 
+  if (!supportsDifficulty(value.variant, value.difficulty)) {
+    return {
+      valid: false,
+      issues: ['Expert is available only for Classic. Choose Classic or Easy, Medium, or Hard.'],
+    }
+  }
+
   const parsed = createGenerationInput(value.variant, value.difficulty, value.seed)
 
   return parsed.puzzleVersion === value.puzzleVersion
@@ -60,7 +71,9 @@ export type GenerationLimits = {
   fallbackWork: number
 }
 
-export type GenerationResult =
+export type GenerationMetrics = { constructionWork: number; fallbackWork: number; layouts: number }
+
+export type GenerationAttemptResult =
   | {
       status: 'ready'
       puzzle: Puzzle
@@ -69,6 +82,8 @@ export type GenerationResult =
     }
   | { status: 'budget-exhausted'; stage: 'fallback-validation' }
   | { status: 'failed'; reason: string }
+
+export type GenerationResult = GenerationAttemptResult & { metrics: Readonly<GenerationMetrics> }
 
 export function parsePuzzle(value: unknown): ParseResult<Puzzle> {
   if (
@@ -87,6 +102,10 @@ export function parsePuzzle(value: unknown): ParseResult<Puzzle> {
   const rules = parseRules(value.rules)
   if (!givens.valid || !solution.valid || !rules.valid) {
     return { valid: false, issues: ['Invalid puzzle board or rules'] }
+  }
+
+  if (!supportsDifficulty(rules.value.kind, value.difficulty)) {
+    return { valid: false, issues: ['Expert difficulty is supported only for Classic'] }
   }
 
   if (
@@ -142,17 +161,18 @@ export function generatePuzzle(
   input: GenerationInput,
   limits = DEFAULT_GENERATION_LIMITS,
 ): GenerationResult {
+  const metrics: GenerationMetrics = { constructionWork: 0, fallbackWork: 0, layouts: 0 }
   const parsed = parseGenerationInput(input)
   const parsedLimits = parseGenerationLimits(limits)
   if (!parsed.valid) {
-    return { status: 'failed', reason: parsed.issues.join('; ') }
+    return { status: 'failed', reason: parsed.issues.join('; '), metrics }
   }
   if (!parsedLimits.valid) {
-    return { status: 'failed', reason: parsedLimits.issues.join('; ') }
+    return { status: 'failed', reason: parsedLimits.issues.join('; '), metrics }
   }
 
   if (parsed.value.variant === 'classic') {
-    return generateClassicPuzzle(parsed.value, parsedLimits.value)
+    return { ...generateClassicPuzzle(parsed.value, parsedLimits.value, metrics), metrics }
   }
-  return generateVariantPuzzle(parsed.value, parsedLimits.value)
+  return { ...generateVariantPuzzle(parsed.value, parsedLimits.value, metrics), metrics }
 }

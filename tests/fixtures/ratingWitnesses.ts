@@ -10,7 +10,7 @@ type UnitWitness = {
   removals: readonly { cell: number; digit: Digit }[]
 } & ({ technique: 'locked-candidate'; target: Unit } | { technique: 'naked-pair' | 'hidden-pair' })
 type RatingWitness = UnitWitness | { technique: 'arrow-combination'; domains: Domains }
-type HigherTierFixtureId = `${SudokuVariant}-${Exclude<Difficulty, 'easy'>}`
+type HigherTierFixtureId = `${SudokuVariant}-${Exclude<Difficulty, 'easy' | 'expert'>}`
 
 // Fixed facts from authored boards: locked positions share a region; pairs reserve two digits.
 // The tests independently replay candidate lists and prove each implication from these facts.

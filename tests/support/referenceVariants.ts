@@ -6,6 +6,7 @@ export function referenceCountSolutions(
   board: Board,
   rules: PuzzleRules,
   maxSolutions: 1 | 2 = 2,
+  domains?: readonly (readonly number[])[],
 ): { count: 0 | 1 | 2; solution: Board | null } {
   const grid: CellValue[] = [...board]
   const groups: number[][] = []
@@ -73,24 +74,46 @@ export function referenceCountSolutions(
   }
   let count: 0 | 1 | 2 = 0
   let solution: Board | null = null
+  let domainVisits = 0
   function visit(): void {
+    if (domains && ++domainVisits > 2000)
+      throw new Error('Independent candidate search budget exhausted')
     if (count >= maxSolutions) return
     let target = -1
     let choices: readonly Digit[] = digits
+    const cellChoices: (readonly Digit[])[] = Array.from({ length: 81 }, () => [])
     for (let cell = 0; cell < 81; cell++) {
       if (grid[cell] !== 0) continue
       const candidates = digits.filter((digit) => {
+        if (domains && !domains[cell].includes(digit)) return false
         grid[cell] = digit
         const allowed = consistent(cell)
         grid[cell] = 0
         return allowed
       })
+      cellChoices[cell] = candidates
       if (!candidates.length) return
       if (target === -1 || candidates.length < choices.length) {
         target = cell
         choices = candidates
       }
-      if (choices.length === 1) break
+      if (choices.length === 1 && !domains) break
+    }
+    if (domains && target !== -1) {
+      // Independently enforce digit coverage in complete units to prune impossible teaching domains.
+      for (const group of groups.filter((group) => group.length === 9)) {
+        for (const digit of digits) {
+          if (group.some((cell) => grid[cell] === digit)) continue
+          const locations = group.filter(
+            (cell) => grid[cell] === 0 && cellChoices[cell].includes(digit),
+          )
+          if (!locations.length) return
+          if (locations.length === 1) {
+            target = locations[0]
+            choices = [digit]
+          }
+        }
+      }
     }
     if (target === -1) {
       count = count === 0 ? 1 : 2

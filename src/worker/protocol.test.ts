@@ -9,11 +9,48 @@ import { findVariantStep } from '@/core/sudoku/variantTechniques'
 import { compileRules } from '@/core/sudoku/rules'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import type { HintResult } from '@/core/sudoku/hint'
+import { parseHint } from '@/worker/hintEvidence'
 import {
   ARROW_REPEAT_BOARD,
   ARROW_REPEAT_RULES,
   VARIANT_FIXTURES,
 } from '../../tests/fixtures/variants'
+
+it('rejects an elimination payload larger than the board candidate space', () => {
+  expect(
+    parseHint({
+      kind: 'deduction',
+      placement: { cell: 40, digit: 5 },
+      steps: [
+        {
+          kind: 'elimination',
+          technique: 'locked-candidate',
+          evidence: {
+            kind: 'unit',
+            unit: { kind: 'row', index: 0 },
+            cells: [0, 1],
+            digits: [1],
+            premises: [],
+          },
+          removals: Array.from({ length: 730 }, () => ({ cell: 0, digit: 1 })),
+        },
+        {
+          kind: 'placement',
+          technique: 'naked-single',
+          cell: 40,
+          digit: 5,
+          evidence: {
+            kind: 'unit',
+            unit: { kind: 'row', index: 4 },
+            cells: [40],
+            digits: [5],
+            premises: [],
+          },
+        },
+      ],
+    }),
+  ).toBeNull()
+})
 
 it.each(RATING_FIXTURES)('accepts compact assessment for $id', (fixture) => {
   const input = createAssessmentInput(fixture.board, fixture.rules)
@@ -48,7 +85,7 @@ it('decodes optional generation metadata independently from a playable puzzle', 
   const puzzle = {
     seed: 'metadata',
     difficulty: 'easy',
-    puzzleVersion: 'sudoku-v2',
+    puzzleVersion: 'sudoku-v3',
     givens: fixture.board,
     solution: fixture.solution,
     rules: fixture.rules,
@@ -162,7 +199,9 @@ it.each(['killer', 'thermo', 'arrow'] as const)(
       result.status !== 'complete' ||
       !result.step ||
       result.step.kind !== 'placement' ||
-      result.step.evidence.kind === 'unit'
+      (result.step.evidence.kind !== 'cage' &&
+        result.step.evidence.kind !== 'thermo' &&
+        result.step.evidence.kind !== 'arrow')
     ) {
       throw new Error('Expected fixed clue placement')
     }

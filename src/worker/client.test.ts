@@ -102,7 +102,7 @@ it('rejects assessment identities that differ from the submitted rules', async (
     requestId: worker.requests[0].requestId,
     outcome: {
       status: 'completed',
-      value: { status: 'ungraded', variant: 'arrow', ratingVersion: 'sudoku-rating-v1' },
+      value: { status: 'ungraded', variant: 'arrow', ratingVersion: 'sudoku-rating-v2' },
     },
   })
 

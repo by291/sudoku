@@ -4,8 +4,31 @@ import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 import { UNIT_SIZE } from '@/core/sudoku/types'
 import type { RuleContext } from '@/core/sudoku/rules'
 
-export type ClassicTechnique =
+export type BasicClassicTechnique =
   'naked-single' | 'hidden-single' | 'locked-candidate' | 'naked-pair' | 'hidden-pair'
+
+export type AdvancedTechnique =
+  'naked-triple' | 'hidden-triple' | 'x-wing' | 'swordfish' | 'xy-wing' | 'simple-coloring'
+export type ClassicTechnique = BasicClassicTechnique | AdvancedTechnique
+
+type CandidateDomain = { cell: number; mask: NoteMask }
+type PatternFacts = {
+  cells: readonly number[]
+  digits: readonly Digit[]
+  domains: readonly CandidateDomain[]
+}
+export type AdvancedEvidence = PatternFacts &
+  (
+    | { kind: 'subset'; unit: Unit; hidden: boolean }
+    | { kind: 'fish'; bases: readonly Unit[]; covers: readonly Unit[] }
+    | { kind: 'wing'; pivot: number; wings: readonly [number, number] }
+    | {
+        kind: 'coloring'
+        mode: 'trap' | 'wrap'
+        colors: readonly [readonly number[], readonly number[]]
+        links: readonly { unit: Unit; cells: readonly [number, number] }[]
+      }
+  )
 
 export type Technique =
   | ClassicTechnique
@@ -45,6 +68,7 @@ export type LogicalStep = {
   technique: Technique
   evidence:
     | RuleEvidence
+    | AdvancedEvidence
     | {
         kind: 'unit'
         unit: Unit
@@ -58,12 +82,24 @@ export type LogicalStep = {
   | { kind: 'elimination'; removals: readonly { cell: number; digit: Digit }[] }
 )
 
-export const TECHNIQUES: readonly ClassicTechnique[] = [
+export const TECHNIQUES: readonly BasicClassicTechnique[] = [
   'naked-single',
   'hidden-single',
   'locked-candidate',
   'naked-pair',
   'hidden-pair',
+]
+export const ADVANCED_TECHNIQUES: readonly AdvancedTechnique[] = [
+  'naked-triple',
+  'hidden-triple',
+  'x-wing',
+  'swordfish',
+  'xy-wing',
+  'simple-coloring',
+]
+export const ALL_CLASSIC_TECHNIQUES: readonly ClassicTechnique[] = [
+  ...TECHNIQUES,
+  ...ADVANCED_TECHNIQUES,
 ]
 export const TECHNIQUE_NAMES: Record<Technique, string> = {
   'naked-single': '唯一候选数',
@@ -71,6 +107,12 @@ export const TECHNIQUE_NAMES: Record<Technique, string> = {
   'locked-candidate': '区块排除',
   'naked-pair': '显性数对',
   'hidden-pair': '隐性数对',
+  'naked-triple': '显性三数组',
+  'hidden-triple': '隐性三数组',
+  'x-wing': 'X-Wing',
+  swordfish: '剑鱼',
+  'xy-wing': 'XY-Wing',
+  'simple-coloring': '简单着色',
   'cage-distinct': '笼内排除',
   'cage-remainder': '笼内余数',
   'cage-combination': '笼内组合',
@@ -80,7 +122,22 @@ export const TECHNIQUE_NAMES: Record<Technique, string> = {
 }
 
 export function isClassicTechnique(value: Technique): value is ClassicTechnique {
-  return TECHNIQUES.some((technique) => technique === value)
+  return ALL_CLASSIC_TECHNIQUES.some((technique) => technique === value)
+}
+
+export function isAdvancedTechnique(value: Technique): value is AdvancedTechnique {
+  return ADVANCED_TECHNIQUES.some((technique) => technique === value)
+}
+
+export function isAdvancedEvidence(
+  evidence: LogicalStep['evidence'],
+): evidence is AdvancedEvidence {
+  return (
+    evidence.kind === 'subset' ||
+    evidence.kind === 'fish' ||
+    evidence.kind === 'wing' ||
+    evidence.kind === 'coloring'
+  )
 }
 
 export function matchesRuleTechnique(technique: Technique, kind: RuleEvidence['kind']): boolean {
@@ -98,10 +155,58 @@ function cellPosition(cell: number): string {
   return `第${Math.floor(cell / UNIT_SIZE) + 1}行第${(cell % UNIT_SIZE) + 1}列`
 }
 
+function advancedReason(evidence: AdvancedEvidence): string {
+  switch (evidence.kind) {
+    case 'subset':
+      return evidence.hidden
+        ? '这三个数字在单元中仅能占据这三格，排除三格内的其他候选数'
+        : '三格的候选数合计只有三个数字，排除单元其他格中的这三个数字'
+    case 'fish':
+      return '这些行（或列）的该数字位置仅覆盖相同数量的列（或行），排除覆盖单元的其他位置'
+    case 'wing':
+      return '枢轴的两种取值分别迫使一翼取共同数字，因此同时看到两翼的格不能取该数字'
+    case 'coloring':
+      return evidence.mode === 'wrap'
+        ? '强链两种颜色交替；同色格互相看到，该颜色不成立'
+        : '此格同时看到强链的两种颜色，无论哪种颜色成立都不能取该数字'
+  }
+}
+
 export function explainStepEvidence(step: LogicalStep): readonly string[] {
   const evidence = step.evidence
   if (evidence.kind === 'unit') {
     return []
+  }
+
+  if (isAdvancedEvidence(evidence)) {
+    const details = evidence.domains
+      .filter(({ cell, mask }) => evidence.cells.includes(cell) && mask !== 0)
+      .map(({ cell, mask }) => `${cellPosition(cell)}：${digitsIn(mask).join('、')}`)
+    if (evidence.kind === 'fish') {
+      const unitLabel = (unit: Unit) => `第${unit.index + 1}${unit.kind === 'row' ? '行' : '列'}`
+      details.unshift(
+        `基础单元：${evidence.bases.map(unitLabel).join('、')}`,
+        `覆盖单元：${evidence.covers.map(unitLabel).join('、')}`,
+      )
+    }
+    if (evidence.kind === 'wing') {
+      details.unshift(
+        `枢轴：${cellPosition(evidence.pivot)}；两翼：${evidence.wings.map(cellPosition).join('、')}`,
+      )
+    }
+    if (evidence.kind === 'coloring') {
+      details.unshift(
+        `颜色 A：${evidence.colors[0].map(cellPosition).join('、')}`,
+        `颜色 B：${evidence.colors[1].map(cellPosition).join('、')}`,
+      )
+      details.push(
+        ...evidence.links.map(
+          ({ cells }) =>
+            `${cellPosition(cells[0])} ↔ ${cellPosition(cells[1])}：数字${evidence.digits[0]}恰有两个位置`,
+        ),
+      )
+    }
+    return details
   }
 
   if (evidence.kind === 'thermo') {
@@ -152,6 +257,14 @@ export function explainStepEvidence(step: LogicalStep): readonly string[] {
 
 export function explainStep(step: LogicalStep): string {
   const evidence = step.evidence
+  if (isAdvancedEvidence(evidence)) {
+    const reason = advancedReason(evidence)
+    const conclusion =
+      step.kind === 'elimination'
+        ? step.removals.map(({ cell, digit }) => `${cellPosition(cell)}排除${digit}`).join('；')
+        : ''
+    return `${TECHNIQUE_NAMES[step.technique]}：${reason}。${conclusion}。`
+  }
   if (evidence.kind !== 'unit') {
     const conclusion =
       step.kind === 'placement'
@@ -186,7 +299,7 @@ export function explainStep(step: LogicalStep): string {
     .map((cell) => `第${Math.floor(cell / UNIT_SIZE) + 1}行第${(cell % UNIT_SIZE) + 1}列`)
     .join('、')
   const digits = step.evidence.digits.join('、')
-  const reasons: Record<ClassicTechnique, string> = {
+  const reasons: Record<BasicClassicTechnique, string> = {
     'naked-single': `${cells}只剩下候选数${digits}，因此可以确定这个数字`,
     'hidden-single': `数字${digits}在这个单元中只有${cells}这一个可用位置`,
     'locked-candidate': `数字${digits}只能出现在${cells}，这些格子也集中在同一行、列或宫，所以可以排除该交叉单元外高亮位置的${digits}`,
@@ -209,9 +322,12 @@ export function explainStep(step: LogicalStep): string {
   }
 
   const prefix = premises.length ? `结合${[...new Set(premises)].join('、')}，` : ''
-  const reason = isClassicTechnique(step.technique)
-    ? reasons[step.technique]
-    : '候选范围受到当前规则限制'
+  const reason =
+    TECHNIQUES.some((technique) => technique === step.technique) &&
+    !isAdvancedTechnique(step.technique) &&
+    isClassicTechnique(step.technique)
+      ? reasons[step.technique]
+      : '候选范围受到当前规则限制'
 
   return `${prefix}${TECHNIQUE_NAMES[step.technique]}：第${evidence.unit.index + 1}${unitName}中，${reason}。`
 }

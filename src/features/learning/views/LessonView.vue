@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NAlert, NButton, NCard } from 'naive-ui'
 import type { CardProps } from 'naive-ui'
-import { computed, useId } from 'vue'
+import { computed, useId, useTemplateRef, nextTick } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import NumberPad from '@/shared/components/NumberPad.vue'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
@@ -9,12 +9,14 @@ import GameView from '@/features/game/views/GameView.vue'
 import { LESSONS } from '@/features/learning/model/lessons'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { useLessonExercise } from '@/features/learning/composables/useLessonExercise'
+import { explainStepEvidence } from '@/core/sudoku/techniques'
 
 const route = useRoute()
 const learning = useLearningStore()
 const lesson = computed(() => LESSONS.find((lesson) => lesson.id === route.params.lessonId))
 const practice = computed(() => route.query.practice === '1')
 const explanationId = useId()
+const boardRegion = useTemplateRef<HTMLElement>('boardRegion')
 const {
   selected,
   removals,
@@ -29,7 +31,22 @@ const {
   answer,
   submitEliminations,
   resetExercise,
+  stageLesson,
+  stageCaption,
+  canAdvance,
+  completed,
+  nextStage,
 } = useLessonExercise(lesson, practice)
+const evidenceDetails = computed(() =>
+  stageLesson.value ? explainStepEvidence(stageLesson.value.step) : [],
+)
+
+async function advanceStage() {
+  nextStage()
+  await nextTick()
+  const target = exerciseCells.value[0]
+  boardRegion.value?.querySelectorAll('button')[target]?.focus()
+}
 
 const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
   correct.value
@@ -56,12 +73,12 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
     :practice-difficulty="lesson.practiceDifficulty"
     :practice-variant="lesson.practiceVariant"
   />
-  <section v-else class="lesson-page">
+  <section v-else-if="stageLesson" class="lesson-page">
     <header class="lesson-heading">
       <h1>{{ lesson.title }}</h1>
       <p class="muted exercise-caption">
         {{
-          lesson.exercise.kind === 'placement'
+          stageLesson.exercise.kind === 'placement'
             ? '填写圆点标出的空格，找出正确数字。'
             : '选出圆点位置可排除的候选数，再提交。'
         }}
@@ -71,12 +88,12 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
       {{ learning.error }}
     </NAlert>
     <div class="lesson-layout">
-      <div class="lesson-board">
+      <div ref="boardRegion" class="lesson-board">
         <SudokuBoard
-          :board="lesson.board"
-          :givens="lesson.board"
+          :board="stageLesson.board"
+          :givens="stageLesson.board"
           :notes="exampleNotes"
-          :rules="lesson.rules"
+          :rules="stageLesson.rules"
           :related-cells="[]"
           :selected-cell="selected"
           :conflicts="[]"
@@ -86,9 +103,16 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
           @select="selected = $event"
         />
         <div class="exercise-toolbar" role="group" aria-label="练习操作">
-          <template v-if="lesson.exercise.kind === 'elimination'">
-            <NButton type="primary" :disabled="busy" @click="submitEliminations">提交排除</NButton>
-            <NButton :disabled="busy" @click="resetExercise">重置练习</NButton>
+          <template v-if="stageLesson.exercise.kind === 'elimination'">
+            <NButton
+              type="primary"
+              :disabled="busy || canAdvance || completed"
+              @click="submitEliminations"
+              >提交排除</NButton
+            >
+            <NButton :disabled="busy || canAdvance || completed" @click="resetExercise"
+              >重置练习</NButton
+            >
           </template>
           <NButton
             :aria-expanded="showExplanation"
@@ -101,8 +125,8 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
         <NumberPad
           class="exercise-pad"
           layout="row"
-          :disabled="selected === null || busy"
-          :action-label="lesson.exercise.kind === 'placement' ? '填写' : '排除'"
+          :disabled="selected === null || busy || canAdvance || completed"
+          :action-label="stageLesson.exercise.kind === 'placement' ? '填写' : '排除'"
           @digit="answer"
         />
         <div class="exercise-status muted">
@@ -118,16 +142,22 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
         >
           {{ feedback }}
         </NCard>
+        <p class="muted">{{ stageCaption }}</p>
+        <p v-if="busy" class="muted">正在准备或保存练习，请稍候…</p>
+        <NButton v-if="canAdvance" type="primary" size="large" @click="advanceStage"
+          >下一阶段</NButton
+        >
+        <p v-if="completed">本课全部练习已完成，进度已保存。</p>
         <p class="muted small">固定教学片段 · 候选数已包含前面推理的排除结果</p>
       </div>
       <aside class="panel lesson-guide" aria-label="练习指引">
         <p class="exercise-kind">
-          {{ lesson.exercise.kind === 'placement' ? '填写练习' : '候选数排除' }}
+          {{ stageLesson.exercise.kind === 'placement' ? '填写练习' : '候选数排除' }}
         </p>
         <h2>试着推理一次</h2>
         <p class="introduction">{{ lesson.introduction }}</p>
         <p>{{ exercisePrompt }}</p>
-        <template v-if="lesson.exercise.kind === 'elimination'">
+        <template v-if="stageLesson.exercise.kind === 'elimination'">
           <p class="muted">已选择 {{ removals.length }} 个排除项</p>
           <ul v-if="removals.length" class="removal-list">
             <li v-for="pair in removals" :key="`${pair.cell}:${pair.digit}`">
@@ -138,7 +168,10 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
         </template>
         <div v-show="showExplanation" :id="explanationId" class="explanation">
           <h3>这一步，怎么想</h3>
-          <p>{{ lesson.explanation }}</p>
+          <p>{{ stageLesson.explanation }}</p>
+          <ul v-if="evidenceDetails.length" class="evidence-details">
+            <li v-for="detail in evidenceDetails" :key="detail">{{ detail }}</li>
+          </ul>
         </div>
         <div class="practice-entry">
           <h3>把方法用起来</h3>

@@ -590,7 +590,7 @@ it('does not create or install a cancelled game while its catalog read is pendin
       difficulty: 'easy',
       seed: 'cancel-before-commit',
       variant: 'classic',
-      puzzleVersion: 'sudoku-v2',
+      puzzleVersion: 'sudoku-v3',
     },
     { kind: 'free' },
   )

@@ -159,7 +159,7 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
             return outcome
           }
 
-          const hint = validateHintEvidence(outcome.value, rules)
+          const hint = validateHintEvidence(outcome.value, rules, board)
 
           return hint.valid ? { status: 'completed', value: hint.value } : null
         },

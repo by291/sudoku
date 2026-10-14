@@ -14,7 +14,7 @@ import { CLASSIC_RULES, compileRules } from '@/core/sudoku/rules'
 import { getDailyIdentity } from '@/features/game/model/daily'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import type { Settings } from '@/features/settings/model/preferences'
-import { isLessonId } from '@/features/learning/model/lessonIds'
+import { isLessonId, lessonStageCount } from '@/features/learning/model/lessonIds'
 import { decodePuzzleAssessment } from '@/core/sudoku/rating'
 
 export type SessionRecord = { formatVersion: 2; revision: number; session: GameSession }
@@ -344,6 +344,20 @@ export function parseSettings(value: unknown): ParseResult<Settings> {
     return { valid: false, issues: ['Invalid settings'] }
   }
 
+  let lessonStages: Record<string, number> | undefined
+  if (value.lessonStages !== undefined) {
+    if (!isRecord(value.lessonStages) || Object.keys(value.lessonStages).length > 32) {
+      return { valid: false, issues: ['Invalid lesson stage progress'] }
+    }
+    lessonStages = {}
+    for (const [id, stage] of Object.entries(value.lessonStages)) {
+      if (!isLessonId(id) || !isNonnegativeInteger(stage) || stage >= lessonStageCount(id)) {
+        return { valid: false, issues: ['Invalid lesson stage progress'] }
+      }
+      lessonStages[id] = stage
+    }
+  }
+
   return {
     valid: true,
     value: {
@@ -351,6 +365,7 @@ export function parseSettings(value: unknown): ParseResult<Settings> {
       showTimer: value.showTimer,
       highlightConflicts: value.highlightConflicts,
       currentLessonId: isLessonId(value.currentLessonId) ? value.currentLessonId : null,
+      ...(lessonStages ? { lessonStages } : {}),
     },
   }
 }

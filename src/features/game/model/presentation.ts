@@ -4,6 +4,7 @@ export const DIFFICULTY_NAMES: Record<Difficulty, string> = {
   easy: '简单',
   medium: '中等',
   hard: '困难',
+  expert: '专家',
 }
 
 export function formatDuration(milliseconds: number): string {

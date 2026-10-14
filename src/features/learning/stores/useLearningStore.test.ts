@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
-import { LESSONS } from '@/features/learning/model/lessons'
+import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
+import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { deferred } from '../../../../tests/support/deferred'
 
 it('allows retries, persists progress once, and retains it across lesson selection', async () => {
@@ -11,9 +12,10 @@ it('allows retries, persists progress once, and retains it across lesson selecti
 
   expect((await learning.submitExercise('rules', { cell: 80, digit: 9 })).correct).toBe(false)
   expect(learning.progress).toHaveLength(0)
-  await learning.submitExercise('rules', LESSONS[0].exercise.expected)
-  await learning.submitExercise('rules', LESSONS[0].exercise.expected)
-  learning.selectLesson('hidden-pair')
+  for (const [index, stage] of lessonStages(LESSONS[0]).entries()) {
+    await learning.submitExercise('rules', stageAnswer(stage).expected, index)
+  }
+  await learning.selectLesson('hidden-pair')
   await learning.load()
 
   expect(learning.progress).toHaveLength(1)
@@ -36,7 +38,12 @@ it('ignores an exercise completion that finishes after progress reset', async ()
 
     return { ok: true, value: undefined }
   }
-  const submitting = learning.submitExercise('rules', LESSONS[0].exercise.expected)
+  await learning.submitExercise('rules', LESSONS[0].exercise.expected, 0)
+  const submitting = learning.submitExercise(
+    'rules',
+    stageAnswer(lessonStages(LESSONS[0])[1]).expected,
+    1,
+  )
   await entered.promise
   learning.reset()
   gate.resolve()
@@ -62,6 +69,97 @@ it('ignores a progress read that finishes after reset', async () => {
   gate.resolve()
   await loading
 
+  expect(learning.progress).toEqual([])
+  test.dispose()
+})
+
+it('resumes committed stages after reload while preserving old completion facts', async () => {
+  const test = await createTestRuntime()
+  await test.database.put('lessons', { lessonId: 'rules', completedAt: '2026-10-11T01:00:00.000Z' })
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  const lesson = LESSONS.find((item) => item.id === 'diagonal-combined')
+  if (!lesson) {
+    throw new Error('Missing combined course')
+  }
+  await learning.submitExercise(lesson.id, stageAnswer(lessonStages(lesson)[0]).expected, 0)
+  await learning.load()
+
+  expect(learning.exerciseStage(lesson.id)).toBe(1)
+  expect(learning.progress).toEqual([
+    { lessonId: 'rules', completedAt: '2026-10-11T01:00:00.000Z' },
+  ])
+  expect(
+    (await learning.submitExercise(lesson.id, stageAnswer(lessonStages(lesson)[0]).expected, 0))
+      .correct,
+  ).toBe(false)
+  test.dispose()
+})
+
+it('retains a failed completion for retry and never announces it as committed', async () => {
+  const test = await createTestRuntime()
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  const stages = lessonStages(LESSONS[0])
+  await learning.submitExercise('rules', stageAnswer(stages[0]).expected, 0)
+  const write = test.runtime.repository.writeLessonProgress
+  test.runtime.repository.writeLessonProgress = async () => ({
+    ok: false,
+    error: { kind: 'write-failed', message: 'fixture failure' },
+  })
+  const failed = await learning.submitExercise('rules', stageAnswer(stages[1]).expected, 1)
+
+  expect(failed).toMatchObject({ correct: true, completed: false, advance: false })
+  expect(learning.progress).toHaveLength(0)
+  expect(learning.exerciseStage('rules')).toBe(1)
+  test.runtime.repository.writeLessonProgress = write
+  expect(await learning.submitExercise('rules', stageAnswer(stages[1]).expected, 1)).toMatchObject({
+    correct: true,
+    completed: true,
+  })
+  expect(learning.progress).toHaveLength(1)
+  test.dispose()
+})
+
+it('does not resume an optimistic stage after its settings transaction fails', async () => {
+  const test = await createTestRuntime()
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  test.runtime.repository.writeSettings = async () => ({
+    ok: false,
+    error: { kind: 'write-failed', message: 'fixture failure' },
+  })
+
+  expect(await learning.submitExercise('rules', LESSONS[0].exercise.expected, 0)).toMatchObject({
+    correct: true,
+    advance: false,
+  })
+  await learning.load()
+  expect(learning.exerciseStage('rules')).toBe(0)
+  expect(await test.database.count('lessons')).toBe(0)
+  test.dispose()
+})
+
+it('does not announce completion after a reset during stage-cursor cleanup', async () => {
+  const test = await createTestRuntime()
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  const stages = lessonStages(LESSONS[0])
+  await learning.submitExercise('rules', stageAnswer(stages[0]).expected, 0)
+  const gate = deferred<void>()
+  const entered = deferred<void>()
+  const write = test.runtime.repository.writeSettings
+  test.runtime.repository.writeSettings = async (settings, epoch) => {
+    entered.resolve()
+    await gate.promise
+    return write(settings, epoch)
+  }
+  const completing = learning.submitExercise('rules', stageAnswer(stages[1]).expected, 1)
+  await entered.promise
+  learning.reset()
+  gate.resolve()
+
+  expect(await completing).toMatchObject({ completed: false })
   expect(learning.progress).toEqual([])
   test.dispose()
 })

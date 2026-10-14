@@ -16,6 +16,7 @@ for (const [value, name] of [
   ['easy', '简单'],
   ['medium', '中等'],
   ['hard', '困难'],
+  ['expert', '专家'],
 ] as const) {
   test(`generates a real ${value} puzzle and accepts touch controls`, async ({
     page,

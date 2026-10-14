@@ -31,7 +31,7 @@ it('provides six lessons with explicit exercises and mode-appropriate practice',
   }
 })
 it('keeps six Classic identities and adds five independently answerable rule lessons', () => {
-  expect(LESSON_IDS).toHaveLength(11)
+  expect(LESSON_IDS).toHaveLength(32)
   const expectations = {
     diagonal: { cell: 0, digit: 1 },
     jigsaw: { cell: 0, digit: 1 },

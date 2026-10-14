@@ -111,12 +111,12 @@ test('resumes from a standalone home action', async ({ page }, testInfo) => {
 
 test('groups learning by type and provides a consistent parent navigation', async ({ page }) => {
   await page.goto('/#/learn')
-  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(6)
+  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(12)
   await page
     .getByRole('navigation', { name: '学习玩法' })
     .getByRole('link', { name: /对角数独/ })
     .click()
-  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(1)
+  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(4)
   await page.getByRole('link', { name: /认识对角数独/ }).click()
   await page
     .getByRole('navigation', { name: '页面导航' })

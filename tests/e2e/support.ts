@@ -21,6 +21,7 @@ export async function enterGameDigit(page: Page, digit: number) {
 }
 
 export async function enterExerciseDigit(page: Page, digit: number, action = '填写') {
+  await expect(page.getByText('正在准备或保存练习，请稍候…', { exact: true })).toBeHidden()
   const touchDigit = page.getByRole('button', { name: `${action}数字${digit}`, exact: true })
   if (await touchDigit.isVisible()) {
     await touchDigit.click()

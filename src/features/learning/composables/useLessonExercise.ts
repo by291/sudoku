@@ -6,6 +6,9 @@ import { maskOf } from '@/core/sudoku/board'
 import { isKeyboardOwnedByControl } from '@/shared/utils/keyboardOwnership'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import type { Lesson } from '@/features/learning/model/lessons'
+import { lessonStages } from '@/features/learning/model/lessons'
+import { stageAnswer } from '@/features/learning/model/exerciseStages'
+import { explainStep } from '@/core/sudoku/techniques'
 
 export function useLessonExercise(
   lesson: MaybeRefOrGetter<Lesson | undefined>,
@@ -14,6 +17,35 @@ export function useLessonExercise(
   const learning = useLearningStore()
   const currentLesson = computed(() => toValue(lesson))
   const inPractice = computed(() => toValue(practice))
+  const stageIndex = ref(0)
+  const canAdvance = ref(false)
+  const completed = ref(false)
+  const stages = computed(() => (currentLesson.value ? lessonStages(currentLesson.value) : []))
+  const stageLesson = computed(() => {
+    const source = currentLesson.value
+    const stage = stages.value[stageIndex.value]
+    return source && stage
+      ? {
+          ...source,
+          board: stage.board,
+          candidates: stage.candidates,
+          rules: stage.rules,
+          exercise: stageAnswer(stage),
+          step: stage.step,
+          explanation: explainStep(stage.step),
+        }
+      : undefined
+  })
+  const stageCaption = computed(() => {
+    let start = 0
+    for (const exercise of currentLesson.value?.exercises ?? []) {
+      if (stageIndex.value < start + exercise.stages.length) {
+        return `${exercise.title} · 第 ${stageIndex.value - start + 1} / ${exercise.stages.length} 步 · 练习阶段 ${stageIndex.value + 1} / ${stages.value.length}`
+      }
+      start += exercise.stages.length
+    }
+    return ''
+  })
 
   const selected = ref<number | null>(null)
   const removals = ref<{ cell: number; digit: Digit }[]>([])
@@ -22,14 +54,14 @@ export function useLessonExercise(
   const busy = ref(false)
   const showExplanation = ref(false)
   const exerciseCells = computed(() =>
-    !currentLesson.value
+    !stageLesson.value
       ? []
-      : currentLesson.value.exercise.kind === 'placement'
-        ? [currentLesson.value.exercise.expected.cell]
-        : [...new Set(currentLesson.value.exercise.expected.map((pair) => pair.cell))],
+      : stageLesson.value.exercise.kind === 'placement'
+        ? [stageLesson.value.exercise.expected.cell]
+        : [...new Set(stageLesson.value.exercise.expected.map((pair) => pair.cell))],
   )
   const exercisePrompt = computed(() =>
-    currentLesson.value?.exercise.kind === 'placement'
+    stageLesson.value?.exercise.kind === 'placement'
       ? '点击圆点标出的空格，填写应该出现的数字。'
       : '点击圆点标出的格子，选择可以排除的候选数。再次选择可撤回，然后提交全部排除。',
   )
@@ -40,7 +72,7 @@ export function useLessonExercise(
   )
   const exampleNotes = computed(
     () =>
-      currentLesson.value?.candidates.map((mask, cell) =>
+      stageLesson.value?.candidates.map((mask, cell) =>
         removals.value
           .filter((pair) => pair.cell === cell)
           .reduce((remaining, pair) => remaining & ~maskOf(pair.digit), mask),
@@ -59,24 +91,39 @@ export function useLessonExercise(
       removals.value = []
       feedback.value = null
       correct.value = false
-      busy.value = false
+      busy.value = true
       showExplanation.value = false
+      stageIndex.value = 0
+      canAdvance.value = false
+      completed.value = false
 
       await learning.load()
       if (!disposed && owner === ownerGeneration && id) {
-        learning.selectLesson(id)
+        stageIndex.value = Math.min(learning.exerciseStage(id), stages.value.length - 1)
+        // Settle the visit write before answers can enqueue a stage write in the same settings queue.
+        await learning.selectLesson(id)
+      }
+      if (!disposed && owner === ownerGeneration) {
+        busy.value = false
       }
     },
     { immediate: true },
   )
 
   async function answer(digit: Digit) {
-    if (inPractice.value || !currentLesson.value || selected.value === null || busy.value) {
+    if (
+      inPractice.value ||
+      !stageLesson.value ||
+      selected.value === null ||
+      busy.value ||
+      canAdvance.value ||
+      completed.value
+    ) {
       return
     }
 
-    if (currentLesson.value.exercise.kind === 'elimination') {
-      if (!(currentLesson.value.candidates[selected.value] & maskOf(digit))) {
+    if (stageLesson.value.exercise.kind === 'elimination') {
+      if (!(stageLesson.value.candidates[selected.value] & maskOf(digit))) {
         return
       }
 
@@ -90,40 +137,71 @@ export function useLessonExercise(
     } else {
       const owner = ownerGeneration
       busy.value = true
-      const result = await learning.submitExercise(currentLesson.value.id, {
-        cell: selected.value,
-        digit,
-      })
+      const result = await learning.submitExercise(
+        stageLesson.value.id,
+        {
+          cell: selected.value,
+          digit,
+        },
+        stageIndex.value,
+      )
       if (disposed || owner !== ownerGeneration) {
         return
       }
 
       feedback.value = result.explanation
       correct.value = result.correct
+      canAdvance.value = result.advance
+      completed.value = result.completed
       busy.value = false
     }
   }
 
   async function submitEliminations() {
-    if (inPractice.value || !currentLesson.value || busy.value) {
+    if (
+      inPractice.value ||
+      !stageLesson.value ||
+      busy.value ||
+      canAdvance.value ||
+      completed.value
+    ) {
       return
     }
 
     const owner = ownerGeneration
     busy.value = true
-    const result = await learning.submitExercise(currentLesson.value.id, removals.value)
+    const result = await learning.submitExercise(
+      stageLesson.value.id,
+      removals.value,
+      stageIndex.value,
+    )
     if (disposed || owner !== ownerGeneration) {
       return
     }
 
     feedback.value = result.explanation
     correct.value = result.correct
+    canAdvance.value = result.advance
+    completed.value = result.completed
     busy.value = false
   }
 
   function resetExercise() {
     removals.value = []
     feedback.value = null
+  }
+
+  function nextStage() {
+    if (!canAdvance.value || stageIndex.value >= stages.value.length - 1) {
+      return
+    }
+    stageIndex.value++
+    selected.value = null
+    removals.value = []
+    feedback.value = null
+    correct.value = false
+    canAdvance.value = false
+    showExplanation.value = false
   }
 
   function handleExerciseKey(event: KeyboardEvent) {
@@ -170,5 +248,10 @@ export function useLessonExercise(
     answer,
     submitEliminations,
     resetExercise,
+    stageLesson,
+    stageCaption,
+    canAdvance,
+    completed,
+    nextStage,
   }
 }

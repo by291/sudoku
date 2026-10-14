@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import type { Difficulty } from '@/core/sudoku/types'
 import { isDifficulty } from '@/core/sudoku/types'
+import { supportsDifficulty } from '@/core/sudoku/difficulties'
 import type { SudokuVariant } from '@/core/sudoku/rules'
 import { createGenerationInput } from '@/core/sudoku/generation'
 import { parseVariantQuery } from '@/features/game/model/variants'
@@ -118,6 +119,11 @@ export function useGameEntry(options: GameEntryOptions) {
           return
         }
 
+        if (!supportsDifficulty(nextVariant.value, route.query.difficulty)) {
+          initializationError.value = '专家难度仅适用于标准数独，请重新选择玩法或难度。'
+          return
+        }
+
         difficulty.value = route.query.difficulty
         await start()
       } else {
@@ -203,6 +209,10 @@ export function useGameEntry(options: GameEntryOptions) {
 
   async function start() {
     if (!queryVariant.value.valid) {
+      return
+    }
+    if (!supportsDifficulty(nextVariant.value, difficulty.value)) {
+      initializationError.value = '专家难度仅适用于标准数独，请重新选择玩法或难度。'
       return
     }
 

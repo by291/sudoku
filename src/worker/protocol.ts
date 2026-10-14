@@ -44,6 +44,9 @@ export function parseWorkerRequest(value: unknown): ParseResult<WorkerRequest> {
 
   if (value.kind === 'generate' && isRecord(value.input)) {
     const input = parseGenerationInput(value.input)
+    if (!input.valid) {
+      return input
+    }
     if (input.valid) {
       return {
         valid: true,

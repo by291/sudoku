@@ -1,10 +1,15 @@
+import type { GenerationMetrics } from '@/core/sudoku/generation'
 import { calculateCandidates, digitsIn, isComplete } from '@/core/sudoku/board'
 import { consumeWork, createWorkBudget } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
 import { BOARD_SIZE, BOX_SIZE, DIGITS, UNIT_SIZE } from '@/core/sudoku/types'
 import type { Board, CellValue } from '@/core/sudoku/types'
-import type { GenerationInput, GenerationLimits, GenerationResult } from '@/core/sudoku/generation'
+import type {
+  GenerationInput,
+  GenerationLimits,
+  GenerationAttemptResult,
+} from '@/core/sudoku/generation'
 import { countSolutions } from '@/core/sudoku/search'
 import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
 import { TEMPLATES } from '@/core/sudoku/templates'
@@ -86,122 +91,130 @@ function transformFallback(template: PuzzleTemplate, random: () => number): Puzz
   }
 }
 
-const CLUE_TARGETS = { easy: 36, medium: 32, hard: 30 } as const
-const TIER_ORDER = { easy: 0, medium: 1, hard: 2 } as const
+const CLUE_TARGETS = { easy: 36, medium: 32, hard: 30, expert: 28 } as const
+const TIER_ORDER = { easy: 0, medium: 1, hard: 2, expert: 3 } as const
 const CELL_INDICES = Array.from({ length: BOARD_SIZE }, (_, cell) => cell)
 
 export function generateClassicPuzzle(
   input: Extract<GenerationInput, { variant: 'classic' }>,
   limits: GenerationLimits,
-): GenerationResult {
+  metrics: GenerationMetrics,
+): GenerationAttemptResult {
   const random = seededRandom(`${input.puzzleVersion}:${input.difficulty}:${input.seed}`)
   // All layouts and checks consume this one allowance; only fallback validation gets a fresh one.
   const budget = createWorkBudget(limits.maxWork)
-  const rules = { kind: 'classic' } as const
-  const assess = (board: Board, work: WorkBudget) =>
-    assessPuzzleWithBudget(
-      createAssessmentInput(board, rules, { maxSteps: limits.maxSteps, maxWork: work.limit }),
-      work,
-    )
+  let fallbackBudget: WorkBudget | null = null
+  try {
+    const rules = { kind: 'classic' } as const
+    const assess = (board: Board, work: WorkBudget) =>
+      assessPuzzleWithBudget(
+        createAssessmentInput(board, rules, { maxSteps: limits.maxSteps, maxWork: work.limit }),
+        work,
+      )
 
-  for (let layout = 0; layout < limits.maxLayouts && budget.used < budget.limit; layout++) {
-    const terminal = constructClassicTerminal(random, budget)
-    if (terminal.status === 'budget-exhausted') {
-      break
-    }
-    const givens = [...terminal.solution]
-    let clues = BOARD_SIZE
-
-    for (const cell of shuffle(CELL_INDICES, random)) {
-      const previous = givens[cell]
-      givens[cell] = 0
-      const unique = countSolutions(givens, {
-        maxSolutions: 2,
-        nodeBudget: budget.limit - budget.used,
-        workBudget: budget,
-      })
-      if (unique.status === 'budget-exhausted') {
-        // Incomplete validation cannot justify keeping a removed clue.
-        givens[cell] = previous
+    for (let layout = 0; layout < limits.maxLayouts && budget.used < budget.limit; layout++) {
+      metrics.layouts++
+      const terminal = constructClassicTerminal(random, budget)
+      if (terminal.status === 'budget-exhausted') {
         break
       }
-      if (unique.count === 0) {
-        return { status: 'failed', reason: 'Constructed terminal lost its known solution' }
-      }
-      if (unique.count !== 1) {
-        givens[cell] = previous
-        continue
-      }
+      const givens = [...terminal.solution]
+      let clues = BOARD_SIZE
 
-      const rating = assess(givens, budget)
-      if (rating.status === 'budget-exhausted') {
-        givens[cell] = previous
-        break
-      }
-      if (rating.status === 'invalid') {
-        return { status: 'failed', reason: rating.issues.join('; ') }
-      }
-      if (
-        rating.status !== 'rated' ||
-        TIER_ORDER[rating.summary.difficulty] > TIER_ORDER[input.difficulty]
-      ) {
-        givens[cell] = previous
-        continue
-      }
+      for (const cell of shuffle(CELL_INDICES, random)) {
+        const previous = givens[cell]
+        givens[cell] = 0
+        const unique = countSolutions(givens, {
+          maxSolutions: 2,
+          nodeBudget: budget.limit - budget.used,
+          workBudget: budget,
+        })
+        if (unique.status === 'budget-exhausted') {
+          // Incomplete validation cannot justify keeping a removed clue.
+          givens[cell] = previous
+          break
+        }
+        if (unique.count === 0) {
+          return { status: 'failed', reason: 'Constructed terminal lost its known solution' }
+        }
+        if (unique.count !== 1) {
+          givens[cell] = previous
+          continue
+        }
 
-      clues--
-      if (
-        clues <= CLUE_TARGETS[input.difficulty] &&
-        rating.summary.difficulty === input.difficulty
-      ) {
-        return {
-          status: 'ready',
-          source: 'generated',
-          assessment: rating.summary,
-          puzzle: {
-            givens: [...givens],
-            solution: terminal.solution,
-            difficulty: input.difficulty,
-            seed: input.seed,
-            puzzleVersion: input.puzzleVersion,
-            rules,
-          },
+        const rating = assess(givens, budget)
+        if (rating.status === 'budget-exhausted') {
+          givens[cell] = previous
+          break
+        }
+        if (rating.status === 'invalid') {
+          return { status: 'failed', reason: rating.issues.join('; ') }
+        }
+        if (
+          rating.status !== 'rated' ||
+          TIER_ORDER[rating.summary.difficulty] > TIER_ORDER[input.difficulty]
+        ) {
+          givens[cell] = previous
+          continue
+        }
+
+        clues--
+        if (
+          clues <= CLUE_TARGETS[input.difficulty] &&
+          rating.summary.difficulty === input.difficulty
+        ) {
+          return {
+            status: 'ready',
+            source: 'generated',
+            assessment: rating.summary,
+            puzzle: {
+              givens: [...givens],
+              solution: terminal.solution,
+              difficulty: input.difficulty,
+              seed: input.seed,
+              puzzleVersion: input.puzzleVersion,
+              rules,
+            },
+          }
         }
       }
     }
-  }
 
-  const authored = TEMPLATES.find((template) => template.difficulty === input.difficulty)
-  if (!authored) {
-    return { status: 'failed', reason: 'No authored fallback for the requested difficulty' }
-  }
-  const fallback = transformFallback(authored, random)
-  const fallbackBudget = createWorkBudget(limits.fallbackWork)
-  const unique = countSolutions(fallback.givens, {
-    maxSolutions: 2,
-    nodeBudget: fallbackBudget.limit,
-    workBudget: fallbackBudget,
-  })
-  if (unique.status === 'budget-exhausted') {
-    return { status: 'budget-exhausted', stage: 'fallback-validation' }
-  }
-  const rating = assess(fallback.givens, fallbackBudget)
-  if (rating.status === 'budget-exhausted') {
-    return { status: 'budget-exhausted', stage: 'fallback-validation' }
-  }
-  if (
-    unique.count !== 1 ||
-    rating.status !== 'rated' ||
-    rating.summary.difficulty !== input.difficulty ||
-    !isComplete(fallback.solution)
-  ) {
-    return { status: 'failed', reason: 'Fallback validation failed' }
-  }
+    const authored = TEMPLATES.find((template) => template.difficulty === input.difficulty)
+    if (!authored) {
+      return { status: 'failed', reason: 'No authored fallback for the requested difficulty' }
+    }
+    const fallback = transformFallback(authored, random)
+    fallbackBudget = createWorkBudget(limits.fallbackWork)
+    const unique = countSolutions(fallback.givens, {
+      maxSolutions: 2,
+      nodeBudget: fallbackBudget.limit,
+      workBudget: fallbackBudget,
+    })
+    if (unique.status === 'budget-exhausted') {
+      return { status: 'budget-exhausted', stage: 'fallback-validation' }
+    }
+    const rating = assess(fallback.givens, fallbackBudget)
+    if (rating.status === 'budget-exhausted') {
+      return { status: 'budget-exhausted', stage: 'fallback-validation' }
+    }
+    if (
+      unique.count !== 1 ||
+      rating.status !== 'rated' ||
+      rating.summary.difficulty !== input.difficulty ||
+      !isComplete(fallback.solution)
+    ) {
+      return { status: 'failed', reason: 'Fallback validation failed' }
+    }
 
-  return {
-    status: 'ready',
-    source: 'fallback',
-    assessment: rating.summary,
-    puzzle: { ...fallback, seed: input.seed, puzzleVersion: input.puzzleVersion, rules },
+    return {
+      status: 'ready',
+      source: 'fallback',
+      assessment: rating.summary,
+      puzzle: { ...fallback, seed: input.seed, puzzleVersion: input.puzzleVersion, rules },
+    }
+  } finally {
+    metrics.constructionWork = budget.used
+    metrics.fallbackWork = fallbackBudget?.used ?? 0
   }
 }

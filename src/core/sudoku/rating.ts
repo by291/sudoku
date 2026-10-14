@@ -1,5 +1,6 @@
 import { analyzeLogic, applyLogicalStep, createLogicalWorkspace } from '@/core/sudoku/logic'
-import { isClassicTechnique } from '@/core/sudoku/techniques'
+import { isClassicTechnique, isAdvancedEvidence } from '@/core/sudoku/techniques'
+import { supportedDifficulties, supportsDifficulty } from '@/core/sudoku/difficulties'
 import type { LogicalStep, Technique } from '@/core/sudoku/techniques'
 import { RATING_POLICIES, RATING_VERSION, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
 import type { RatingVersion } from '@/core/sudoku/ratingPolicies'
@@ -135,6 +136,12 @@ function emptyTechniqueCounts(): Record<Technique, number> {
     'locked-candidate': 0,
     'naked-pair': 0,
     'hidden-pair': 0,
+    'naked-triple': 0,
+    'hidden-triple': 0,
+    'x-wing': 0,
+    swordfish: 0,
+    'xy-wing': 0,
+    'simple-coloring': 0,
     'cage-distinct': 0,
     'cage-remainder': 0,
     'cage-combination': 0,
@@ -146,6 +153,9 @@ function emptyTechniqueCounts(): Record<Technique, number> {
 
 function hasVariantEvidence(step: LogicalStep): boolean {
   const evidence = step.evidence
+  if (isAdvancedEvidence(evidence)) {
+    return false
+  }
   if (evidence.kind !== 'unit') {
     return true
   }
@@ -166,7 +176,7 @@ export function summarizeLogicalTrace(
 ): ParseResult<ReasoningWorkload> {
   const state = createLogicalWorkspace(board, context)
   const techniqueCounts = emptyTechniqueCounts()
-  const order = RATING_POLICIES[context.rules.kind].hard
+  const order = RATING_POLICIES[context.rules.kind].expert
   let placements = 0
   let eliminations = 0
   let candidateRemovals = 0
@@ -289,7 +299,7 @@ function assessSnapshot(snapshot: AssessmentInput, budget: WorkBudget): Assessme
     return { status: 'budget-exhausted', ...identity, stage: 'validation', difficulty: null }
   }
 
-  for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+  for (const difficulty of supportedDifficulties(identity.variant)) {
     // Failed policy state and trace are discarded; only its consumed work carries forward.
     const result = analyzeLogic(
       snapshot.board,
@@ -335,6 +345,12 @@ const TECHNIQUE_ACTIONS = {
   'locked-candidate': 'elimination',
   'naked-pair': 'elimination',
   'hidden-pair': 'elimination',
+  'naked-triple': 'elimination',
+  'hidden-triple': 'elimination',
+  'x-wing': 'elimination',
+  swordfish: 'elimination',
+  'xy-wing': 'elimination',
+  'simple-coloring': 'elimination',
   'cage-distinct': 'either',
   'cage-remainder': 'placement',
   'cage-combination': 'either',
@@ -357,6 +373,7 @@ export function parseAssessmentSummary(value: unknown): ParseResult<DifficultyAs
     value.ratingVersion !== RATING_VERSION ||
     !isSudokuVariant(value.variant) ||
     !isDifficulty(value.difficulty) ||
+    !supportsDifficulty(value.variant, value.difficulty) ||
     !isRecord(value.workload)
   ) {
     return { valid: false, issues: ['Invalid assessment summary identity'] }
@@ -376,7 +393,7 @@ export function parseAssessmentSummary(value: unknown): ParseResult<DifficultyAs
 
   const techniqueCounts = emptyTechniqueCounts()
   const policy = RATING_POLICIES[value.variant][value.difficulty]
-  const order = RATING_POLICIES[value.variant].hard
+  const order = RATING_POLICIES[value.variant].expert
   let total = 0
   let requiredPlacements = 0
   let requiredEliminations = 0
@@ -487,7 +504,9 @@ export function parseAssessmentOutcome(value: unknown): ParseResult<AssessmentOu
   if (
     value.status === 'budget-exhausted' &&
     ((value.stage === 'validation' && value.difficulty === null) ||
-      (value.stage === 'logic' && isDifficulty(value.difficulty)))
+      (value.stage === 'logic' &&
+        isDifficulty(value.difficulty) &&
+        supportsDifficulty(value.variant, value.difficulty)))
   ) {
     return {
       valid: true,

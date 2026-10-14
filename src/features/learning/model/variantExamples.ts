@@ -41,10 +41,48 @@ const arrowRules: PuzzleRules = { kind: 'arrow', arrows: [{ circle: 8, shaft: [1
 const arrowBoard: Board = Array.from({ length: 81 }, (_, cell) =>
   cell === 8 ? 8 : cell === 16 ? 2 : cell === 24 ? 1 : cell === 32 ? 3 : 0,
 )
+const arrowTransferBoard: Board = arrowBoard.map((digit, cell) =>
+  cell === 32 ? 0 : cell === 40 ? 2 : digit,
+)
+const arrowCircleBoard: Board = arrowBoard.map((digit, cell) =>
+  cell === 8 ? 0 : cell === 40 ? 2 : digit,
+)
 
 function domains(board: Board, cells: readonly number[]) {
   return cells.map((cell) => ({ cell, mask: board[cell] ? maskOf(board[cell]) : ALL_DIGITS_MASK }))
 }
+
+export const ARROW_TRANSFER_EXAMPLE = example(arrowRules, arrowTransferBoard, {
+  kind: 'placement',
+  technique: 'arrow-equation',
+  cell: 32,
+  digit: 3,
+  evidence: {
+    kind: 'arrow',
+    constraintId: 'arrow:0',
+    cells: [8, 16, 24, 32, 40],
+    digits: [3],
+    circle: 8,
+    shaft: [16, 24, 32, 40],
+    domains: domains(arrowTransferBoard, [8, 16, 24, 32, 40]),
+  },
+})
+
+export const ARROW_CIRCLE_EXAMPLE = example(arrowRules, arrowCircleBoard, {
+  kind: 'placement',
+  technique: 'arrow-equation',
+  cell: 8,
+  digit: 8,
+  evidence: {
+    kind: 'arrow',
+    constraintId: 'arrow:0',
+    cells: [8, 16, 24, 32, 40],
+    digits: [8],
+    circle: 8,
+    shaft: [16, 24, 32, 40],
+    domains: domains(arrowCircleBoard, [8, 16, 24, 32, 40]),
+  },
+})
 
 // Proofs are authored from unit contents, arithmetic, and strict path length; no search answer supplies a hint.
 export const VARIANT_EXAMPLES: Record<NewSudokuVariant, VariantExample> = {

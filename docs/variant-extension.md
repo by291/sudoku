@@ -43,3 +43,9 @@ Use fixed fixtures to prove valid and invalid assignments, candidates, conflicts
 Random call order, legal transforms, template order, and fallback selection determine current seeded output. Pin current determinism and independent solution/tier facts. The user removed historical-generation compatibility requirements: no old generator dispatch, frozen old-output corpus, or daily cutoff is required. Bump current generation identity when algorithm semantics change; do not silently regrade or regenerate saved boards.
 
 Run relevant engine, worker, lifecycle, storage, and presentation tests during implementation. Before completion, run type checking, lint, formatting, all unit tests, root and `/sudoku/` builds, and the configured Playwright projects. Verify real worker assets, modal keyboard ownership, touch controls, pauses, saves, lessons, and completion. Report actual unavailable browser runtimes; mobile emulation does not certify a physical device.
+
+## Advanced play and course contracts
+
+`core/sudoku/difficulties.ts` statically covers all six types and 19 supported type/tier combinations. Expert belongs only to Classic and must be rejected for variants at generation, transport, persistence, and player selection boundaries. Easy/Medium/Hard technique policies remain unchanged. `advancedTechniques.ts` owns bounded advanced detection and direct proof validation; unit, candidate, fish, wing, and strong-link premises cannot be supplied by a search answer or manual player notes.
+
+Learning owns 32 stable IDs, authored candidate snapshots in `courseFragments.ts`, and ordered exercise/transfer states in `exerciseStages.ts`. Every unit requires two exercises; combined variant units use three stages per exercise. Stage cursors use optional settings metadata and dataset epoch fencing. Only committed final completion writes enter lesson progress. Preserve all original lesson completion IDs and the independent lifetime of full-board practice.

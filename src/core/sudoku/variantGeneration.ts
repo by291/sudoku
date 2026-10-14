@@ -1,3 +1,4 @@
+import type { GenerationMetrics } from '@/core/sudoku/generation'
 import {
   VARIANT_GENERATION_STRATEGIES,
   createVariantGeometry,
@@ -18,7 +19,7 @@ import { seededRandom, shuffle } from '@/core/sudoku/random'
 import type {
   GenerationInput,
   GenerationLimits,
-  GenerationResult,
+  GenerationAttemptResult,
   Puzzle,
 } from '@/core/sudoku/generation'
 
@@ -147,7 +148,8 @@ function seededTransform(template: VariantTemplate, random: () => number): Varia
 export function generateVariantPuzzle(
   input: Extract<GenerationInput, { puzzleVersion: 'sudoku-variants-v2' }>,
   limits: GenerationLimits,
-): GenerationResult {
+  metrics: GenerationMetrics,
+): GenerationAttemptResult {
   const random = seededRandom(
     `${input.puzzleVersion}:${input.variant}:${input.difficulty}:${input.seed}`,
   )
@@ -163,140 +165,146 @@ export function generateVariantPuzzle(
   })
   // Geometry, uniqueness, fresh assessment policies, and necessity share work across every layout.
   const generationBudget = createWorkBudget(limits.maxWork)
-
-  for (
-    let layout = 0;
-    layout < limits.maxLayouts && generationBudget.used < generationBudget.limit;
-    layout++
-  ) {
-    const base = seededTransform(templates[Math.floor(random() * templates.length)], random)
-    const rules = createVariantGeometry(base.rules, base.solution, random, generationBudget)
-    if (!rules || !parseRules(rules).valid) {
-      continue
-    }
-
-    const context = compileRules(rules)
-    if (
-      !isComplete(base.solution, context) ||
-      (rules.kind === 'jigsaw' && !irregularRegions(rules))
+  let fallbackBudget: WorkBudget | null = null
+  try {
+    for (
+      let layout = 0;
+      layout < limits.maxLayouts && generationBudget.used < generationBudget.limit;
+      layout++
     ) {
-      continue
-    }
-
-    const givens = [...base.solution]
-
-    for (const cell of shuffle(CELL_INDICES, random)) {
-      const previous = givens[cell]
-      givens[cell] = 0
-      const unique = countSolutions(givens, {
-        maxSolutions: 2,
-        nodeBudget: generationBudget.limit - generationBudget.used,
-        context,
-        workBudget: generationBudget,
-      })
-      if (unique.status === 'budget-exhausted') {
-        givens[cell] = previous
-        break
-      }
-
-      if (unique.count === 0) {
-        return { status: 'failed', reason: 'Constructed variant lost its known solution' }
-      }
-
-      if (unique.count !== 1) {
-        givens[cell] = previous
+      metrics.layouts++
+      const base = seededTransform(templates[Math.floor(random() * templates.length)], random)
+      const rules = createVariantGeometry(base.rules, base.solution, random, generationBudget)
+      if (!rules || !parseRules(rules).valid) {
         continue
       }
 
-      const rating = assessPuzzleWithBudget(
-        createAssessmentInput(givens, rules, {
-          maxSteps: limits.maxSteps,
-          maxWork: generationBudget.limit,
-        }),
-        generationBudget,
-      )
-      if (rating.status === 'budget-exhausted') {
-        givens[cell] = previous
-        break
-      }
-
-      if (rating.status === 'invalid') {
-        return { status: 'failed', reason: rating.issues.join('; ') }
-      }
-      if (rating.status !== 'rated') {
-        givens[cell] = previous
+      const context = compileRules(rules)
+      if (
+        !isComplete(base.solution, context) ||
+        (rules.kind === 'jigsaw' && !irregularRegions(rules))
+      ) {
         continue
       }
 
-      if (rating.summary.difficulty !== input.difficulty) {
-        continue
-      }
+      const givens = [...base.solution]
 
-      const candidate: VariantTemplate = {
-        rules,
-        solution: base.solution,
-        givens: [...givens],
-        difficulty: rating.summary.difficulty,
-      }
-      const necessity = variantRulesMatter(candidate, generationBudget)
-      if (necessity.status === 'budget-exhausted') {
-        break
-      }
+      for (const cell of shuffle(CELL_INDICES, random)) {
+        const previous = givens[cell]
+        givens[cell] = 0
+        const unique = countSolutions(givens, {
+          maxSolutions: 2,
+          nodeBudget: generationBudget.limit - generationBudget.used,
+          context,
+          workBudget: generationBudget,
+        })
+        if (unique.status === 'budget-exhausted') {
+          givens[cell] = previous
+          break
+        }
 
-      if (necessity.matters) {
-        return {
-          status: 'ready',
-          source: 'generated',
-          puzzle: makePuzzle(candidate),
-          assessment: rating.summary,
+        if (unique.count === 0) {
+          return { status: 'failed', reason: 'Constructed variant lost its known solution' }
+        }
+
+        if (unique.count !== 1) {
+          givens[cell] = previous
+          continue
+        }
+
+        const rating = assessPuzzleWithBudget(
+          createAssessmentInput(givens, rules, {
+            maxSteps: limits.maxSteps,
+            maxWork: generationBudget.limit,
+          }),
+          generationBudget,
+        )
+        if (rating.status === 'budget-exhausted') {
+          givens[cell] = previous
+          break
+        }
+
+        if (rating.status === 'invalid') {
+          return { status: 'failed', reason: rating.issues.join('; ') }
+        }
+        if (rating.status !== 'rated') {
+          givens[cell] = previous
+          continue
+        }
+
+        if (rating.summary.difficulty !== input.difficulty) {
+          continue
+        }
+
+        const candidate: VariantTemplate = {
+          rules,
+          solution: base.solution,
+          givens: [...givens],
+          difficulty: rating.summary.difficulty,
+        }
+        const necessity = variantRulesMatter(candidate, generationBudget)
+        if (necessity.status === 'budget-exhausted') {
+          break
+        }
+
+        if (necessity.matters) {
+          return {
+            status: 'ready',
+            source: 'generated',
+            puzzle: makePuzzle(candidate),
+            assessment: rating.summary,
+          }
         }
       }
     }
-  }
 
-  const fallback = seededTransform(templates[Math.floor(random() * templates.length)], random)
-  const fallbackBudget = createWorkBudget(limits.fallbackWork)
-  const context = compileRules(fallback.rules)
-  const unique = countSolutions(fallback.givens, {
-    maxSolutions: 2,
-    nodeBudget: fallbackBudget.limit,
-    context,
-    workBudget: fallbackBudget,
-  })
-  if (unique.status === 'budget-exhausted') {
-    return { status: 'budget-exhausted', stage: 'fallback-validation' }
-  }
+    const fallback = seededTransform(templates[Math.floor(random() * templates.length)], random)
+    fallbackBudget = createWorkBudget(limits.fallbackWork)
+    const context = compileRules(fallback.rules)
+    const unique = countSolutions(fallback.givens, {
+      maxSolutions: 2,
+      nodeBudget: fallbackBudget.limit,
+      context,
+      workBudget: fallbackBudget,
+    })
+    if (unique.status === 'budget-exhausted') {
+      return { status: 'budget-exhausted', stage: 'fallback-validation' }
+    }
 
-  const rating = assessPuzzleWithBudget(
-    createAssessmentInput(fallback.givens, fallback.rules, {
-      maxSteps: limits.maxSteps,
-      maxWork: fallbackBudget.limit,
-    }),
-    fallbackBudget,
-  )
-  if (rating.status === 'budget-exhausted') {
-    return { status: 'budget-exhausted', stage: 'fallback-validation' }
-  }
+    const rating = assessPuzzleWithBudget(
+      createAssessmentInput(fallback.givens, fallback.rules, {
+        maxSteps: limits.maxSteps,
+        maxWork: fallbackBudget.limit,
+      }),
+      fallbackBudget,
+    )
+    if (rating.status === 'budget-exhausted') {
+      return { status: 'budget-exhausted', stage: 'fallback-validation' }
+    }
 
-  const necessity = variantRulesMatter(fallback, fallbackBudget)
-  if (necessity.status === 'budget-exhausted') {
-    return { status: 'budget-exhausted', stage: 'fallback-validation' }
-  }
+    const necessity = variantRulesMatter(fallback, fallbackBudget)
+    if (necessity.status === 'budget-exhausted') {
+      return { status: 'budget-exhausted', stage: 'fallback-validation' }
+    }
 
-  if (
-    unique.count !== 1 ||
-    rating.status !== 'rated' ||
-    rating.summary.difficulty !== input.difficulty ||
-    !necessity.matters ||
-    !isComplete(fallback.solution, context)
-  ) {
-    return { status: 'failed', reason: 'Fallback validation failed' }
-  }
+    if (
+      unique.count !== 1 ||
+      rating.status !== 'rated' ||
+      rating.summary.difficulty !== input.difficulty ||
+      !necessity.matters ||
+      !isComplete(fallback.solution, context)
+    ) {
+      return { status: 'failed', reason: 'Fallback validation failed' }
+    }
 
-  return {
-    status: 'ready',
-    source: 'fallback',
-    puzzle: makePuzzle(fallback),
-    assessment: rating.summary,
+    return {
+      status: 'ready',
+      source: 'fallback',
+      puzzle: makePuzzle(fallback),
+      assessment: rating.summary,
+    }
+  } finally {
+    metrics.constructionWork = generationBudget.used
+    metrics.fallbackWork = fallbackBudget?.used ?? 0
   }
 }

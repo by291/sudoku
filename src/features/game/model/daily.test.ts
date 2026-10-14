@@ -12,7 +12,7 @@ import { makeSession } from '../../../../tests/support/gameFixtures'
 it('changes the challenge at Beijing midnight with a versioned stable seed', () => {
   expect(getChallengeDate(new Date('2026-10-11T15:59:59.999Z'))).toBe('2026-10-11')
   expect(getChallengeDate(new Date('2026-10-11T16:00:00.000Z'))).toBe('2026-10-12')
-  expect(getDailySeed('2026-10-11', 'sudoku-v2')).toBe('daily:sudoku-v2:2026-10-11')
+  expect(getDailySeed('2026-10-11', 'sudoku-v3')).toBe('daily:sudoku-v3:2026-10-11')
   expect(() => getDailySeed('2026-02-30', 'v1')).toThrow()
 })
 it('restarts daily entries while retaining identity, accumulated time and assistance', () => {
@@ -36,7 +36,7 @@ it('restarts daily entries while retaining identity, accumulated time and assist
 })
 it('uses distinct formal daily identities without rewriting Classic', () => {
   expect(getDailyIdentity('2026-10-11', 'classic')).toMatchObject({
-    seed: 'daily:sudoku-v2:2026-10-11',
+    seed: 'daily:sudoku-v3:2026-10-11',
     formalId: 'daily:2026-10-11:formal',
     input: { variant: 'classic', difficulty: 'medium' },
   })

@@ -3,7 +3,7 @@ import { RATING_POLICIES, RATING_VERSION, TECHNIQUE_TIERS } from '@/core/sudoku/
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
 
 it('covers all six types with nested applicable policies', () => {
-  expect(RATING_VERSION).toBe('sudoku-rating-v1')
+  expect(RATING_VERSION).toBe('sudoku-rating-v2')
   expect(Object.keys(RATING_POLICIES)).toEqual([...SUDOKU_VARIANTS])
 
   for (const variant of SUDOKU_VARIANTS) {
@@ -27,7 +27,7 @@ it('preserves the explicit technique order', () => {
   const pairs = ['naked-pair', 'hidden-pair']
 
   for (const variant of ['classic', 'diagonal', 'jigsaw'] as const) {
-    expect(RATING_POLICIES[variant]).toEqual({
+    expect(RATING_POLICIES[variant]).toMatchObject({
       easy: singles,
       medium: [...singles, 'locked-candidate'],
       hard: [...singles, 'locked-candidate', ...pairs],
@@ -58,4 +58,16 @@ it('preserves the explicit technique order', () => {
   expect(TECHNIQUE_TIERS['cage-remainder']).toBe('easy')
   expect(TECHNIQUE_TIERS['arrow-combination']).toBe('medium')
   expect(TECHNIQUE_TIERS['hidden-pair']).toBe('hard')
+  expect(RATING_POLICIES.classic.expert.slice(0, 5)).toEqual(RATING_POLICIES.classic.hard)
+  expect(RATING_POLICIES.classic.expert.slice(5)).toEqual([
+    'naked-triple',
+    'hidden-triple',
+    'x-wing',
+    'swordfish',
+    'xy-wing',
+    'simple-coloring',
+  ])
+  for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
+    expect(RATING_POLICIES[variant].expert).toEqual(RATING_POLICIES[variant].hard)
+  }
 })

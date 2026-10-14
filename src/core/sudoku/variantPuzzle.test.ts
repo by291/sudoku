@@ -59,6 +59,7 @@ it('validates fallback independently and never returns an unverified puzzle afte
   expect(generatePuzzle(input, { ...limits, fallbackWork: 0 })).toEqual({
     status: 'budget-exhausted',
     stage: 'fallback-validation',
+    metrics: { constructionWork: 0, fallbackWork: 0, layouts: 0 },
   })
 })
 it('rejects missing rules and solutions that violate their clues', () => {

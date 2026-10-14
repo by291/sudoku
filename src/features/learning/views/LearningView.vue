@@ -82,12 +82,20 @@ const classicStages: Readonly<Record<string, string>> = {
   rules: '起步 · 认识棋盘',
   'naked-single': '基础 · 寻找唯一',
   'locked-candidate': '进阶 · 排除候选',
+  'naked-triple': '高级 · 专家推理',
 }
 const lessonSteps = computed(() =>
   selectedLessons.value.map((lesson, index) => ({
     lesson,
     number: String(index + 1).padStart(2, '0'),
-    stage: selectedVariant.value === 'classic' ? classicStages[lesson.id] : '入门 · 理解玩法',
+    stage:
+      selectedVariant.value === 'classic'
+        ? classicStages[lesson.id]
+        : index === 0
+          ? '入门 · 理解玩法'
+          : index === 3
+            ? '综合 · 连续推理'
+            : '进阶 · 候选与约束',
     completed: completedLessonIds.value.has(lesson.id),
     suggested: lesson.id === suggestedLesson.value?.id,
   })),
@@ -102,6 +110,9 @@ onMounted(learning.load)
       <p class="eyebrow">循序渐进 / LEARN</p>
       <h1>从看懂一格，到解开整盘</h1>
       <p class="muted">选一种玩法，沿着推理的路径，慢慢练熟。</p>
+      <p v-if="totalCompleted > 0 && totalCompleted < LESSONS.length" class="muted">
+        课程已扩充至 32 节；之前的完成记录保留，新加入的课程可继续学习。
+      </p>
     </header>
     <NAlert v-if="learning.error" class="feedback-message" type="error" :show-icon="false">
       {{ learning.error }} <NButton @click="learning.load">重试</NButton>

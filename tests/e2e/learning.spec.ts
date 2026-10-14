@@ -1,9 +1,11 @@
 import { test, expect, cellName, readSessions, enterExerciseDigit } from './support'
-import { LESSONS } from '@/features/learning/model/lessons'
+import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
+import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { VARIANT_OPTIONS } from '@/features/game/model/variants'
 
 test('completes the rules exercise using only keyboard navigation', async ({ page }, testInfo) => {
   await page.goto('/#/learn/rules')
+  await expect(page.getByText('正在准备或保存练习，请稍候…', { exact: true })).toBeHidden()
   const first = page.getByRole('button', { name: cellName(0) })
 
   for (
@@ -41,26 +43,39 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
     animations: 'disabled',
   })
 })
-test('teaches all eleven exercises with retry and durable progress', async ({ page }) => {
+test('teaches all thirty-two units with every required stage, retry and durable progress', async ({
+  page,
+}) => {
+  test.setTimeout(300000)
   for (const lesson of LESSONS) {
     await page.goto(`/#/learn/${lesson.id}`)
     await expect(page.getByRole('heading', { name: lesson.title, exact: true })).toBeVisible()
-    if (lesson.exercise.kind === 'placement') {
-      const { cell, digit } = lesson.exercise.expected
-      await page.getByRole('button', { name: cellName(cell) }).click()
-      await enterExerciseDigit(page, digit === 9 ? 8 : 9)
-      await expect(page.getByRole('status')).toContainText('还差一点')
-      await enterExerciseDigit(page, digit)
-    } else {
-      for (const { cell, digit } of lesson.exercise.expected) {
+    const stages = lessonStages(lesson)
+    for (const [index, stage] of stages.entries()) {
+      const exercise = stageAnswer(stage)
+      if (exercise.kind === 'placement') {
+        const { cell, digit } = exercise.expected
         await page.getByRole('button', { name: cellName(cell) }).click()
-        await enterExerciseDigit(page, digit, '排除')
+        await enterExerciseDigit(page, digit === 9 ? 8 : 9)
+        await expect(page.getByRole('status')).toContainText('还差一点')
+        await enterExerciseDigit(page, digit)
+      } else {
+        await page.getByRole('button', { name: '提交排除', exact: true }).click()
+        await expect(page.getByRole('status')).toContainText('还差一点')
+        for (const { cell, digit } of exercise.expected) {
+          await page.getByRole('button', { name: cellName(cell) }).click()
+          await enterExerciseDigit(page, digit, '排除')
+        }
+
+        await page.getByRole('button', { name: '提交排除', exact: true }).click()
       }
 
-      await page.getByRole('button', { name: '提交排除', exact: true }).click()
+      await expect(page.getByRole('status')).toContainText('推理正确')
+      if (index < stages.length - 1) {
+        await page.getByRole('button', { name: '下一阶段', exact: true }).click()
+      }
     }
-
-    await expect(page.getByRole('status')).toContainText('推理正确')
+    await expect(page.getByText('本课全部练习已完成，进度已保存。')).toBeVisible()
     await page.getByRole('link', { name: /返回课程列表/ }).click()
     await expect(
       page.getByRole('link').filter({ hasText: lesson.title }).filter({ hasText: '已完成' }),
@@ -70,7 +85,7 @@ test('teaches all eleven exercises with retry and durable progress', async ({ pa
   await page.reload()
   await expect(page.getByRole('progressbar', { name: '全部课程学习进度' })).toHaveAttribute(
     'aria-valuetext',
-    '已完成 11 / 11 节',
+    '已完成 32 / 32 节',
   )
 
   for (const variant of VARIANT_OPTIONS) {
@@ -80,7 +95,7 @@ test('teaches all eleven exercises with retry and durable progress', async ({ pa
       .click()
     await expect(
       page.getByRole('list', { name: '课程路径' }).getByRole('link').filter({ hasText: '已完成' }),
-    ).toHaveCount(variant.value === 'classic' ? 6 : 1)
+    ).toHaveCount(variant.value === 'classic' ? 12 : 4)
     await expect(page.getByRole('link', { name: '复习课程', exact: true })).toBeVisible()
   }
 })

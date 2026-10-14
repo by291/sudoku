@@ -1,6 +1,6 @@
 import type { Board, Digit } from '@/core/sudoku/types'
 import type { LogicalStep } from '@/core/sudoku/techniques'
-import { TECHNIQUES } from '@/core/sudoku/techniques'
+import { ALL_CLASSIC_TECHNIQUES } from '@/core/sudoku/techniques'
 import { applyLogicalStep, createLogicalWorkspace, findLogicalStep } from '@/core/sudoku/logic'
 import { isComplete } from '@/core/sudoku/board'
 import type { LogicalOptions } from '@/core/sudoku/logic'
@@ -32,7 +32,9 @@ export function analyzeHint(
   const state = createLogicalWorkspace(board, context)
   const budget = options?.workBudget ?? createWorkBudget(DEFAULT_WORK_LIMIT)
   const techniques =
-    context.rules.kind === 'classic' ? TECHNIQUES : RATING_POLICIES[context.rules.kind].hard
+    context.rules.kind === 'classic'
+      ? ALL_CLASSIC_TECHNIQUES
+      : RATING_POLICIES[context.rules.kind].hard
   const steps: LogicalStep[] = []
 
   for (let index = 0; index < stepBudget; index++) {

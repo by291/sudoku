@@ -12,6 +12,8 @@
 
 **Status:** Approved by the user on 2026-10-14 with narrowed scope: retain milestones 1–4 and local data protection from milestone 5. Remove difficulty feedback, manual playtest calibration, and the independent release-acceptance milestone. Approval does not authorize commits, pushes, or remote publication.
 
+**Progress (2026-10-14):** Milestones 1–3 are implemented and verified. See [Advanced and Learning Verification](../verification/2026-10-14-sudoku-advanced-and-learning.md). Milestones 4–5 remain pending.
+
 ## Product scope
 
 The application remains a Chinese-language, statically hosted product with computation and data in the current browser. Keep casual play, guided learning, daily challenges, and personal records. Retain Classic, Diagonal, Jigsaw, Killer, Thermo, and Arrow; this roadmap adds depth to these six types.
@@ -57,11 +59,11 @@ Teaching and generation share completed engine contracts. Backup design can proc
 
 **Contract:** Git, editors, and Prettier use LF for repository text on Windows and Linux. Existing application behavior and pinned packages remain unchanged.
 
-- [ ] Add `* text=auto eol=lf` to `.gitattributes`, `end_of_line = lf` and UTF-8 to `.editorconfig`, and explicit `endOfLine: 'lf'` to Prettier configuration. Keep binary detection intact and avoid changing global Git settings.
-- [ ] Normalize current tracked text, inspect the content diff, and retain unrelated work. Add no new behavior tests for a line-ending-only change.
-- [ ] Verify the pinned Node/pnpm runtime, production browser assets, and the documented project-local Firefox cache workaround. Establish commands that reproduce the baseline on the development host.
-- [ ] Run all configured checks and inspect actual GitHub Actions jobs. Separate setup failures from application failures; fix confirmed test races at their cause.
-- [ ] Record the baseline in a verification report, including Worker assets, browser projects/concurrency, warnings, and environment constraints.
+- [x] Add `* text=auto eol=lf` to `.gitattributes`, `end_of_line = lf` and UTF-8 to `.editorconfig`, and explicit `endOfLine: 'lf'` to Prettier configuration. Keep binary detection intact and avoid changing global Git settings.
+- [x] Normalize current tracked text, inspect the content diff, and retain unrelated work. Add no new behavior tests for a line-ending-only change.
+- [x] Verify the pinned Node/pnpm runtime, production browser assets, and the documented project-local Firefox cache workaround. Establish commands that reproduce the baseline on the development host.
+- [x] Run all configured checks and inspect actual GitHub Actions jobs. Separate setup failures from application failures; fix confirmed test races at their cause.
+- [x] Record the baseline in a verification report, including Worker assets, browser projects/concurrency, warnings, and environment constraints.
 
 **Acceptance:** `pnpm format:check` passes on the unmodified working tree after the normalization. Types, ESLint, all unit tests, both deployment builds, and desktop/mobile Chromium, Firefox, and serial WebKit tests pass. Do not weaken checks or increase the production timeout to obtain a green result.
 
@@ -75,12 +77,12 @@ Classic retains Easy, Medium, and Hard and gains Expert (`expert`), displayed as
 
 Use explicit evidence variants for subsets, fish, wings, and coloring. Evidence must identify the actual units, candidate domains, links, removed candidates, and any required premises. The Worker validates those premises against the current puzzle state rather than trusting object shape or the claimed technique name.
 
-- [ ] Author independent positive and negative deduction fixtures before implementation. Cover false fish patterns, misplaced wing peers, incomplete units, contradictory coloring graphs, no-op eliminations, and already-filled cells. Replay conclusions without production detectors or candidate helpers as the sole oracle.
-- [ ] Implement bounded, deterministic detectors, evidence, explanations, and highlighting. Charge work for combinations and graph traversal; preserve cancellation and explicit exhaustion.
-- [ ] Introduce an exhaustive type/tier capability map and carry it through requests, policy dispatch, saved data, setup choices, record summaries, and learning practice. An unsupported Expert variant is an actionable validation error.
-- [ ] Add independent Classic Expert fixtures and authored fallback puzzles. Reuse construction and uniqueness checks; accept only a matching complete Expert assessment.
-- [ ] Version the assessment and affected generation policies together. Keep old boards/results and the stored difficulty intact; older assessment metadata follows explicit supported/unavailable decoding without automatic regrading.
-- [ ] Verify the complete Expert player flow: selection, real Worker delivery, notes, hints, undo/redo, pause, save/resume, restart, completion, assistance, and separate personal bests.
+- [x] Author independent positive and negative deduction fixtures before implementation. Cover false fish patterns, misplaced wing peers, incomplete units, contradictory coloring graphs, no-op eliminations, and already-filled cells. Replay conclusions without production detectors or candidate helpers as the sole oracle.
+- [x] Implement bounded, deterministic detectors, evidence, explanations, and highlighting. Charge work for combinations and graph traversal; preserve cancellation and explicit exhaustion.
+- [x] Introduce an exhaustive type/tier capability map and carry it through requests, policy dispatch, saved data, setup choices, record summaries, and learning practice. An unsupported Expert variant is an actionable validation error.
+- [x] Add independent Classic Expert fixtures and authored fallback puzzles. Reuse construction and uniqueness checks; accept only a matching complete Expert assessment.
+- [x] Version the assessment and affected generation policies together. Keep old boards/results and the stored difficulty intact; older assessment metadata follows explicit supported/unavailable decoding without automatic regrading.
+- [x] Verify the complete Expert player flow: selection, real Worker delivery, notes, hints, undo/redo, pause, save/resume, restart, completion, assistance, and separate personal bests.
 
 **Acceptance:** Each technique has an independently justified conclusion and rejected near-miss cases. Expert requires a deduction beyond the unchanged Hard policy and a uniquely solvable full puzzle. Actual production Workers agree with fixture facts at `/` and `/sudoku/`. Existing three-tier and daily behavior remains covered.
 
@@ -104,11 +106,11 @@ Every unit includes a Chinese explanation, a guided example, and two original va
 
 Reuse typed deduction evidence for explanations. Multi-stage exercises declare their board/candidate states, expected placements or eliminations, and explanations explicitly. A wrong answer retains the current stage for retry. Save completion only after all required exercises succeed, and never report durable progress before its write commits.
 
-- [ ] Extend stable lesson IDs and declarative course paths. Preserve existing completion and last-visited behavior; explain newly added units when a previously complete course has more work available.
-- [ ] Implement guided and transfer exercise progression behind a typed exercise-stage model. Keep keyboard, touch, and submit actions aligned; preserve cleanup, route changes, and full-board practice ownership.
-- [ ] Author and independently validate each exercise's premises and expected facts. Arithmetic lessons show numeric domains/equations; regional lessons show their actual unit intersections.
-- [ ] Expand the catalogue to the 32 specified units and connect practice to the supported tier/type. Keep detailed guidance beside the lesson workflow rather than splitting each small operation into a separate feature.
-- [ ] Verify every unit end to end, including a wrong answer, retry, completion, refresh, direct navigation, and returning to its course path. Verify old progress alongside newly added units.
+- [x] Extend stable lesson IDs and declarative course paths. Preserve existing completion and last-visited behavior; explain newly added units when a previously complete course has more work available.
+- [x] Implement guided and transfer exercise progression behind a typed exercise-stage model. Keep keyboard, touch, and submit actions aligned; preserve cleanup, route changes, and full-board practice ownership.
+- [x] Author and independently validate each exercise's premises and expected facts. Arithmetic lessons show numeric domains/equations; regional lessons show their actual unit intersections.
+- [x] Expand the catalogue to the 32 specified units and connect practice to the supported tier/type. Keep detailed guidance beside the lesson workflow rather than splitting each small operation into a separate feature.
+- [x] Verify every unit end to end, including a wrong answer, retry, completion, refresh, direct navigation, and returning to its course path. Verify old progress alongside newly added units.
 
 **Acceptance:** All 32 units are functional, every exercise has independent proof facts, and multi-stage answers cannot skip required stages. Both keyboard and touch can complete the courses. No existing completion, active practice game, or route ownership is lost.
 

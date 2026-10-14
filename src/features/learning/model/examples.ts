@@ -1,4 +1,4 @@
-import type { LogicalState, LogicalStep, ClassicTechnique } from '@/core/sudoku/techniques'
+import type { LogicalState, LogicalStep, BasicClassicTechnique } from '@/core/sudoku/techniques'
 
 export const EXAMPLES = {
   'naked-single': {
@@ -137,4 +137,4 @@ export const EXAMPLES = {
       ],
     },
   },
-} satisfies Record<ClassicTechnique, LogicalState & { step: LogicalStep }>
+} satisfies Record<BasicClassicTechnique, LogicalState & { step: LogicalStep }>

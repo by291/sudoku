@@ -9,7 +9,7 @@ import {
 import { TEMPLATES } from '@/core/sudoku/templates'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { analyzeLogic } from '@/core/sudoku/logic'
-import { TECHNIQUES } from '@/core/sudoku/techniques'
+import { ALL_CLASSIC_TECHNIQUES, TECHNIQUES } from '@/core/sudoku/techniques'
 import { countReferenceSolutions } from '../../../tests/support/referenceSudoku'
 import { isComplete } from '@/core/sudoku/board'
 import type { Difficulty } from '@/core/sudoku/types'
@@ -24,7 +24,7 @@ it.each(TEMPLATES)(
       status: 'rated',
       summary: { difficulty },
     })
-    expect(analyzeLogic(givens, TECHNIQUES, 500)).toMatchObject({
+    expect(analyzeLogic(givens, ALL_CLASSIC_TECHNIQUES, 500)).toMatchObject({
       status: 'solved',
       board: solution,
     })
@@ -82,12 +82,13 @@ it('falls back deterministically only after verifying its transformed template',
   expect(generatePuzzle(input, { ...limits, fallbackWork: 0 })).toEqual({
     status: 'budget-exhausted',
     stage: 'fallback-validation',
+    metrics: { constructionWork: 0, fallbackWork: 0, layouts: 0 },
   })
 })
 
 it('uses only current generation versions and returns an accepted assessment', () => {
   const input = createGenerationInput('classic', 'easy', 'current-generation')
-  expect(input.puzzleVersion).toBe('sudoku-v2')
+  expect(input.puzzleVersion).toBe('sudoku-v3')
   expect(createGenerationInput('arrow', 'easy', 'current-generation').puzzleVersion).toBe(
     'sudoku-variants-v2',
   )
@@ -96,7 +97,7 @@ it('uses only current generation versions and returns an accepted assessment', (
 
   expect(result).toMatchObject({
     status: 'ready',
-    assessment: { variant: 'classic', difficulty: 'easy', ratingVersion: 'sudoku-rating-v1' },
+    assessment: { variant: 'classic', difficulty: 'easy', ratingVersion: 'sudoku-rating-v2' },
   })
 })
 
@@ -139,7 +140,7 @@ it('never delivers a puzzle when fallback assessment cannot finish', () => {
 
   expect(
     generatePuzzle(input, { maxLayouts: 0, maxWork: 0, maxSteps: 0, fallbackWork: 1000000 }),
-  ).toEqual({ status: 'budget-exhausted', stage: 'fallback-validation' })
+  ).toMatchObject({ status: 'budget-exhausted', stage: 'fallback-validation' })
 })
 it('rejects unsupported generation versions rather than silently changing the rules', () => {
   expect(

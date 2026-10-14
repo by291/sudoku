@@ -9,15 +9,16 @@ import {
 import type { SudokuUnit } from '@/core/sudoku/board'
 import { DIGITS } from '@/core/sudoku/types'
 import type { Board, CellValue, Digit, NoteMask } from '@/core/sudoku/types'
-import { TECHNIQUES } from '@/core/sudoku/techniques'
+import { ALL_CLASSIC_TECHNIQUES } from '@/core/sudoku/techniques'
+import { findAdvancedStep } from '@/core/sudoku/advancedTechniques'
 import type {
   LogicalState,
   LogicalStep,
   Technique,
-  ClassicTechnique,
+  BasicClassicTechnique,
   RuleEvidence,
 } from '@/core/sudoku/techniques'
-import { isClassicTechnique } from '@/core/sudoku/techniques'
+import { isClassicTechnique, isAdvancedTechnique } from '@/core/sudoku/techniques'
 import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
 import type { RuleContext } from '@/core/sudoku/rules'
 import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
@@ -253,7 +254,7 @@ function hiddenPair(state: LogicalState): LogicalStep | null {
   return null
 }
 
-const detectors: Record<ClassicTechnique, (state: LogicalState) => LogicalStep | null> = {
+const detectors: Record<BasicClassicTechnique, (state: LogicalState) => LogicalStep | null> = {
   'naked-single': nakedSingle,
   'hidden-single': hiddenSingle,
   'locked-candidate': lockedCandidate,
@@ -268,14 +269,19 @@ export function findLogicalStep(
 ): StepOutcome {
   const ordered =
     state.context.rules.kind === 'classic'
-      ? TECHNIQUES.filter((technique) => allowed.includes(technique))
+      ? ALL_CLASSIC_TECHNIQUES.filter((technique) => allowed.includes(technique))
       : allowed
   if (!consumeWork(budget)) {
     return { status: 'budget-exhausted' }
   }
 
   for (const technique of ordered) {
-    if (isClassicTechnique(technique)) {
+    if (isAdvancedTechnique(technique)) {
+      const result = findAdvancedStep(state, technique, budget)
+      if (result.status === 'budget-exhausted' || result.step) {
+        return result
+      }
+    } else if (isClassicTechnique(technique)) {
       const step = detectors[technique](state)
       if (step) {
         return { status: 'complete', step }
@@ -297,7 +303,11 @@ export function applyLogicalStep(state: LogicalWorkspace, step: LogicalStep): vo
       state.candidates[removal.cell] &= ~maskOf(removal.digit)
     }
 
-    if (step.evidence.kind !== 'unit') {
+    if (
+      step.evidence.kind === 'cage' ||
+      step.evidence.kind === 'thermo' ||
+      step.evidence.kind === 'arrow'
+    ) {
       state.premises.push(step.evidence)
     }
 

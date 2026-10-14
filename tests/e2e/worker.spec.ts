@@ -11,17 +11,12 @@ import { referenceCountSolutions } from '../support/referenceVariants'
 test('verifies fixed production-worker seeds and a known logical conclusion', async ({ page }) => {
   await page.goto('/#/')
 
-  for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+  for (const difficulty of ['easy', 'medium', 'hard', 'expert'] as const) {
     const response = parseWorkerResponse(
       await runWorker(page, {
         kind: 'generate',
         requestId: `seed-${difficulty}`,
-        input: {
-          difficulty,
-          seed: 'production-fixed-seed',
-          variant: 'classic',
-          puzzleVersion: 'sudoku-v2',
-        },
+        input: createGenerationInput('classic', difficulty, 'production-fixed-seed'),
       }),
     )
     if (

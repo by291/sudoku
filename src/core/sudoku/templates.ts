@@ -38,4 +38,14 @@ export const TEMPLATES: readonly PuzzleTemplate[] = [
       '004600000600190308190000060800701000000000090003020050901000080007409035005000100',
     ),
   },
+  {
+    difficulty: 'expert',
+    // This authored snapshot needs three coloring steps; independent tests verify uniqueness and links.
+    solution: literalBoard(
+      '481352796725689143639174582862415379517938264394726851143597628256843917978261435',
+    ),
+    givens: literalBoard(
+      '081052006725080000009100000002005009000000004394000050000090020050003907000200035',
+    ),
+  },
 ]

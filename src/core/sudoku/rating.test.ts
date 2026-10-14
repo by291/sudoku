@@ -70,7 +70,7 @@ it('rates a one-hole board with exact placement statistics', () => {
   const result = rated(assessPuzzle(createAssessmentInput(board, { kind: 'classic' })))
 
   expect(result.summary).toMatchObject({
-    ratingVersion: 'sudoku-rating-v1',
+    ratingVersion: 'sudoku-rating-v2',
     variant: 'classic',
     difficulty: 'easy',
     workload: {
@@ -105,7 +105,7 @@ it('rates a completed board without inventing a technique even with zero limits'
     highestTechnique: null,
     variantSteps: 0,
   })
-  expect(Object.values(result.summary.workload.techniqueCounts)).toEqual(Array(11).fill(0))
+  expect(Object.values(result.summary.workload.techniqueCounts)).toEqual(Array(17).fill(0))
   expect(result.trace).toEqual([])
 })
 
@@ -153,7 +153,8 @@ it.each(RATING_FIXTURES)(
     ).toBe(result.trace.length)
     expect(result.summary.workload.highestTier).toBe(fixture.difficulty)
     if (fixture.difficulty !== 'easy') {
-      const earlier = fixture.difficulty === 'hard' ? 'medium' : 'easy'
+      const earlier =
+        fixture.difficulty === 'expert' ? 'hard' : fixture.difficulty === 'hard' ? 'medium' : 'easy'
       const failed = analyzeLogic(
         fixture.board,
         RATING_POLICIES[fixture.rules.kind][earlier],
@@ -191,7 +192,11 @@ it('summarizes only the successful policy trace and starts each policy with fres
   expect(result.summary.workload.steps).toBe(independentRun.steps.length)
 })
 
-it.each(RATING_FIXTURES.filter((fixture) => fixture.difficulty !== 'easy'))(
+it.each(
+  RATING_FIXTURES.filter(
+    (fixture) => fixture.difficulty !== 'easy' && fixture.difficulty !== 'expert',
+  ),
+)(
   'proves a fixed higher-tier deduction for $id independently of production detectors',
   (fixture) => {
     const witness = RATING_WITNESSES[fixture.id]
@@ -427,17 +432,17 @@ it('round-trips a valid versioned summary and every compact outcome', () => {
   expect(parseAssessmentSummary(summary)).toEqual({ valid: true, value: summary })
   for (const outcome of [
     { status: 'rated', summary },
-    { status: 'ungraded', ratingVersion: 'sudoku-rating-v1', variant: 'classic' },
+    { status: 'ungraded', ratingVersion: 'sudoku-rating-v2', variant: 'classic' },
     {
       status: 'budget-exhausted',
-      ratingVersion: 'sudoku-rating-v1',
+      ratingVersion: 'sudoku-rating-v2',
       variant: 'classic',
       stage: 'validation',
       difficulty: null,
     },
     {
       status: 'budget-exhausted',
-      ratingVersion: 'sudoku-rating-v1',
+      ratingVersion: 'sudoku-rating-v2',
       variant: 'classic',
       stage: 'logic',
       difficulty: 'medium',
@@ -450,7 +455,7 @@ it('round-trips a valid versioned summary and every compact outcome', () => {
   expect(
     parseAssessmentOutcome({
       status: 'budget-exhausted',
-      ratingVersion: 'sudoku-rating-v1',
+      ratingVersion: 'sudoku-rating-v2',
       variant: 'classic',
       stage: 'logic',
       difficulty: null,
@@ -634,7 +639,7 @@ it('retains absence and reports unsupported versions, corrupt summaries and iden
   })
   expect(
     decodePuzzleAssessment(
-      { status: 'rated', summary: { ...summary, ratingVersion: 'sudoku-rating-v2' } },
+      { status: 'rated', summary: { ...summary, ratingVersion: 'sudoku-rating-v1' } },
       identity,
     ),
   ).toMatchObject({ status: 'unavailable', reason: 'unsupported-version' })
@@ -647,7 +652,7 @@ it('retains absence and reports unsupported versions, corrupt summaries and iden
     reason: 'identity-mismatch',
   })
   const unavailable = toPuzzleAssessment(
-    { status: 'ungraded', ratingVersion: 'sudoku-rating-v1', variant: 'classic' },
+    { status: 'ungraded', ratingVersion: 'sudoku-rating-v2', variant: 'classic' },
     identity,
   )
 

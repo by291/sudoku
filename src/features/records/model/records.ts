@@ -27,6 +27,7 @@ export function summarizeRecords(
       easy: { assisted: null, unassisted: null },
       medium: { assisted: null, unassisted: null },
       hard: { assisted: null, unassisted: null },
+      expert: { assisted: null, unassisted: null },
     },
     dailyTotals: { assisted: 0, unassisted: 0 },
     currentStreak: 0,

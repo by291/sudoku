@@ -18,6 +18,14 @@ Free play and new daily construction immediately use the current factory, withou
 
 Prove Classic terminal diversity with independent intercalate counts: unequal counts establish different transformation classes; equal counts do not prove equivalence. Do not claim uniform sampling. Scores, advanced techniques, and variant geometry diversity remain separate work.
 
+## Continuation amendment: Classic Expert and complete courses
+
+The approved [local product roadmap](../plans/2026-10-14-sudoku-local-product-roadmap.md) adds Classic-only Expert. Preserve the original Easy/Medium/Hard policies and add naked triples, hidden triples, X-Wing, Swordfish, XY-Wing, and simple coloring to Expert. A matching Expert assessment requires Hard to stall and the expanded policy to finish. Advanced detectors consume combination/graph work and carry subset, fish, wing, or coloring evidence; Worker clients validate proofs against replayed candidates from the requested board.
+
+The current assessment identity is `sudoku-rating-v2`, and Classic generation is `sudoku-v3`. Saved boards, stored difficulty, and completion facts retain precedence; unsupported older optional assessment metadata becomes explicitly unavailable without regrading. All variants continue to expose three tiers, and daily challenges remain Medium.
+
+Learning has 32 freely selectable units: 12 Classic units and four per variant. Keep the original 11 IDs, use two validated exercises per unit, and require three ordered stages in each variant combined exercise. Optional settings `lessonStages` stores committed incomplete-stage cursors; completion records keep their existing format. Database schema 1 remains unchanged.
+
 ## 1. Intent and decisions
 
 Improve puzzle generation and difficulty assessment for the existing Chinese-language Sudoku application. A delivered puzzle must have a unique solution, be solvable with the techniques supported for its type and difficulty, and carry an explainable assessment. Development tools and production must execute the same assessment code with the same policies.

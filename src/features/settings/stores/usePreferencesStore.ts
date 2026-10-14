@@ -45,26 +45,32 @@ export const usePreferencesStore = defineStore('preferences', () => {
     }
   }
 
-  function update(patch: Partial<Settings>) {
+  /** Returns true only for this committed write; exercise cursors opt out of optimistic display. */
+  function update(
+    patch: Partial<Settings>,
+    options: { optimistic: boolean } = { optimistic: true },
+  ) {
     const snapshot = { ...settings.value, ...patch }
-    settings.value = snapshot
+    if (options.optimistic) {
+      settings.value = snapshot
+    }
     loaded = true
     const current = ++epoch
-    tail = tail.then(async () => {
+    const writing = tail.then(async () => {
       if (current !== epoch) {
-        return
+        return false
       }
 
       if (datasetEpoch === null) {
         const fence = await runtime.repository.readDatasetEpoch()
         if (current !== epoch) {
-          return
+          return false
         }
 
         if (!fence.ok) {
           error.value = '偏好尚未保存，请保持页面打开并重试。'
 
-          return
+          return false
         }
 
         datasetEpoch = fence.value
@@ -72,6 +78,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
       const result = await runtime.repository.writeSettings(snapshot, datasetEpoch)
       if (current === epoch) {
+        if (result.ok && !options.optimistic) {
+          settings.value = snapshot
+        }
         error.value = result.ok ? null : '偏好尚未保存，请保持页面打开并重试。'
       }
 
@@ -79,9 +88,11 @@ export const usePreferencesStore = defineStore('preferences', () => {
         datasetEpoch = null
         loaded = false
       }
+      return current === epoch && result.ok
     })
+    tail = writing.then(() => undefined)
 
-    return tail
+    return writing
   }
 
   async function reset() {

@@ -1,4 +1,6 @@
 import { test, expect, cellName, enterExerciseDigit } from './support'
+import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
+import { stageAnswer } from '@/features/learning/model/exerciseStages'
 
 test('shows one course path and retains the selected type through refresh and parent navigation', async ({
   page,
@@ -10,11 +12,11 @@ test('shows one course path and retains the selected type through refresh and pa
     'aria-current',
     'page',
   )
-  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(6)
+  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(12)
   await navigation.getByRole('link', { name: /箭头数独/ }).focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/#\/learn\?variant=arrow$/)
-  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(1)
+  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(4)
   await expect(page.getByRole('heading', { name: '标准数独', exact: true })).toHaveCount(0)
   await page.reload()
   await expect(navigation.getByRole('link', { name: /箭头数独/ })).toHaveAttribute(
@@ -38,10 +40,16 @@ test('recommends the next unfinished lesson and resumes the last visited lesson'
   await page.getByRole('button', { name: cellName(40) }).click()
   await enterExerciseDigit(page, 5)
   await expect(page.getByRole('status')).toContainText('推理正确')
+  await page.getByRole('button', { name: '下一阶段', exact: true }).click()
+  const transfer = stageAnswer(lessonStages(LESSONS[0])[1])
+  if (transfer.kind !== 'placement') throw new Error('Expected placement transfer')
+  await page.getByRole('button', { name: cellName(transfer.expected.cell) }).click()
+  await enterExerciseDigit(page, transfer.expected.digit)
+  await expect(page.getByText('本课全部练习已完成，进度已保存。')).toBeVisible()
   await page.getByRole('link', { name: '返回课程列表', exact: true }).click()
   await expect(page.getByRole('progressbar', { name: '标准数独学习进度' })).toHaveAttribute(
     'aria-valuetext',
-    '已完成 1 / 6 节',
+    '已完成 1 / 12 节',
   )
   await page.getByRole('link', { name: '学习下一节', exact: true }).click()
   await expect(page).toHaveURL(/#\/learn\/naked-single$/)
@@ -74,7 +82,7 @@ test('recovers an unknown course type without losing access to the course naviga
   await expect(page.getByRole('alert')).toContainText('无法识别')
   await page.getByRole('link', { name: '查看标准课程', exact: true }).click()
   await expect(page).toHaveURL(/#\/learn$/)
-  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(6)
+  await expect(page.getByRole('list', { name: '课程路径' }).getByRole('link')).toHaveCount(12)
 })
 
 test('opens a different course at the top and restores the previous path on browser back', async ({
