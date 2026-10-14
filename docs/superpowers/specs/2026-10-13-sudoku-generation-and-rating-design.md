@@ -34,6 +34,8 @@ The records workflow now supports versioned local backup and replacement restora
 
 ## 1. Intent and decisions
 
+Refinement (2026-10-14): After the delivered roadmap, the user authorized algorithm and generator changes, explicitly extending the optimization to all six types and accepting changed seed outputs. Current Classic advances to `sudoku-v4` and variants to `sudoku-variants-v4`; rating stays `sudoku-rating-v2`. Use shared bounded finite-domain search with singleton, full-unit and exact arithmetic propagation, affected-constraint queues and isolated MRV branch snapshots. Terminal construction maintains unit masks across Classic, Diagonal and Jigsaw. Screen Killer Hard construction states by logical tier before exact counting; every delivered candidate still requires exact uniqueness, a matching complete assessment and meaningful rules. Work, layout, step and Worker limits remain unchanged. See [Shared Search Verification](../verification/2026-10-14-sudoku-search.md) for algorithm comparisons, the full current corpus and limits. Saved puzzle/result/assessment facts and original daily eligibility remain authoritative.
+
 Improve puzzle generation and difficulty assessment for the existing Chinese-language Sudoku application. A delivered puzzle must have a unique solution, be solvable with the techniques supported for its type and difficulty, and carry an explainable assessment. Development tools and production must execute the same assessment code with the same policies.
 
 The agreed direction is:

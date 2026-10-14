@@ -1,0 +1,1829 @@
+{
+  "corpusVersion": "local-product-corpus-v1",
+  "seeds": [
+    "local-product-corpus-v1:seed:000",
+    "local-product-corpus-v1:seed:001",
+    "local-product-corpus-v1:seed:002",
+    "local-product-corpus-v1:seed:003",
+    "local-product-corpus-v1:seed:004",
+    "local-product-corpus-v1:seed:005",
+    "local-product-corpus-v1:seed:006",
+    "local-product-corpus-v1:seed:007",
+    "local-product-corpus-v1:seed:008",
+    "local-product-corpus-v1:seed:009",
+    "local-product-corpus-v1:seed:010",
+    "local-product-corpus-v1:seed:011",
+    "local-product-corpus-v1:seed:012",
+    "local-product-corpus-v1:seed:013",
+    "local-product-corpus-v1:seed:014",
+    "local-product-corpus-v1:seed:015",
+    "local-product-corpus-v1:seed:016",
+    "local-product-corpus-v1:seed:017",
+    "local-product-corpus-v1:seed:018",
+    "local-product-corpus-v1:seed:019",
+    "local-product-corpus-v1:seed:020",
+    "local-product-corpus-v1:seed:021",
+    "local-product-corpus-v1:seed:022",
+    "local-product-corpus-v1:seed:023",
+    "local-product-corpus-v1:seed:024",
+    "local-product-corpus-v1:seed:025",
+    "local-product-corpus-v1:seed:026",
+    "local-product-corpus-v1:seed:027",
+    "local-product-corpus-v1:seed:028",
+    "local-product-corpus-v1:seed:029",
+    "local-product-corpus-v1:seed:030",
+    "local-product-corpus-v1:seed:031",
+    "local-product-corpus-v1:seed:032",
+    "local-product-corpus-v1:seed:033",
+    "local-product-corpus-v1:seed:034",
+    "local-product-corpus-v1:seed:035",
+    "local-product-corpus-v1:seed:036",
+    "local-product-corpus-v1:seed:037",
+    "local-product-corpus-v1:seed:038",
+    "local-product-corpus-v1:seed:039",
+    "local-product-corpus-v1:seed:040",
+    "local-product-corpus-v1:seed:041",
+    "local-product-corpus-v1:seed:042",
+    "local-product-corpus-v1:seed:043",
+    "local-product-corpus-v1:seed:044",
+    "local-product-corpus-v1:seed:045",
+    "local-product-corpus-v1:seed:046",
+    "local-product-corpus-v1:seed:047",
+    "local-product-corpus-v1:seed:048",
+    "local-product-corpus-v1:seed:049",
+    "local-product-corpus-v1:seed:050",
+    "local-product-corpus-v1:seed:051",
+    "local-product-corpus-v1:seed:052",
+    "local-product-corpus-v1:seed:053",
+    "local-product-corpus-v1:seed:054",
+    "local-product-corpus-v1:seed:055",
+    "local-product-corpus-v1:seed:056",
+    "local-product-corpus-v1:seed:057",
+    "local-product-corpus-v1:seed:058",
+    "local-product-corpus-v1:seed:059",
+    "local-product-corpus-v1:seed:060",
+    "local-product-corpus-v1:seed:061",
+    "local-product-corpus-v1:seed:062",
+    "local-product-corpus-v1:seed:063"
+  ],
+  "baseCommit": "52df1c5",
+  "versionsBefore": {
+    "classic": "sudoku-v3",
+    "variants": "sudoku-variants-v3",
+    "assessment": "sudoku-rating-v2"
+  },
+  "versionsAfter": {
+    "classic": "sudoku-v4",
+    "variants": "sudoku-variants-v4",
+    "assessment": "sudoku-rating-v2"
+  },
+  "limits": {
+    "maxLayouts": 20,
+    "maxWork": 1000000,
+    "maxSteps": 500,
+    "fallbackWork": 1000000
+  },
+  "workerTimeoutMilliseconds": 15000,
+  "host": {
+    "platform": "win32",
+    "release": "10.0.26300",
+    "node": "v26.10.0",
+    "cpu": "Intel(R) Core(TM) Ultra 9 285K"
+  },
+  "interpretation": "Generator identities differ. Full-corpus timings include changed layouts and acceptance paths. Same-board public-counter benchmarks isolate search changes. All timings are host- and run-specific.",
+  "before": {
+    "requests": 1216,
+    "ready": 1216,
+    "generated": 982,
+    "fallback": 234,
+    "terminalFamilyLowerBound": 31,
+    "canonicalGeometries": 382,
+    "generationMilliseconds": {
+      "min": 4.504799999995157,
+      "median": 68.15750000000116,
+      "p95": 543.3508000000002,
+      "max": 6447.867100000003,
+      "total": 170822.84030000036
+    },
+    "constructionWork": {
+      "min": 1128,
+      "median": 63090,
+      "p95": 1000000,
+      "max": 1000000,
+      "total": 335323603
+    },
+    "fallbackWork": {
+      "min": 0,
+      "median": 0,
+      "p95": 102235,
+      "max": 472260,
+      "total": 15967805
+    },
+    "logicSteps": {
+      "min": 15,
+      "median": 57,
+      "p95": 112,
+      "max": 113,
+      "total": 69793
+    }
+  },
+  "after": {
+    "requests": 1216,
+    "ready": 1216,
+    "generated": 1163,
+    "fallback": 53,
+    "terminalFamilyLowerBound": 32,
+    "canonicalGeometries": 556,
+    "generationMilliseconds": {
+      "min": 4.838400000007823,
+      "median": 39.980200000005425,
+      "p95": 320.70560000000114,
+      "max": 3828.1849,
+      "total": 111452.11949999991
+    },
+    "constructionWork": {
+      "min": 3103,
+      "median": 33030,
+      "p95": 549675,
+      "max": 1000000,
+      "total": 137818006
+    },
+    "fallbackWork": {
+      "min": 0,
+      "median": 0,
+      "p95": 0,
+      "max": 24664,
+      "total": 938805
+    },
+    "logicSteps": {
+      "min": 11,
+      "median": 58,
+      "p95": 112,
+      "max": 153,
+      "total": 71566
+    }
+  },
+  "combinations": [
+    {
+      "variant": "classic",
+      "difficulty": "easy",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 13.078599999999938,
+          "median": 14.20659999999998,
+          "p95": 15.673699999999997,
+          "max": 27.734899999999982,
+          "total": 928.2585000000004
+        },
+        "constructionWork": {
+          "min": 2197,
+          "median": 2293,
+          "p95": 2407,
+          "max": 2532,
+          "total": 147196
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 45,
+          "median": 45,
+          "p95": 45,
+          "max": 45,
+          "total": 2880
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 11.43909999999994,
+          "median": 12.165899999999965,
+          "p95": 15.22539999999998,
+          "max": 26.662500000000023,
+          "total": 813.0160999999998
+        },
+        "constructionWork": {
+          "min": 6706,
+          "median": 7249,
+          "p95": 8116,
+          "max": 9700,
+          "total": 469050
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 45,
+          "median": 45,
+          "p95": 45,
+          "max": 45,
+          "total": 2880
+        }
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "medium",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 16.70849999999973,
+          "median": 94.54409999999916,
+          "p95": 441.4436999999998,
+          "max": 599.9117999999999,
+          "total": 9534.1908
+        },
+        "constructionWork": {
+          "min": 2931,
+          "median": 30426,
+          "p95": 134541,
+          "max": 188277,
+          "total": 2896621
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 51,
+          "median": 57,
+          "p95": 61,
+          "max": 64,
+          "total": 3623
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 14.195999999999913,
+          "median": 65.92740000000003,
+          "p95": 243.9378999999999,
+          "max": 415.04359999999997,
+          "total": 5142.841800000004
+        },
+        "constructionWork": {
+          "min": 8364,
+          "median": 62235,
+          "p95": 238516,
+          "max": 441495,
+          "total": 5033339
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 50,
+          "median": 57,
+          "p95": 61,
+          "max": 62,
+          "total": 3607
+        }
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "hard",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 55,
+        "fallback": 9,
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 15.378700000001118,
+          "median": 265.60280000000057,
+          "p95": 835.5623000000014,
+          "max": 968.5413000000008,
+          "total": 19787.00170000001
+        },
+        "constructionWork": {
+          "min": 3200,
+          "median": 87239,
+          "p95": 278849,
+          "max": 336262,
+          "total": 7004043
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 256,
+          "max": 558,
+          "total": 2499
+        },
+        "logicSteps": {
+          "min": 52,
+          "median": 59,
+          "p95": 65,
+          "max": 66,
+          "total": 3800
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 58,
+        "fallback": 6,
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 15.332899999999427,
+          "median": 156.01380000000063,
+          "p95": 410.5211999999992,
+          "max": 427.8251999999993,
+          "total": 11176.536699999995
+        },
+        "constructionWork": {
+          "min": 10110,
+          "median": 155546,
+          "p95": 422806,
+          "max": 446697,
+          "total": 11228168
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 389,
+          "max": 539,
+          "total": 2617
+        },
+        "logicSteps": {
+          "min": 53,
+          "median": 60,
+          "p95": 66,
+          "max": 68,
+          "total": 3808
+        }
+      }
+    },
+    {
+      "variant": "classic",
+      "difficulty": "expert",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 23.674699999995937,
+          "median": 157.99200000000565,
+          "p95": 514.7046000000046,
+          "max": 740.4369000000006,
+          "total": 12193.256000000023
+        },
+        "constructionWork": {
+          "min": 8709,
+          "median": 68470,
+          "p95": 199234,
+          "max": 274274,
+          "total": 5063786
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 54,
+          "median": 58,
+          "p95": 65,
+          "max": 69,
+          "total": 3778
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 62,
+        "fallback": 2,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 20.181899999999587,
+          "median": 94.47520000000077,
+          "p95": 303.83790000000226,
+          "max": 430.6923999999999,
+          "total": 7649.190800000004
+        },
+        "constructionWork": {
+          "min": 18188,
+          "median": 89143,
+          "p95": 311535,
+          "max": 422749,
+          "total": 7677389
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 9298,
+          "total": 18445
+        },
+        "logicSteps": {
+          "min": 54,
+          "median": 58,
+          "p95": 66,
+          "max": 70,
+          "total": 3777
+        }
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "easy",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 7.891800000004878,
+          "median": 14.574199999995471,
+          "p95": 19.66320000000269,
+          "max": 21.155500000000757,
+          "total": 920.1405000000159
+        },
+        "constructionWork": {
+          "min": 1128,
+          "median": 2640,
+          "p95": 3742,
+          "max": 4479,
+          "total": 165464
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 25,
+          "median": 40,
+          "p95": 47,
+          "max": 51,
+          "total": 2470
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 21,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 5.198199999998906,
+          "median": 17.016700000000128,
+          "p95": 22.314399999999296,
+          "max": 23.534100000000763,
+          "total": 1036.807600000011
+        },
+        "constructionWork": {
+          "min": 3103,
+          "median": 11078,
+          "p95": 15502,
+          "max": 16681,
+          "total": 677466
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 13,
+          "median": 41,
+          "p95": 51,
+          "max": 53,
+          "total": 2469
+        }
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "medium",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 20.256999999997788,
+          "median": 39.17369999999937,
+          "p95": 409.52189999999973,
+          "max": 827.6126000000004,
+          "total": 6843.87099999997
+        },
+        "constructionWork": {
+          "min": 3137,
+          "median": 8573,
+          "p95": 134888,
+          "max": 241427,
+          "total": 1753802
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 48,
+          "median": 61,
+          "p95": 66,
+          "max": 68,
+          "total": 3888
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 17,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 21.399199999999837,
+          "median": 32.04520000000048,
+          "p95": 152.09979999999996,
+          "max": 237.21830000000045,
+          "total": 3738.989199999978
+        },
+        "constructionWork": {
+          "min": 9516,
+          "median": 15047,
+          "p95": 98639,
+          "max": 176520,
+          "total": 2193112
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 54,
+          "median": 61,
+          "p95": 67,
+          "max": 71,
+          "total": 3888
+        }
+      }
+    },
+    {
+      "variant": "diagonal",
+      "difficulty": "hard",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 20.743900000001304,
+          "median": 288.16070000000764,
+          "p95": 1537.964399999997,
+          "max": 2527.0545000000056,
+          "total": 31632.091800000002
+        },
+        "constructionWork": {
+          "min": 3294,
+          "median": 78828,
+          "p95": 497953,
+          "max": 739437,
+          "total": 9131187
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 53,
+          "median": 66,
+          "p95": 74,
+          "max": 77,
+          "total": 4227
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 21.018800000005285,
+          "median": 91.16370000000461,
+          "p95": 395.0764999999956,
+          "max": 737.5751999999993,
+          "total": 8972.481500000009
+        },
+        "constructionWork": {
+          "min": 9506,
+          "median": 63880,
+          "p95": 288212,
+          "max": 543595,
+          "total": 6453098
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 57,
+          "median": 66,
+          "p95": 73,
+          "max": 78,
+          "total": 4237
+        }
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "easy",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 23,
+        "canonicalGeometries": 9,
+        "generationMilliseconds": {
+          "min": 11.273600000000442,
+          "median": 27.282500000001164,
+          "p95": 167.3564999999944,
+          "max": 290.11539999999513,
+          "total": 3408.91459999996
+        },
+        "constructionWork": {
+          "min": 1657,
+          "median": 5974,
+          "p95": 53406,
+          "max": 88447,
+          "total": 870772
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 31,
+          "median": 51,
+          "p95": 56,
+          "max": 58,
+          "total": 3151
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 7,
+        "generationMilliseconds": {
+          "min": 8.093800000002375,
+          "median": 24.280800000000454,
+          "p95": 82.09130000000005,
+          "max": 92.5225999999966,
+          "total": 2036.164199999992
+        },
+        "constructionWork": {
+          "min": 4983,
+          "median": 16694,
+          "p95": 72215,
+          "max": 81509,
+          "total": 1552425
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 20,
+          "median": 50,
+          "p95": 57,
+          "max": 60,
+          "total": 3029
+        }
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "medium",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 63,
+        "fallback": 1,
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 8,
+        "generationMilliseconds": {
+          "min": 20.002699999997276,
+          "median": 73.62720000000263,
+          "p95": 425.4033000000054,
+          "max": 6447.867100000003,
+          "total": 14069.861600000004
+        },
+        "constructionWork": {
+          "min": 3256,
+          "median": 18113,
+          "p95": 147866,
+          "max": 1000000,
+          "total": 3187267
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 2730,
+          "total": 2730
+        },
+        "logicSteps": {
+          "min": 49,
+          "median": 57,
+          "p95": 63,
+          "max": 67,
+          "total": 3671
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 6,
+        "generationMilliseconds": {
+          "min": 18.83409999999276,
+          "median": 53.05159999999887,
+          "p95": 148.8475000000035,
+          "max": 233.74950000000536,
+          "total": 3897.92710000003
+        },
+        "constructionWork": {
+          "min": 7845,
+          "median": 32261,
+          "p95": 99948,
+          "max": 161650,
+          "total": 2535386
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 47,
+          "median": 58,
+          "p95": 64,
+          "max": 66,
+          "total": 3701
+        }
+      }
+    },
+    {
+      "variant": "jigsaw",
+      "difficulty": "hard",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 56,
+        "fallback": 8,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 4,
+        "generationMilliseconds": {
+          "min": 22.025600000008126,
+          "median": 330.5198000000091,
+          "p95": 1363.6251000000047,
+          "max": 3721.676800000001,
+          "total": 33633.47120000004
+        },
+        "constructionWork": {
+          "min": 3438,
+          "median": 112890,
+          "p95": 436818,
+          "max": 1000000,
+          "total": 10802222
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 276,
+          "max": 439,
+          "total": 2329
+        },
+        "logicSteps": {
+          "min": 48,
+          "median": 61,
+          "p95": 72,
+          "max": 73,
+          "total": 3899
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 58,
+        "fallback": 6,
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 4,
+        "generationMilliseconds": {
+          "min": 19.644899999999325,
+          "median": 132.45580000000336,
+          "p95": 607.5714000000007,
+          "max": 3828.1849,
+          "total": 15795.424400000047
+        },
+        "constructionWork": {
+          "min": 7970,
+          "median": 92548,
+          "p95": 439923,
+          "max": 1000000,
+          "total": 8904508
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 721,
+          "max": 844,
+          "total": 4508
+        },
+        "logicSteps": {
+          "min": 50,
+          "median": 62,
+          "p95": 68,
+          "max": 71,
+          "total": 3938
+        }
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "easy",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 18,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 7.616599999979371,
+          "median": 23.883499999996275,
+          "p95": 38.592800000013085,
+          "max": 54.54130000001169,
+          "total": 1577.6919999998354
+        },
+        "constructionWork": {
+          "min": 26923,
+          "median": 151300,
+          "p95": 300304,
+          "max": 336270,
+          "total": 10554980
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 18,
+          "median": 38,
+          "p95": 50,
+          "max": 54,
+          "total": 2416
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 4.838400000007823,
+          "median": 20.638099999996484,
+          "p95": 27.193299999999,
+          "max": 33.37829999999667,
+          "total": 1301.9419999999373
+        },
+        "constructionWork": {
+          "min": 4137,
+          "median": 19009,
+          "p95": 26004,
+          "max": 28202,
+          "total": 1184559
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 11,
+          "median": 41,
+          "p95": 50,
+          "max": 51,
+          "total": 2526
+        }
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "medium",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 43,
+        "fallback": 21,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 44,
+        "generationMilliseconds": {
+          "min": 49.22320000000764,
+          "median": 78.04450000001816,
+          "p95": 94.4206000000122,
+          "max": 292.1042000000016,
+          "total": 5086.4820000001055
+        },
+        "constructionWork": {
+          "min": 407456,
+          "median": 826380,
+          "p95": 1000000,
+          "max": 1000000,
+          "total": 52390335
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 24202,
+          "max": 24995,
+          "total": 449434
+        },
+        "logicSteps": {
+          "min": 55,
+          "median": 65,
+          "p95": 77,
+          "max": 79,
+          "total": 4099
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 30.030500000008033,
+          "median": 44.059699999997974,
+          "p95": 57.325499999991735,
+          "max": 62.21809999999823,
+          "total": 2870.6132999999827
+        },
+        "constructionWork": {
+          "min": 29185,
+          "median": 58922,
+          "p95": 109209,
+          "max": 133567,
+          "total": 4218729
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 56,
+          "median": 71,
+          "p95": 78,
+          "max": 82,
+          "total": 4500
+        }
+      }
+    },
+    {
+      "variant": "killer",
+      "difficulty": "hard",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 0,
+        "fallback": 64,
+        "terminalFamilyLowerBound": 1,
+        "canonicalGeometries": 1,
+        "generationMilliseconds": {
+          "min": 83.47709999998915,
+          "median": 100.19459999998799,
+          "p95": 118.77749999999651,
+          "max": 125.5057000000088,
+          "total": 6470.248999999982
+        },
+        "constructionWork": {
+          "min": 1000000,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "total": 64000000
+        },
+        "fallbackWork": {
+          "min": 102235,
+          "median": 157896,
+          "p95": 472260,
+          "max": 472260,
+          "total": 14825535
+        },
+        "logicSteps": {
+          "min": 112,
+          "median": 112,
+          "p95": 113,
+          "max": 113,
+          "total": 7184
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 26,
+        "fallback": 38,
+        "terminalFamilyLowerBound": 15,
+        "canonicalGeometries": 27,
+        "generationMilliseconds": {
+          "min": 90.08079999999609,
+          "median": 164.45610000001034,
+          "p95": 334.80569999999716,
+          "max": 368.8793000000005,
+          "total": 12183.884900000048
+        },
+        "constructionWork": {
+          "min": 372089,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "total": 54709008
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 23811,
+          "p95": 24589,
+          "max": 24664,
+          "total": 911888
+        },
+        "logicSteps": {
+          "min": 112,
+          "median": 112,
+          "p95": 137,
+          "max": 153,
+          "total": 7553
+        }
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "easy",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 21,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 4.504799999995157,
+          "median": 20.29759999999078,
+          "p95": 26.014100000000326,
+          "max": 74.2905000000028,
+          "total": 1276.7900999999547
+        },
+        "constructionWork": {
+          "min": 4147,
+          "median": 52202,
+          "p95": 91024,
+          "max": 312039,
+          "total": 3559648
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 15,
+          "median": 46,
+          "p95": 53,
+          "max": 55,
+          "total": 2784
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 9.458499999993364,
+          "median": 18.471400000009453,
+          "p95": 25.945999999996275,
+          "max": 29.465100000001257,
+          "total": 1198.0655000000552
+        },
+        "constructionWork": {
+          "min": 5595,
+          "median": 14360,
+          "p95": 20655,
+          "max": 23600,
+          "total": 938672
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 20,
+          "median": 44,
+          "p95": 54,
+          "max": 58,
+          "total": 2763
+        }
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "medium",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 28,
+        "fallback": 36,
+        "terminalFamilyLowerBound": 17,
+        "canonicalGeometries": 29,
+        "generationMilliseconds": {
+          "min": 21.152300000016112,
+          "median": 90.82639999999083,
+          "p95": 145.6032000000123,
+          "max": 188.1490000000049,
+          "total": 5786.1608000001
+        },
+        "constructionWork": {
+          "min": 57442,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "total": 47508463
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 2561,
+          "p95": 4784,
+          "max": 4790,
+          "total": 131524
+        },
+        "logicSteps": {
+          "min": 56,
+          "median": 58,
+          "p95": 67,
+          "max": 70,
+          "total": 3837
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 19.54759999999078,
+          "median": 107.74139999999898,
+          "p95": 313.3894,
+          "max": 495.10050000000047,
+          "total": 8142.96879999993
+        },
+        "constructionWork": {
+          "min": 10886,
+          "median": 96592,
+          "p95": 304934,
+          "max": 454229,
+          "total": 7403239
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 51,
+          "median": 65,
+          "p95": 70,
+          "max": 79,
+          "total": 4111
+        }
+      }
+    },
+    {
+      "variant": "thermo",
+      "difficulty": "hard",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 14,
+        "fallback": 50,
+        "terminalFamilyLowerBound": 11,
+        "canonicalGeometries": 15,
+        "generationMilliseconds": {
+          "min": 29.112200000003213,
+          "median": 109.03449999997974,
+          "p95": 158.97200000000885,
+          "max": 188.5734999999986,
+          "total": 6698.390200000169
+        },
+        "constructionWork": {
+          "min": 129134,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "total": 55029040
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 5345,
+          "p95": 12238,
+          "max": 13956,
+          "total": 353897
+        },
+        "logicSteps": {
+          "min": 62,
+          "median": 64,
+          "p95": 69,
+          "max": 74,
+          "total": 4140
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 63,
+        "fallback": 1,
+        "terminalFamilyLowerBound": 22,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 23.634599999990314,
+          "median": 150.87249999999767,
+          "p95": 489.4231,
+          "max": 728.0641999999934,
+          "total": 12359.018199999919
+        },
+        "constructionWork": {
+          "min": 15089,
+          "median": 130309,
+          "p95": 474807,
+          "max": 729484,
+          "total": 11138868
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 1347,
+          "total": 1347
+        },
+        "logicSteps": {
+          "min": 53,
+          "median": 68,
+          "p95": 75,
+          "max": 78,
+          "total": 4298
+        }
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "easy",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 57,
+        "fallback": 7,
+        "terminalFamilyLowerBound": 17,
+        "canonicalGeometries": 58,
+        "generationMilliseconds": {
+          "min": 7.001199999998789,
+          "median": 19.197400000004563,
+          "p95": 126.06160000001546,
+          "max": 174.35509999998612,
+          "total": 2237.6191000001854
+        },
+        "constructionWork": {
+          "min": 5785,
+          "median": 34814,
+          "p95": 1000000,
+          "max": 1000000,
+          "total": 10775320
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 372,
+          "max": 407,
+          "total": 2548
+        },
+        "logicSteps": {
+          "min": 22,
+          "median": 43,
+          "p95": 51,
+          "max": 53,
+          "total": 2545
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 7.3377999999938766,
+          "median": 19.003499999991618,
+          "p95": 83.0277999999962,
+          "max": 118.81660000000556,
+          "total": 1775.9060000000172
+        },
+        "constructionWork": {
+          "min": 5340,
+          "median": 14506,
+          "p95": 77217,
+          "max": 120979,
+          "total": 1537374
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 20,
+          "median": 44,
+          "p95": 51,
+          "max": 54,
+          "total": 2688
+        }
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "medium",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 6.170099999988452,
+          "median": 21.605699999985518,
+          "p95": 28.31359999999404,
+          "max": 33.205199999996694,
+          "total": 1372.8840999999084
+        },
+        "constructionWork": {
+          "min": 6033,
+          "median": 46403,
+          "p95": 80939,
+          "max": 100035,
+          "total": 3097172
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 21,
+          "median": 51,
+          "p95": 60,
+          "max": 65,
+          "total": 3241
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 20,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 8.00800000000163,
+          "median": 19.912900000010268,
+          "p95": 24.816500000000815,
+          "max": 25.676500000001397,
+          "total": 1256.4644000000117
+        },
+        "constructionWork": {
+          "min": 4106,
+          "median": 11153,
+          "p95": 15200,
+          "max": 15744,
+          "total": 704485
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 25,
+          "median": 51,
+          "p95": 60,
+          "max": 62,
+          "total": 3219
+        }
+      }
+    },
+    {
+      "variant": "arrow",
+      "difficulty": "hard",
+      "before": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 26,
+        "fallback": 38,
+        "terminalFamilyLowerBound": 14,
+        "canonicalGeometries": 27,
+        "generationMilliseconds": {
+          "min": 32.76019999998971,
+          "median": 114.12840000001597,
+          "p95": 201.2955999999831,
+          "max": 275.5719000000099,
+          "total": 7365.5153000001155
+        },
+        "constructionWork": {
+          "min": 62903,
+          "median": 1000000,
+          "p95": 1000000,
+          "max": 1000000,
+          "total": 47386285
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 3477,
+          "p95": 8330,
+          "max": 11559,
+          "total": 197309
+        },
+        "logicSteps": {
+          "min": 61,
+          "median": 61,
+          "p95": 78,
+          "max": 89,
+          "total": 4160
+        }
+      },
+      "after": {
+        "requests": 64,
+        "ready": 64,
+        "generated": 64,
+        "fallback": 0,
+        "terminalFamilyLowerBound": 19,
+        "canonicalGeometries": 64,
+        "generationMilliseconds": {
+          "min": 30.286800000001676,
+          "median": 107.58890000000247,
+          "p95": 415.60130000000936,
+          "max": 861.4017000000167,
+          "total": 10103.876999999964
+        },
+        "constructionWork": {
+          "min": 16176,
+          "median": 104364,
+          "p95": 395358,
+          "max": 806316,
+          "total": 9259131
+        },
+        "fallbackWork": {
+          "min": 0,
+          "median": 0,
+          "p95": 0,
+          "max": 0,
+          "total": 0
+        },
+        "logicSteps": {
+          "min": 55,
+          "median": 72,
+          "p95": 81,
+          "max": 86,
+          "total": 4574
+        }
+      }
+    }
+  ],
+  "publicSearch": {
+    "queries": 95,
+    "sparseQueries": 76,
+    "compiledRulesOutsideTiming": true,
+    "inputValidationInsideTiming": true,
+    "independentCountsMatched": true,
+    "fixtureQueries": [
+      "authored givens",
+      "complete solution",
+      "two extra givens",
+      "four extra givens",
+      "eight extra givens"
+    ],
+    "sparseByType": [
+      {
+        "variant": "classic",
+        "queries": 16,
+        "beforeMilliseconds": {
+          "min": 0.16460000000000719,
+          "median": 0.4440000000000168,
+          "p95": 1.4730000000000132,
+          "max": 1.4730000000000132,
+          "total": 9.347600000000028
+        },
+        "afterMilliseconds": {
+          "min": 0.07430000000002224,
+          "median": 0.18309999999999604,
+          "p95": 0.8217999999999961,
+          "max": 0.8217999999999961,
+          "total": 3.9044000000000096
+        }
+      },
+      {
+        "variant": "diagonal",
+        "queries": 12,
+        "beforeMilliseconds": {
+          "min": 0.11050000000000182,
+          "median": 0.293899999999951,
+          "p95": 1.547300000000007,
+          "max": 1.547300000000007,
+          "total": 4.883399999999995
+        },
+        "afterMilliseconds": {
+          "min": 0.07190000000002783,
+          "median": 0.12740000000002283,
+          "p95": 0.21350000000001046,
+          "max": 0.21350000000001046,
+          "total": 1.545000000000016
+        }
+      },
+      {
+        "variant": "jigsaw",
+        "queries": 12,
+        "beforeMilliseconds": {
+          "min": 0.0817000000000121,
+          "median": 0.2108000000000061,
+          "p95": 3.4483999999999924,
+          "max": 3.4483999999999924,
+          "total": 6.699199999999962
+        },
+        "afterMilliseconds": {
+          "min": 0.04599999999999227,
+          "median": 0.07910000000003947,
+          "p95": 0.26830000000001064,
+          "max": 0.26830000000001064,
+          "total": 1.0415000000000987
+        }
+      },
+      {
+        "variant": "killer",
+        "queries": 12,
+        "beforeMilliseconds": {
+          "min": 0.5056999999999903,
+          "median": 1.5964999999999918,
+          "p95": 22.890600000000006,
+          "max": 22.890600000000006,
+          "total": 47.070100000000025
+        },
+        "afterMilliseconds": {
+          "min": 0.151299999999992,
+          "median": 0.21800000000001774,
+          "p95": 0.7013000000000034,
+          "max": 0.7013000000000034,
+          "total": 3.1251000000000886
+        }
+      },
+      {
+        "variant": "thermo",
+        "queries": 12,
+        "beforeMilliseconds": {
+          "min": 0.1048000000000684,
+          "median": 0.8991000000000895,
+          "p95": 2.068399999999997,
+          "max": 2.068399999999997,
+          "total": 11.09740000000022
+        },
+        "afterMilliseconds": {
+          "min": 0.07929999999998927,
+          "median": 0.17909999999994852,
+          "p95": 0.21720000000004802,
+          "max": 0.21720000000004802,
+          "total": 1.8564000000000078
+        }
+      },
+      {
+        "variant": "arrow",
+        "queries": 12,
+        "beforeMilliseconds": {
+          "min": 0.07039999999994961,
+          "median": 0.20500000000004093,
+          "p95": 0.9098999999999933,
+          "max": 0.9098999999999933,
+          "total": 3.1009999999998854
+        },
+        "afterMilliseconds": {
+          "min": 0.07010000000002492,
+          "median": 0.11330000000009477,
+          "p95": 0.2866999999999962,
+          "max": 0.2866999999999962,
+          "total": 1.4686000000000377
+        }
+      }
+    ]
+  },
+  "killerConstructionStates": {
+    "queries": 64,
+    "independentCountsMatched": true,
+    "propagationMilliseconds": {
+      "min": 0.40619999999989886,
+      "median": 0.5679999999999836,
+      "p95": 0.830000000000382,
+      "max": 1.1720000000000255,
+      "total": 37.90520000000083
+    },
+    "dlxMilliseconds": {
+      "min": 0.5516999999999825,
+      "median": 0.8072999999999411,
+      "p95": 1.303000000000111,
+      "max": 1.6598999999998796,
+      "total": 55.32999999999856
+    }
+  },
+  "terminalConstruction": {
+    "queries": 48,
+    "sameSeededOutputs": true,
+    "sameWorkCounts": true,
+    "byType": [
+      {
+        "variant": "classic",
+        "beforeMilliseconds": {
+          "min": 0.28949999999997544,
+          "median": 0.3384000000000924,
+          "p95": 1.0234000000000378,
+          "max": 1.0234000000000378,
+          "total": 6.475500000000125
+        },
+        "afterMilliseconds": {
+          "min": 0.23649999999997817,
+          "median": 0.26080000000001746,
+          "p95": 0.8374000000000024,
+          "max": 0.8374000000000024,
+          "total": 5.443000000000211
+        }
+      },
+      {
+        "variant": "diagonal",
+        "beforeMilliseconds": {
+          "min": 0.30520000000001346,
+          "median": 0.4133000000000493,
+          "p95": 1.5780999999999494,
+          "max": 1.5780999999999494,
+          "total": 8.09479999999985
+        },
+        "afterMilliseconds": {
+          "min": 0.23279999999999745,
+          "median": 0.3186000000000604,
+          "p95": 1.2255999999999858,
+          "max": 1.2255999999999858,
+          "total": 6.1092000000002145
+        }
+      },
+      {
+        "variant": "jigsaw",
+        "beforeMilliseconds": {
+          "min": 1.295099999999934,
+          "median": 1.5007000000000517,
+          "p95": 3.6597000000000435,
+          "max": 3.6597000000000435,
+          "total": 29.09039999999959
+        },
+        "afterMilliseconds": {
+          "min": 1.3344999999999345,
+          "median": 1.5143999999999096,
+          "p95": 2.82630000000006,
+          "max": 2.82630000000006,
+          "total": 28.12269999999978
+        }
+      }
+    ]
+  },
+  "earlierSatProbe": {
+    "implementation": "logic-solver@2.0.1",
+    "fixedQueries": 64,
+    "changingQueries": 576,
+    "modelAndFirstCountMilliseconds": {
+      "median": 20.6842000000006,
+      "p95": 23.515599999998813,
+      "total": 1394.9953999999993
+    },
+    "reusedModelChangingGivensMilliseconds": {
+      "median": 0.17660000000000764,
+      "p95": 0.2991999999999848,
+      "total": 111.4482000000063
+    },
+    "browserIntegrationMeasured": false,
+    "interpretation": "Fresh model setup is included in the first measurement. This is not process cold start. Incremental reuse is faster, but the tested JS interface exposes no work-budget/interruption hook."
+  }
+}
