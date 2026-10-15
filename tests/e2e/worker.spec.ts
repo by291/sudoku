@@ -14,7 +14,7 @@ import {
   KILLER_HARD_RECOVERY_INPUT,
 } from '../fixtures/generationLatency'
 
-test('recovers the former layout-limit failure with a fully verified Hard puzzle at both roots', async ({
+test('verifies current-identity puzzles for historical recovery seeds at both roots', async ({
   page,
 }) => {
   for (const base of ['/', '/sudoku/'] as const) {
