@@ -1,3 +1,4 @@
+import { GENERATION_STRATEGIES } from '@/core/sudoku/generationLayouts'
 import { describe, expect, it } from 'vitest'
 import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
 import { SUDOKU_VARIANTS, compileRules } from '@/core/sudoku/rules'
@@ -37,4 +38,11 @@ describe('variant rule definitions', () => {
       expect(JSON.stringify(rules)).toBe(before)
     }
   })
+})
+
+it('statically registers construction for all six supported variants', () => {
+  expect(Object.keys(GENERATION_STRATEGIES)).toEqual([...SUDOKU_VARIANTS])
+  for (const strategy of Object.values(GENERATION_STRATEGIES)) {
+    expect(typeof strategy.construct).toBe('function')
+  }
 })

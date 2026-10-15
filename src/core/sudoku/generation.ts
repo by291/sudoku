@@ -1,12 +1,12 @@
 import type { Board, Difficulty } from '@/core/sudoku/types'
 import type { DifficultyAssessment } from '@/core/sudoku/rating'
-import { generateClassicPuzzle } from '@/core/sudoku/classicGeneration'
+import { searchGeneration } from '@/core/sudoku/generationSearch'
+import type { WorkStage } from '@/core/sudoku/budget'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import { isDifficulty, isRecord } from '@/core/sudoku/types'
 import type { ParseResult } from '@/core/sudoku/types'
 import { compileRules, isSudokuVariant, parseRules } from '@/core/sudoku/rules'
 import type { NewSudokuVariant, PuzzleRules, SudokuVariant } from '@/core/sudoku/rules'
-import { generateVariantPuzzle } from '@/core/sudoku/variantGeneration'
 import { supportsDifficulty } from '@/core/sudoku/difficulties'
 
 export const PUZZLE_VERSION = 'sudoku-v9'
@@ -70,7 +70,16 @@ export type GenerationLimits = {
   maxSteps: number
 }
 
-export type GenerationMetrics = { constructionWork: number; layouts: number }
+export type GenerationMetrics = {
+  constructionWork: number
+  layouts: number
+  completedLayouts: number
+  candidateVisits: number
+  workByStage: Record<WorkStage, number>
+}
+
+export type GenerationExhaustionCause =
+  'work-limit' | 'logical-step-limit' | 'layout-limit' | 'exhausted-frontier'
 
 export type GenerationAttemptResult =
   | {
@@ -79,7 +88,7 @@ export type GenerationAttemptResult =
       source: 'generated'
       assessment: DifficultyAssessment
     }
-  | { status: 'budget-exhausted'; stage: 'construction' }
+  | { status: 'budget-exhausted'; stage: 'construction'; cause: GenerationExhaustionCause }
   | { status: 'failed'; reason: string }
 
 export type GenerationResult = GenerationAttemptResult & { metrics: Readonly<GenerationMetrics> }
@@ -159,7 +168,13 @@ export function generatePuzzle(
   input: GenerationInput,
   limits = DEFAULT_GENERATION_LIMITS,
 ): GenerationResult {
-  const metrics: GenerationMetrics = { constructionWork: 0, layouts: 0 }
+  const metrics: GenerationMetrics = {
+    constructionWork: 0,
+    layouts: 0,
+    completedLayouts: 0,
+    candidateVisits: 0,
+    workByStage: { preparation: 0, arithmetic: 0, exact: 0, logic: 0, proposals: 0 },
+  }
   const parsed = parseGenerationInput(input)
   const parsedLimits = parseGenerationLimits(limits)
   if (!parsed.valid) {
@@ -169,8 +184,5 @@ export function generatePuzzle(
     return { status: 'failed', reason: parsedLimits.issues.join('; '), metrics }
   }
 
-  if (parsed.value.variant === 'classic') {
-    return { ...generateClassicPuzzle(parsed.value, parsedLimits.value, metrics), metrics }
-  }
-  return { ...generateVariantPuzzle(parsed.value, parsedLimits.value, metrics), metrics }
+  return { ...searchGeneration(parsed.value, parsedLimits.value, metrics), metrics }
 }

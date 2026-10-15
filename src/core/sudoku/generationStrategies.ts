@@ -1,5 +1,10 @@
-import type { NewSudokuVariant, PuzzleRules, RulesFor } from '@/core/sudoku/ruleTypes'
-import type { Board } from '@/core/sudoku/types'
+import type {
+  NewSudokuVariant,
+  SudokuVariant,
+  PuzzleRules,
+  RulesFor,
+} from '@/core/sudoku/ruleTypes'
+import type { Board, Difficulty } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { DIAGONAL_GENERATION_STRATEGY } from '@/core/sudoku/variants/diagonal'
 import { JIGSAW_GENERATION_STRATEGY } from '@/core/sudoku/variants/jigsaw'
@@ -70,4 +75,22 @@ export function transformVariantRules(
     case 'arrow':
       return VARIANT_GENERATION_STRATEGIES.arrow.transformRules(rules, cellMap, complement)
   }
+}
+
+export type LayoutRandomStreams = { terminal: () => number; geometry: () => number }
+
+export type LayoutConstructionResult<K extends SudokuVariant = SudokuVariant> =
+  | { status: 'ready'; terminal: Board; rules: RulesFor<K> }
+  | { status: 'budget-exhausted' }
+  | { status: 'attempt-exhausted' }
+  | { status: 'failed'; reason: string }
+
+export type GenerationStrategy<K extends SudokuVariant> = {
+  readonly allowsDigitMap: boolean
+  readonly allowsComplement: boolean
+  construct(
+    difficulty: Difficulty,
+    random: LayoutRandomStreams,
+    budget: WorkBudget,
+  ): LayoutConstructionResult<K>
 }

@@ -19,11 +19,11 @@ it('finds a unique Expert in a nearby clue mask within a three-terminal allowanc
   expect(result).toMatchObject({
     status: 'ready',
     assessment: { difficulty: 'expert' },
-    metrics: { layouts: 3 },
   })
   if (result.status !== 'ready') {
-    throw new Error('Missing Expert refinement')
+    throw new Error('Missing shared Expert exploration')
   }
+  expect(result.metrics.layouts).toBeLessThanOrEqual(3)
   expect(referenceCountSolutions(result.puzzle.givens, result.puzzle.rules)).toEqual({
     count: 1,
     solution: result.puzzle.solution,

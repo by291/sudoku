@@ -1,31 +1,24 @@
-import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
-import type { GenerationMetrics } from '@/core/sudoku/generation'
 import {
   VARIANT_GENERATION_STRATEGIES,
   createVariantGeometry,
   transformVariantRules,
 } from '@/core/sudoku/generationStrategies'
+import type {
+  LayoutConstructionResult,
+  LayoutRandomStreams,
+} from '@/core/sudoku/generationStrategies'
 import { irregularRegions } from '@/core/sudoku/variants/jigsaw'
 import { isComplete } from '@/core/sudoku/board'
-import { CLASSIC_CONTEXT, compileRules, parseRules } from '@/core/sudoku/rules'
-import type { Board, CellValue, Digit } from '@/core/sudoku/types'
-import type { NewSudokuVariant, RuleContext } from '@/core/sudoku/rules'
-import type { DifficultyAssessment, PreparedAssessment } from '@/core/sudoku/rating'
+import { CLASSIC_CONTEXT, prepareRuleContext, parseRules } from '@/core/sudoku/rules'
+import type { Board, CellValue, Digit, Difficulty } from '@/core/sudoku/types'
+import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules'
 import { isDigit } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { countSolutions } from '@/core/sudoku/search'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import type { VariantTemplate } from '@/core/sudoku/variantTemplates'
-import { createWorkBudget } from '@/core/sudoku/budget'
-import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
-import { seededRandom, shuffle } from '@/core/sudoku/random'
+import { shuffle } from '@/core/sudoku/random'
 import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
-import type {
-  GenerationInput,
-  GenerationLimits,
-  GenerationAttemptResult,
-  Puzzle,
-} from '@/core/sudoku/generation'
 
 export type SpatialSymmetry = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
@@ -126,15 +119,7 @@ export function variantRulesMatter(
 }
 
 const SYMMETRIES: readonly SpatialSymmetry[] = [0, 1, 2, 3, 4, 5, 6, 7]
-const CELL_INDICES = Array.from({ length: 81 }, (_, cell) => cell)
-
-type RemovalCheck =
-  | { status: 'matching-tier'; assessment: DifficultyAssessment }
-  | { status: 'rejected'; retainRemoval: boolean }
-  | { status: 'budget-exhausted' }
-  | { status: 'failed'; reason: string }
-
-function freshGeometryInput(rules: Puzzle['rules']): Puzzle['rules'] {
+function freshGeometryInput(rules: PuzzleRules): PuzzleRules {
   if (rules.kind === 'thermo') {
     return { kind: 'thermo', paths: [] }
   }
@@ -165,175 +150,52 @@ function seededTransform(template: VariantTemplate, random: () => number): Varia
   })
 }
 
-export function generateVariantPuzzle(
-  input: Extract<GenerationInput, { variant: NewSudokuVariant }>,
-  limits: GenerationLimits,
-  metrics: GenerationMetrics,
-): GenerationAttemptResult {
-  const random = seededRandom(
-    `${input.puzzleVersion}:${input.variant}:${input.difficulty}:${input.seed}`,
-  )
-  const geometryExamples = VARIANT_TEMPLATES[input.variant][input.difficulty]
-  if (!geometryExamples.length) {
+/** One terminal/geometry attempt. The scheduler charges its layout slot before calling. */
+export function constructVariantLayout(
+  variant: NewSudokuVariant,
+  difficulty: Difficulty,
+  random: LayoutRandomStreams,
+  budget: WorkBudget,
+): LayoutConstructionResult<NewSudokuVariant> {
+  const examples = VARIANT_TEMPLATES[variant][difficulty]
+  if (!examples.length) {
     return { status: 'failed', reason: 'No geometry example for this type and difficulty' }
   }
-
-  const makePuzzle = (template: VariantTemplate): Puzzle => ({
-    ...template,
-    seed: input.seed,
-    puzzleVersion: input.puzzleVersion,
-  })
-  // Geometry, uniqueness, assessment and necessity share work across every layout.
-  const generationBudget = createWorkBudget(limits.maxWork)
-
-  function assessRemoval(board: Board, assessment: PreparedAssessment): RemovalCheck {
-    const rating = assessment.screen(board, generationBudget)
-    if (rating.status === 'budget-exhausted') {
-      return rating
+  const base = seededTransform(
+    examples[Math.floor(random.geometry() * examples.length)],
+    random.geometry,
+  )
+  let terminalContext = CLASSIC_CONTEXT
+  if (base.rules.kind === 'diagonal' || base.rules.kind === 'jigsaw') {
+    const prepared = prepareRuleContext(base.rules, budget)
+    if (prepared.status !== 'ready') {
+      return prepared
     }
-    if (rating.status === 'invalid') {
-      return { status: 'failed', reason: rating.issues.join('; ') }
-    }
-    if (rating.status !== 'rated') {
-      return { status: 'rejected', retainRemoval: false }
-    }
-    if (rating.difficulty !== input.difficulty) {
-      return { status: 'rejected', retainRemoval: true }
-    }
-    const completed = rating.complete()
-
-    return { status: 'matching-tier', assessment: completed.summary }
+    terminalContext = prepared.context
+  }
+  const terminal = constructUnitTerminal(terminalContext, random.terminal, budget)
+  if (terminal.status !== 'ready') {
+    return terminal
+  }
+  // Arithmetic clues from examples describe another solution; rebuild them for this terminal.
+  const rules = createVariantGeometry(
+    freshGeometryInput(base.rules),
+    terminal.solution,
+    random.geometry,
+    budget,
+  )
+  if (!rules) {
+    return budget.used >= budget.limit
+      ? { status: 'budget-exhausted' }
+      : { status: 'attempt-exhausted' }
+  }
+  const parsed = parseRules(rules)
+  if (!parsed.valid || parsed.value.kind === 'classic' || parsed.value.kind !== variant) {
+    return { status: 'attempt-exhausted' }
+  }
+  if (parsed.value.kind === 'jigsaw' && !irregularRegions(parsed.value)) {
+    return { status: 'attempt-exhausted' }
   }
 
-  function checkRemoval(
-    board: Board,
-    assessment: PreparedAssessment,
-    context: RuleContext,
-  ): RemovalCheck {
-    const ratingFirst = input.variant === 'killer' && input.difficulty === 'hard'
-    // Screening continues the actual Easy prefix into higher policies once per board.
-    // No candidate workspace survives the next removal, which would widen its domains.
-    const earlierRating = ratingFirst ? assessRemoval(board, assessment) : null
-    if (earlierRating !== null && earlierRating.status !== 'matching-tier') {
-      // Different-tier removals are tentative construction states. Every delivered candidate
-      // still passes the independent exact-count gate below; rating never replaces uniqueness.
-      return earlierRating
-    }
-
-    const unique = countSolutions(board, {
-      maxSolutions: 2,
-      nodeBudget: generationBudget.limit - generationBudget.used,
-      context,
-      workBudget: generationBudget,
-    })
-    if (unique.status === 'budget-exhausted') {
-      return unique
-    }
-    if (unique.count === 0) {
-      return { status: 'failed', reason: 'Constructed variant lost its known solution' }
-    }
-    if (unique.count !== 1) {
-      return { status: 'rejected', retainRemoval: false }
-    }
-    return earlierRating ?? assessRemoval(board, assessment)
-  }
-
-  try {
-    for (
-      let layout = 0;
-      layout < limits.maxLayouts && generationBudget.used < generationBudget.limit;
-      layout++
-    ) {
-      metrics.layouts++
-      const base = seededTransform(
-        geometryExamples[Math.floor(random() * geometryExamples.length)],
-        random,
-      )
-      const terminalContext =
-        base.rules.kind === 'diagonal' || base.rules.kind === 'jigsaw'
-          ? compileRules(base.rules)
-          : CLASSIC_CONTEXT
-      const terminal = constructUnitTerminal(terminalContext, random, generationBudget)
-      if (terminal.status === 'budget-exhausted') {
-        break
-      }
-      if (terminal.status === 'attempt-exhausted') {
-        continue
-      }
-      if (terminal.status === 'failed') {
-        return terminal
-      }
-      // Example arithmetic paths belong to a different solution. Rebuild their geometry
-      // from scratch for the new terminal instead of retaining incompatible clue values.
-      const rules = createVariantGeometry(
-        freshGeometryInput(base.rules),
-        terminal.solution,
-        random,
-        generationBudget,
-      )
-      if (!rules || !parseRules(rules).valid) {
-        continue
-      }
-
-      const prepared = prepareRuleComputation(rules, generationBudget)
-      if (prepared.status !== 'ready') {
-        break
-      }
-      const context = prepared.computation.context
-      const assessment = prepareAssessmentWithComputation(prepared.computation, {
-        maxSteps: limits.maxSteps,
-        maxWork: generationBudget.limit,
-      })
-      if (
-        !isComplete(terminal.solution, context) ||
-        (rules.kind === 'jigsaw' && !irregularRegions(rules))
-      ) {
-        continue
-      }
-
-      const givens = [...terminal.solution]
-
-      for (const cell of shuffle(CELL_INDICES, random)) {
-        const previous = givens[cell]
-        givens[cell] = 0
-        const check = checkRemoval(givens, assessment, context)
-        if (check.status === 'budget-exhausted') {
-          givens[cell] = previous
-          break
-        }
-        if (check.status === 'failed') {
-          return check
-        }
-        if (check.status === 'rejected') {
-          if (!check.retainRemoval) {
-            givens[cell] = previous
-          }
-          continue
-        }
-        const candidate: VariantTemplate = {
-          rules,
-          solution: terminal.solution,
-          givens: [...givens],
-          difficulty: check.assessment.difficulty,
-        }
-        const necessity = variantRulesMatter(candidate, generationBudget)
-        if (necessity.status === 'budget-exhausted') {
-          break
-        }
-
-        if (necessity.matters) {
-          return {
-            status: 'ready',
-            source: 'generated',
-            puzzle: makePuzzle(candidate),
-            assessment: check.assessment,
-          }
-        }
-      }
-    }
-
-    return { status: 'budget-exhausted', stage: 'construction' }
-  } finally {
-    metrics.constructionWork = generationBudget.used
-  }
+  return { status: 'ready', terminal: terminal.solution, rules: parsed.value }
 }

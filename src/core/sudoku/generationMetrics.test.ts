@@ -16,6 +16,12 @@ it('reports consumed construction work without resetting abandoned layouts or su
       stage: 'construction',
       metrics: { constructionWork: 1, layouts: 1 },
     })
-    expect(result.metrics).toEqual({ constructionWork: 1, layouts: 1 })
+    expect(result.metrics).toEqual({
+      constructionWork: 1,
+      layouts: 1,
+      completedLayouts: 0,
+      candidateVisits: 0,
+      workByStage: { preparation: 1, arithmetic: 0, exact: 0, logic: 0, proposals: 0 },
+    })
   }
 })

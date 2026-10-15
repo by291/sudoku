@@ -78,7 +78,14 @@ it('returns reproducible construction exhaustion without substituting an authore
   expect(result).toEqual({
     status: 'budget-exhausted',
     stage: 'construction',
-    metrics: { constructionWork: 0, layouts: 0 },
+    cause: 'work-limit',
+    metrics: {
+      constructionWork: 0,
+      layouts: 0,
+      completedLayouts: 0,
+      candidateVisits: 0,
+      workByStage: { preparation: 0, arithmetic: 0, exact: 0, logic: 0, proposals: 0 },
+    },
   })
   expect(generatePuzzle(input, limits)).toEqual(result)
 })
