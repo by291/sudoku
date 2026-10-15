@@ -3,9 +3,9 @@ import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
 import type { RuleContext } from '@/core/sudoku/rules/types'
 import { createWorkBudget, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
-import type { PreparedRuleComputation } from '@/core/sudoku/constraintSupport'
-import { countPropagationSolutions } from '@/core/sudoku/propagationSearch'
+import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
+import type { PreparedRuleComputation } from '@/core/sudoku/constraints/types'
+import { countPropagationSolutions } from '@/core/sudoku/search/propagation'
 import type { Board, SearchResult } from '@/core/sudoku/types'
 
 export type PreparedExactValidator = {

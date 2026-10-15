@@ -1,19 +1,19 @@
 import { expect, it } from 'vitest'
-import { countSolutions } from '@/core/sudoku/search'
-import { countReferenceSolutions } from '../../../tests/support/referenceSudoku'
+import { countSolutions } from '@/core/sudoku/search/exact'
+import { countReferenceSolutions } from '../../../../tests/support/referenceSudoku'
 import {
   uniqueBoard,
   solvedBoard,
   emptyBoard,
   conflictingBoard,
   unsatisfiableBoard,
-} from '../../../tests/fixtures/sudoku'
+} from '../../../../tests/fixtures/sudoku'
 import { compileRules } from '@/core/sudoku/rules/context'
-import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
+import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
-import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
+import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../../tests/fixtures/classicPuzzles'
 
 const propagationFixtures = [
   ...CLASSIC_PUZZLE_FIXTURES.filter((fixture) =>

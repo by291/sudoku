@@ -1,16 +1,13 @@
 import { expect, it } from 'vitest'
-import {
-  prepareConstraintSupport,
-  prepareRuleComputation,
-  getConstraintSupport,
-  DEFAULT_CATALOGUE_LIMITS,
-} from '@/core/sudoku/constraintSupport'
+import { prepareConstraintSupport, getConstraintSupport } from '@/core/sudoku/constraints/support'
+import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
+import { DEFAULT_CATALOGUE_LIMITS } from '@/core/sudoku/constraints/cageCatalogue'
 import { compileRules } from '@/core/sudoku/rules/context'
 import type { Cage, RuleContext } from '@/core/sudoku/rules/types'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { createLogicalWorkspace } from '@/core/sudoku/logic'
 import type { Board, NoteMask } from '@/core/sudoku/types'
-import { ARROW_REPEAT_BOARD, ARROW_REPEAT_RULES } from '../../../tests/fixtures/variants'
+import { ARROW_REPEAT_BOARD, ARROW_REPEAT_RULES } from '../../../../tests/fixtures/variants'
 
 const empty: Board = Array(81).fill(0)
 const allDomains: readonly NoteMask[] = Array(81).fill(511)

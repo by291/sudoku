@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
-import { evaluateCandidates, evaluateConflicts } from '@/core/sudoku/constraints'
+import { evaluateCandidates } from '@/core/sudoku/constraints/candidates'
+import { evaluateConflicts } from '@/core/sudoku/constraints/conflicts'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { isComplete, maskOf } from '@/core/sudoku/board'
@@ -7,7 +8,7 @@ import {
   ARROW_REPEAT_BOARD,
   ARROW_REPEAT_RULES,
   FULL_LENGTH_THERMO_RULES,
-} from '../../../tests/fixtures/variants'
+} from '../../../../tests/fixtures/variants'
 import type { Board } from '@/core/sudoku/types'
 import { DIGITS } from '@/core/sudoku/types'
 

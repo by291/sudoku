@@ -1,4 +1,4 @@
-import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
+import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
 import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
 import { expect, it } from 'vitest'
 import {

@@ -6,7 +6,7 @@ import {
   assessPuzzle,
   createAssessmentInput,
 } from '@/core/sudoku/rating'
-import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
+import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { RATING_FIXTURES } from '../../../tests/fixtures/rating'
 import { solvedBoard, uniqueBoard } from '../../../tests/fixtures/sudoku'

@@ -25,7 +25,7 @@ import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { findVariantStep } from '@/core/sudoku/variantTechniques'
 import type { StepOutcome } from '@/core/sudoku/variantTechniques'
-import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraintSupport'
+import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraints/types'
 
 export type LogicalWorkspace = {
   board: CellValue[]

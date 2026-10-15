@@ -1,14 +1,14 @@
 import { expect, it } from 'vitest'
-import { countSolutions } from '@/core/sudoku/search'
+import { countSolutions } from '@/core/sudoku/search/exact'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { compileRules } from '@/core/sudoku/rules/context'
-import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
+import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
 import {
   ARROW_REPEAT_RULES,
   ARROW_REPEAT_BOARD,
   FULL_LENGTH_THERMO_RULES,
   VARIANT_FIXTURES,
-} from '../../../tests/fixtures/variants'
+} from '../../../../tests/fixtures/variants'
 import type { Board, Digit } from '@/core/sudoku/types'
 
 const digits: readonly Digit[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]

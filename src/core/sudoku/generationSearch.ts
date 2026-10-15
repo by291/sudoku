@@ -2,8 +2,8 @@
 import { isComplete, parseBoard } from '@/core/sudoku/board'
 import { createWorkBudget, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
-import type { PreparedRuleComputation } from '@/core/sudoku/constraintSupport'
+import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
+import type { PreparedRuleComputation } from '@/core/sudoku/constraints/types'
 import {
   createCandidateFrontier,
   givenMask,
@@ -23,8 +23,8 @@ import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
 import type { PreparedAssessment, TargetScreenResult } from '@/core/sudoku/rating'
 import { RATING_VERSION } from '@/core/sudoku/ratingPolicies'
 import { parseRules } from '@/core/sudoku/rules/context'
-import { prepareExactValidator } from '@/core/sudoku/search'
-import type { PreparedExactValidator } from '@/core/sudoku/search'
+import { prepareExactValidator } from '@/core/sudoku/search/exact'
+import type { PreparedExactValidator } from '@/core/sudoku/search/exact'
 import type { Board } from '@/core/sudoku/types'
 import { variantRulesMatter } from '@/core/sudoku/variantGeneration'
 

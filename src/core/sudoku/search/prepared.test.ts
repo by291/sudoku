@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
-import { prepareExactValidator, countSolutions } from '@/core/sudoku/search'
+import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
+import { prepareExactValidator, countSolutions } from '@/core/sudoku/search/exact'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import {
   uniqueBoard,
@@ -8,10 +8,10 @@ import {
   emptyBoard,
   conflictingBoard,
   unsatisfiableBoard,
-} from '../../../tests/fixtures/sudoku'
-import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
-import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
-import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
+} from '../../../../tests/fixtures/sudoku'
+import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
+import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../../tests/fixtures/classicPuzzles'
 import type { PuzzleRules } from '@/core/sudoku/rules/types'
 
 const fixtures = [

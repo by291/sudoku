@@ -1,5 +1,5 @@
-import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
-import type { PreparedRuleComputation } from '@/core/sudoku/constraintSupport'
+import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
+import type { PreparedRuleComputation } from '@/core/sudoku/constraints/types'
 import {
   analyzeLogicalWorkspace,
   applyLogicalStep,
@@ -22,7 +22,7 @@ import { isSudokuVariant, parseRules } from '@/core/sudoku/rules/context'
 import { isCellIndex, maskOf, parseBoard } from '@/core/sudoku/board'
 import { createWorkBudget, DEFAULT_WORK_LIMIT, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { evaluateConflicts } from '@/core/sudoku/constraints'
+import { evaluateConflicts } from '@/core/sudoku/constraints/conflicts'
 
 export type AssessmentLimits = { maxSteps: number; maxWork: number }
 export type AssessmentInput = {

@@ -1,26 +1,19 @@
-// Own exact local support and layout-static catalogues; domain memo state belongs to each workspace.
+import { filterCageCatalogue } from '@/core/sudoku/constraints/cageCatalogue'
 import { digitsIn, maskOf } from '@/core/sudoku/board'
 import { consumeWork, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { constraintCells, prepareRuleContext } from '@/core/sudoku/rules/context'
-import type { PuzzleRules, RuleConstraint, RuleContext } from '@/core/sudoku/rules/types'
-import { DIGITS } from '@/core/sudoku/types'
+import { constraintCells } from '@/core/sudoku/rules/context'
+import type { RuleConstraint, RuleContext } from '@/core/sudoku/rules/types'
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
-
-export type ConstraintSupport =
-  | { status: 'complete'; cells: readonly number[]; supports: readonly NoteMask[] }
-  | { status: 'budget-exhausted' }
-
-export type CageSupportMemo = Map<
-  Extract<RuleConstraint, { kind: 'cage' }>,
-  {
-    context: RuleContext
-    sum: number
-    cells: readonly number[]
-    domains: readonly NoteMask[]
-    supports: readonly NoteMask[]
-  }
->
+import type {
+  ConstraintSupport,
+  PreparedConstraintSupport,
+  CatalogueLimits,
+} from '@/core/sudoku/constraints/types'
+import {
+  DEFAULT_CATALOGUE_LIMITS,
+  compileCageCatalogue,
+} from '@/core/sudoku/constraints/cageCatalogue'
 
 // Local support is a proof of possibility only within this clue and duplicate peers.
 // Unsupported values can be removed; exhaustion cannot prove an unsupported value.
@@ -124,110 +117,6 @@ export function getConstraintSupport(
   )
 }
 
-export type PreparedConstraintSupport = {
-  get(
-    board: Board,
-    candidates: readonly NoteMask[],
-    constraint: RuleConstraint,
-    budget: WorkBudget,
-  ): ConstraintSupport
-}
-
-export type PreparedRuleComputation = {
-  readonly context: RuleContext
-  readonly support: PreparedConstraintSupport
-}
-
-export type CatalogueLimits = { maxTuplesPerConstraint: number; maxTuplesPerLayout: number }
-
-export const DEFAULT_CATALOGUE_LIMITS: Readonly<CatalogueLimits> = Object.freeze({
-  maxTuplesPerConstraint: 512,
-  maxTuplesPerLayout: 8192,
-})
-
-type CatalogueResult =
-  | { status: 'complete'; tuples: readonly (readonly NoteMask[])[] }
-  | { status: 'fallback' }
-  | { status: 'budget-exhausted' }
-
-function compileCage(
-  cage: Extract<RuleConstraint, { kind: 'cage' }>,
-  capacity: number,
-  budget: WorkBudget,
-): CatalogueResult {
-  const tuples: NoteMask[][] = []
-  const combination: Digit[] = []
-  const assigned: Digit[] = []
-  let exhausted = false
-  let overflow = false
-
-  function permute(used: number): void {
-    if (assigned.length === combination.length) {
-      if (tuples.length >= capacity) {
-        overflow = true
-        return
-      }
-      tuples.push(assigned.map(maskOf))
-      return
-    }
-    for (const digit of combination) {
-      if ((used & maskOf(digit)) !== 0) {
-        continue
-      }
-      if (!consumeWork(budget)) {
-        exhausted = true
-        return
-      }
-      assigned.push(digit)
-      permute(used | maskOf(digit))
-      assigned.pop()
-      if (exhausted || overflow) {
-        return
-      }
-    }
-  }
-
-  function combine(start: number, sum: number): void {
-    if (combination.length === cage.cells.length) {
-      if (sum === cage.sum) {
-        permute(0)
-      }
-      return
-    }
-    const remaining = cage.cells.length - combination.length
-    for (const digit of DIGITS) {
-      if (digit < start || digit > 10 - remaining) {
-        continue
-      }
-      if (!consumeWork(budget)) {
-        exhausted = true
-        return
-      }
-      const minimum = sum + remaining * digit + (remaining * (remaining - 1)) / 2
-      const maximum = sum + digit + (remaining - 1) * 9 - ((remaining - 1) * (remaining - 2)) / 2
-      if (minimum > cage.sum || maximum < cage.sum) {
-        continue
-      }
-      combination.push(digit)
-      combine(digit + 1, sum + digit)
-      combination.pop()
-      if (exhausted || overflow) {
-        return
-      }
-    }
-  }
-
-  combine(1, 0)
-  if (exhausted) {
-    return { status: 'budget-exhausted' }
-  }
-  if (overflow) {
-    return { status: 'fallback' }
-  }
-
-  return { status: 'complete', tuples: Object.freeze(tuples.map((tuple) => Object.freeze(tuple))) }
-}
-
 export function prepareConstraintSupport(
   context: RuleContext,
   budget: WorkBudget,
@@ -254,7 +143,7 @@ export function prepareConstraintSupport(
         limits.maxTuplesPerConstraint,
         limits.maxTuplesPerLayout - retainedTuples,
       )
-      const result = compileCage(constraint, capacity, budget)
+      const result = compileCageCatalogue(constraint, capacity, budget)
       if (result.status === 'budget-exhausted') {
         return result
       }
@@ -292,49 +181,10 @@ export function prepareConstraintSupport(
             if (domainCombinations <= tuples.length) {
               return enumerateConstraintSupport(board, candidates, context, constraint, queryBudget)
             }
-            const supports = cells.map(() => 0)
-            for (const tuple of tuples) {
-              let compatible = true
-              for (let index = 0; index < cells.length; index++) {
-                if (!consumeWork(queryBudget)) {
-                  return { status: 'budget-exhausted' }
-                }
-                if ((tuple[index] & domains[index]) === 0) {
-                  compatible = false
-                  break
-                }
-              }
-              if (compatible) {
-                tuple.forEach((mask, index) => {
-                  supports[index] |= mask
-                })
-              }
-            }
-
-            return { status: 'complete', cells: [...cells], supports }
+            return filterCageCatalogue(cells, domains, tuples, queryBudget)
           })
         },
       },
     }
   })
-}
-
-/** All preparation consumes the same request budget; partial catalogues never escape. */
-export function prepareRuleComputation(
-  rules: PuzzleRules,
-  budget: WorkBudget,
-): { status: 'ready'; computation: PreparedRuleComputation } | { status: 'budget-exhausted' } {
-  const compiled = prepareRuleContext(rules, budget)
-  if (compiled.status !== 'ready') {
-    return compiled
-  }
-  const prepared = prepareConstraintSupport(compiled.context, budget)
-  if (prepared.status !== 'ready') {
-    return prepared
-  }
-
-  return {
-    status: 'ready',
-    computation: Object.freeze({ context: compiled.context, support: prepared.support }),
-  }
 }

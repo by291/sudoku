@@ -1,7 +1,7 @@
 import { calculateBaseCandidates, digitsIn, isComplete, maskOf } from '@/core/sudoku/board'
 import { consumeWork } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import type { PreparedRuleComputation } from '@/core/sudoku/constraintSupport'
+import type { PreparedRuleComputation } from '@/core/sudoku/constraints/types'
 import { BOARD_SIZE, DIGITS, UNIT_SIZE } from '@/core/sudoku/types'
 import type { Board, NoteMask, SearchResult } from '@/core/sudoku/types'
 
