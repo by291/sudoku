@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createGenerationInput } from '@/core/sudoku/generation'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
 import type { SessionMetadata } from '@/features/game/model/session'
 import GameView from '@/features/game/views/GameView.vue'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'

@@ -1,4 +1,4 @@
-import type { VariantGenerationStrategy } from '@/core/sudoku/generationStrategies'
+import type { VariantGenerationStrategy } from '@/core/sudoku/generation/types'
 import { consumeWork } from '@/core/sudoku/budget'
 import { cellsTouch } from '@/core/sudoku/ruleTopology'
 import { isRecord, UNIT_SIZE } from '@/core/sudoku/types'

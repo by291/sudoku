@@ -1,4 +1,4 @@
-import { generatePuzzle } from '@/core/sudoku/generation'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
 import { analyzeHint } from '@/core/sudoku/hint'
 import { isRecord } from '@/core/sudoku/types'
 import { parseWorkerRequest } from '@/worker/protocol'

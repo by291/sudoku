@@ -1,4 +1,4 @@
-import type { VariantGenerationStrategy } from '@/core/sudoku/generationStrategies'
+import type { VariantGenerationStrategy } from '@/core/sudoku/generation/types'
 import { consumeWork } from '@/core/sudoku/budget'
 import { cellsTouch } from '@/core/sudoku/ruleTopology'
 import { shuffle } from '@/core/sudoku/random'

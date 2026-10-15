@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createSudokuWorkerClient } from '@/worker/client'
-import { createGenerationInput, PUZZLE_VERSION } from '@/core/sudoku/generation'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 import { solvedBoard, uniqueBoard } from '../../tests/fixtures/sudoku'
 import type { WorkerRequest } from '@/worker/protocol'

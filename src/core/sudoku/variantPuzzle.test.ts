@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest'
-import { generatePuzzle, parsePuzzle, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
+import { parsePuzzle } from '@/core/sudoku/puzzle'
+import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'

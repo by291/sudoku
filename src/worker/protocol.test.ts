@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { parseWorkerRequest, parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
-import { createGenerationInput } from '@/core/sudoku/generation'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
 import { assessPuzzle, createAssessmentInput, toAssessmentOutcome } from '@/core/sudoku/rating'
 import { RATING_FIXTURES } from '../../tests/fixtures/rating'
 import { analyzeHint } from '@/core/sudoku/hint'

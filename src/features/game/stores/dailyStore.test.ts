@@ -8,7 +8,7 @@ import { createPinia, disposePinia } from 'pinia'
 import { gameRuntimeKey } from '@/runtime'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
-import type { GenerationInput } from '@/core/sudoku/generation'
+import type { GenerationInput } from '@/core/sudoku/generation/types'
 import { getDailyIdentity } from '@/features/game/model/daily'
 
 it('restores yesterday and old puzzle versions without generating them again', async () => {

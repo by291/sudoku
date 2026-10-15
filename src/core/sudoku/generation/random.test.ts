@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import { createGenerationRandom } from '@/core/sudoku/random'
-import { createGenerationInput } from '@/core/sudoku/generation'
+import { createGenerationRandom } from '@/core/sudoku/generation/random'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
 
 it('isolates terminal and geometry streams from failed candidate exploration', () => {
   const input = createGenerationInput('classic', 'hard', 'feedback-random')

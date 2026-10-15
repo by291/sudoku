@@ -1,9 +1,6 @@
 import { expect, it } from 'vitest'
-import {
-  createGenerationInput,
-  generatePuzzle,
-  DEFAULT_GENERATION_LIMITS,
-} from '@/core/sudoku/generation'
+import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
 
 it('reports consumed construction work without resetting abandoned layouts or substituting a puzzle', () => {
   for (const variant of ['classic', 'diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {

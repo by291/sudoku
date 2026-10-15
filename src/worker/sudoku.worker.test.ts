@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import { createGenerationInput, generatePuzzle } from '@/core/sudoku/generation'
-import type { GenerationExhaustionCause } from '@/core/sudoku/generation'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
+import type { GenerationExhaustionCause } from '@/core/sudoku/generation/types'
 import type { WorkerResponse } from '@/worker/protocol'
 
-vi.mock('@/core/sudoku/generation', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/core/sudoku/generation')>()),
+vi.mock('@/core/sudoku/generation/generate', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/core/sudoku/generation/generate')>()),
   generatePuzzle: vi.fn(),
 }))
 

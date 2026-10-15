@@ -1,32 +1,12 @@
-import type {
-  NewSudokuVariant,
-  SudokuVariant,
-  PuzzleRules,
-  RulesFor,
-} from '@/core/sudoku/ruleTypes'
-import type { Board, Difficulty } from '@/core/sudoku/types'
+import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/ruleTypes'
+import type { Board } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { DIAGONAL_GENERATION_STRATEGY } from '@/core/sudoku/variants/diagonal'
 import { JIGSAW_GENERATION_STRATEGY } from '@/core/sudoku/variants/jigsaw'
 import { KILLER_GENERATION_STRATEGY } from '@/core/sudoku/variants/killer'
 import { THERMO_GENERATION_STRATEGY } from '@/core/sudoku/variants/thermo'
 import { ARROW_GENERATION_STRATEGY } from '@/core/sudoku/variants/arrow'
-
-export type VariantGenerationStrategy<K extends NewSudokuVariant> = {
-  readonly allowsDigitMap: boolean
-  readonly allowsComplement: boolean
-  createGeometry(
-    rules: RulesFor<K>,
-    solution: Board,
-    random: () => number,
-    budget: WorkBudget,
-  ): RulesFor<K> | null
-  transformRules(
-    rules: RulesFor<K>,
-    cellMap: (cell: number) => number,
-    complement: boolean,
-  ): RulesFor<K>
-}
+import type { VariantGenerationStrategy } from '@/core/sudoku/generation/types'
 
 export const VARIANT_GENERATION_STRATEGIES = {
   diagonal: DIAGONAL_GENERATION_STRATEGY,
@@ -75,22 +55,4 @@ export function transformVariantRules(
     case 'arrow':
       return VARIANT_GENERATION_STRATEGIES.arrow.transformRules(rules, cellMap, complement)
   }
-}
-
-export type LayoutRandomStreams = { terminal: () => number; geometry: () => number }
-
-export type LayoutConstructionResult<K extends SudokuVariant = SudokuVariant> =
-  | { status: 'ready'; terminal: Board; rules: RulesFor<K> }
-  | { status: 'budget-exhausted' }
-  | { status: 'attempt-exhausted' }
-  | { status: 'failed'; reason: string }
-
-export type GenerationStrategy<K extends SudokuVariant> = {
-  readonly allowsDigitMap: boolean
-  readonly allowsComplement: boolean
-  construct(
-    difficulty: Difficulty,
-    random: LayoutRandomStreams,
-    budget: WorkBudget,
-  ): LayoutConstructionResult<K>
 }

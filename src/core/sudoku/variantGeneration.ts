@@ -3,10 +3,7 @@ import {
   createVariantGeometry,
   transformVariantRules,
 } from '@/core/sudoku/generationStrategies'
-import type {
-  LayoutConstructionResult,
-  LayoutRandomStreams,
-} from '@/core/sudoku/generationStrategies'
+import type { LayoutConstructionResult, LayoutRandomStreams } from '@/core/sudoku/generation/types'
 import { irregularRegions } from '@/core/sudoku/variants/jigsaw'
 import { isComplete } from '@/core/sudoku/board'
 import { CLASSIC_CONTEXT, prepareRuleContext, parseRules } from '@/core/sudoku/rules'

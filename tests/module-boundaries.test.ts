@@ -64,7 +64,7 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
     ['src/runtime.ts', '@/worker/client'],
     ['src/storage/fixture.ts', '@/features/game/model/session'],
     ['src/storage/fixture.ts', '@/storage/ownership'],
-    ['src/worker/fixture.ts', '@/core/sudoku/generation'],
+    ['src/worker/fixture.ts', '@/core/sudoku/generation/generate'],
     ['src/theme/fixture.ts', '@/features/settings/model/preferences'],
     ['src/features/game/stores/fixture.test.ts', '@/router'],
   ])('allows %s importing %s', async (filePath, target) => {

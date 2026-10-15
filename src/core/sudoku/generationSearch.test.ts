@@ -6,11 +6,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import * as layouts from '@/core/sudoku/generationLayouts'
 import * as rating from '@/core/sudoku/rating'
 import * as search from '@/core/sudoku/search'
-import {
-  createGenerationInput,
-  generatePuzzle,
-  DEFAULT_GENERATION_LIMITS,
-} from '@/core/sudoku/generation'
+import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
 import { consumeWork, withWorkStage } from '@/core/sudoku/budget'
 import type { Board } from '@/core/sudoku/types'
 import type { TargetScreenResult } from '@/core/sudoku/rating'

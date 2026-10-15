@@ -1,21 +1,19 @@
 import { expect, it } from 'vitest'
 import {
   createGenerationInput,
-  generatePuzzle,
   parseGenerationInput,
-  parsePuzzle,
-  parseGenerationLimits,
-  PUZZLE_VERSION,
   DEFAULT_GENERATION_LIMITS,
-} from '@/core/sudoku/generation'
-import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
+} from '@/core/sudoku/generation/input'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
+import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../../tests/fixtures/classicPuzzles'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { analyzeLogic } from '@/core/sudoku/logic'
 import { ALL_CLASSIC_TECHNIQUES, TECHNIQUES } from '@/core/sudoku/techniques'
-import { countReferenceSolutions } from '../../../tests/support/referenceSudoku'
+import { countReferenceSolutions } from '../../../../tests/support/referenceSudoku'
 import { isComplete } from '@/core/sudoku/board'
 import type { Difficulty } from '@/core/sudoku/types'
-import { countIntercalates } from '../../../tests/support/terminalDiversity'
+import { countIntercalates } from '../../../../tests/support/terminalDiversity'
 
 it.each(CLASSIC_PUZZLE_FIXTURES)(
   'verifies the authored $difficulty fixture independently',
@@ -39,7 +37,9 @@ it.each(CLASSIC_PUZZLE_FIXTURES)(
     }
   },
 )
+
 const tiers: Difficulty[] = ['easy', 'medium', 'hard']
+
 it.each(
   tiers.flatMap((difficulty) =>
     ['generation-01', 'generation-02', 'generation-03'].map((seed) => ({ difficulty, seed })),
@@ -65,6 +65,7 @@ it.each(
     ),
   ).toBe(true)
 })
+
 it('returns reproducible construction exhaustion without substituting an authored puzzle', () => {
   const input = {
     variant: 'classic',
@@ -114,36 +115,6 @@ it('uses only current generation versions and returns an accepted assessment', (
   })
 })
 
-it('validates exact current work limits without accepting historical field names', () => {
-  const limits = { maxLayouts: 0, maxWork: 0, maxSteps: 500 }
-
-  expect(parseGenerationLimits(limits)).toEqual({ valid: true, value: limits })
-  expect(parseGenerationLimits({ ...limits, maxWork: Infinity }).valid).toBe(false)
-  expect(parseGenerationLimits({ ...limits, maxSteps: 501 }).valid).toBe(false)
-  expect(
-    parseGenerationLimits({
-      maxLayouts: 0,
-      searchNodes: 0,
-      logicalSteps: 500,
-      fallbackNodes: 1000000,
-    }).valid,
-  ).toBe(false)
-  expect(parseGenerationLimits({ ...limits, extra: 0 }).valid).toBe(false)
-  expect(parseGenerationLimits({ ...limits, fallbackWork: 1000000 }).valid).toBe(false)
-})
-
-it('uses only construction limits for every type and retains the logical step ceiling', () => {
-  expect(DEFAULT_GENERATION_LIMITS).toEqual({
-    maxLayouts: 40,
-    maxWork: 4000000,
-    maxSteps: 500,
-  })
-  expect(parseGenerationLimits(DEFAULT_GENERATION_LIMITS).valid).toBe(true)
-  expect(parseGenerationLimits({ ...DEFAULT_GENERATION_LIMITS, maxWork: 4000001 }).valid).toBe(
-    false,
-  )
-})
-
 it('delivers generated puzzles from independently different terminal classes', () => {
   const counts = new Set<number>()
   for (let index = 1; index <= 4; index++) {
@@ -167,36 +138,4 @@ it('never delivers a puzzle when construction assessment cannot finish', () => {
   expect(
     generatePuzzle(input, { ...DEFAULT_GENERATION_LIMITS, maxLayouts: 1, maxSteps: 0 }),
   ).toMatchObject({ status: 'budget-exhausted', stage: 'construction' })
-})
-it('rejects unsupported generation versions rather than silently changing the rules', () => {
-  expect(
-    parseGenerationInput({
-      variant: 'classic',
-      seed: 'a',
-      difficulty: 'easy',
-      puzzleVersion: 'unknown',
-    }).valid,
-  ).toBe(false)
-})
-
-it('retains valid v7 saved puzzles while new generation rejects their historical identity', () => {
-  const fixture = CLASSIC_PUZZLE_FIXTURES.find((item) => item.difficulty === 'easy')
-  if (!fixture) {
-    throw new Error('Missing authored Easy fixture')
-  }
-  const storedPuzzle = {
-    givens: fixture.givens,
-    solution: fixture.solution,
-    difficulty: fixture.difficulty,
-    seed: 'saved-before-lightweight-rating',
-    puzzleVersion: 'sudoku-v7',
-    rules: { kind: 'classic' },
-  }
-  const input = createGenerationInput('classic', 'easy', storedPuzzle.seed)
-
-  expect(parsePuzzle(storedPuzzle)).toEqual({ valid: true, value: storedPuzzle })
-  expect(parseGenerationInput({ ...input, puzzleVersion: storedPuzzle.puzzleVersion }).valid).toBe(
-    false,
-  )
-  expect(input.puzzleVersion).toBe('sudoku-v10')
 })

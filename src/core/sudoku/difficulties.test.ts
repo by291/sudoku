@@ -1,12 +1,8 @@
 import { expect, it } from 'vitest'
 import { supportedDifficulties, supportsDifficulty } from '@/core/sudoku/difficulties'
-import {
-  createGenerationInput,
-  parseGenerationInput,
-  parsePuzzle,
-  PUZZLE_VERSION,
-  VARIANT_PUZZLE_VERSION,
-} from '@/core/sudoku/generation'
+import { createGenerationInput, parseGenerationInput } from '@/core/sudoku/generation/input'
+import { parsePuzzle } from '@/core/sudoku/puzzle'
+import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { parseAssessmentOutcome } from '@/core/sudoku/rating'

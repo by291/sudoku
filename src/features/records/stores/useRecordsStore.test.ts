@@ -9,7 +9,7 @@ import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import type { OwnershipNotice } from '@/storage/ownership'
 import { deferred } from '../../../../tests/support/deferred'
-import { createGenerationInput } from '@/core/sudoku/generation'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
 
 it('settles dirty game and queued preferences before returning a committed backup', async () => {
   const test = await createTestRuntime()

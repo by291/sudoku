@@ -1,6 +1,6 @@
 import type { GameSession } from '@/features/game/model/session'
-import { PUZZLE_VERSION } from '@/core/sudoku/generation'
-import type { Puzzle } from '@/core/sudoku/generation'
+import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
+import type { Puzzle } from '@/core/sudoku/puzzle'
 import {
   assessPuzzle,
   createAssessmentInput,

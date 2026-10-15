@@ -6,14 +6,14 @@ import type {
   GenerationStrategy,
   LayoutConstructionResult,
   LayoutRandomStreams,
-} from '@/core/sudoku/generationStrategies'
+} from '@/core/sudoku/generation/types'
 import { VARIANT_RULE_DEFINITIONS } from '@/core/sudoku/variantRegistry'
 import type {
   NewSudokuVariant,
   SudokuVariant,
   VariantRuleDefinition,
 } from '@/core/sudoku/ruleTypes'
-import type { GenerationInput } from '@/core/sudoku/generation'
+import type { GenerationInput } from '@/core/sudoku/generation/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 
 function variantStrategy<K extends NewSudokuVariant>(

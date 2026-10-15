@@ -1,5 +1,3 @@
-import type { GenerationInput } from '@/core/sudoku/generation'
-
 // Hash UTF-16 code units with FNV-1a, then produce a deterministic Mulberry32 stream.
 // Generator call ordering is fixed within each current generation version.
 export function seededRandom(seed: string): () => number {
@@ -27,24 +25,4 @@ export function shuffle<T>(values: readonly T[], random: () => number): T[] {
   }
 
   return result
-}
-
-/** Separate version-owned streams prevent failed neighborhoods from replacing future terminals. */
-export function createGenerationRandom(
-  input: GenerationInput,
-  phase: 'terminal' | 'geometry' | 'candidate',
-  layoutIndex: number,
-  proposalIndex = 0,
-): () => number {
-  return seededRandom(
-    JSON.stringify([
-      input.puzzleVersion,
-      input.variant,
-      input.difficulty,
-      input.seed,
-      phase,
-      layoutIndex,
-      proposalIndex,
-    ]),
-  )
 }

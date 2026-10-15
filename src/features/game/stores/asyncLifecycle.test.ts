@@ -10,10 +10,10 @@ import { completeSession } from '@/features/game/model/session'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { useGameStore } from '@/features/game/stores/useGameStore'
-import { createGenerationInput } from '@/core/sudoku/generation'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
-import type { Puzzle } from '@/core/sudoku/generation'
+import type { Puzzle } from '@/core/sudoku/puzzle'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 
 const runtimes: Awaited<ReturnType<typeof createTestRuntime>>[] = []

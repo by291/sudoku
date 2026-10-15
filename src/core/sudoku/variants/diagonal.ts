@@ -1,4 +1,4 @@
-import type { VariantGenerationStrategy } from '@/core/sudoku/generationStrategies'
+import type { VariantGenerationStrategy } from '@/core/sudoku/generation/types'
 import { isRecord } from '@/core/sudoku/types'
 import type { VariantRuleDefinition } from '@/core/sudoku/ruleTypes'
 import { CLASSIC_UNITS, compileUnits, invalidRules } from '@/core/sudoku/ruleTopology'

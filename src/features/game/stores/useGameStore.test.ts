@@ -7,7 +7,7 @@ import { useGameStore } from '@/features/game/stores/useGameStore'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 import type { HintResult } from '@/core/sudoku/hint'
 import { createTestRuntime } from '../../../../tests/support/runtime'
-import { createGenerationInput } from '@/core/sudoku/generation'
+import { createGenerationInput } from '@/core/sudoku/generation/input'
 
 function setup() {
   let time = 0

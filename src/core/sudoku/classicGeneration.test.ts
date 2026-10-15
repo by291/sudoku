@@ -5,11 +5,8 @@ import { seededRandom } from '@/core/sudoku/random'
 import { countIntercalates } from '../../../tests/support/terminalDiversity'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 import { solvedBoard } from '../../../tests/fixtures/sudoku'
-import {
-  createGenerationInput,
-  generatePuzzle,
-  DEFAULT_GENERATION_LIMITS,
-} from '@/core/sudoku/generation'
+import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
 
 it('finds a unique Expert in a nearby clue mask within a three-terminal allowance', () => {
   const input = createGenerationInput('classic', 'expert', 'local-product-corpus-v1:seed:005')

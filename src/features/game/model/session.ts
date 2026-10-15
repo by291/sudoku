@@ -1,6 +1,6 @@
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
-import type { Puzzle } from '@/core/sudoku/generation'
-import { parsePuzzle } from '@/core/sudoku/generation'
+import type { Puzzle } from '@/core/sudoku/puzzle'
+import { parsePuzzle } from '@/core/sudoku/puzzle'
 import { isCellIndex, isComplete, maskOf } from '@/core/sudoku/board'
 import { compileRules } from '@/core/sudoku/rules'
 import { evaluateCandidates } from '@/core/sudoku/constraints'

@@ -1,10 +1,7 @@
 // @vitest-environment node
 import { expect, it } from 'vitest'
-import {
-  createGenerationInput,
-  generatePuzzle,
-  DEFAULT_GENERATION_LIMITS,
-} from '@/core/sudoku/generation'
+import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
+import { generatePuzzle } from '@/core/sudoku/generation/generate'
 import { KILLER_HARD_REGRESSION_SEEDS } from './fixtures/generationCorpus'
 import { referenceCountSolutions } from './support/referenceVariants'
 

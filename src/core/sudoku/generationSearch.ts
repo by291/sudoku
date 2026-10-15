@@ -17,8 +17,8 @@ import type {
   GenerationInput,
   GenerationLimits,
   GenerationMetrics,
-} from '@/core/sudoku/generation'
-import { createGenerationRandom } from '@/core/sudoku/random'
+} from '@/core/sudoku/generation/types'
+import { createGenerationRandom } from '@/core/sudoku/generation/random'
 import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
 import type { PreparedAssessment, TargetScreenResult } from '@/core/sudoku/rating'
 import { RATING_VERSION } from '@/core/sudoku/ratingPolicies'

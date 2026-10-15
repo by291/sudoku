@@ -1,5 +1,5 @@
 import type { Board } from '@/core/sudoku/types'
-import type { GenerationInput } from '@/core/sudoku/generation'
+import type { GenerationInput } from '@/core/sudoku/generation/types'
 import type { HintResult } from '@/core/sudoku/hint'
 import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
 import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'

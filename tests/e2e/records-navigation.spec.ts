@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './support'
 import { makeSession } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
-import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
+import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import type { GameSession } from '@/features/game/model/session'
 
 async function chooseRecordsVariant(page: Page, name: string) {

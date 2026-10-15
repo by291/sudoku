@@ -6,7 +6,7 @@ import { makeSession } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
 import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
-import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation'
+import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import type { NewSudokuVariant } from '@/core/sudoku/rules'
 
 export { expect }
