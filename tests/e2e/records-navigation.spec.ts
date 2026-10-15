@@ -78,6 +78,23 @@ async function seedCompletedRecords(page: Page) {
   }, results)
 }
 
+test('keeps populated completion history beside best times in a short desktop window', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'Desktop records columns')
+  await page.setViewportSize({ width: 1100, height: 720 })
+  await seedCompletedRecords(page)
+
+  await page.goto('/#/records?variant=arrow')
+  const history = page.getByRole('list').filter({ hasText: '箭头数独' })
+
+  await expect(history.getByRole('listitem')).toHaveCount(3)
+  await expect(history).toBeInViewport({ ratio: 1 })
+  await expect(page.getByRole('table')).toBeInViewport({ ratio: 1 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1100)
+})
+
 test('restores the records type from its URL through refresh and browser history', async ({
   page,
 }, testInfo) => {

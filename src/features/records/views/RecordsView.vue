@@ -143,29 +143,33 @@ function duration(value: number | null) {
         />
       </label>
       <section class="records-content" :aria-label="`${getVariantPresentation(variant).label}成绩`">
-        <div class="records-overview">
-          <p class="eyebrow">按玩法积累</p>
-          <h2>{{ getVariantPresentation(variant).label }}</h2>
-          <p class="completion-count">已完成 {{ results.length }} 局</p>
-          <p class="muted">难度与最快成绩按玩法分别计算。</p>
-        </div>
-        <div class="stat-grid">
-          <div class="panel stat">
-            <span>当前连续挑战</span><strong>{{ summary.currentStreak }} <small>天</small></strong>
+        <div class="records-summary">
+          <div class="records-overview">
+            <p class="eyebrow">按玩法积累</p>
+            <h2>{{ getVariantPresentation(variant).label }}</h2>
+            <p class="completion-count">已完成 {{ results.length }} 局</p>
+            <p class="muted">难度与最快成绩按玩法分别计算。</p>
           </div>
-          <div class="panel stat">
-            <span>最长连续挑战</span><strong>{{ summary.longestStreak }} <small>天</small></strong>
-          </div>
-          <div class="panel stat">
-            <span>正式挑战完成</span
-            ><strong
-              >{{ summary.dailyTotals.unassisted + summary.dailyTotals.assisted }}
-              <small>次</small></strong
-            >
-            <p>
-              无辅助 {{ summary.dailyTotals.unassisted }} · 辅助
-              {{ summary.dailyTotals.assisted }}
-            </p>
+          <div class="stat-grid">
+            <div class="panel stat">
+              <span>当前连续挑战</span
+              ><strong>{{ summary.currentStreak }} <small>天</small></strong>
+            </div>
+            <div class="panel stat">
+              <span>最长连续挑战</span
+              ><strong>{{ summary.longestStreak }} <small>天</small></strong>
+            </div>
+            <div class="panel stat">
+              <span>正式挑战完成</span
+              ><strong
+                >{{ summary.dailyTotals.unassisted + summary.dailyTotals.assisted }}
+                <small>次</small></strong
+              >
+              <p>
+                无辅助 {{ summary.dailyTotals.unassisted }} · 辅助
+                {{ summary.dailyTotals.assisted }}
+              </p>
+            </div>
           </div>
         </div>
         <section class="panel bests">
@@ -245,10 +249,10 @@ function duration(value: number | null) {
 </template>
 <style scoped>
 .records-page {
-  padding-top: 24px;
+  padding-top: var(--page-top-space);
 }
 .records-heading {
-  margin-bottom: 32px;
+  margin-bottom: var(--page-heading-space);
 }
 .records-workspace {
   display: grid;
@@ -406,6 +410,108 @@ td {
 }
 .data-actions {
   margin-top: 24px;
+}
+@media (min-width: 801px) and (max-height: 1000px) {
+  h1 {
+    margin: 4px 0 8px;
+    font-size: 28px;
+  }
+  .records-heading > p:last-child {
+    margin: 0;
+  }
+  .eyebrow {
+    margin-bottom: 4px;
+  }
+  .records-workspace {
+    gap: 24px;
+  }
+  .records-sidebar {
+    top: 16px;
+    padding: 16px 12px;
+  }
+  .records-navigation {
+    gap: 4px;
+  }
+  .records-choice {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+  .records-total {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  .records-overview {
+    padding: 16px;
+  }
+  .records-overview h2 {
+    font-size: 24px;
+  }
+  .completion-count {
+    margin-top: 8px;
+  }
+  .stat-grid {
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .stat,
+  .bests,
+  .history {
+    padding: 16px;
+  }
+  .stat strong {
+    font-size: 32px;
+  }
+  .stat p {
+    margin: 4px 0 0;
+  }
+  .bests,
+  .history {
+    margin: 16px 0;
+  }
+  h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+  th,
+  td {
+    padding: 8px;
+  }
+  .history li {
+    padding: 12px 0;
+  }
+  .history-time {
+    font-size: 18px;
+  }
+}
+@media (min-width: 1100px) and (max-height: 1000px) {
+  .records-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 16px;
+  }
+  .records-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: stretch;
+    gap: 16px;
+    grid-column: 1 / -1;
+  }
+  .stat-grid {
+    gap: 8px;
+    margin: 0;
+  }
+  .bests,
+  .history {
+    margin: 0;
+  }
+  .data-actions,
+  .feedback-message {
+    grid-column: 1 / -1;
+  }
+  .data-actions {
+    margin-top: 0;
+  }
 }
 @media (max-width: 800px) {
   .records-workspace {

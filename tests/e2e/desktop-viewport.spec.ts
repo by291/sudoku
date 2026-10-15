@@ -61,6 +61,15 @@ for (const viewport of desktopViewports) {
       await expect(page.getByText(/练习阶段 1 \/ 2/)).toBeInViewport({ ratio: 1 })
     })
 
+    test('shows best times and completion history in the first screen', async ({ page }) => {
+      await page.goto('/#/records')
+
+      await expect(page.getByRole('table')).toBeInViewport({ ratio: 1 })
+      await expect(page.getByText('这个玩法还没有完成记录，先享受解题的过程吧。')).toBeInViewport({
+        ratio: 1,
+      })
+    })
+
     test('keeps the board tools and keyboard instructions in the first screen', async ({
       page,
     }) => {
