@@ -1,3 +1,5 @@
+import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
+import type { PreparedRuleComputation } from '@/core/sudoku/constraintSupport'
 import {
   analyzeLogicalWorkspace,
   applyLogicalStep,
@@ -7,6 +9,7 @@ import {
   isClassicTechnique,
   isAdvancedEvidence,
   ALL_CLASSIC_TECHNIQUES,
+  copyLogicalStep,
 } from '@/core/sudoku/techniques'
 import { supportedDifficulties, supportsDifficulty } from '@/core/sudoku/difficulties'
 import type { LogicalStep, Technique } from '@/core/sudoku/techniques'
@@ -15,9 +18,9 @@ import type { RatingVersion } from '@/core/sudoku/ratingPolicies'
 import type { Board, Difficulty, ParseResult } from '@/core/sudoku/types'
 import { BOARD_SIZE, UNIT_SIZE, isDifficulty, isRecord } from '@/core/sudoku/types'
 import type { RuleContext, PuzzleRules, SudokuVariant } from '@/core/sudoku/rules'
-import { compileRules, isSudokuVariant, parseRules } from '@/core/sudoku/rules'
+import { isSudokuVariant, parseRules } from '@/core/sudoku/rules'
 import { isCellIndex, maskOf, parseBoard } from '@/core/sudoku/board'
-import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
+import { createWorkBudget, DEFAULT_WORK_LIMIT, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { evaluateConflicts } from '@/core/sudoku/constraints'
 
@@ -74,8 +77,23 @@ export type TrialAssessmentResult =
   | { status: 'rated'; difficulty: Difficulty; complete(): RatedAssessmentResult }
   | Exclude<AssessmentOutcome, { status: 'rated' }>
 
+export type TargetFeedback = { remainingCells: number; deductions: number }
+
+type CompletedTargetTrial = {
+  difficulty: Difficulty
+  feedback: TargetFeedback
+  complete(): RatedAssessmentResult
+}
+
+export type TargetScreenResult =
+  | ({ status: 'below-target' } & CompletedTargetTrial)
+  | ({ status: 'matching-target' } & CompletedTargetTrial)
+  | { status: 'target-stalled'; feedback: TargetFeedback }
+  | { status: 'budget-exhausted'; cause: 'work-limit' | 'logical-step-limit' }
+  | { status: 'invalid'; issues: readonly string[] }
+
 export type PreparedAssessment = {
-  readonly context: RuleContext
+  screenTarget(board: Board, target: Difficulty, budget: WorkBudget): TargetScreenResult
   assess(board: Board, budget: WorkBudget): AssessmentResult
   screen(board: Board, budget: WorkBudget): TrialAssessmentResult
 }
@@ -301,10 +319,7 @@ export function assessPuzzleWithBudget(
   return assessSnapshot(parsed.value, budget)
 }
 
-/**
- * Owns a validated rules/limits snapshot and shares its read-only geometry across boards.
- * Each call validates/copies its board, owns fresh logical state, and charges the supplied budget.
- */
+/** Own validated inputs; expensive preparation is lazy and consumes the first caller's budget. */
 export function prepareAssessment(
   rules: PuzzleRules,
   limits: AssessmentLimits = DEFAULT_ASSESSMENT_LIMITS,
@@ -312,44 +327,128 @@ export function prepareAssessment(
   const parsedRules = parseRules(rules)
   const parsedLimits = parseAssessmentLimits(limits)
   if (!parsedRules.valid || !parsedLimits.valid) {
-    const issues = [
-      ...(!parsedRules.valid ? parsedRules.issues : []),
-      ...(!parsedLimits.valid ? parsedLimits.issues : []),
-    ]
-    throw new TypeError(issues.join('; '))
+    throw new TypeError('Invalid assessment preparation rules or limits')
   }
 
-  // Parsing owns nested clue arrays; caller edits cannot change this prepared layout.
-  const context = compileRules(parsedRules.value)
-  const snapshotLimits = parsedLimits.value
+  return createAssessmentOwner(parsedRules.value, parsedLimits.value)
+}
 
-  function screen(board: Board, budget: WorkBudget): TrialAssessmentResult {
+/** Reuse a layout's already charged immutable computation without rebuilding its catalogues. */
+export function prepareAssessmentWithComputation(
+  computation: PreparedRuleComputation,
+  limits: AssessmentLimits,
+): PreparedAssessment {
+  const parsedLimits = parseAssessmentLimits(limits)
+  if (!parsedLimits.valid) {
+    throw new TypeError(parsedLimits.issues.join('; '))
+  }
+
+  return createAssessmentOwner(computation.context.rules, parsedLimits.value, computation)
+}
+
+type PolicyScreen =
+  | {
+      status: 'rated'
+      difficulty: Difficulty
+      feedback: TargetFeedback
+      complete(): RatedAssessmentResult
+    }
+  | { status: 'target-stalled'; feedback: TargetFeedback }
+  | { status: 'invalid'; issues: readonly string[] }
+  | {
+      status: 'budget-exhausted'
+      cause: 'work-limit' | 'logical-step-limit'
+      stage: 'validation' | 'logic'
+      difficulty: Difficulty | null
+    }
+
+function createAssessmentOwner(
+  rules: PuzzleRules,
+  limits: AssessmentLimits,
+  initial?: PreparedRuleComputation,
+): PreparedAssessment {
+  let computation = initial
+
+  function evaluate(board: Board, budget: WorkBudget, target?: Difficulty): PolicyScreen {
     const parsedBoard = parseBoard(board)
     if (!parsedBoard.valid) {
       return { status: 'invalid', issues: parsedBoard.issues }
     }
-    if (!validAssessmentBudget(budget, snapshotLimits.maxWork)) {
+    if (!validAssessmentBudget(budget, limits.maxWork)) {
       return { status: 'invalid', issues: ['Invalid caller-owned assessment budget'] }
     }
+    if (target !== undefined && !supportsDifficulty(rules.kind, target)) {
+      return { status: 'invalid', issues: ['Unsupported assessment target'] }
+    }
+    if (!computation) {
+      const prepared = prepareRuleComputation(rules, budget)
+      if (prepared.status !== 'ready') {
+        return {
+          status: 'budget-exhausted',
+          cause: 'work-limit',
+          stage: 'validation',
+          difficulty: null,
+        }
+      }
+      computation = prepared.computation
+    }
 
-    return screenSnapshot(
-      {
-        board: parsedBoard.value,
-        rules: context.rules,
-        ratingVersion: RATING_VERSION,
-        limits: snapshotLimits,
-      },
-      budget,
-      context,
+    const prepared = computation
+    return withWorkStage(budget, 'logic', () =>
+      screenPolicies(
+        {
+          board: parsedBoard.value,
+          rules: prepared.context.rules,
+          ratingVersion: RATING_VERSION,
+          limits,
+        },
+        budget,
+        prepared,
+        target,
+      ),
     )
   }
 
+  function screen(board: Board, budget: WorkBudget): TrialAssessmentResult {
+    const result = evaluate(board, budget)
+    if (result.status === 'target-stalled') {
+      return { status: 'ungraded', ratingVersion: RATING_VERSION, variant: rules.kind }
+    }
+    if (result.status === 'budget-exhausted') {
+      return {
+        status: 'budget-exhausted',
+        ratingVersion: RATING_VERSION,
+        variant: rules.kind,
+        stage: result.stage,
+        difficulty: result.difficulty,
+      }
+    }
+    if (result.status === 'invalid') {
+      return result
+    }
+
+    return { status: 'rated', difficulty: result.difficulty, complete: result.complete }
+  }
+
   return {
-    context,
     screen,
     assess(board, budget) {
       const result = screen(board, budget)
       return result.status === 'rated' ? result.complete() : result
+    },
+    screenTarget(board, target, budget) {
+      const result = evaluate(board, budget, target)
+      if (result.status === 'rated') {
+        if (result.difficulty === target) {
+          return { ...result, status: 'matching-target' }
+        }
+        return { ...result, status: 'below-target' }
+      }
+      if (result.status === 'budget-exhausted') {
+        return { status: 'budget-exhausted', cause: result.cause }
+      }
+
+      return result
     },
   }
 }
@@ -365,22 +464,19 @@ function validAssessmentBudget(budget: WorkBudget, maxWork: number): boolean {
   )
 }
 
-function assessSnapshot(
-  snapshot: AssessmentInput,
-  budget: WorkBudget,
-  context = compileRules(snapshot.rules),
-): AssessmentResult {
-  const result = screenSnapshot(snapshot, budget, context)
-  return result.status === 'rated' ? result.complete() : result
+function assessSnapshot(snapshot: AssessmentInput, budget: WorkBudget): AssessmentResult {
+  return prepareAssessment(snapshot.rules, snapshot.limits).assess(snapshot.board, budget)
 }
 
-function screenSnapshot(
+function screenPolicies(
   snapshot: AssessmentInput,
   budget: WorkBudget,
-  context: RuleContext,
-): TrialAssessmentResult {
+  computation: PreparedRuleComputation,
+  target?: Difficulty,
+): PolicyScreen {
+  const { context, support } = computation
   const identity = { ratingVersion: snapshot.ratingVersion, variant: snapshot.rules.kind }
-  const conflicts = evaluateConflicts(snapshot.board, context, budget)
+  const conflicts = evaluateConflicts(snapshot.board, context, budget, support)
   if (conflicts.violations.length) {
     return {
       status: 'invalid',
@@ -390,12 +486,21 @@ function screenSnapshot(
     }
   }
   if (conflicts.status === 'budget-exhausted') {
-    return { status: 'budget-exhausted', ...identity, stage: 'validation', difficulty: null }
+    return {
+      status: 'budget-exhausted',
+      cause: 'work-limit',
+      stage: 'validation',
+      difficulty: null,
+    }
   }
 
-  let workspace = createLogicalWorkspace(snapshot.board, context)
+  let workspace = createLogicalWorkspace(snapshot.board, context, support)
   let previousOrder: readonly Technique[] = []
   let previousSteps: readonly LogicalStep[] = []
+  let feedback: TargetFeedback = {
+    remainingCells: snapshot.board.filter((digit) => digit === 0).length,
+    deductions: 0,
+  }
 
   for (const difficulty of supportedDifficulties(identity.variant)) {
     const policy = RATING_POLICIES[identity.variant][difficulty]
@@ -403,10 +508,9 @@ function screenSnapshot(
       identity.variant === 'classic'
         ? ALL_CLASSIC_TECHNIQUES.filter((technique) => policy.includes(technique))
         : policy
-    // A higher policy repeats the same deterministic deductions until its added techniques
-    // become necessary. Changed priorities invalidate that prefix and require a fresh state.
+    // Only an unchanged priority prefix permits continuation; clue masks never share this workspace.
     if (!previousOrder.every((technique, index) => order[index] === technique)) {
-      workspace = createLogicalWorkspace(snapshot.board, context)
+      workspace = createLogicalWorkspace(snapshot.board, context, support)
       previousSteps = []
     }
     const result = analyzeLogicalWorkspace(
@@ -417,14 +521,22 @@ function screenSnapshot(
       previousSteps,
     )
     if (result.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', ...identity, stage: 'logic', difficulty }
+      return {
+        status: 'budget-exhausted',
+        cause: result.cause,
+        stage: 'logic',
+        difficulty,
+      }
+    }
+    feedback = {
+      remainingCells: result.board.filter((digit) => digit === 0).length,
+      deductions: result.steps.length,
     }
     if (result.status === 'solved') {
-      // This closure owns the board and successful trace from this screening call. A later
-      // clue mask cannot reuse its domains, and final delivery still replays the full trace.
       return {
         status: 'rated',
         difficulty,
+        feedback,
         complete() {
           const workload = summarizeLogicalTrace(snapshot.board, context, result.steps)
           if (!workload.valid) {
@@ -434,16 +546,19 @@ function screenSnapshot(
           return {
             status: 'rated',
             summary: { ...identity, difficulty, workload: workload.value },
-            trace: result.steps,
+            trace: result.steps.map(copyLogicalStep),
           }
         },
       }
+    }
+    if (difficulty === target) {
+      break
     }
     previousOrder = order
     previousSteps = result.steps
   }
 
-  return { status: 'ungraded', ...identity }
+  return { status: 'target-stalled', feedback }
 }
 
 export function toAssessmentOutcome(result: AssessmentResult): AssessmentOutcome {

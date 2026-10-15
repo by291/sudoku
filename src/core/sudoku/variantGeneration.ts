@@ -1,3 +1,4 @@
+import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
 import type { GenerationMetrics } from '@/core/sudoku/generation'
 import {
   VARIANT_GENERATION_STRATEGIES,
@@ -8,7 +9,7 @@ import { irregularRegions } from '@/core/sudoku/variants/jigsaw'
 import { isComplete } from '@/core/sudoku/board'
 import { CLASSIC_CONTEXT, compileRules, parseRules } from '@/core/sudoku/rules'
 import type { Board, CellValue, Digit } from '@/core/sudoku/types'
-import type { NewSudokuVariant } from '@/core/sudoku/rules'
+import type { NewSudokuVariant, RuleContext } from '@/core/sudoku/rules'
 import type { DifficultyAssessment, PreparedAssessment } from '@/core/sudoku/rating'
 import { isDigit } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
@@ -16,7 +17,7 @@ import { countSolutions } from '@/core/sudoku/search'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import type { VariantTemplate } from '@/core/sudoku/variantTemplates'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { prepareAssessment } from '@/core/sudoku/rating'
+import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
 import { seededRandom, shuffle } from '@/core/sudoku/random'
 import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
 import type {
@@ -204,8 +205,11 @@ export function generateVariantPuzzle(
     return { status: 'matching-tier', assessment: completed.summary }
   }
 
-  function checkRemoval(board: Board, assessment: PreparedAssessment): RemovalCheck {
-    const context = assessment.context
+  function checkRemoval(
+    board: Board,
+    assessment: PreparedAssessment,
+    context: RuleContext,
+  ): RemovalCheck {
     const ratingFirst = input.variant === 'killer' && input.difficulty === 'hard'
     // Screening continues the actual Easy prefix into higher policies once per board.
     // No candidate workspace survives the next removal, which would widen its domains.
@@ -271,11 +275,15 @@ export function generateVariantPuzzle(
         continue
       }
 
-      const assessment = prepareAssessment(rules, {
+      const prepared = prepareRuleComputation(rules, generationBudget)
+      if (prepared.status !== 'ready') {
+        break
+      }
+      const context = prepared.computation.context
+      const assessment = prepareAssessmentWithComputation(prepared.computation, {
         maxSteps: limits.maxSteps,
         maxWork: generationBudget.limit,
       })
-      const context = assessment.context
       if (
         !isComplete(terminal.solution, context) ||
         (rules.kind === 'jigsaw' && !irregularRegions(rules))
@@ -288,7 +296,7 @@ export function generateVariantPuzzle(
       for (const cell of shuffle(CELL_INDICES, random)) {
         const previous = givens[cell]
         givens[cell] = 0
-        const check = checkRemoval(givens, assessment)
+        const check = checkRemoval(givens, assessment, context)
         if (check.status === 'budget-exhausted') {
           givens[cell] = previous
           break

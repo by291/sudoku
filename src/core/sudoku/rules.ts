@@ -198,9 +198,7 @@ export function prepareRuleContext(
   return withWorkStage(budget, 'preparation', () => {
     // Classic geometry is static. The request only inspects the kind, not its constant topology.
     if (rules.kind === 'classic') {
-      return consumeWork(budget)
-        ? { status: 'ready', context: CLASSIC_CONTEXT }
-        : { status: 'budget-exhausted' }
+      return { status: 'ready', context: CLASSIC_CONTEXT }
     }
     const context = buildRuleContext(rules, budget)
 

@@ -1,3 +1,5 @@
+import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
+import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
 import { expect, it } from 'vitest'
 import {
   assessPuzzle,
@@ -186,15 +188,22 @@ it.each(RATING_FIXTURES)('matches a fresh successful-policy trace for $id', (fix
   expect(result.summary.workload.steps).toBe(independentRun.steps.length)
 })
 
-it('finishes the authored Killer Hard trace without repeating lower-policy work', () => {
+it('finishes the prepared authored Killer Hard trace without repeating lower-policy work', () => {
   const fixture = RATING_FIXTURES.find((item) => item.id === 'killer-hard')
   if (!fixture) {
     throw new Error('Missing known Killer Hard fixture')
   }
-  const input = createAssessmentInput(fixture.board, fixture.rules)
+  const prepared = prepareRuleComputation(fixture.rules, createWorkBudget(100000))
+  if (prepared.status !== 'ready') {
+    throw new Error('Expected charged fixture preparation')
+  }
   const budget = createWorkBudget(15000)
+  const owner = prepareAssessmentWithComputation(prepared.computation, {
+    maxSteps: 500,
+    maxWork: 4000000,
+  })
 
-  const result = rated(assessPuzzleWithBudget(input, budget))
+  const result = rated(owner.assess(fixture.board, budget))
 
   expect(result.summary.difficulty).toBe('hard')
   expect(result.trace).toEqual(

@@ -9,6 +9,7 @@ import {
   unsatisfiableBoard,
 } from '../../../tests/fixtures/sudoku'
 import { compileRules } from '@/core/sudoku/rules'
+import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 import { createWorkBudget } from '@/core/sudoku/budget'
@@ -171,11 +172,16 @@ it('does not mutate the source puzzle', () => {
   expect(board).toEqual(uniqueBoard)
 })
 
-it('charges standalone preparation before its first exact node', () => {
+it('charges puzzle-specific standalone preparation before its first exact node', () => {
   const budget = createWorkBudget(1)
 
   expect(
-    countSolutions(uniqueBoard, { maxSolutions: 2, nodeBudget: 1000, workBudget: budget }),
+    countSolutions(VARIANT_FIXTURES.diagonal.givens, {
+      maxSolutions: 2,
+      nodeBudget: 1000,
+      workBudget: budget,
+      context: compileRules(VARIANT_FIXTURES.diagonal.rules),
+    }),
   ).toEqual({
     status: 'budget-exhausted',
     nodesVisited: 0,

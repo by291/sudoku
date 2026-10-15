@@ -13,7 +13,7 @@ it.each(RATING_FIXTURES)('classifies $id before producing its complete assessmen
   const before = [...fixture.board]
 
   const trial = prepared.screen(fixture.board, trialBudget)
-  const expected = prepared.assess(fixture.board, completeBudget)
+  const expected = prepareAssessment(fixture.rules, limits).assess(fixture.board, completeBudget)
 
   expect(trial).toMatchObject({ status: 'rated', difficulty: fixture.difficulty })
   expect(trial).not.toHaveProperty('summary')

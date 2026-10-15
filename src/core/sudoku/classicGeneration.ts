@@ -1,3 +1,4 @@
+import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'
 import type { GenerationMetrics } from '@/core/sudoku/generation'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
@@ -12,7 +13,7 @@ import type {
   GenerationAttemptResult,
 } from '@/core/sudoku/generation'
 import { countSolutions } from '@/core/sudoku/search'
-import { prepareAssessment } from '@/core/sudoku/rating'
+import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
 import type { DifficultyAssessment } from '@/core/sudoku/rating'
 import { refineExpertClues } from '@/core/sudoku/expertGeneration'
 import type { ExpertCheckpoint } from '@/core/sudoku/expertGeneration'
@@ -61,7 +62,11 @@ export function generateClassicPuzzle(
   const budget = createWorkBudget(limits.maxWork)
   try {
     const rules = { kind: 'classic' } as const
-    const assessment = prepareAssessment(rules, {
+    const prepared = prepareRuleComputation(rules, budget)
+    if (prepared.status !== 'ready') {
+      return { status: 'budget-exhausted', stage: 'construction' }
+    }
+    const assessment = prepareAssessmentWithComputation(prepared.computation, {
       maxSteps: limits.maxSteps,
       maxWork: budget.limit,
     })

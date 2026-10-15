@@ -43,10 +43,12 @@ export type LogicalOptions = {
 }
 
 export type LogicResult = {
-  status: 'solved' | 'stalled' | 'budget-exhausted'
   board: Board
   steps: readonly LogicalStep[]
-}
+} & (
+  | { status: 'solved' | 'stalled' }
+  | { status: 'budget-exhausted'; cause: 'work-limit' | 'logical-step-limit' }
+)
 
 export function createLogicalWorkspace(
   board: Board,
@@ -370,12 +372,12 @@ export function analyzeLogicalWorkspace(
 
   while (!isComplete(state.board, state.context)) {
     if (steps.length >= stepBudget) {
-      return { status: 'budget-exhausted', board: state.board, steps }
+      return { status: 'budget-exhausted', cause: 'logical-step-limit', board: state.board, steps }
     }
 
     const result = findLogicalStep(state, allowed, budget)
     if (result.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', board: state.board, steps }
+      return { status: 'budget-exhausted', cause: 'work-limit', board: state.board, steps }
     }
 
     if (!result.step) {

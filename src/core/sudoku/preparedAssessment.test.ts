@@ -43,7 +43,6 @@ it('owns the rule and limit snapshots across caller mutations', () => {
   mutableLimits.maxSteps = 0
 
   expect(prepared.assess(fixture.board, createWorkBudget(limits.maxWork))).toEqual(expected)
-  expect(prepared.context.rules).toEqual(fixture.rules)
 })
 
 it('uses separate logical state and traces for every board', () => {
@@ -123,7 +122,6 @@ it.each(['killer-hard', 'thermo-hard', 'arrow-hard'])(
 
     reverseClueGeometry(result.trace)
 
-    expect(prepared.context.rules).toEqual(fixture.rules)
     expect(prepared.assess(fixture.board, createWorkBudget(limits.maxWork))).toEqual(expected)
   },
 )
