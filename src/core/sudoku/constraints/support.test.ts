@@ -5,7 +5,7 @@ import { DEFAULT_CATALOGUE_LIMITS } from '@/core/sudoku/constraints/cageCatalogu
 import { compileRules } from '@/core/sudoku/rules/context'
 import type { Cage, RuleContext } from '@/core/sudoku/rules/types'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { createLogicalWorkspace } from '@/core/sudoku/logic'
+import { createLogicalWorkspace } from '@/core/sudoku/logic/workspace'
 import type { Board, NoteMask } from '@/core/sudoku/types'
 import { ARROW_REPEAT_BOARD, ARROW_REPEAT_RULES } from '../../../../tests/fixtures/variants'
 

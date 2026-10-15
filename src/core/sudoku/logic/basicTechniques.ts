@@ -1,73 +1,13 @@
-import {
-  calculateBaseCandidates,
-  digitsIn,
-  isComplete,
-  maskOf,
-  PEERS,
-  UNITS,
-} from '@/core/sudoku/board'
+import { digitsIn, maskOf, UNITS } from '@/core/sudoku/board'
 import type { SudokuUnit } from '@/core/sudoku/rules/types'
 import { DIGITS } from '@/core/sudoku/types'
-import type { Board, CellValue, Digit, NoteMask } from '@/core/sudoku/types'
-import { ALL_CLASSIC_TECHNIQUES } from '@/core/sudoku/techniques'
-import { findAdvancedStep } from '@/core/sudoku/advancedTechniques'
+import type { Digit } from '@/core/sudoku/types'
 import type {
   LogicalState,
   LogicalStep,
   Technique,
   BasicClassicTechnique,
-  RuleEvidence,
-} from '@/core/sudoku/techniques'
-import { isClassicTechnique, isAdvancedTechnique } from '@/core/sudoku/techniques'
-import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
-import type { RuleContext } from '@/core/sudoku/rules/types'
-import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
-import type { WorkBudget } from '@/core/sudoku/budget'
-import { findVariantStep } from '@/core/sudoku/variantTechniques'
-import type { StepOutcome } from '@/core/sudoku/variantTechniques'
-import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraints/types'
-
-export type LogicalWorkspace = {
-  board: CellValue[]
-  candidates: NoteMask[]
-  context: RuleContext
-  premises: RuleEvidence[]
-  support?: PreparedConstraintSupport
-  cageSupportMemo: CageSupportMemo
-}
-
-export type LogicalOptions = {
-  support?: PreparedConstraintSupport
-  context: RuleContext
-  workBudget: WorkBudget
-}
-
-export type LogicResult = {
-  board: Board
-  steps: readonly LogicalStep[]
-} & (
-  | { status: 'solved' | 'stalled' }
-  | { status: 'budget-exhausted'; cause: 'work-limit' | 'logical-step-limit' }
-)
-
-export function createLogicalWorkspace(
-  board: Board,
-  context: RuleContext = CLASSIC_CONTEXT,
-  support?: PreparedConstraintSupport,
-): LogicalWorkspace {
-  // Cage exclusion is emitted as an explained step, rather than hidden initialization.
-  const base = context.rules.kind === 'killer' ? CLASSIC_CONTEXT : context
-
-  return {
-    board: [...board],
-    candidates: [...calculateBaseCandidates(board, base)],
-    context,
-    support,
-    premises: [],
-    // Never carry deductions or support snapshots into another trial clue mask.
-    cageSupportMemo: new Map(),
-  }
-}
+} from '@/core/sudoku/logic/types'
 
 function unitsFor(state: LogicalState): readonly SudokuUnit[] {
   return state.context?.units ?? UNITS
@@ -280,121 +220,9 @@ const detectors: Record<BasicClassicTechnique, (state: LogicalState) => LogicalS
   'hidden-pair': hiddenPair,
 }
 
-export function findLogicalStep(
-  state: LogicalWorkspace,
-  allowed: readonly Technique[],
-  budget: WorkBudget = createWorkBudget(DEFAULT_WORK_LIMIT),
-): StepOutcome {
-  const ordered =
-    state.context.rules.kind === 'classic'
-      ? ALL_CLASSIC_TECHNIQUES.filter((technique) => allowed.includes(technique))
-      : allowed
-  if (!consumeWork(budget)) {
-    return { status: 'budget-exhausted' }
-  }
-
-  for (const technique of ordered) {
-    if (isAdvancedTechnique(technique)) {
-      const result = findAdvancedStep(state, technique, budget)
-      if (result.status === 'budget-exhausted' || result.step) {
-        return result
-      }
-    } else if (isClassicTechnique(technique)) {
-      const step = detectors[technique](state)
-      if (step) {
-        return { status: 'complete', step }
-      }
-    } else {
-      const result = findVariantStep(state, state.context, [technique], budget)
-      if (result.status === 'budget-exhausted' || result.step) {
-        return result
-      }
-    }
-  }
-
-  return { status: 'complete', step: null }
-}
-
-export function applyLogicalStep(state: LogicalWorkspace, step: LogicalStep): void {
-  if (step.kind === 'elimination') {
-    for (const removal of step.removals) {
-      state.candidates[removal.cell] &= ~maskOf(removal.digit)
-    }
-
-    if (
-      step.evidence.kind === 'cage' ||
-      step.evidence.kind === 'thermo' ||
-      step.evidence.kind === 'arrow'
-    ) {
-      state.premises.push(step.evidence)
-    }
-
-    return
-  }
-
-  state.board[step.cell] = step.digit
-  state.candidates[step.cell] = 0
-  const peers =
-    state.context.rules.kind === 'classic'
-      ? PEERS[step.cell]
-      : [
-          ...new Set(
-            state.context.units
-              .filter((unit) => unit.cells.includes(step.cell))
-              .flatMap((unit) => unit.cells),
-          ),
-        ]
-
-  for (const peer of peers) {
-    state.candidates[peer] &= ~maskOf(step.digit)
-  }
-
-  state.premises = []
-}
-
-export function analyzeLogic(
-  board: Board,
-  allowed: readonly Technique[],
-  stepBudget: number,
-  options?: LogicalOptions,
-): LogicResult {
-  const state = createLogicalWorkspace(board, options?.context, options?.support)
-  const budget = options?.workBudget ?? createWorkBudget(DEFAULT_WORK_LIMIT)
-
-  return analyzeLogicalWorkspace(state, allowed, stepBudget, budget)
-}
-
-/**
- * Mutates a caller-owned workspace. Prior steps must describe that workspace; the step
- * limit includes them. The returned board aliases the workspace; the trace is copied.
- * Callers may resume only when technique priorities retain the prefix.
- */
-export function analyzeLogicalWorkspace(
-  state: LogicalWorkspace,
-  allowed: readonly Technique[],
-  stepBudget: number,
-  budget: WorkBudget,
-  previousSteps: readonly LogicalStep[] = [],
-): LogicResult {
-  const steps = [...previousSteps]
-
-  while (!isComplete(state.board, state.context)) {
-    if (steps.length >= stepBudget) {
-      return { status: 'budget-exhausted', cause: 'logical-step-limit', board: state.board, steps }
-    }
-
-    const result = findLogicalStep(state, allowed, budget)
-    if (result.status === 'budget-exhausted') {
-      return { status: 'budget-exhausted', cause: 'work-limit', board: state.board, steps }
-    }
-
-    if (!result.step) {
-      return { status: 'stalled', board: state.board, steps }
-    }
-
-    applyLogicalStep(state, result.step)
-    steps.push(result.step)
-  }
-
-  return { status: 'solved', board: state.board, steps }
+export function findBasicStep(
+  state: LogicalState,
+  technique: BasicClassicTechnique,
+): LogicalStep | null {
+  return detectors[technique](state)
 }

@@ -5,7 +5,7 @@ import { usePreferencesStore } from '@/features/settings/stores/usePreferencesSt
 import type { LessonProgress } from '@/storage/records'
 import { LESSONS, checkExercise, lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
-import { explainStep } from '@/core/sudoku/techniques'
+import { explainStep } from '@/features/game/model/techniquePresentation'
 import type { Exercise } from '@/features/learning/model/lessons'
 
 export const useLearningStore = defineStore('learning', () => {

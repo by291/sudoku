@@ -1,18 +1,15 @@
 import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
 import type { PreparedRuleComputation } from '@/core/sudoku/constraints/types'
-import {
-  analyzeLogicalWorkspace,
-  applyLogicalStep,
-  createLogicalWorkspace,
-} from '@/core/sudoku/logic'
+import { analyzeLogicalWorkspace } from '@/core/sudoku/logic/solver'
+import { applyLogicalStep, createLogicalWorkspace } from '@/core/sudoku/logic/workspace'
 import {
   isClassicTechnique,
   isAdvancedEvidence,
   ALL_CLASSIC_TECHNIQUES,
-  copyLogicalStep,
-} from '@/core/sudoku/techniques'
+} from '@/core/sudoku/logic/techniques'
+import { copyLogicalStep } from '@/core/sudoku/logic/evidence'
 import { supportedDifficulties, supportsDifficulty } from '@/core/sudoku/difficulties'
-import type { LogicalStep, Technique } from '@/core/sudoku/techniques'
+import type { LogicalStep, Technique } from '@/core/sudoku/logic/types'
 import { RATING_POLICIES, RATING_VERSION, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
 import type { RatingVersion } from '@/core/sudoku/ratingPolicies'
 import type { Board, Difficulty, ParseResult } from '@/core/sudoku/types'
@@ -23,8 +20,10 @@ import { isCellIndex, maskOf, parseBoard } from '@/core/sudoku/board'
 import { createWorkBudget, DEFAULT_WORK_LIMIT, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { evaluateConflicts } from '@/core/sudoku/constraints/conflicts'
+import { TECHNIQUE_ACTIONS, isTechnique } from '@/core/sudoku/logic/techniques'
 
 export type AssessmentLimits = { maxSteps: number; maxWork: number }
+
 export type AssessmentInput = {
   board: Board
   rules: PuzzleRules
@@ -565,33 +564,9 @@ export function toAssessmentOutcome(result: AssessmentResult): AssessmentOutcome
   return result.status === 'rated' ? { status: 'rated', summary: result.summary } : result
 }
 
-function isTechnique(value: unknown): value is Technique {
-  return typeof value === 'string' && Object.hasOwn(TECHNIQUE_TIERS, value)
-}
-
 function isCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
-
-const TECHNIQUE_ACTIONS = {
-  'naked-single': 'placement',
-  'hidden-single': 'placement',
-  'locked-candidate': 'elimination',
-  'naked-pair': 'elimination',
-  'hidden-pair': 'elimination',
-  'naked-triple': 'elimination',
-  'hidden-triple': 'elimination',
-  'x-wing': 'elimination',
-  swordfish: 'elimination',
-  'xy-wing': 'elimination',
-  'simple-coloring': 'elimination',
-  'cage-distinct': 'either',
-  'cage-remainder': 'placement',
-  'cage-combination': 'either',
-  'thermo-bound': 'either',
-  'arrow-equation': 'placement',
-  'arrow-combination': 'either',
-} as const satisfies Record<Technique, 'placement' | 'elimination' | 'either'>
 
 function parseIssues(value: unknown): ParseResult<readonly string[]> {
   if (!Array.isArray(value) || !value.every((issue) => typeof issue === 'string' && issue.trim())) {

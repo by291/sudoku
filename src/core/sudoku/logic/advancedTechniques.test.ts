@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest'
-import { findAdvancedStep, validateAdvancedStep } from '@/core/sudoku/advancedTechniques'
+import { findAdvancedStep } from '@/core/sudoku/logic/advancedTechniques'
+import { validateAdvancedStep } from '@/core/sudoku/logic/advancedEvidence'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
-import type { LogicalState, Technique } from '@/core/sudoku/techniques'
+import type { LogicalState, Technique } from '@/core/sudoku/logic/types'
 import type { CellValue } from '@/core/sudoku/types'
 
 function fixture(entries: readonly [number, number][], base = 511): LogicalState {

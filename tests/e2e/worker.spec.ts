@@ -7,7 +7,7 @@ import { countReferenceSolutions } from '../support/referenceSudoku'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { createGenerationInput } from '@/core/sudoku/generation/input'
 import { generatePuzzle } from '@/core/sudoku/generation/generate'
-import { explainStep } from '@/core/sudoku/techniques'
+import { explainStep } from '@/features/game/model/techniquePresentation'
 import { referenceCountSolutions } from '../support/referenceVariants'
 import {
   GENERATION_LATENCY_INPUTS,

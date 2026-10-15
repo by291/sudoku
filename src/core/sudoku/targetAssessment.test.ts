@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest'
-import * as logic from '@/core/sudoku/logic'
+import * as logic from '@/core/sudoku/logic/solver'
 import {
   prepareAssessment,
   prepareAssessmentWithComputation,

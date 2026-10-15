@@ -1,109 +1,19 @@
 import type { Unit } from '@/core/sudoku/rules/types'
 import { digitsIn } from '@/core/sudoku/board'
-import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 import { UNIT_SIZE } from '@/core/sudoku/types'
-import type { RuleContext } from '@/core/sudoku/rules/types'
-import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraints/types'
+import type {
+  BasicClassicTechnique,
+  AdvancedEvidence,
+  Technique,
+  LogicalStep,
+} from '@/core/sudoku/logic/types'
+import {
+  TECHNIQUES,
+  isClassicTechnique,
+  isAdvancedTechnique,
+  isAdvancedEvidence,
+} from '@/core/sudoku/logic/techniques'
 
-export type BasicClassicTechnique =
-  'naked-single' | 'hidden-single' | 'locked-candidate' | 'naked-pair' | 'hidden-pair'
-
-export type AdvancedTechnique =
-  'naked-triple' | 'hidden-triple' | 'x-wing' | 'swordfish' | 'xy-wing' | 'simple-coloring'
-export type ClassicTechnique = BasicClassicTechnique | AdvancedTechnique
-
-type CandidateDomain = { cell: number; mask: NoteMask }
-type PatternFacts = {
-  cells: readonly number[]
-  digits: readonly Digit[]
-  domains: readonly CandidateDomain[]
-}
-export type AdvancedEvidence = PatternFacts &
-  (
-    | { kind: 'subset'; unit: Unit; hidden: boolean }
-    | { kind: 'fish'; bases: readonly Unit[]; covers: readonly Unit[] }
-    | { kind: 'wing'; pivot: number; wings: readonly [number, number] }
-    | {
-        kind: 'coloring'
-        mode: 'trap' | 'wrap'
-        colors: readonly [readonly number[], readonly number[]]
-        links: readonly { unit: Unit; cells: readonly [number, number] }[]
-      }
-  )
-
-export type Technique =
-  | ClassicTechnique
-  | 'cage-distinct'
-  | 'cage-remainder'
-  | 'cage-combination'
-  | 'thermo-bound'
-  | 'arrow-equation'
-  | 'arrow-combination'
-
-type ClueEvidence = { constraintId: string; cells: readonly number[]; digits: readonly Digit[] }
-
-export type RuleEvidence = ClueEvidence &
-  (
-    | { kind: 'cage'; sum: number; domains: readonly { cell: number; mask: NoteMask }[] }
-    | {
-        kind: 'thermo'
-        path: readonly number[]
-        bounds: readonly { cell: number; min: Digit; max: Digit }[]
-      }
-    | {
-        kind: 'arrow'
-        circle: number
-        shaft: readonly number[]
-        domains: readonly { cell: number; mask: NoteMask }[]
-      }
-  )
-
-export type LogicalState = {
-  board: Board
-  candidates: readonly NoteMask[]
-  context?: RuleContext
-  premises?: readonly RuleEvidence[]
-  support?: PreparedConstraintSupport
-  cageSupportMemo?: CageSupportMemo
-}
-
-export type LogicalStep = {
-  technique: Technique
-  evidence:
-    | RuleEvidence
-    | AdvancedEvidence
-    | {
-        kind: 'unit'
-        unit: Unit
-        cells: readonly number[]
-        digits: readonly Digit[]
-        premises: readonly RuleEvidence[]
-        units?: readonly Unit[]
-      }
-} & (
-  | { kind: 'placement'; cell: number; digit: Digit }
-  | { kind: 'elimination'; removals: readonly { cell: number; digit: Digit }[] }
-)
-
-export const TECHNIQUES: readonly BasicClassicTechnique[] = [
-  'naked-single',
-  'hidden-single',
-  'locked-candidate',
-  'naked-pair',
-  'hidden-pair',
-]
-export const ADVANCED_TECHNIQUES: readonly AdvancedTechnique[] = [
-  'naked-triple',
-  'hidden-triple',
-  'x-wing',
-  'swordfish',
-  'xy-wing',
-  'simple-coloring',
-]
-export const ALL_CLASSIC_TECHNIQUES: readonly ClassicTechnique[] = [
-  ...TECHNIQUES,
-  ...ADVANCED_TECHNIQUES,
-]
 export const TECHNIQUE_NAMES: Record<Technique, string> = {
   'naked-single': '唯一候选数',
   'hidden-single': '单元唯一数',
@@ -122,36 +32,6 @@ export const TECHNIQUE_NAMES: Record<Technique, string> = {
   'thermo-bound': '温度计范围',
   'arrow-equation': '箭头求和',
   'arrow-combination': '箭头组合',
-}
-
-export function isClassicTechnique(value: Technique): value is ClassicTechnique {
-  return ALL_CLASSIC_TECHNIQUES.some((technique) => technique === value)
-}
-
-export function isAdvancedTechnique(value: Technique): value is AdvancedTechnique {
-  return ADVANCED_TECHNIQUES.some((technique) => technique === value)
-}
-
-export function isAdvancedEvidence(
-  evidence: LogicalStep['evidence'],
-): evidence is AdvancedEvidence {
-  return (
-    evidence.kind === 'subset' ||
-    evidence.kind === 'fish' ||
-    evidence.kind === 'wing' ||
-    evidence.kind === 'coloring'
-  )
-}
-
-export function matchesRuleTechnique(technique: Technique, kind: RuleEvidence['kind']): boolean {
-  switch (kind) {
-    case 'cage':
-      return technique.startsWith('cage-')
-    case 'thermo':
-      return technique === 'thermo-bound'
-    case 'arrow':
-      return technique.startsWith('arrow-')
-  }
 }
 
 function cellPosition(cell: number): string {
@@ -333,86 +213,4 @@ export function explainStep(step: LogicalStep): string {
       : '候选范围受到当前规则限制'
 
   return `${prefix}${TECHNIQUE_NAMES[step.technique]}：第${evidence.unit.index + 1}${unitName}中，${reason}。`
-}
-
-/** Copy nested proof data so independently completed trials cannot edit one another. */
-export function copyLogicalStep(step: LogicalStep): LogicalStep {
-  const evidence = copyStepEvidence(step.evidence)
-
-  return step.kind === 'elimination'
-    ? { ...step, evidence, removals: step.removals.map((removal) => ({ ...removal })) }
-    : { ...step, evidence }
-}
-
-function copyRuleEvidence(evidence: RuleEvidence): RuleEvidence {
-  const shared = { cells: [...evidence.cells], digits: [...evidence.digits] }
-  switch (evidence.kind) {
-    case 'cage':
-      return { ...evidence, ...shared, domains: evidence.domains.map((domain) => ({ ...domain })) }
-    case 'arrow':
-      return {
-        ...evidence,
-        ...shared,
-        shaft: [...evidence.shaft],
-        domains: evidence.domains.map((domain) => ({ ...domain })),
-      }
-    case 'thermo':
-      return {
-        ...evidence,
-        ...shared,
-        path: [...evidence.path],
-        bounds: evidence.bounds.map((bound) => ({ ...bound })),
-      }
-  }
-}
-
-function copyStepEvidence(evidence: LogicalStep['evidence']): LogicalStep['evidence'] {
-  const shared = { cells: [...evidence.cells], digits: [...evidence.digits] }
-  switch (evidence.kind) {
-    case 'cage':
-    case 'arrow':
-    case 'thermo':
-      return copyRuleEvidence(evidence)
-    case 'unit':
-      return {
-        ...evidence,
-        ...shared,
-        unit: { ...evidence.unit },
-        units: evidence.units?.map((unit) => ({ ...unit })),
-        premises: evidence.premises.map(copyRuleEvidence),
-      }
-    case 'subset':
-      return {
-        ...evidence,
-        ...shared,
-        domains: evidence.domains.map((domain) => ({ ...domain })),
-        unit: { ...evidence.unit },
-      }
-    case 'fish':
-      return {
-        ...evidence,
-        ...shared,
-        domains: evidence.domains.map((domain) => ({ ...domain })),
-        bases: evidence.bases.map((unit) => ({ ...unit })),
-        covers: evidence.covers.map((unit) => ({ ...unit })),
-      }
-    case 'wing':
-      return {
-        ...evidence,
-        ...shared,
-        domains: evidence.domains.map((domain) => ({ ...domain })),
-        wings: [evidence.wings[0], evidence.wings[1]],
-      }
-    case 'coloring':
-      return {
-        ...evidence,
-        ...shared,
-        domains: evidence.domains.map((domain) => ({ ...domain })),
-        colors: [[...evidence.colors[0]], [...evidence.colors[1]]],
-        links: evidence.links.map((link) => ({
-          unit: { ...link.unit },
-          cells: [link.cells[0], link.cells[1]],
-        })),
-      }
-  }
 }

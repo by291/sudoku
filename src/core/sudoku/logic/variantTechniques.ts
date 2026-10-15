@@ -7,11 +7,9 @@ import { constraintCells } from '@/core/sudoku/rules/context'
 import type { RuleConstraint, RuleContext } from '@/core/sudoku/rules/types'
 import { DIGITS, isDigit } from '@/core/sudoku/types'
 import type { NoteMask } from '@/core/sudoku/types'
-import type { LogicalState, LogicalStep, RuleEvidence, Technique } from '@/core/sudoku/techniques'
-import { matchesRuleTechnique } from '@/core/sudoku/techniques'
-
-export type StepOutcome =
-  { status: 'complete'; step: LogicalStep | null } | { status: 'budget-exhausted' }
+import type { LogicalState, LogicalStep, RuleEvidence, Technique } from '@/core/sudoku/logic/types'
+import { matchesRuleTechnique } from '@/core/sudoku/logic/techniques'
+import type { StepOutcome } from '@/core/sudoku/logic/types'
 
 function combinationSupport(
   state: LogicalState,

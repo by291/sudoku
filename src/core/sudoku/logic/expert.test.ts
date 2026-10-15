@@ -1,14 +1,14 @@
 import { expect, it } from 'vitest'
-import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
+import { CLASSIC_PUZZLE_FIXTURES } from '../../../../tests/fixtures/classicPuzzles'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
-import { analyzeLogic } from '@/core/sudoku/logic'
+import { analyzeLogic } from '@/core/sudoku/logic/solver'
 import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
 import { generatePuzzle } from '@/core/sudoku/generation/generate'
 import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
 import { analyzeHint } from '@/core/sudoku/hint'
 import { validateHintEvidence, parseHint } from '@/worker/hintEvidence'
-import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
-import { referenceRatingState } from '../../../tests/support/referenceRatingState'
+import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
+import { referenceRatingState } from '../../../../tests/support/referenceRatingState'
 
 it('has a uniquely solvable authored Expert fixture requiring a deduction beyond Hard', () => {
   const template = CLASSIC_PUZZLE_FIXTURES.find((item) => item.difficulty === 'expert')

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { maskOf } from '@/core/sudoku/board'
-import { explainStep, explainStepEvidence } from '@/core/sudoku/techniques'
-import type { LogicalStep } from '@/core/sudoku/techniques'
+import { explainStep, explainStepEvidence } from '@/features/game/model/techniquePresentation'
+import type { LogicalStep } from '@/core/sudoku/logic/types'
 
 it('names each eliminated cage candidate and exposes its input domains and target sum', () => {
   const step: LogicalStep = {

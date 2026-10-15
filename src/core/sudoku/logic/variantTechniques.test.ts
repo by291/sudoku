@@ -1,10 +1,11 @@
 import { expect, it } from 'vitest'
 import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
-import { findVariantStep } from '@/core/sudoku/variantTechniques'
+import { findVariantStep } from '@/core/sudoku/logic/variantTechniques'
 import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
-import { createLogicalWorkspace, findLogicalStep } from '@/core/sudoku/logic'
+import { createLogicalWorkspace } from '@/core/sudoku/logic/workspace'
+import { findLogicalStep } from '@/core/sudoku/logic/solver'
 import { analyzeHint } from '@/core/sudoku/hint'
-import { explainStep } from '@/core/sudoku/techniques'
+import { explainStep } from '@/features/game/model/techniquePresentation'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import {
@@ -12,7 +13,7 @@ import {
   ARROW_REPEAT_RULES,
   FULL_LENGTH_THERMO_RULES,
   VARIANT_FIXTURES,
-} from '../../../tests/fixtures/variants'
+} from '../../../../tests/fixtures/variants'
 import type { Board } from '@/core/sudoku/types'
 
 function sumThreeWorkspace() {

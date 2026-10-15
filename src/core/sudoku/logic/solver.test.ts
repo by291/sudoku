@@ -1,11 +1,12 @@
 import { expect, it } from 'vitest'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
-import { findLogicalStep, analyzeLogic } from '@/core/sudoku/logic'
-import { explainStep, TECHNIQUES } from '@/core/sudoku/techniques'
-import { emptyBoard, uniqueBoard, solvedBoard } from '../../../tests/fixtures/sudoku'
-import { createLogicalWorkspace } from '@/core/sudoku/logic'
-import type { Technique, LogicalStep } from '@/core/sudoku/techniques'
-import type { LogicalState } from '@/core/sudoku/techniques'
+import { findLogicalStep, analyzeLogic } from '@/core/sudoku/logic/solver'
+import { explainStep } from '@/features/game/model/techniquePresentation'
+import { TECHNIQUES } from '@/core/sudoku/logic/techniques'
+import { emptyBoard, uniqueBoard, solvedBoard } from '../../../../tests/fixtures/sudoku'
+import { createLogicalWorkspace } from '@/core/sudoku/logic/workspace'
+import type { Technique, LogicalStep } from '@/core/sudoku/logic/types'
+import type { LogicalState } from '@/core/sudoku/logic/types'
 
 function state(candidates: number[]): LogicalState {
   return { board: emptyBoard, candidates }

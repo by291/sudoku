@@ -3,30 +3,22 @@ import type { HintResult } from '@/core/sudoku/hint'
 import { isCellIndex } from '@/core/sudoku/board'
 import { ALL_DIGITS_MASK, isDigit, isRecord } from '@/core/sudoku/types'
 import {
-  TECHNIQUE_NAMES,
   isClassicTechnique,
   matchesRuleTechnique,
   isAdvancedEvidence,
   isAdvancedTechnique,
-} from '@/core/sudoku/techniques'
-import type {
-  AdvancedEvidence,
-  LogicalStep,
-  Technique,
-  RuleEvidence,
-} from '@/core/sudoku/techniques'
-import { validateAdvancedStep } from '@/core/sudoku/advancedTechniques'
-import { createLogicalWorkspace, findLogicalStep, applyLogicalStep } from '@/core/sudoku/logic'
+} from '@/core/sudoku/logic/techniques'
+import type { AdvancedEvidence, LogicalStep, RuleEvidence } from '@/core/sudoku/logic/types'
+import { validateAdvancedStep } from '@/core/sudoku/logic/advancedEvidence'
+import { createLogicalWorkspace, applyLogicalStep } from '@/core/sudoku/logic/workspace'
+import { findLogicalStep } from '@/core/sudoku/logic/solver'
 import { createWorkBudget, consumeWork, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import { compileRules, constraintCells, parseRules } from '@/core/sudoku/rules/context'
 import type { PuzzleRules, Unit } from '@/core/sudoku/rules/types'
+import { isTechnique } from '@/core/sudoku/logic/techniques'
 
 function isIndex(value: unknown): value is number {
   return typeof value === 'number' && isCellIndex(value)
-}
-
-function isTechnique(value: unknown): value is Technique {
-  return typeof value === 'string' && Object.hasOwn(TECHNIQUE_NAMES, value)
 }
 
 function parseUnit(value: unknown): Unit | null {

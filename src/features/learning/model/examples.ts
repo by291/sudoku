@@ -1,4 +1,4 @@
-import type { LogicalState, LogicalStep, BasicClassicTechnique } from '@/core/sudoku/techniques'
+import type { LogicalState, LogicalStep, BasicClassicTechnique } from '@/core/sudoku/logic/types'
 
 export const EXAMPLES = {
   'naked-single': {

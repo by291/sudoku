@@ -9,7 +9,7 @@ import GameView from '@/features/game/views/GameView.vue'
 import { LESSONS } from '@/features/learning/model/lessons'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { useLessonExercise } from '@/features/learning/composables/useLessonExercise'
-import { explainStepEvidence } from '@/core/sudoku/techniques'
+import { explainStepEvidence } from '@/features/game/model/techniquePresentation'
 
 const route = useRoute()
 const learning = useLearningStore()

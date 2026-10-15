@@ -15,10 +15,10 @@ import {
 } from '@/core/sudoku/rating'
 import type { AssessmentResult } from '@/core/sudoku/rating'
 import { RATING_POLICIES, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
-import { analyzeLogic } from '@/core/sudoku/logic'
+import { analyzeLogic } from '@/core/sudoku/logic/solver'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import type { LogicalStep, Technique } from '@/core/sudoku/techniques'
+import type { LogicalStep, Technique } from '@/core/sudoku/logic/types'
 import type { Board } from '@/core/sudoku/types'
 import { RATING_FIXTURES } from '../../../tests/fixtures/rating'
 import {

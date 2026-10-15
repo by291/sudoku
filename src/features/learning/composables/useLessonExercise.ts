@@ -8,7 +8,7 @@ import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import type { Lesson } from '@/features/learning/model/lessons'
 import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
-import { explainStep } from '@/core/sudoku/techniques'
+import { explainStep } from '@/features/game/model/techniquePresentation'
 
 export function useLessonExercise(
   lesson: MaybeRefOrGetter<Lesson | undefined>,
