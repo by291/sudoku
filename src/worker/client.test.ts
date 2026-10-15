@@ -5,7 +5,7 @@ import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 import { solvedBoard, uniqueBoard } from '../../tests/fixtures/sudoku'
 import type { WorkerRequest } from '@/worker/protocol'
-import { createAssessmentInput } from '@/core/sudoku/rating'
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
 
 class FakeWorker extends EventTarget {
   static instances: FakeWorker[] = []

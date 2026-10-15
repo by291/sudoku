@@ -3,8 +3,8 @@ import { runWorker } from './workerHarness'
 import { RATING_FIXTURES } from '../fixtures/rating'
 import { solvedBoard, emptyBoard, conflictingBoard } from '../fixtures/sudoku'
 import { makeSession } from '../support/gameFixtures'
-import { createAssessmentInput } from '@/core/sudoku/rating'
-import { RATING_VERSION } from '@/core/sudoku/ratingPolicies'
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
+import { RATING_VERSION } from '@/core/sudoku/rating/policies'
 import { parseWorkerResponse } from '@/worker/protocol'
 
 test('assesses authored fixtures and explicit outcomes through real production workers', async ({

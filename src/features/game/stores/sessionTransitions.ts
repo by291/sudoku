@@ -12,7 +12,7 @@ import type { GameSession, SessionMetadata, SessionPhase } from '@/features/game
 import type { GameTransition } from '@/features/game/model/variants'
 import type { StorageOutcome, SessionRecord } from '@/storage/records'
 import type { SessionPersistence } from '@/features/game/stores/sessionPersistence'
-import type { PuzzleAssessment } from '@/core/sudoku/rating'
+import type { PuzzleAssessment } from '@/core/sudoku/rating/types'
 
 export type SessionTransitionHost = {
   session: Ref<GameSession | null>

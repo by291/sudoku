@@ -5,8 +5,9 @@ import { cpus, platform, release } from 'node:os'
 import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
 import { generatePuzzle } from '@/core/sudoku/generation/generate'
 import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import { RATING_VERSION } from '@/core/sudoku/ratingPolicies'
-import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
+import { RATING_VERSION } from '@/core/sudoku/rating/policies'
+import { assessPuzzle } from '@/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import {
   CORPUS_COMBINATIONS,
   CORPUS_SEEDS,

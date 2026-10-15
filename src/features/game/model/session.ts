@@ -7,8 +7,8 @@ import { evaluateCandidates } from '@/core/sudoku/constraints/candidates'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { BOARD_SIZE, isDigit } from '@/core/sudoku/types'
-import { decodePuzzleAssessment } from '@/core/sudoku/rating'
-import type { PuzzleAssessment } from '@/core/sudoku/rating'
+import { decodePuzzleAssessment } from '@/core/sudoku/rating/decoding'
+import type { PuzzleAssessment } from '@/core/sudoku/rating/types'
 
 export type GameMode = 'free' | 'learning' | 'daily'
 

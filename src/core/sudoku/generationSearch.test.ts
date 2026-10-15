@@ -1,16 +1,17 @@
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import * as variantGeneration from '@/core/sudoku/variantGeneration'
 import { givenMask } from '@/core/sudoku/generationCandidates'
 import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
 import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as layouts from '@/core/sudoku/generationLayouts'
-import * as rating from '@/core/sudoku/rating'
+import * as rating from '@/core/sudoku/rating/assessment'
 import * as search from '@/core/sudoku/search/exact'
 import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
 import { generatePuzzle } from '@/core/sudoku/generation/generate'
 import { consumeWork, withWorkStage } from '@/core/sudoku/budget'
 import type { Board } from '@/core/sudoku/types'
-import type { TargetScreenResult } from '@/core/sudoku/rating'
+import type { TargetScreenResult } from '@/core/sudoku/rating/types'
 import { solvedBoard } from '../../../tests/fixtures/sudoku'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
@@ -19,7 +20,7 @@ const hard = CLASSIC_PUZZLE_FIXTURES.find((fixture) => fixture.difficulty === 'h
 if (!hard) {
   throw new Error('Missing independently verified Hard fixture')
 }
-const complete = rating.assessPuzzle(rating.createAssessmentInput(hard.givens, { kind: 'classic' }))
+const complete = rating.assessPuzzle(createAssessmentInput(hard.givens, { kind: 'classic' }))
 if (complete.status !== 'rated') {
   throw new Error('Missing fixed Hard assessment')
 }
@@ -189,7 +190,7 @@ it('independently verifies a real shared-engine result', () => {
     solution: result.puzzle.solution,
   })
   expect(
-    rating.assessPuzzle(rating.createAssessmentInput(result.puzzle.givens, result.puzzle.rules)),
+    rating.assessPuzzle(createAssessmentInput(result.puzzle.givens, result.puzzle.rules)),
   ).toMatchObject({ status: 'rated', summary: result.assessment })
 })
 

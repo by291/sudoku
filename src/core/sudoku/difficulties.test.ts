@@ -5,8 +5,8 @@ import { parsePuzzle } from '@/core/sudoku/puzzle'
 import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
-import { parseAssessmentOutcome } from '@/core/sudoku/rating'
-import { RATING_VERSION } from '@/core/sudoku/ratingPolicies'
+import { parseAssessmentOutcome } from '@/core/sudoku/rating/decoding'
+import { RATING_VERSION } from '@/core/sudoku/rating/policies'
 
 it('offers nineteen supported type and tier combinations', () => {
   expect(supportedDifficulties('classic')).toEqual(['easy', 'medium', 'hard', 'expert'])

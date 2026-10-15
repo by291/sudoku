@@ -5,7 +5,7 @@ import { parseWorkerRequest } from '@/worker/protocol'
 import type { WorkerResponse } from '@/worker/protocol'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
-import { assessPuzzle, toAssessmentOutcome } from '@/core/sudoku/rating'
+import { assessPuzzle, toAssessmentOutcome } from '@/core/sudoku/rating/assessment'
 
 addEventListener('message', (event: MessageEvent<unknown>) => {
   const parsed = parseWorkerRequest(event.data)

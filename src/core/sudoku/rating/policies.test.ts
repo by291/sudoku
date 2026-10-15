@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { RATING_POLICIES, RATING_VERSION, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
+import { RATING_POLICIES, RATING_VERSION, TECHNIQUE_TIERS } from '@/core/sudoku/rating/policies'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 
 it('covers all six types with nested applicable policies', () => {

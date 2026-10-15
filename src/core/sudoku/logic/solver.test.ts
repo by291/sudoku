@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
-import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
+import { assessPuzzle } from '@/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import { findLogicalStep, analyzeLogic } from '@/core/sudoku/logic/solver'
 import { explainStep } from '@/features/game/model/techniquePresentation'
 import { TECHNIQUES } from '@/core/sudoku/logic/techniques'

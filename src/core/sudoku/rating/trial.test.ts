@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest'
-import { assessPuzzle, createAssessmentInput, prepareAssessment } from '@/core/sudoku/rating'
+import { assessPuzzle, prepareAssessment } from '@/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { RATING_FIXTURES } from '../../../tests/fixtures/rating'
-import { solvedBoard, uniqueBoard } from '../../../tests/fixtures/sudoku'
+import { RATING_FIXTURES } from '../../../../tests/fixtures/rating'
+import { solvedBoard, uniqueBoard } from '../../../../tests/fixtures/sudoku'
 
 const limits = { maxSteps: 500, maxWork: 4000000 }
 

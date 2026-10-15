@@ -13,7 +13,7 @@ import { CLASSIC_PUZZLE_FIXTURES } from '../fixtures/classicPuzzles'
 import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import { createGenerationInput } from '@/core/sudoku/generation/input'
 import { analyzeLogic } from '@/core/sudoku/logic/solver'
-import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
+import { RATING_POLICIES } from '@/core/sudoku/rating/policies'
 import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import { runWorker } from './workerHarness'
 

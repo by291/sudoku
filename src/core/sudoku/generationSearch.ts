@@ -19,9 +19,9 @@ import type {
   GenerationMetrics,
 } from '@/core/sudoku/generation/types'
 import { createGenerationRandom } from '@/core/sudoku/generation/random'
-import { prepareAssessmentWithComputation } from '@/core/sudoku/rating'
-import type { PreparedAssessment, TargetScreenResult } from '@/core/sudoku/rating'
-import { RATING_VERSION } from '@/core/sudoku/ratingPolicies'
+import { prepareAssessmentWithComputation } from '@/core/sudoku/rating/assessment'
+import type { PreparedAssessment, TargetScreenResult } from '@/core/sudoku/rating/types'
+import { RATING_VERSION } from '@/core/sudoku/rating/policies'
 import { parseRules } from '@/core/sudoku/rules/context'
 import { prepareExactValidator } from '@/core/sudoku/search/exact'
 import type { PreparedExactValidator } from '@/core/sudoku/search/exact'

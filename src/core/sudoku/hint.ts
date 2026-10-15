@@ -7,7 +7,7 @@ import { isComplete } from '@/core/sudoku/board'
 import type { LogicalOptions } from '@/core/sudoku/logic/types'
 import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
-import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
+import { RATING_POLICIES } from '@/core/sudoku/rating/policies'
 
 export type HintResult =
   | { kind: 'review-entry'; cell: number }

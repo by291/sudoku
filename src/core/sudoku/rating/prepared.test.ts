@@ -1,13 +1,10 @@
 import { expect, it } from 'vitest'
-import {
-  assessPuzzleWithBudget,
-  createAssessmentInput,
-  prepareAssessment,
-} from '@/core/sudoku/rating'
+import { assessPuzzleWithBudget, prepareAssessment } from '@/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { DIGITS } from '@/core/sudoku/types'
-import { RATING_FIXTURES } from '../../../tests/fixtures/rating'
-import { solvedBoard, uniqueBoard } from '../../../tests/fixtures/sudoku'
+import { RATING_FIXTURES } from '../../../../tests/fixtures/rating'
+import { solvedBoard, uniqueBoard } from '../../../../tests/fixtures/sudoku'
 
 const limits = { maxSteps: 500, maxWork: 1000000 }
 

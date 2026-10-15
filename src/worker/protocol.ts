@@ -9,12 +9,13 @@ import { isRecord } from '@/core/sudoku/types'
 import { compileRules, parseRules } from '@/core/sudoku/rules/context'
 import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import { parseHint } from '@/worker/hintEvidence'
-import type { AssessmentInput, AssessmentOutcome, PuzzleAssessment } from '@/core/sudoku/rating'
-import {
-  decodePuzzleAssessment,
-  parseAssessmentInput,
-  parseAssessmentOutcome,
-} from '@/core/sudoku/rating'
+import type {
+  AssessmentInput,
+  AssessmentOutcome,
+  PuzzleAssessment,
+} from '@/core/sudoku/rating/types'
+import { decodePuzzleAssessment, parseAssessmentOutcome } from '@/core/sudoku/rating/decoding'
+import { parseAssessmentInput } from '@/core/sudoku/rating/input'
 
 export { validateHintEvidence } from '@/worker/hintEvidence'
 

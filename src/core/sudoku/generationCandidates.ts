@@ -2,7 +2,7 @@
 import { parseBoard } from '@/core/sudoku/board'
 import { consumeWork, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import type { TargetFeedback } from '@/core/sudoku/rating'
+import type { TargetFeedback } from '@/core/sudoku/rating/types'
 import { shuffle } from '@/core/sudoku/random'
 import { BOARD_SIZE } from '@/core/sudoku/types'
 import type { Board, Difficulty } from '@/core/sudoku/types'

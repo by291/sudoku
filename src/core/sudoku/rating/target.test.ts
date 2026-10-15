@@ -4,12 +4,12 @@ import {
   prepareAssessment,
   prepareAssessmentWithComputation,
   assessPuzzle,
-  createAssessmentInput,
-} from '@/core/sudoku/rating'
+} from '@/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import { prepareRuleComputation } from '@/core/sudoku/constraints/computation'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { RATING_FIXTURES } from '../../../tests/fixtures/rating'
-import { solvedBoard, uniqueBoard } from '../../../tests/fixtures/sudoku'
+import { RATING_FIXTURES } from '../../../../tests/fixtures/rating'
+import { solvedBoard, uniqueBoard } from '../../../../tests/fixtures/sudoku'
 
 const limits = { maxSteps: 500, maxWork: 4000000 }
 

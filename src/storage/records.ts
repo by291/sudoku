@@ -15,7 +15,7 @@ import { getDailyIdentity } from '@/features/game/model/daily'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import type { Settings } from '@/features/settings/model/preferences'
 import { isLessonId, lessonStageCount } from '@/features/learning/model/lessonIds'
-import { decodePuzzleAssessment } from '@/core/sudoku/rating'
+import { decodePuzzleAssessment } from '@/core/sudoku/rating/decoding'
 
 export type SessionRecord = { formatVersion: 2; revision: number; session: GameSession }
 

@@ -1,5 +1,5 @@
 import type { Difficulty, Board } from '@/core/sudoku/types'
-import type { DifficultyAssessment } from '@/core/sudoku/rating'
+import type { DifficultyAssessment } from '@/core/sudoku/rating/types'
 import type { WorkStage, WorkBudget } from '@/core/sudoku/budget'
 import type { Puzzle } from '@/core/sudoku/puzzle'
 import type { NewSudokuVariant, SudokuVariant, RulesFor } from '@/core/sudoku/rules/types'
