@@ -120,6 +120,7 @@ export default [
   })),
   {
     files: ['src/core/sudoku/rules/definitions/**/*.ts'],
+    ignores: ['src/**/*.test.ts'],
     rules: restrictImports({
       paths: coreExternalPackages,
       patterns: [
