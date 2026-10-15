@@ -103,7 +103,7 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
           @select="selected = $event"
         />
         <div class="exercise-toolbar" role="group" aria-label="练习操作">
-          <template v-if="stageLesson.exercise.kind === 'elimination'">
+          <template v-if="stageLesson.exercise.kind === 'elimination' && !canAdvance && !completed">
             <NButton
               type="primary"
               :disabled="busy || canAdvance || completed"
@@ -121,6 +121,7 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
           >
             {{ showExplanation ? '收起讲解' : '查看讲解' }}
           </NButton>
+          <NButton v-if="canAdvance" type="primary" @click="advanceStage">下一阶段</NButton>
         </div>
         <NumberPad
           class="exercise-pad"
@@ -142,13 +143,9 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
         >
           {{ feedback }}
         </NCard>
-        <p class="muted">{{ stageCaption }}</p>
+        <p class="muted stage-caption">{{ stageCaption }}</p>
         <p v-if="busy" class="muted">正在准备或保存练习，请稍候…</p>
-        <NButton v-if="canAdvance" type="primary" size="large" @click="advanceStage"
-          >下一阶段</NButton
-        >
         <p v-if="completed">本课全部练习已完成，进度已保存。</p>
-        <p class="muted small">固定教学片段 · 候选数已包含前面推理的排除结果</p>
       </div>
       <aside class="panel lesson-guide" aria-label="练习指引">
         <p class="exercise-kind">
@@ -157,6 +154,7 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
         <h2>试着推理一次</h2>
         <p class="introduction">{{ lesson.introduction }}</p>
         <p>{{ exercisePrompt }}</p>
+        <p class="muted small">固定教学片段 · 候选数已包含前面推理的排除结果</p>
         <template v-if="stageLesson.exercise.kind === 'elimination'">
           <p class="muted">已选择 {{ removals.length }} 个排除项</p>
           <ul v-if="removals.length" class="removal-list">
@@ -189,7 +187,7 @@ const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
 <style scoped>
 .lesson-page,
 .unknown {
-  margin-top: 24px;
+  margin-top: var(--page-top-space);
 }
 h1 {
   font-size: 30px;
@@ -275,6 +273,35 @@ h3 {
 }
 .removal-list {
   padding-left: 20px;
+}
+@media (min-width: 801px) and (max-height: 1000px) {
+  .lesson-heading {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 0;
+  }
+  .lesson-layout {
+    /* Leave room for answer feedback as well as the actions and stage information. */
+    grid-template-columns: minmax(0, clamp(320px, calc(100dvh - 400px), 560px)) minmax(280px, 1fr);
+    gap: 24px;
+    margin-top: 16px;
+  }
+  .exercise-status,
+  .stage-caption {
+    margin: 8px 0 0;
+  }
+  .lesson-guide {
+    padding: 20px;
+  }
+  .practice-entry {
+    margin-top: 16px;
+    padding: 16px;
+  }
 }
 @media (max-width: 800px) {
   .lesson-layout {

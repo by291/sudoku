@@ -109,7 +109,7 @@ onMounted(learning.load)
     <header class="learning-heading">
       <p class="eyebrow">循序渐进 / LEARN</p>
       <h1>从看懂一格，到解开整盘</h1>
-      <p class="muted">选一种玩法，沿着推理的路径，慢慢练熟。</p>
+      <p class="muted learning-introduction">选一种玩法，沿着推理的路径，慢慢练熟。</p>
       <p v-if="totalCompleted > 0 && totalCompleted < LESSONS.length" class="muted">
         课程已扩充至 32 节；之前的完成记录保留，新加入的课程可继续学习。
       </p>
@@ -169,21 +169,19 @@ onMounted(learning.load)
             <p class="eyebrow">{{ selectedVariant === 'classic' ? '逻辑基础' : '变体入门' }}</p>
             <h2>{{ getVariantPresentation(selectedVariant).label }}</h2>
             <p class="course-description">{{ getVariantPresentation(selectedVariant).ruleText }}</p>
-            <template v-if="suggestedLesson">
-              <p class="suggestion-caption">
-                {{ suggestionCaption }} · {{ suggestedLesson.title }}
-              </p>
-              <RouterLink v-slot="{ href, navigate }" :to="`/learn/${suggestedLesson.id}`" custom>
-                <NButton
-                  tag="a"
-                  :type="suggestionLabel === '继续学习' ? 'info' : 'primary'"
-                  :href="href"
-                  @click="navigate"
-                >
-                  {{ suggestionLabel }} <span class="forward-arrow" aria-hidden="true">→</span>
-                </NButton>
-              </RouterLink>
-            </template>
+          </div>
+          <div v-if="suggestedLesson" class="course-action">
+            <p class="suggestion-caption">{{ suggestionCaption }} · {{ suggestedLesson.title }}</p>
+            <RouterLink v-slot="{ href, navigate }" :to="`/learn/${suggestedLesson.id}`" custom>
+              <NButton
+                tag="a"
+                :type="suggestionLabel === '继续学习' ? 'info' : 'primary'"
+                :href="href"
+                @click="navigate"
+              >
+                {{ suggestionLabel }} <span class="forward-arrow" aria-hidden="true">→</span>
+              </NButton>
+            </RouterLink>
           </div>
           <div class="course-progress">
             <NProgress
@@ -210,7 +208,6 @@ onMounted(learning.load)
         </div>
         <ol class="lesson-path" aria-label="课程路径">
           <li v-for="step in lessonSteps" :key="step.lesson.id" class="lesson-step">
-            <p v-if="step.stage" class="stage-label">{{ step.stage }}</p>
             <RouterLink
               :to="`/learn/${step.lesson.id}`"
               class="lesson-link"
@@ -218,7 +215,10 @@ onMounted(learning.load)
             >
               <span class="step-number" aria-hidden="true">{{ step.number }}</span>
               <div class="step-copy">
-                <h3>{{ step.lesson.title }}</h3>
+                <div class="step-heading">
+                  <h3>{{ step.lesson.title }}</h3>
+                  <span v-if="step.stage" class="stage-label">{{ step.stage }}</span>
+                </div>
                 <p>{{ step.lesson.introduction }}</p>
               </div>
               <span class="step-status">
@@ -236,10 +236,10 @@ onMounted(learning.load)
 
 <style scoped>
 .learning-page {
-  padding-top: 24px;
+  padding-top: var(--page-top-space);
 }
 .learning-heading {
-  margin-bottom: 32px;
+  margin-bottom: var(--page-heading-space);
 }
 h1 {
   margin: 8px 0 12px;
@@ -310,36 +310,49 @@ h1 {
 }
 .course-overview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  grid-template-areas: 'copy progress' 'action action';
   align-items: center;
-  gap: 28px;
-  padding: 28px;
+  gap: 20px 24px;
+  padding: 24px;
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--accent-soft);
+}
+.overview-copy {
+  grid-area: copy;
 }
 .overview-copy h2 {
   margin: 0;
   font-size: 28px;
 }
 .course-description {
-  margin: 12px 0 20px;
+  margin: 12px 0 0;
   font-size: 14px;
 }
 .suggestion-caption {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 13px;
 }
 .forward-arrow {
   margin-left: 20px;
 }
+.course-action {
+  grid-area: action;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
 .course-progress {
+  grid-area: progress;
   text-align: center;
 }
 .progress-count {
   color: var(--text);
   font-size: 32px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .progress-total {
   color: var(--muted);
@@ -383,14 +396,9 @@ h1 {
   border-left: 1px solid var(--control-border);
 }
 .stage-label {
-  position: relative;
-  margin: 8px 0 10px;
-  padding-left: 16px;
-  background: var(--background);
   color: var(--muted);
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1px;
+  white-space: nowrap;
 }
 .lesson-link {
   position: relative;
@@ -440,10 +448,17 @@ h1 {
   margin: 2px 0 8px;
   font-size: 17px;
 }
+.step-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
 .step-copy p {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
+  text-wrap: pretty;
 }
 .step-status {
   display: flex;
@@ -461,6 +476,66 @@ h1 {
   margin: 16px 0 0;
   color: var(--muted);
   font-size: 13px;
+}
+@media (min-width: 801px) and (max-height: 1000px) {
+  .learning-heading {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 24px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 28px;
+  }
+  .learning-heading > p {
+    margin: 0;
+  }
+  .learning-heading > .eyebrow {
+    flex-basis: 100%;
+  }
+  .eyebrow {
+    margin-bottom: 4px;
+  }
+  .learning-workspace {
+    gap: 24px;
+  }
+  .course-sidebar {
+    top: 16px;
+  }
+  .total-progress {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  .overview-copy h2 {
+    font-size: 24px;
+  }
+  .progress-count {
+    font-size: 24px;
+  }
+  .progress-total {
+    font-size: 12px;
+  }
+  .course-progress p {
+    margin-top: 6px;
+  }
+  .path-heading {
+    margin: 24px 0 16px;
+  }
+}
+@media (min-width: 1100px) {
+  .course-overview {
+    grid-template-columns: minmax(0, 1fr) auto 96px;
+    grid-template-areas: 'copy action progress';
+  }
+  .course-action {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    max-width: 190px;
+    gap: 12px;
+  }
 }
 @media (max-width: 800px) {
   .learning-workspace {
@@ -502,34 +577,19 @@ h1 {
     padding: 20px;
   }
   .overview-copy {
-    display: contents;
-  }
-  .overview-copy .eyebrow {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: end;
-    margin: 0;
+    display: block;
   }
   .overview-copy h2 {
-    grid-column: 1;
-    grid-row: 2;
     font-size: 24px;
   }
-  .course-progress {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+  .course-action {
+    display: block;
   }
-  .course-description,
   .suggestion-caption {
-    grid-column: 1 / -1;
-    margin: 0;
+    margin-bottom: 12px;
   }
   .course-description {
-    margin-top: 4px;
-  }
-  .overview-copy > a {
-    grid-column: 1 / -1;
-    justify-self: start;
+    margin-top: 8px;
   }
   .progress-count {
     font-size: 24px;

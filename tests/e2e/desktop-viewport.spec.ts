@@ -1,10 +1,17 @@
-import { test, expect, seedSession, cellName, makeVariantHintSession } from './support'
+import {
+  test,
+  expect,
+  seedSession,
+  cellName,
+  enterExerciseDigit,
+  makeVariantHintSession,
+} from './support'
 import { makeSession } from '../support/gameFixtures'
 
 const desktopViewports = [
-  { width: 1280, height: 720 },
-  { width: 1440, height: 780 },
-  { width: 1920, height: 936 },
+  { width: 1280, height: 720, visibleLessons: 2 },
+  { width: 1440, height: 780, visibleLessons: 2 },
+  { width: 1920, height: 936, visibleLessons: 3 },
 ]
 
 test.beforeEach(({ isMobile }) => {
@@ -14,6 +21,45 @@ test.beforeEach(({ isMobile }) => {
 for (const viewport of desktopViewports) {
   test.describe(`${viewport.width} by ${viewport.height} desktop viewport`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } })
+
+    test('keeps lesson operations and stage information together in the first screen', async ({
+      page,
+    }) => {
+      await page.goto('/#/learn/locked-candidate')
+
+      await expect(page.getByRole('group', { name: '数独棋盘', exact: true })).toBeInViewport({
+        ratio: 1,
+      })
+      await expect(page.getByRole('group', { name: '练习操作', exact: true })).toBeInViewport({
+        ratio: 1,
+      })
+      await expect(page.getByText(/练习阶段 1 \/ 2/)).toBeInViewport({ ratio: 1 })
+      await expect(page.getByText(/固定教学片段/)).toBeInViewport({ ratio: 1 })
+    })
+
+    test('shows the opening course steps without scrolling past a large overview', async ({
+      page,
+    }) => {
+      await page.goto('/#/learn')
+      const lessons = page.getByRole('list', { name: '课程路径' }).getByRole('link')
+
+      await expect(lessons.nth(viewport.visibleLessons - 1)).toBeInViewport({ ratio: 1 })
+    })
+
+    test('keeps the answer feedback and next stage action inside the first screen', async ({
+      page,
+    }) => {
+      await page.goto('/#/learn/rules')
+      await page.getByRole('button', { name: cellName(40) }).click()
+      await enterExerciseDigit(page, 5)
+
+      await expect(page.getByRole('status')).toContainText('推理正确')
+      await expect(page.getByRole('status')).toBeInViewport({ ratio: 1 })
+      await expect(page.getByRole('button', { name: '下一阶段', exact: true })).toBeInViewport({
+        ratio: 1,
+      })
+      await expect(page.getByText(/练习阶段 1 \/ 2/)).toBeInViewport({ ratio: 1 })
+    })
 
     test('keeps the board tools and keyboard instructions in the first screen', async ({
       page,
