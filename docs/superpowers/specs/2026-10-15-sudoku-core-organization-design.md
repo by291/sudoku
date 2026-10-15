@@ -2,7 +2,7 @@
 
 Date: 2026-10-15
 
-Status: Approved by the user on 2026-10-15. Implementation is in progress on `refactor/sudoku-core-organization`.
+Status: Approved by the user on 2026-10-15. Implementation and verification are complete on `refactor/sudoku-core-organization`; see the [verification report](../verification/2026-10-15-sudoku-core-organization.md).
 
 ## Intent
 
