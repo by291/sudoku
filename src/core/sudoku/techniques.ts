@@ -3,7 +3,7 @@ import { digitsIn } from '@/core/sudoku/board'
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 import { UNIT_SIZE } from '@/core/sudoku/types'
 import type { RuleContext } from '@/core/sudoku/rules'
-import type { CageSupportMemo } from '@/core/sudoku/constraints'
+import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraintSupport'
 
 export type BasicClassicTechnique =
   'naked-single' | 'hidden-single' | 'locked-candidate' | 'naked-pair' | 'hidden-pair'
@@ -63,6 +63,7 @@ export type LogicalState = {
   candidates: readonly NoteMask[]
   context?: RuleContext
   premises?: readonly RuleEvidence[]
+  support?: PreparedConstraintSupport
   cageSupportMemo?: CageSupportMemo
 }
 

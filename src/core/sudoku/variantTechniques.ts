@@ -1,8 +1,8 @@
 import { digitsIn, maskOf } from '@/core/sudoku/board'
 import { consumeWork } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { getConstraintSupport } from '@/core/sudoku/constraints'
-import type { ConstraintSupport } from '@/core/sudoku/constraints'
+import { getConstraintSupport } from '@/core/sudoku/constraintSupport'
+import type { ConstraintSupport } from '@/core/sudoku/constraintSupport'
 import { constraintCells } from '@/core/sudoku/rules'
 import type { RuleConstraint, RuleContext } from '@/core/sudoku/rules'
 import { DIGITS, isDigit } from '@/core/sudoku/types'
@@ -21,7 +21,9 @@ function combinationSupport(
 ): ConstraintSupport {
   const memo = state.cageSupportMemo
   if (constraint.kind !== 'cage' || !memo) {
-    return getConstraintSupport(state.board, state.candidates, context, constraint, budget)
+    return state.support
+      ? state.support.get(state.board, state.candidates, constraint, budget)
+      : getConstraintSupport(state.board, state.candidates, context, constraint, budget)
   }
 
   const cells = constraint.cells
@@ -42,7 +44,9 @@ function combinationSupport(
     return { status: 'complete', cells: [...previous.cells], supports: [...previous.supports] }
   }
 
-  const support = getConstraintSupport(state.board, state.candidates, context, constraint, budget)
+  const support = state.support
+    ? state.support.get(state.board, state.candidates, constraint, budget)
+    : getConstraintSupport(state.board, state.candidates, context, constraint, budget)
   if (support.status === 'complete') {
     // One owned snapshot per cage bounds memory; partial support is never a proof.
     memo.set(constraint, {

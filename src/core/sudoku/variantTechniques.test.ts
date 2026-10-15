@@ -110,6 +110,11 @@ it('never reuses incomplete enumeration or another board workspace as a cage pro
 
 it('keeps cage proofs separate from changed clue geometry, sums and rule contexts', () => {
   const workspace = sumThreeWorkspace()
+  // Raw callers may supply mutable contexts; prepared contexts themselves are immutable.
+  workspace.context = {
+    ...workspace.context,
+    constraints: workspace.context.constraints.map((constraint) => ({ ...constraint })),
+  }
   const constraint = workspace.context.constraints[0]
   if (constraint.kind !== 'cage') {
     throw new Error('Missing arithmetic fixture')

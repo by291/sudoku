@@ -25,17 +25,19 @@ import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { findVariantStep } from '@/core/sudoku/variantTechniques'
 import type { StepOutcome } from '@/core/sudoku/variantTechniques'
-import type { CageSupportMemo } from '@/core/sudoku/constraints'
+import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraintSupport'
 
 export type LogicalWorkspace = {
   board: CellValue[]
   candidates: NoteMask[]
   context: RuleContext
   premises: RuleEvidence[]
+  support?: PreparedConstraintSupport
   cageSupportMemo: CageSupportMemo
 }
 
 export type LogicalOptions = {
+  support?: PreparedConstraintSupport
   context: RuleContext
   workBudget: WorkBudget
 }
@@ -49,6 +51,7 @@ export type LogicResult = {
 export function createLogicalWorkspace(
   board: Board,
   context: RuleContext = CLASSIC_CONTEXT,
+  support?: PreparedConstraintSupport,
 ): LogicalWorkspace {
   // Cage exclusion is emitted as an explained step, rather than hidden initialization.
   const base = context.rules.kind === 'killer' ? CLASSIC_CONTEXT : context
@@ -57,6 +60,7 @@ export function createLogicalWorkspace(
     board: [...board],
     candidates: [...calculateBaseCandidates(board, base)],
     context,
+    support,
     premises: [],
     // Never carry deductions or support snapshots into another trial clue mask.
     cageSupportMemo: new Map(),
@@ -344,7 +348,7 @@ export function analyzeLogic(
   stepBudget: number,
   options?: LogicalOptions,
 ): LogicResult {
-  const state = createLogicalWorkspace(board, options?.context)
+  const state = createLogicalWorkspace(board, options?.context, options?.support)
   const budget = options?.workBudget ?? createWorkBudget(DEFAULT_WORK_LIMIT)
 
   return analyzeLogicalWorkspace(state, allowed, stepBudget, budget)
