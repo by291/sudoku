@@ -35,6 +35,8 @@ export type RuleConstraint =
   | (Arrow & { kind: 'arrow'; id: string; index: number })
 
 export type RuleContext = {
+  readonly cellUnits: readonly (readonly number[])[]
+  readonly cellConstraints: readonly (readonly number[])[]
   rules: PuzzleRules
   units: readonly SudokuUnit[]
   duplicatePeers: readonly (readonly number[])[]

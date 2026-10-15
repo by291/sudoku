@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CLASSIC_CONTEXT, compileRules, parseRules } from '@/core/sudoku/rules'
+import { CLASSIC_CONTEXT, compileRules, parseRules, prepareRuleContext } from '@/core/sudoku/rules'
+import { createWorkBudget } from '@/core/sudoku/budget'
 import { PEERS, UNITS } from '@/core/sudoku/board'
 import { ARROW_REPEAT_RULES } from '../../../tests/fixtures/variants'
 
@@ -80,4 +81,41 @@ describe('rule geometry validation', () => {
       }).valid,
     ).toBe(true)
   })
+})
+
+it('owns rule snapshots and compiled memberships', () => {
+  const cages = [
+    { cells: [0, 1], sum: 3 },
+    ...singletonCages.slice(2).map((cage) => ({ ...cage, cells: [...cage.cells] })),
+  ]
+  const context = compileRules({ kind: 'killer', cages })
+  const regions = rows.map((row) => [...row])
+  const jigsaw = compileRules({ kind: 'jigsaw', regions })
+
+  cages[0].cells.reverse()
+  cages[0].sum = 4
+  regions[0].reverse()
+
+  expect(context.rules.kind === 'killer' && context.rules.cages[0]).toEqual({
+    cells: [0, 1],
+    sum: 3,
+  })
+  expect(jigsaw.rules.kind === 'jigsaw' && jigsaw.rules.regions[0]).toEqual(rows[0])
+  expect(context.cellUnits[0]).toEqual([0, 9, 18])
+  expect(context.cellConstraints[0]).toEqual([0])
+  expect(context.cellConstraints[1]).toEqual([0])
+  expect(context.units).toHaveLength(27)
+  expect(Object.isFrozen(context.cellUnits[0])).toBe(true)
+})
+
+it('keeps partial topology preparation inconclusive and charged', () => {
+  const rules = { kind: 'jigsaw' as const, regions: rows }
+  const zero = createWorkBudget(0)
+  const partial = createWorkBudget(7)
+
+  expect(prepareRuleContext(rules, zero)).toEqual({ status: 'budget-exhausted' })
+  expect(prepareRuleContext(rules, partial)).toEqual({ status: 'budget-exhausted' })
+  expect(zero.used).toBe(0)
+  expect(partial.used).toBe(7)
+  expect(prepareRuleContext(rules, createWorkBudget(100000)).status).toBe('ready')
 })
