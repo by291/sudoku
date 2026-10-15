@@ -1,11 +1,4 @@
-import {
-  test,
-  expect,
-  seedSession,
-  selectGameMenuAction,
-  readSessions,
-  useNextGenerationSeed,
-} from './support'
+import { test, expect, seedSession, selectGameMenuAction, readSessions } from './support'
 import { makeSession } from '../support/gameFixtures'
 
 async function holdGeneration(page: import('@playwright/test').Page) {
@@ -82,8 +75,34 @@ test('reports exhausted generation without replacing a save or offering an ident
     .getByRole('radiogroup', { name: '难度', exact: true })
     .getByText('困难', { exact: true })
     .click()
-  // This v9 Classic Hard seed exhausts 40 terminal layouts without a replacement.
-  await useNextGenerationSeed(page, 'local-product-corpus-v1:seed:058')
+  // The former failing seed is now a recovery test; inject the valid transport outcome here.
+  await page.evaluate(() => {
+    Worker.prototype.postMessage = function (this: Worker, message: unknown) {
+      if (
+        typeof message !== 'object' ||
+        message === null ||
+        !('kind' in message) ||
+        message.kind !== 'generate' ||
+        !('requestId' in message)
+      ) {
+        throw new Error('Expected an isolated generation request')
+      }
+      queueMicrotask(() =>
+        this.dispatchEvent(
+          new MessageEvent('message', {
+            data: {
+              kind: 'generate',
+              requestId: message.requestId,
+              outcome: {
+                status: 'budget-exhausted',
+                message: 'No qualifying puzzle found within the generation limits',
+              },
+            },
+          }),
+        ),
+      )
+    }
+  })
   await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
 
   await expect(

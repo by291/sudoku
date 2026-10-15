@@ -154,3 +154,37 @@ it('uses six Medium daily inputs and preserves independent formal attempts after
     test.dispose()
   }
 })
+
+it('keeps a saved v9 formal attempt authoritative across the current generator identity', async () => {
+  const test = await createTestRuntime()
+  const saved = makeSession({
+    id: 'daily:2026-10-11:formal',
+    mode: 'daily',
+    elapsedMs: 71000,
+    metadata: { kind: 'daily', challengeDate: '2026-10-11', formalAttempt: true },
+  })
+  saved.puzzle = { ...saved.puzzle, puzzleVersion: 'sudoku-v9', seed: 'daily:sudoku-v9:2026-10-11' }
+  saved.assessment = makeAssessment(saved.puzzle)
+  const lease = await test.runtime.ownership.acquireOwnership(saved.id, 'v9-fixture')
+  if (!lease.ok || !lease.value) {
+    throw new Error('Expected fixture lease')
+  }
+  await test.runtime.repository.writeSession(saved, 0, lease.value)
+  await test.runtime.ownership.releaseOwnership(lease.value)
+  const generate = vi.spyOn(test.runtime.worker, 'generate')
+  const assess = vi.spyOn(test.runtime.worker, 'assess')
+  const game = test.app.runWithContext(() => useGameStore(test.pinia))
+
+  await game.startDaily('2026-10-11', 'classic')
+
+  expect(game.session?.id).toBe(saved.id)
+  expect(game.session?.puzzle).toEqual(saved.puzzle)
+  expect(game.session?.assessment).toEqual(saved.assessment)
+  expect(game.session?.metadata).toEqual(saved.metadata)
+  expect(game.session?.elapsedMs).toBe(71000)
+  expect(generate).not.toHaveBeenCalled()
+  expect(assess).not.toHaveBeenCalled()
+  await game.leaveGame()
+  game.dispose()
+  test.dispose()
+})

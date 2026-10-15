@@ -10,38 +10,53 @@ import { explainStep } from '@/core/sudoku/techniques'
 import { referenceCountSolutions } from '../support/referenceVariants'
 import {
   GENERATION_LATENCY_INPUTS,
-  GENERATION_EXHAUSTION_INPUTS,
+  GENERATION_RECOVERY_INPUTS,
   KILLER_HARD_RECOVERY_INPUT,
 } from '../fixtures/generationLatency'
 
-test('reports construction exhaustion without publishing a replacement puzzle at both roots', async ({
+test('recovers the former layout-limit failure with a fully verified Hard puzzle at both roots', async ({
   page,
 }) => {
-  // The v9 corpus records a Classic Hard request exhausting its layout allowance.
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
-    for (const { variant, difficulty, seed } of GENERATION_EXHAUSTION_INPUTS) {
-      const raw = await runWorker(
-        page,
-        {
-          kind: 'generate',
-          requestId: `exhausted-${variant}-${base}`,
-          input: createGenerationInput(variant, difficulty, seed),
-        },
-        base,
+    for (const { variant, difficulty, seed } of GENERATION_RECOVERY_INPUTS) {
+      const response = parseWorkerResponse(
+        await runWorker(
+          page,
+          {
+            kind: 'generate',
+            requestId: `recovered-${variant}-${base}`,
+            input: createGenerationInput(variant, difficulty, seed),
+          },
+          base,
+        ),
       )
 
-      expect(raw).not.toHaveProperty('outcome.value')
-      expect(raw).not.toHaveProperty('outcome.assessment')
-      expect(parseWorkerResponse(raw)).toMatchObject({
+      expect(response).toMatchObject({
         valid: true,
         value: {
           kind: 'generate',
           outcome: {
-            status: 'budget-exhausted',
-            message: 'No qualifying puzzle found within the generation limits',
+            status: 'completed',
+            assessment: { status: 'rated', summary: { variant, difficulty } },
           },
         },
+      })
+      if (
+        !response.valid ||
+        response.value.kind !== 'generate' ||
+        response.value.outcome.status !== 'completed'
+      ) {
+        throw new Error('Expected recovered generated puzzle')
+      }
+      const puzzle = response.value.outcome.value
+      expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
+        count: 1,
+        solution: puzzle.solution,
+      })
+      expect(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))).toMatchObject({
+        status: 'rated',
+        summary: { variant, difficulty },
       })
     }
   }

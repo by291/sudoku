@@ -16,7 +16,7 @@ export const GENERATION_LATENCY_INPUTS = [
     variant: 'classic',
     difficulty: 'hard',
     seed: 'local-product-corpus-v1:seed:058',
-    expectedStatus: 'budget-exhausted',
+    expectedStatus: 'completed',
   },
   {
     variant: 'classic',
@@ -117,7 +117,7 @@ export const GENERATION_LATENCY_INPUTS = [
 ] as const
 
 // Natural v9 layout exhaustion; no authored replacement or identical-input retry.
-export const GENERATION_EXHAUSTION_INPUTS = [
+export const GENERATION_RECOVERY_INPUTS = [
   {
     variant: 'classic',
     difficulty: 'hard',
