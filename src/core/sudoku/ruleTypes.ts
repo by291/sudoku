@@ -37,11 +37,11 @@ export type RuleConstraint =
 export type RuleContext = {
   readonly cellUnits: readonly (readonly number[])[]
   readonly cellConstraints: readonly (readonly number[])[]
-  rules: PuzzleRules
-  units: readonly SudokuUnit[]
-  duplicatePeers: readonly (readonly number[])[]
-  relatedCells: readonly (readonly number[])[]
-  constraints: readonly RuleConstraint[]
+  readonly rules: PuzzleRules
+  readonly units: readonly SudokuUnit[]
+  readonly duplicatePeers: readonly (readonly number[])[]
+  readonly relatedCells: readonly (readonly number[])[]
+  readonly constraints: readonly RuleConstraint[]
 }
 
 export type RulesFor<K extends SudokuVariant> = Extract<PuzzleRules, { kind: K }>

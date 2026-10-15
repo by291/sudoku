@@ -43,8 +43,9 @@ export type PreparedLayout = {
 type ActiveLayout = PreparedLayout & {
   visits: number
   expandedAt: number
+  workUsed: number
   bestTier: number
-  bestDeductions: number
+  bestProgress: number
 }
 
 type CandidateEvaluation =
@@ -182,12 +183,10 @@ function evaluateCandidate(
       exact,
     })
     const tier = TIER_ORDER[trial.difficulty]
-    if (
-      tier > layout.bestTier ||
-      (tier === layout.bestTier && trial.feedback.deductions > layout.bestDeductions)
-    ) {
+    const progress = board.filter((digit) => digit === 0).length
+    if (tier > layout.bestTier || (tier === layout.bestTier && progress > layout.bestProgress)) {
       layout.bestTier = tier
-      layout.bestDeductions = trial.feedback.deductions
+      layout.bestProgress = progress
     }
     const meetsCluePolicy =
       input.variant !== 'classic' || board.filter(Boolean).length <= CLUE_TARGETS[input.difficulty]
@@ -207,9 +206,7 @@ function evaluateCandidate(
 
 function compareLayouts(left: ActiveLayout, right: ActiveLayout): number {
   return (
-    left.bestTier - right.bestTier ||
-    left.bestDeductions - right.bestDeductions ||
-    right.id - left.id
+    left.bestTier - right.bestTier || left.bestProgress - right.bestProgress || right.id - left.id
   )
 }
 
@@ -222,7 +219,6 @@ export function searchGeneration(
   budget.accounting = { stage: 'preparation', byStage: metrics.workByStage }
   const active: ActiveLayout[] = []
   let expansionRequestedBy: ActiveLayout | null = null
-  let nextLayout = 0
   let logicalScreens = 0
   let stepLimitedScreens = 0
   let workExhausted = false
@@ -252,6 +248,7 @@ export function searchGeneration(
           }
         }
         // A failed terminal or geometry still consumes its attempt; clue edits do not.
+        const layoutWorkStarted = budget.used
         const id = metrics.layouts++
         const result = withWorkStage(budget, 'preparation', () =>
           constructGenerationLayout(
@@ -306,8 +303,9 @@ export function searchGeneration(
           validator: prepareExactValidator(prepared.computation),
           visits: 0,
           expandedAt: 0,
+          workUsed: budget.used - layoutWorkStarted,
           bestTier: 0,
-          bestDeductions: 0,
+          bestProgress: 0,
         }
         metrics.completedLayouts++
         if (expansionRequestedBy) {
@@ -315,17 +313,20 @@ export function searchGeneration(
           expansionRequestedBy = null
         }
         active.push(layout)
-        nextLayout = active.length - 1
       }
       if (active.length === 0) {
         break
       }
-      const layout = active[nextLayout % active.length]
-      nextLayout = (nextLayout + 1) % active.length
+      // Equal call counts are not equal work: a stalled arithmetic trial can be much
+      // more expensive than a progressing sweep. Give the least-served owner its next turn.
+      active.sort((left, right) => left.workUsed - right.workUsed || left.id - right.id)
+      const layout = active[0]
+      const proposalWorkStarted = budget.used
       const proposal = layout.frontier.next(
         createGenerationRandom(input, 'candidate', layout.id, layout.visits),
         budget,
       )
+      layout.workUsed += budget.used - proposalWorkStarted
       if (!proposal) {
         if (budget.used >= budget.limit) {
           break
@@ -334,7 +335,9 @@ export function searchGeneration(
       }
       layout.visits++
       metrics.candidateVisits++
+      const evaluationWorkStarted = budget.used
       const result = evaluateCandidate(layout, proposal.mask, input, budget)
+      layout.workUsed += budget.used - evaluationWorkStarted
       if (result.status === 'ready' || result.status === 'failed') {
         return result
       }

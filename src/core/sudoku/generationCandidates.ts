@@ -11,6 +11,7 @@ export type GivenMask = bigint
 
 const FULL_GIVEN_MASK = (1n << BigInt(BOARD_SIZE)) - 1n
 const CELLS = Array.from({ length: BOARD_SIZE }, (_, cell) => cell)
+const CELL_BITS = CELLS.map((cell) => 1n << BigInt(cell))
 const TIER_ORDER = { easy: 0, medium: 1, hard: 2, expert: 3 } as const
 
 export const GENERATION_SEARCH_BOUNDS = Object.freeze({
@@ -49,6 +50,9 @@ type FrontierEntry = {
   checkpoint: CandidateCheckpoint
   cursor: number
   order: readonly number[] | null
+  present: readonly number[] | null
+  missing: readonly number[] | null
+  sweepCursor: number
 }
 
 function validateMask(mask: GivenMask): void {
@@ -62,7 +66,7 @@ export function givenMask(board: Board): GivenMask {
     throw new TypeError('Invalid candidate board')
   }
 
-  return board.reduce((mask, digit, cell) => (digit === 0 ? mask : mask | (1n << BigInt(cell))), 0n)
+  return board.reduce((mask, digit, cell) => (digit === 0 ? mask : mask | CELL_BITS[cell]), 0n)
 }
 
 export function materializeCandidate(terminal: Board, mask: GivenMask): Board {
@@ -71,7 +75,7 @@ export function materializeCandidate(terminal: Board, mask: GivenMask): Board {
     throw new TypeError('Candidate terminal must be complete')
   }
 
-  return terminal.map((digit, cell) => ((mask & (1n << BigInt(cell))) === 0n ? 0 : digit))
+  return terminal.map((digit, cell) => ((mask & CELL_BITS[cell]) === 0n ? 0 : digit))
 }
 
 function clueCount(mask: GivenMask): number {
@@ -94,6 +98,13 @@ function compareCheckpoints(
     if (leftDistance !== rightDistance) {
       return leftDistance - rightDistance
     }
+    // Both derivations are complete: extra deductions are workload, not further progress.
+    // After tier/completion ties, prefer the deeper clue search even if its trace got shorter.
+    return (
+      left.feedback.remainingCells - right.feedback.remainingCells ||
+      clueCount(left.mask) - clueCount(right.mask) ||
+      right.feedback.deductions - left.feedback.deductions
+    )
   }
   if (
     left.kind === 'stalled' &&
@@ -110,12 +121,10 @@ function compareCheckpoints(
 }
 
 function neighboringProposal(entry: FrontierEntry, budget: WorkBudget): CandidateProposal | null {
-  const { checkpoint, cursor, order } = entry
-  if (!order) {
+  const { checkpoint, cursor, order, present, missing } = entry
+  if (!order || !present || !missing) {
     throw new Error('Missing seeded candidate edit order')
   }
-  const present = order.filter((cell) => (checkpoint.mask & (1n << BigInt(cell))) !== 0n)
-  const missing = order.filter((cell) => (checkpoint.mask & (1n << BigInt(cell))) === 0n)
   const intermediateMasks: GivenMask[] = []
   let mask = checkpoint.mask
 
@@ -124,14 +133,24 @@ function neighboringProposal(entry: FrontierEntry, budget: WorkBudget): Candidat
       return false
     }
     intermediateMasks.push(mask)
-    mask = restore ? mask | (1n << BigInt(cell)) : mask & ~(1n << BigInt(cell))
+    mask = restore ? mask | CELL_BITS[cell] : mask & ~CELL_BITS[cell]
     return true
   }
 
+  let sweepCell: number | undefined
+  if (checkpoint.kind === 'solved' && (cursor < 24 || missing.length === 0)) {
+    while (entry.sweepCursor < order.length) {
+      const cell = order[entry.sweepCursor++]
+      if ((checkpoint.mask & CELL_BITS[cell]) !== 0n) {
+        sweepCell = cell
+        break
+      }
+    }
+  }
   let kind: CandidateProposal['kind']
-  if (checkpoint.kind === 'solved' && (cursor < 24 || missing.length === 0) && present.length > 0) {
+  if (sweepCell !== undefined) {
     kind = 'remove'
-    if (!edit(present[cursor % present.length], false)) {
+    if (!edit(sweepCell, false)) {
       return null
     }
   } else if (
@@ -175,7 +194,10 @@ export function createCandidateFrontier(
   materializeCandidate(terminal, FULL_GIVEN_MASK)
   const seen = new Set<GivenMask>()
   let entries: FrontierEntry[] = []
+  let sweepEntry: FrontierEntry | null = null
   let pendingMask: GivenMask | null = null
+  let pendingParent: FrontierEntry | null = null
+  let pendingKind: CandidateProposal['kind'] | null = null
   let nonImproving = 0
   let selections = 0
 
@@ -192,18 +214,35 @@ export function createCandidateFrontier(
       ) {
         return false
       }
+      // Continue a removal lineage's remaining sweep. Restores/exchanges start another
+      // order because adding clues can make earlier rejected removals useful again.
+      const inherited =
+        checkpoint.mask === pendingMask && pendingKind === 'remove' ? pendingParent : null
       pendingMask = null
+      pendingParent = null
+      pendingKind = null
       seen.add(checkpoint.mask)
+      // Closed checkpoints cannot propose again; novelty lives separately in `seen`.
+      // Keeping them in the bounded pool would crowd out viable lower-ranked children.
+      entries = entries.filter((entry) => entry.cursor < GENERATION_SEARCH_BOUNDS.proposals)
       const previousBest = entries
         .filter((entry) => entry.checkpoint.kind === checkpoint.kind)
         .sort((a, b) => compareCheckpoints(a.checkpoint, b.checkpoint, target))[0]
       const improved =
         !previousBest || compareCheckpoints(checkpoint, previousBest.checkpoint, target) < 0
-      entries.push({
+      const retained: FrontierEntry = {
         checkpoint: { ...checkpoint, feedback: { ...checkpoint.feedback } },
         cursor: 0,
-        order: null,
-      })
+        order: inherited?.order ?? null,
+        sweepCursor: inherited?.sweepCursor ?? 0,
+        present: null,
+        missing: null,
+      }
+      entries.push(retained)
+      const continuingSweep = inherited !== null && checkpoint.kind === 'solved'
+      if (continuingSweep) {
+        sweepEntry = retained
+      }
       const solved = entries
         .filter((entry) => entry.checkpoint.kind === 'solved')
         .sort((a, b) => compareCheckpoints(a.checkpoint, b.checkpoint, target))
@@ -219,9 +258,15 @@ export function createCandidateFrontier(
         reserved,
         GENERATION_SEARCH_BOUNDS.checkpoints - solved.length,
       )
-      entries = [...solved.slice(0, solvedCapacity), ...stalled.slice(0, stalledCapacity)]
+      const retainedSolved = solved.slice(0, solvedCapacity)
+      // Human tiers are not monotonic under clue removal. Keep the ordinary solved
+      // lineage in one existing slot so a temporary tier decrease cannot cut its sweep short.
+      if (sweepEntry && !retainedSolved.includes(sweepEntry)) {
+        retainedSolved[retainedSolved.length - 1] = sweepEntry
+      }
+      entries = [...retainedSolved, ...stalled.slice(0, stalledCapacity)]
 
-      return improved
+      return improved || continuingSweep
     },
     next(random, budget) {
       return withWorkStage(budget, 'proposals', () => {
@@ -244,9 +289,23 @@ export function createCandidateFrontier(
           const tied = ranked.filter(
             (entry) => compareCheckpoints(entry.checkpoint, best.checkpoint, target) === 0,
           )
-          const selected = tied[Math.floor(random() * tied.length)]
+          if (
+            sweepEntry &&
+            (!eligible.includes(sweepEntry) || sweepEntry.sweepCursor >= BOARD_SIZE)
+          ) {
+            sweepEntry = null
+          }
+          const selected = sweepEntry ?? tied[Math.floor(random() * tied.length)]
           if (!selected.order) {
             selected.order = shuffle(CELLS, random)
+          }
+          if (!selected.present || !selected.missing) {
+            selected.present = selected.order.filter(
+              (cell) => (selected.checkpoint.mask & CELL_BITS[cell]) !== 0n,
+            )
+            selected.missing = selected.order.filter(
+              (cell) => (selected.checkpoint.mask & CELL_BITS[cell]) === 0n,
+            )
           }
           const proposal = neighboringProposal(selected, budget)
           selected.cursor++
@@ -257,6 +316,8 @@ export function createCandidateFrontier(
             continue
           }
           pendingMask = proposal.mask
+          pendingParent = selected
+          pendingKind = proposal.kind
           seen.add(proposal.mask)
 
           return proposal

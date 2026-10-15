@@ -95,9 +95,17 @@ function unitEvidence(
 }
 
 function positions(state: LogicalState, unit: SudokuUnit, digit: Digit): number[] {
-  return unit.cells.filter(
-    (cell) => state.board[cell] === 0 && (state.candidates[cell] & maskOf(digit)) !== 0,
-  )
+  const matches: number[] = []
+  const bit = maskOf(digit)
+  // Prepared topology is frozen; indexed traversal avoids the generic frozen-array filter path.
+  for (let index = 0; index < unit.cells.length; index++) {
+    const cell = unit.cells[index]
+    if (state.board[cell] === 0 && (state.candidates[cell] & bit) !== 0) {
+      matches.push(cell)
+    }
+  }
+
+  return matches
 }
 
 function elimination(

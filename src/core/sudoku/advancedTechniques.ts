@@ -30,9 +30,16 @@ function* combinations<T>(
 }
 
 function available(state: LogicalState, cells: readonly number[], digit: Digit): number[] {
-  return cells.filter(
-    (cell) => state.board[cell] === 0 && (state.candidates[cell] & maskOf(digit)) !== 0,
-  )
+  const matches: number[] = []
+  const bit = maskOf(digit)
+  for (let index = 0; index < cells.length; index++) {
+    const cell = cells[index]
+    if (state.board[cell] === 0 && (state.candidates[cell] & bit) !== 0) {
+      matches.push(cell)
+    }
+  }
+
+  return matches
 }
 
 function identity(unit: SudokuUnit): Unit {

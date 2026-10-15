@@ -280,6 +280,18 @@ export function prepareConstraintSupport(
             const domains = cells.map((cell) =>
               board[cell] === 0 ? candidates[cell] : maskOf(board[cell]),
             )
+            if (!consumeWork(queryBudget)) {
+              return { status: 'budget-exhausted' }
+            }
+            // A nearly fixed cage has fewer assignments than catalogue rows. Enumerating its
+            // actual domains avoids scanning incompatible tuples; preparation is never refunded.
+            const domainCombinations = domains.reduce(
+              (product, mask) => product * digitsIn(mask).length,
+              1,
+            )
+            if (domainCombinations <= tuples.length) {
+              return enumerateConstraintSupport(board, candidates, context, constraint, queryBudget)
+            }
             const supports = cells.map(() => 0)
             for (const tuple of tuples) {
               let compatible = true

@@ -165,6 +165,9 @@ it('keeps a saved v9 formal attempt authoritative across the current generator i
   })
   saved.puzzle = { ...saved.puzzle, puzzleVersion: 'sudoku-v9', seed: 'daily:sudoku-v9:2026-10-11' }
   saved.assessment = makeAssessment(saved.puzzle)
+  expect(getDailyIdentity('2026-10-11', 'classic').input.puzzleVersion).not.toBe(
+    saved.puzzle.puzzleVersion,
+  )
   const lease = await test.runtime.ownership.acquireOwnership(saved.id, 'v9-fixture')
   if (!lease.ok || !lease.value) {
     throw new Error('Expected fixture lease')

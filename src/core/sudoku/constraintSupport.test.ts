@@ -209,3 +209,25 @@ it('never publishes incomplete catalogues or partial filtering support', () => {
     createLogicalWorkspace(empty, context).cageSupportMemo,
   )
 })
+
+it('uses bounded enumeration for a singleton local domain instead of scanning a large catalogue', () => {
+  const context = cageContext([{ cells: [0, 1, 2, 3], sum: 18 }])
+  const prepared = prepareConstraintSupport(context, createWorkBudget(100000))
+  if (prepared.status !== 'ready') {
+    throw new Error('Expected a complete size-four catalogue')
+  }
+  const board = [...empty]
+  board[0] = 5
+  board[1] = 3
+  board[2] = 4
+  board[3] = 6
+  // One method-selection visit and four assignment extensions suffice for this exact domain.
+  const budget = createWorkBudget(5)
+
+  expect(prepared.support.get(board, allDomains, context.constraints[0], budget)).toEqual({
+    status: 'complete',
+    cells: [0, 1, 2, 3],
+    supports: [16, 4, 8, 32],
+  })
+  expect(budget.used).toBe(5)
+})

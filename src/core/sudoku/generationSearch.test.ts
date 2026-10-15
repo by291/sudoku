@@ -233,7 +233,7 @@ it('uses a stalled checkpoint to restore clues before finding the target', () =>
   let restored = false
   scriptedSearch((board) => {
     const clues = board.filter(Boolean).length
-    if (stalledMask === null && clues === 30) {
+    if (!restored && clues === 30) {
       stalledMask = givenMask(board)
       return { status: 'target-stalled', feedback: { remainingCells: 5, deductions: 46 } }
     }
@@ -278,4 +278,29 @@ it('keeps an incomplete final necessity gate inconclusive without inventing cons
   expect(result).toMatchObject({ status: 'budget-exhausted', cause: 'work-limit' })
   expect(result).not.toHaveProperty('puzzle')
   expect(result.metrics.constructionWork).toBeLessThan(4000000)
+})
+
+it('finishes a costly progressing sweep before spending work on another layout', () => {
+  const mocks = scriptedSearch()
+  const original = vi.mocked(rating.prepareAssessmentWithComputation).getMockImplementation()
+  if (!original) {
+    throw new Error('Missing typed screening fixture')
+  }
+  vi.mocked(rating.prepareAssessmentWithComputation).mockImplementation((computation, limits) => {
+    const owner = original(computation, limits)
+    return {
+      ...owner,
+      screenTarget(board, target, budget) {
+        if (!consumeWork(budget, 20000)) {
+          return { status: 'budget-exhausted', cause: 'work-limit' }
+        }
+        return owner.screenTarget(board, target, budget)
+      },
+    }
+  })
+  const result = generatePuzzle(createGenerationInput('classic', 'hard', 'costly-progress'))
+
+  expect(result.status).toBe('ready')
+  expect(result.metrics.layouts).toBe(1)
+  expect(mocks.finish).toHaveBeenCalledTimes(1)
 })

@@ -76,7 +76,7 @@ function relationships(
     }
   }
 
-  return Object.freeze(peers.map((cells) => Object.freeze([...cells].sort((a, b) => a - b))))
+  return peers.map((cells) => [...cells].sort((a, b) => a - b))
 }
 
 // Only freshly parsed snapshots enter this owner; freezing cannot affect caller arrays.
@@ -147,9 +147,9 @@ function buildRuleContext(rules: PuzzleRules, budget?: WorkBudget): RuleContext 
     constraints: sourceConstraints,
     duplicateGroups,
   } = compileVariantRules(ownedRules)
-  const units = Object.freeze(
-    sourceUnits.map((unit) => Object.freeze({ ...unit, cells: Object.freeze([...unit.cells]) })),
-  )
+  // These lists are owned and borrowed read-only. Frozen numeric arrays force generic
+  // array paths in V8; never expose these lists through mutable proof/result data.
+  const units = sourceUnits.map((unit) => Object.freeze({ ...unit, cells: [...unit.cells] }))
   const constraints = Object.freeze(
     sourceConstraints.map((constraint) => Object.freeze(constraint)),
   )

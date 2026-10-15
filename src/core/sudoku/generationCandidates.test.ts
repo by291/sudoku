@@ -14,6 +14,21 @@ const full = (1n << 81n) - 1n
 
 function checkpoint(
   mask: bigint,
+  kind?: 'solved',
+  layoutId?: number,
+): Extract<CandidateCheckpoint, { kind: 'solved' }>
+function checkpoint(
+  mask: bigint,
+  kind: 'stalled',
+  layoutId?: number,
+): Extract<CandidateCheckpoint, { kind: 'stalled' }>
+function checkpoint(
+  mask: bigint,
+  kind: 'solved' | 'stalled',
+  layoutId?: number,
+): CandidateCheckpoint
+function checkpoint(
+  mask: bigint,
   kind: 'solved' | 'stalled' = 'solved',
   layoutId = 0,
 ): CandidateCheckpoint {
@@ -172,4 +187,75 @@ it('ranks stalled checkpoints by remaining cells before total deductions', () =>
   expect(proposal && materializeCandidate(solvedBoard, proposal.mask).filter(Boolean)).toHaveLength(
     77,
   )
+})
+
+it('continues the ordinary sweep after accepted removals without retrying rejected cells', () => {
+  const owner = createCandidateFrontier(0, solvedBoard, 'hard')
+  owner.retain(checkpoint(full))
+  const random = () => 0
+  const rejected = owner.next(random, createWorkBudget(1000))
+  const accepted = owner.next(random, createWorkBudget(1000))
+  if (!rejected || !accepted) {
+    throw new Error('Expected initial sweep proposals')
+  }
+  owner.retain(checkpoint(accepted.mask))
+  const continued = owner.next(random, createWorkBudget(1000))
+
+  // Fisher-Yates with zero draws orders cells 1,2,3,...,80,0. Cell 1 was rejected.
+  expect(rejected.mask).toBe(full & ~(1n << 1n))
+  expect(accepted.mask).toBe(full & ~(1n << 2n))
+  expect(continued?.mask).toBe(full & ~(1n << 2n) & ~(1n << 3n))
+})
+
+it('keeps a completed lower-tier removal even when its successful trace becomes shorter', () => {
+  const owner = createCandidateFrontier(0, solvedBoard, 'hard')
+  const parent = (1n << 30n) - 1n
+  const child = parent & ~1n
+  owner.retain({ ...checkpoint(parent), feedback: { remainingCells: 0, deductions: 100 } })
+  const improved = owner.retain({
+    ...checkpoint(child),
+    feedback: { remainingCells: 0, deductions: 80 },
+  })
+  const proposal = owner.next(() => 0, createWorkBudget(1000))
+
+  expect(improved).toBe(true)
+  expect(proposal && materializeCandidate(solvedBoard, proposal.mask).filter(Boolean)).toHaveLength(
+    28,
+  )
+})
+
+it('continues a solved removal sweep through a temporary decrease in rated difficulty', () => {
+  const owner = createCandidateFrontier(0, solvedBoard, 'hard')
+  const parent = (1n << 30n) - 1n
+  owner.retain({ ...checkpoint(parent), difficulty: 'medium' })
+  const proposal = owner.next(() => 0, createWorkBudget(1000))
+  if (!proposal) {
+    throw new Error('Expected a removal from the Medium checkpoint')
+  }
+  owner.retain({ ...checkpoint(proposal.mask), difficulty: 'easy' })
+  const continued = owner.next(() => 0, createWorkBudget(1000))
+
+  expect(continued?.kind).toBe('remove')
+  expect(continued && (continued.mask & proposal.mask) === continued.mask).toBe(true)
+  expect(
+    continued && materializeCandidate(solvedBoard, continued.mask).filter(Boolean),
+  ).toHaveLength(28)
+  expect(owner.checkpointCount).toBeLessThanOrEqual(8)
+})
+
+it('frees completed checkpoint slots for viable lower-tier neighbors', () => {
+  const owner = createCandidateFrontier(0, solvedBoard, 'hard')
+  for (let index = 0; index < 8; index++) {
+    owner.retain({ ...checkpoint(full & ~(1n << BigInt(index))), difficulty: 'medium' })
+  }
+  const random = seededRandom('closed-checkpoint-capacity')
+  while (owner.next(random, createWorkBudget(10000))) {
+    // Exhaust each checkpoint's finite edit allowance without accepting any child.
+  }
+  const newMask = (1n << 30n) - 1n
+  owner.retain({ ...checkpoint(newMask), difficulty: 'easy' })
+  const proposal = owner.next(random, createWorkBudget(10000))
+
+  expect(proposal).not.toBeNull()
+  expect(owner.checkpointCount).toBe(1)
 })
