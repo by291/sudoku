@@ -2,12 +2,12 @@ import { expect, it } from 'vitest'
 import { generatePuzzle } from '@/core/sudoku/generation/generate'
 import { parsePuzzle } from '@/core/sudoku/puzzle'
 import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
-import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
+import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
+import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
 import { assessPuzzle } from '@/core/sudoku/rating/assessment'
 import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { variantRulesMatter } from '@/core/sudoku/variantGeneration'
+import { variantRulesMatter } from '@/core/sudoku/generation/variant'
 
 const variants = ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const
 it.each(

@@ -1,4 +1,4 @@
-import { searchGeneration } from '@/core/sudoku/generationSearch'
+import { searchGeneration } from '@/core/sudoku/generation/search'
 import type {
   GenerationInput,
   GenerationMetrics,

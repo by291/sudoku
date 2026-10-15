@@ -10,7 +10,7 @@ import {
 } from '../../../../tests/fixtures/sudoku'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../../../tests/fixtures/classicPuzzles'

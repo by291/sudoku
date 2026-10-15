@@ -1,7 +1,7 @@
 // Assemble construction separately from pure geometry definitions to avoid registry cycles.
-import { constructClassicTerminal } from '@/core/sudoku/classicGeneration'
-import { constructVariantLayout } from '@/core/sudoku/variantGeneration'
-import { VARIANT_GENERATION_STRATEGIES } from '@/core/sudoku/generationStrategies'
+import { constructClassicTerminal } from '@/core/sudoku/generation/classic'
+import { constructVariantLayout } from '@/core/sudoku/generation/variant'
+import { VARIANT_GENERATION_STRATEGIES } from '@/core/sudoku/generation/variantStrategies'
 import type {
   GenerationStrategy,
   LayoutConstructionResult,

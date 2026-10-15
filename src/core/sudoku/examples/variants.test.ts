@@ -1,13 +1,13 @@
 import { expect, it } from 'vitest'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { assessPuzzleWithBudget } from '@/core/sudoku/rating/assessment'
 import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import { analyzeLogic } from '@/core/sudoku/logic/solver'
 import { RATING_POLICIES } from '@/core/sudoku/rating/policies'
-import { variantRulesMatter } from '@/core/sudoku/variantGeneration'
-import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
+import { variantRulesMatter } from '@/core/sudoku/generation/variant'
+import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
 
 it('verifies all fifteen original fallback slots independently', () => {
   expect(Object.keys(VARIANT_TEMPLATES)).toHaveLength(5)

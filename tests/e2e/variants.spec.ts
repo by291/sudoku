@@ -13,7 +13,7 @@ import { makeSession } from '../support/gameFixtures'
 import type { Page } from '@playwright/test'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
 import { LESSONS } from '@/features/learning/model/lessons'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import type { Digit } from '@/core/sudoku/types'
 

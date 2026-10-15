@@ -4,7 +4,7 @@ import { createGenerationInput, parseGenerationInput } from '@/core/sudoku/gener
 import { parsePuzzle } from '@/core/sudoku/puzzle'
 import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 import { parseAssessmentOutcome } from '@/core/sudoku/rating/decoding'
 import { RATING_VERSION } from '@/core/sudoku/rating/policies'
 

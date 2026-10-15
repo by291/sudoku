@@ -1,5 +1,5 @@
 import { CLASSIC_PUZZLE_FIXTURES } from './classicPuzzles'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import type { Board, Difficulty } from '@/core/sudoku/types'

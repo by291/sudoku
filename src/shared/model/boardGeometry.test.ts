@@ -6,9 +6,9 @@ import {
   VARIANT_BOARD_ADAPTERS,
 } from '@/shared/model/boardGeometry'
 import { ARROW_REPEAT_RULES, VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
-import { transformVariantTemplate } from '@/core/sudoku/variantGeneration'
-import type { SpatialSymmetry } from '@/core/sudoku/variantGeneration'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { transformVariantTemplate } from '@/core/sudoku/generation/variant'
+import type { SpatialSymmetry } from '@/core/sudoku/generation/variant'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 
 it('covers every variant with specialized visual and accessible clues', () => {
   expect(Object.keys(VARIANT_BOARD_ADAPTERS)).toEqual([

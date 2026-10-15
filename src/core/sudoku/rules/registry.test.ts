@@ -1,4 +1,4 @@
-import { GENERATION_STRATEGIES } from '@/core/sudoku/generationLayouts'
+import { GENERATION_STRATEGIES } from '@/core/sudoku/generation/layouts'
 import { describe, expect, it } from 'vitest'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'

@@ -4,11 +4,11 @@ import {
   givenMask,
   materializeCandidate,
   GENERATION_SEARCH_BOUNDS,
-} from '@/core/sudoku/generationCandidates'
-import type { CandidateCheckpoint } from '@/core/sudoku/generationCandidates'
+} from '@/core/sudoku/generation/candidates'
+import type { CandidateCheckpoint } from '@/core/sudoku/generation/candidates'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { seededRandom } from '@/core/sudoku/random'
-import { solvedBoard } from '../../../tests/fixtures/sudoku'
+import { solvedBoard } from '../../../../tests/fixtures/sudoku'
 
 const full = (1n << 81n) - 1n
 

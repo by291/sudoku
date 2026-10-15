@@ -9,9 +9,9 @@ import {
   givenMask,
   materializeCandidate,
   GENERATION_SEARCH_BOUNDS,
-} from '@/core/sudoku/generationCandidates'
-import type { CandidateFrontier, GivenMask } from '@/core/sudoku/generationCandidates'
-import { constructGenerationLayout } from '@/core/sudoku/generationLayouts'
+} from '@/core/sudoku/generation/candidates'
+import type { CandidateFrontier, GivenMask } from '@/core/sudoku/generation/candidates'
+import { constructGenerationLayout } from '@/core/sudoku/generation/layouts'
 import type {
   GenerationAttemptResult,
   GenerationInput,
@@ -26,7 +26,7 @@ import { parseRules } from '@/core/sudoku/rules/context'
 import { prepareExactValidator } from '@/core/sudoku/search/exact'
 import type { PreparedExactValidator } from '@/core/sudoku/search/exact'
 import type { Board } from '@/core/sudoku/types'
-import { variantRulesMatter } from '@/core/sudoku/variantGeneration'
+import { variantRulesMatter } from '@/core/sudoku/generation/variant'
 
 const CLUE_TARGETS = { easy: 36, medium: 32, hard: 30, expert: 28 } as const
 const TIER_ORDER = { easy: 0, medium: 1, hard: 2, expert: 3 } as const

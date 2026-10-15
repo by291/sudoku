@@ -1,7 +1,7 @@
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 import type { LogicalStep, RuleEvidence, AdvancedEvidence } from '@/core/sudoku/logic/types'
 import type { PuzzleRules, Unit } from '@/core/sudoku/rules/types'
-import { transformVariantRules } from '@/core/sudoku/generationStrategies'
+import { transformVariantRules } from '@/core/sudoku/generation/variantStrategies'
 
 export type ExerciseAnswer =
   | { kind: 'placement'; expected: { cell: number; digit: Digit } }

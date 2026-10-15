@@ -1,13 +1,13 @@
 import { expect, it } from 'vitest'
-import { transformVariantTemplate, variantRulesMatter } from '@/core/sudoku/variantGeneration'
-import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
+import { transformVariantTemplate, variantRulesMatter } from '@/core/sudoku/generation/variant'
+import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { isComplete } from '@/core/sudoku/board'
-import { VARIANT_GENERATION_STRATEGIES } from '@/core/sudoku/generationStrategies'
+import { VARIANT_GENERATION_STRATEGIES } from '@/core/sudoku/generation/variantStrategies'
 import { seededRandom } from '@/core/sudoku/random'
-import { solvedBoard } from '../../../tests/fixtures/sudoku'
-import { structureIssues } from '../../../tests/support/variantStructure'
+import { solvedBoard } from '../../../../tests/fixtures/sudoku'
+import { structureIssues } from '../../../../tests/support/variantStructure'
 
 it.each(Array.from({ length: 8 }, (_, index) => `crowded-cage-${index}`))(
   'avoids trapped singleton cages while preserving complete geometry for %s',

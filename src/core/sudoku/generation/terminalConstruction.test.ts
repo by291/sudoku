@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest'
-import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
+import { constructUnitTerminal } from '@/core/sudoku/generation/terminalConstruction'
 import { compileRules, CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 import { seededRandom } from '@/core/sudoku/random'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
-import { countIntercalates } from '../../../tests/support/terminalDiversity'
+import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
+import { countIntercalates } from '../../../../tests/support/terminalDiversity'
 
 it.each(['classic', 'diagonal', 'jigsaw'] as const)(
   'constructs non-cosmetic %s terminal families within the caller budget',

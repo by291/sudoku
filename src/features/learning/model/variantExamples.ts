@@ -4,7 +4,7 @@ import type { LogicalStep } from '@/core/sudoku/logic/types'
 import { compileRules } from '@/core/sudoku/rules/context'
 import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules/types'
 import { calculateBaseCandidates, maskOf } from '@/core/sudoku/board'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 
 type PlacementProof = Extract<LogicalStep, { kind: 'placement' }>
 

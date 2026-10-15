@@ -2,7 +2,7 @@ import {
   VARIANT_GENERATION_STRATEGIES,
   createVariantGeometry,
   transformVariantRules,
-} from '@/core/sudoku/generationStrategies'
+} from '@/core/sudoku/generation/variantStrategies'
 import type { LayoutConstructionResult, LayoutRandomStreams } from '@/core/sudoku/generation/types'
 import { irregularRegions } from '@/core/sudoku/rules/definitions/jigsaw'
 import { isComplete } from '@/core/sudoku/board'
@@ -12,10 +12,10 @@ import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules/types'
 import { isDigit } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { countSolutions } from '@/core/sudoku/search/exact'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
-import type { VariantTemplate } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
+import type { VariantTemplate } from '@/core/sudoku/examples/variants'
 import { shuffle } from '@/core/sudoku/random'
-import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
+import { constructUnitTerminal } from '@/core/sudoku/generation/terminalConstruction'
 
 export type SpatialSymmetry = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 

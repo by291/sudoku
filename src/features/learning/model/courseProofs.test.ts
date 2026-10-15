@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { LESSONS } from '@/features/learning/model/lessons'
 import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
 import type { Board, Digit } from '@/core/sudoku/types'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
+import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 
 it.each(LESSONS)(
   'independently proves candidate-constrained conclusions in $id',
