@@ -1,5 +1,5 @@
 import type { Board, CellValue, Digit } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 
 // Deliberately separate from production compilation, support propagation, and MRV code.
 export function referenceCountSolutions(

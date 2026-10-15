@@ -1,10 +1,9 @@
 import { ALL_DIGITS_MASK, BOARD_SIZE, DIGITS, UNIT_SIZE, isDigit } from '@/core/sudoku/types'
 import type { Board, CellValue, Digit, NoteMask, ParseResult } from '@/core/sudoku/types'
 
-export type { Unit, SudokuUnit } from '@/core/sudoku/rules'
-import type { SudokuUnit } from '@/core/sudoku/rules'
-import type { RuleContext } from '@/core/sudoku/rules'
-import { CLASSIC_CONTEXT, satisfiesConstraint } from '@/core/sudoku/rules'
+import type { SudokuUnit } from '@/core/sudoku/rules/types'
+import type { RuleContext } from '@/core/sudoku/rules/types'
+import { CLASSIC_CONTEXT, satisfiesConstraint } from '@/core/sudoku/rules/context'
 
 export const UNITS: readonly SudokuUnit[] = CLASSIC_CONTEXT.units
 

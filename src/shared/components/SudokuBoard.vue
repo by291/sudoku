@@ -3,7 +3,7 @@ import { computed, useTemplateRef, watch, nextTick } from 'vue'
 import type { Board, NoteMask } from '@/core/sudoku/types'
 import { DIGITS } from '@/core/sudoku/types'
 import { digitsIn, maskOf } from '@/core/sudoku/board'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import {
   getBoardGeometry,
   getCellRuleContext,

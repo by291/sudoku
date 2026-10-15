@@ -4,7 +4,7 @@ import { useGameStore } from '@/features/game/stores/useGameStore'
 import { useGameRuntime } from '@/runtime'
 import { getChallengeDate } from '@/features/game/model/daily'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
-import type { SudokuVariant } from '@/core/sudoku/rules'
+import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import { parseVariantQuery } from '@/features/game/model/variants'
 import type { Difficulty } from '@/core/sudoku/types'
 

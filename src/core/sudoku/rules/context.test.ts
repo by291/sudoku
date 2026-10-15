@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { CLASSIC_CONTEXT, compileRules, parseRules, prepareRuleContext } from '@/core/sudoku/rules'
+import {
+  CLASSIC_CONTEXT,
+  compileRules,
+  parseRules,
+  prepareRuleContext,
+} from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { PEERS, UNITS } from '@/core/sudoku/board'
-import { ARROW_REPEAT_RULES } from '../../../tests/fixtures/variants'
+import { ARROW_REPEAT_RULES } from '../../../../tests/fixtures/variants'
 
 const rows = Array.from({ length: 9 }, (_, row) =>
   Array.from({ length: 9 }, (_, col) => row * 9 + col),

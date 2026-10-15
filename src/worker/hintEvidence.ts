@@ -18,8 +18,8 @@ import type {
 import { validateAdvancedStep } from '@/core/sudoku/advancedTechniques'
 import { createLogicalWorkspace, findLogicalStep, applyLogicalStep } from '@/core/sudoku/logic'
 import { createWorkBudget, consumeWork, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
-import { compileRules, constraintCells, parseRules } from '@/core/sudoku/rules'
-import type { PuzzleRules, Unit } from '@/core/sudoku/rules'
+import { compileRules, constraintCells, parseRules } from '@/core/sudoku/rules/context'
+import type { PuzzleRules, Unit } from '@/core/sudoku/rules/types'
 
 function isIndex(value: unknown): value is number {
   return typeof value === 'number' && isCellIndex(value)

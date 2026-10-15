@@ -1,5 +1,5 @@
 import { digitsIn, maskOf, PEERS, UNITS } from '@/core/sudoku/board'
-import type { SudokuUnit, Unit } from '@/core/sudoku/board'
+import type { SudokuUnit, Unit } from '@/core/sudoku/rules/types'
 import { consumeWork } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import type {

@@ -12,7 +12,7 @@ import {
 import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../../tests/fixtures/classicPuzzles'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 
 const fixtures = [
   { rules: { kind: 'classic' } as const, givens: uniqueBoard, solution: solvedBoard },

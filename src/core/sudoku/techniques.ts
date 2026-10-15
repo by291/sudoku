@@ -1,8 +1,8 @@
-import type { Unit } from '@/core/sudoku/board'
+import type { Unit } from '@/core/sudoku/rules/types'
 import { digitsIn } from '@/core/sudoku/board'
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 import { UNIT_SIZE } from '@/core/sudoku/types'
-import type { RuleContext } from '@/core/sudoku/rules'
+import type { RuleContext } from '@/core/sudoku/rules/types'
 import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraintSupport'
 
 export type BasicClassicTechnique =

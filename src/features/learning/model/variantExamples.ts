@@ -1,8 +1,8 @@
 import type { Board } from '@/core/sudoku/types'
 import { ALL_DIGITS_MASK, DIGITS } from '@/core/sudoku/types'
 import type { LogicalStep } from '@/core/sudoku/techniques'
-import { compileRules } from '@/core/sudoku/rules'
-import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
+import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules/types'
 import { calculateBaseCandidates, maskOf } from '@/core/sudoku/board'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 

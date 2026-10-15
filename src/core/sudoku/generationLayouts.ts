@@ -7,12 +7,12 @@ import type {
   LayoutConstructionResult,
   LayoutRandomStreams,
 } from '@/core/sudoku/generation/types'
-import { VARIANT_RULE_DEFINITIONS } from '@/core/sudoku/variantRegistry'
+import { VARIANT_RULE_DEFINITIONS } from '@/core/sudoku/rules/registry'
 import type {
   NewSudokuVariant,
   SudokuVariant,
   VariantRuleDefinition,
-} from '@/core/sudoku/ruleTypes'
+} from '@/core/sudoku/rules/types'
 import type { GenerationInput } from '@/core/sudoku/generation/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 

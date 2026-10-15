@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { RATING_POLICIES, RATING_VERSION, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
-import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 
 it('covers all six types with nested applicable policies', () => {
   expect(RATING_VERSION).toBe('sudoku-rating-v2')

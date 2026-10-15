@@ -1,5 +1,5 @@
 import type { Board, Digit } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import type { LogicalStep } from '@/core/sudoku/techniques'
 
 /** Replays explicit actions using separate unit construction and digit lists, without engine helpers. */

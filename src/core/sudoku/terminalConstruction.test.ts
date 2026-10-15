@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
-import { compileRules, CLASSIC_CONTEXT } from '@/core/sudoku/rules'
+import { compileRules, CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { seededRandom } from '@/core/sudoku/random'
 import { createWorkBudget } from '@/core/sudoku/budget'

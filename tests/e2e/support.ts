@@ -7,7 +7,7 @@ import { VARIANT_FIXTURES } from '../fixtures/variants'
 import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import type { NewSudokuVariant } from '@/core/sudoku/rules'
+import type { NewSudokuVariant } from '@/core/sudoku/rules/types'
 
 export { expect }
 

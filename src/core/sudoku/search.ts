@@ -1,6 +1,6 @@
 import { isComplete, parseBoard } from '@/core/sudoku/board'
-import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
-import type { RuleContext } from '@/core/sudoku/rules'
+import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
+import type { RuleContext } from '@/core/sudoku/rules/types'
 import { createWorkBudget, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { prepareRuleComputation } from '@/core/sudoku/constraintSupport'

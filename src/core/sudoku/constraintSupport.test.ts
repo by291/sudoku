@@ -5,8 +5,8 @@ import {
   getConstraintSupport,
   DEFAULT_CATALOGUE_LIMITS,
 } from '@/core/sudoku/constraintSupport'
-import { compileRules } from '@/core/sudoku/rules'
-import type { Cage, RuleContext } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
+import type { Cage, RuleContext } from '@/core/sudoku/rules/types'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { createLogicalWorkspace } from '@/core/sudoku/logic'
 import type { Board, NoteMask } from '@/core/sudoku/types'

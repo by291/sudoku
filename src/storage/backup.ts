@@ -4,8 +4,8 @@ import { commitTransaction } from '@/storage/database'
 import { StorageConflict } from '@/storage/ownership'
 import { isRecord } from '@/core/sudoku/types'
 import type { ParseResult } from '@/core/sudoku/types'
-import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
-import type { SudokuVariant } from '@/core/sudoku/rules'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
+import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import {
   isIsoInstant,
   isNonnegativeInteger,

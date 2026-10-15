@@ -8,7 +8,7 @@ import {
   conflictingBoard,
   unsatisfiableBoard,
 } from '../../../tests/fixtures/sudoku'
-import { compileRules } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
 import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'

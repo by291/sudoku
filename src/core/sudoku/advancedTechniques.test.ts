@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { findAdvancedStep, validateAdvancedStep } from '@/core/sudoku/advancedTechniques'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
+import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
 import type { LogicalState, Technique } from '@/core/sudoku/techniques'
 import type { CellValue } from '@/core/sudoku/types'
 

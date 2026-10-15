@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { countSolutions } from '@/core/sudoku/search'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { compileRules } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
 import { referenceCountSolutions } from '../../../tests/support/referenceVariants'
 import {
   ARROW_REPEAT_RULES,

@@ -2,30 +2,15 @@ import { consumeWork, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { BOARD_SIZE, isRecord } from '@/core/sudoku/types'
 import type { Board, ParseResult } from '@/core/sudoku/types'
-import { SUDOKU_VARIANTS } from '@/core/sudoku/ruleTypes'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 import type {
   PuzzleRules,
   SudokuVariant,
   RuleConstraint,
   RuleContext,
-} from '@/core/sudoku/ruleTypes'
-import { invalidRules } from '@/core/sudoku/ruleTopology'
-import { VARIANT_RULE_DEFINITIONS, compileVariantRules } from '@/core/sudoku/variantRegistry'
-
-export { SUDOKU_VARIANTS } from '@/core/sudoku/ruleTypes'
-export type {
-  SudokuVariant,
-  NewSudokuVariant,
-  Cage,
-  Arrow,
-  PuzzleRules,
-  Unit,
-  SudokuUnit,
-  RuleConstraint,
-  RuleContext,
-  RulesFor,
-} from '@/core/sudoku/ruleTypes'
-export { cellsTouch } from '@/core/sudoku/ruleTopology'
+} from '@/core/sudoku/rules/types'
+import { invalidRules } from '@/core/sudoku/rules/topology'
+import { VARIANT_RULE_DEFINITIONS, compileVariantRules } from '@/core/sudoku/rules/registry'
 
 export const CLASSIC_RULES: PuzzleRules = { kind: 'classic' }
 

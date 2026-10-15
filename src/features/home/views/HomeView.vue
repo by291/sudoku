@@ -8,7 +8,7 @@ import { sessionLink, modeName } from '@/features/records/model/records'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { getVariantPresentation } from '@/features/game/model/variants'
 import { getDailyStatuses } from '@/features/game/model/daily'
-import type { SudokuVariant } from '@/core/sudoku/rules'
+import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import type { Difficulty } from '@/core/sudoku/types'
 import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
 

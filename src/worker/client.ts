@@ -5,7 +5,7 @@ import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
 import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import type { WorkerRequest } from '@/worker/protocol'
 import { isRecord } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import type { AssessmentInput, AssessmentOutcome } from '@/core/sudoku/rating'
 
 const GENERATION_TIMEOUT_MILLISECONDS = 3000

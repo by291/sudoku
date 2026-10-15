@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/variantTemplates'
-import { compileRules } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rating'
 import { analyzeLogic } from '@/core/sudoku/logic'

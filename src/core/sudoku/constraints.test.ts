@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { evaluateCandidates, evaluateConflicts } from '@/core/sudoku/constraints'
 import { createWorkBudget } from '@/core/sudoku/budget'
-import { compileRules } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
 import { isComplete, maskOf } from '@/core/sudoku/board'
 import {
   ARROW_REPEAT_BOARD,

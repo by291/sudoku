@@ -5,7 +5,7 @@ import { assessPuzzleWithBudget, createAssessmentInput } from '@/core/sudoku/rat
 import { createLogicalWorkspace, findLogicalStep } from '@/core/sudoku/logic'
 import { analyzeHint } from '@/core/sudoku/hint'
 import { explainStep } from '@/core/sudoku/techniques'
-import { compileRules } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import {
   ARROW_REPEAT_BOARD,

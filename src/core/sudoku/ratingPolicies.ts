@@ -1,4 +1,4 @@
-import type { SudokuVariant } from '@/core/sudoku/rules'
+import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import { TECHNIQUES, ALL_CLASSIC_TECHNIQUES, ADVANCED_TECHNIQUES } from '@/core/sudoku/techniques'
 import type { Technique } from '@/core/sudoku/techniques'
 import type { Difficulty } from '@/core/sudoku/types'

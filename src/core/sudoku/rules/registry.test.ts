@@ -1,8 +1,9 @@
 import { GENERATION_STRATEGIES } from '@/core/sudoku/generationLayouts'
 import { describe, expect, it } from 'vitest'
-import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
-import { SUDOKU_VARIANTS, compileRules } from '@/core/sudoku/rules'
-import { VARIANT_RULE_DEFINITIONS } from '@/core/sudoku/variantRegistry'
+import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
+import { compileRules } from '@/core/sudoku/rules/context'
+import { VARIANT_RULE_DEFINITIONS } from '@/core/sudoku/rules/registry'
 
 describe('variant rule definitions', () => {
   it('covers every supported variant with its own decoded kind', () => {

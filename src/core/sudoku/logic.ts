@@ -6,7 +6,7 @@ import {
   PEERS,
   UNITS,
 } from '@/core/sudoku/board'
-import type { SudokuUnit } from '@/core/sudoku/board'
+import type { SudokuUnit } from '@/core/sudoku/rules/types'
 import { DIGITS } from '@/core/sudoku/types'
 import type { Board, CellValue, Digit, NoteMask } from '@/core/sudoku/types'
 import { ALL_CLASSIC_TECHNIQUES } from '@/core/sudoku/techniques'
@@ -19,8 +19,8 @@ import type {
   RuleEvidence,
 } from '@/core/sudoku/techniques'
 import { isClassicTechnique, isAdvancedTechnique } from '@/core/sudoku/techniques'
-import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
-import type { RuleContext } from '@/core/sudoku/rules'
+import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
+import type { RuleContext } from '@/core/sudoku/rules/types'
 import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { findVariantStep } from '@/core/sudoku/variantTechniques'

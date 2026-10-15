@@ -4,7 +4,7 @@ import { ALL_CLASSIC_TECHNIQUES } from '@/core/sudoku/techniques'
 import { applyLogicalStep, createLogicalWorkspace, findLogicalStep } from '@/core/sudoku/logic'
 import { isComplete } from '@/core/sudoku/board'
 import type { LogicalOptions } from '@/core/sudoku/logic'
-import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
+import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
 import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import { RATING_POLICIES } from '@/core/sudoku/ratingPolicies'
 

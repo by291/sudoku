@@ -3,13 +3,13 @@ import type {
   PuzzleRules,
   CompiledVariantRules,
   VariantRuleDefinition,
-} from '@/core/sudoku/ruleTypes'
-import { CLASSIC_RULE_DEFINITION } from '@/core/sudoku/variants/classic'
-import { DIAGONAL_RULE_DEFINITION } from '@/core/sudoku/variants/diagonal'
-import { JIGSAW_RULE_DEFINITION } from '@/core/sudoku/variants/jigsaw'
-import { KILLER_RULE_DEFINITION } from '@/core/sudoku/variants/killer'
-import { THERMO_RULE_DEFINITION } from '@/core/sudoku/variants/thermo'
-import { ARROW_RULE_DEFINITION } from '@/core/sudoku/variants/arrow'
+} from '@/core/sudoku/rules/types'
+import { CLASSIC_RULE_DEFINITION } from '@/core/sudoku/rules/definitions/classic'
+import { DIAGONAL_RULE_DEFINITION } from '@/core/sudoku/rules/definitions/diagonal'
+import { JIGSAW_RULE_DEFINITION } from '@/core/sudoku/rules/definitions/jigsaw'
+import { KILLER_RULE_DEFINITION } from '@/core/sudoku/rules/definitions/killer'
+import { THERMO_RULE_DEFINITION } from '@/core/sudoku/rules/definitions/thermo'
+import { ARROW_RULE_DEFINITION } from '@/core/sudoku/rules/definitions/arrow'
 
 export const VARIANT_RULE_DEFINITIONS = {
   classic: CLASSIC_RULE_DEFINITION,

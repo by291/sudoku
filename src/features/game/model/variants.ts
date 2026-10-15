@@ -1,5 +1,6 @@
-import { isSudokuVariant, SUDOKU_VARIANTS } from '@/core/sudoku/rules'
-import type { SudokuVariant } from '@/core/sudoku/rules'
+import { isSudokuVariant } from '@/core/sudoku/rules/context'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
+import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import type { ParseResult } from '@/core/sudoku/types'
 
 export type VariantPresentation = { label: string; ruleText: string }

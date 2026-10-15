@@ -1,11 +1,11 @@
-import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/ruleTypes'
+import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules/types'
 import type { Board } from '@/core/sudoku/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { DIAGONAL_GENERATION_STRATEGY } from '@/core/sudoku/variants/diagonal'
-import { JIGSAW_GENERATION_STRATEGY } from '@/core/sudoku/variants/jigsaw'
-import { KILLER_GENERATION_STRATEGY } from '@/core/sudoku/variants/killer'
-import { THERMO_GENERATION_STRATEGY } from '@/core/sudoku/variants/thermo'
-import { ARROW_GENERATION_STRATEGY } from '@/core/sudoku/variants/arrow'
+import { DIAGONAL_GENERATION_STRATEGY } from '@/core/sudoku/generation/variants/diagonal'
+import { JIGSAW_GENERATION_STRATEGY } from '@/core/sudoku/generation/variants/jigsaw'
+import { KILLER_GENERATION_STRATEGY } from '@/core/sudoku/generation/variants/killer'
+import { THERMO_GENERATION_STRATEGY } from '@/core/sudoku/generation/variants/thermo'
+import { ARROW_GENERATION_STRATEGY } from '@/core/sudoku/generation/variants/arrow'
 import type { VariantGenerationStrategy } from '@/core/sudoku/generation/types'
 
 export const VARIANT_GENERATION_STRATEGIES = {

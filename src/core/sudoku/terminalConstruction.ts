@@ -1,7 +1,7 @@
 import { digitsIn, isComplete } from '@/core/sudoku/board'
 import { consumeWork } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import type { RuleContext } from '@/core/sudoku/rules'
+import type { RuleContext } from '@/core/sudoku/rules/types'
 import { shuffle } from '@/core/sudoku/random'
 import { BOARD_SIZE, UNIT_SIZE, DIGITS, ALL_DIGITS_MASK } from '@/core/sudoku/types'
 import type { Board, CellValue } from '@/core/sudoku/types'

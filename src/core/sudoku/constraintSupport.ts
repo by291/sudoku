@@ -2,8 +2,8 @@
 import { digitsIn, maskOf } from '@/core/sudoku/board'
 import { consumeWork, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { constraintCells, prepareRuleContext } from '@/core/sudoku/rules'
-import type { PuzzleRules, RuleConstraint, RuleContext } from '@/core/sudoku/rules'
+import { constraintCells, prepareRuleContext } from '@/core/sudoku/rules/context'
+import type { PuzzleRules, RuleConstraint, RuleContext } from '@/core/sudoku/rules/types'
 import { DIGITS } from '@/core/sudoku/types'
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 

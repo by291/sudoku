@@ -1,6 +1,6 @@
 import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
 import type { LogicalStep, RuleEvidence, AdvancedEvidence } from '@/core/sudoku/techniques'
-import type { PuzzleRules, Unit } from '@/core/sudoku/rules'
+import type { PuzzleRules, Unit } from '@/core/sudoku/rules/types'
 import { transformVariantRules } from '@/core/sudoku/generationStrategies'
 
 export type ExerciseAnswer =

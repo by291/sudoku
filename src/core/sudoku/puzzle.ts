@@ -1,8 +1,8 @@
 import type { Board, Difficulty, ParseResult } from '@/core/sudoku/types'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import { isDifficulty, isRecord } from '@/core/sudoku/types'
-import { compileRules, parseRules } from '@/core/sudoku/rules'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import { compileRules, parseRules } from '@/core/sudoku/rules/context'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import { supportsDifficulty } from '@/core/sudoku/difficulties'
 
 export type Puzzle = {

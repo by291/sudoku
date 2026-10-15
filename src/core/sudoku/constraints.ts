@@ -3,8 +3,8 @@ import type { PreparedConstraintSupport } from '@/core/sudoku/constraintSupport'
 import { calculateBaseCandidates } from '@/core/sudoku/board'
 import { consumeWork } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { constraintCells, satisfiesConstraint } from '@/core/sudoku/rules'
-import type { RuleConstraint, RuleContext } from '@/core/sudoku/rules'
+import { constraintCells, satisfiesConstraint } from '@/core/sudoku/rules/context'
+import type { RuleConstraint, RuleContext } from '@/core/sudoku/rules/types'
 import type { Board, NoteMask } from '@/core/sudoku/types'
 
 export type CandidateResult =

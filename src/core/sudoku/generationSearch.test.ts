@@ -1,7 +1,7 @@
 import * as variantGeneration from '@/core/sudoku/variantGeneration'
 import { givenMask } from '@/core/sudoku/generationCandidates'
 import { VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import { afterEach, expect, it, vi } from 'vitest'
 import * as layouts from '@/core/sudoku/generationLayouts'
 import * as rating from '@/core/sudoku/rating'

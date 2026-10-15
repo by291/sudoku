@@ -1,6 +1,6 @@
 import { parseBoard } from '@/core/sudoku/board'
 import type { Board, Difficulty, StandardDifficulty } from '@/core/sudoku/types'
-import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules'
+import type { NewSudokuVariant, PuzzleRules } from '@/core/sudoku/rules/types'
 
 export type VariantTemplate = {
   rules: PuzzleRules

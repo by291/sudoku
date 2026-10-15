@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, useTemplateRef, watch } from 'vue'
 import { NAlert, NButton, NModal, NRadio, NRadioButton, NRadioGroup } from 'naive-ui'
-import { isSudokuVariant } from '@/core/sudoku/rules'
-import type { SudokuVariant } from '@/core/sudoku/rules'
+import { isSudokuVariant } from '@/core/sudoku/rules/context'
+import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import { isDifficulty } from '@/core/sudoku/types'
 import { supportedDifficulties, supportsDifficulty } from '@/core/sudoku/difficulties'
 import type { Difficulty } from '@/core/sudoku/types'

@@ -1,5 +1,5 @@
 import type { WorkBudget } from '@/core/sudoku/budget'
-import { CLASSIC_CONTEXT } from '@/core/sudoku/rules'
+import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
 import { constructUnitTerminal } from '@/core/sudoku/terminalConstruction'
 import type { TerminalConstructionResult } from '@/core/sudoku/terminalConstruction'
 

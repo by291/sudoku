@@ -16,7 +16,7 @@ import {
 import type { AssessmentResult } from '@/core/sudoku/rating'
 import { RATING_POLICIES, TECHNIQUE_TIERS } from '@/core/sudoku/ratingPolicies'
 import { analyzeLogic } from '@/core/sudoku/logic'
-import { compileRules } from '@/core/sudoku/rules'
+import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import type { LogicalStep, Technique } from '@/core/sudoku/techniques'
 import type { Board } from '@/core/sudoku/types'

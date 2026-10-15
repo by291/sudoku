@@ -1,4 +1,4 @@
-import { SUDOKU_VARIANTS } from '@/core/sudoku/rules'
+import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 import { supportedDifficulties } from '@/core/sudoku/difficulties'
 
 export const CORPUS_VERSION = 'local-product-corpus-v1'

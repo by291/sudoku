@@ -1,5 +1,5 @@
 import type { Board } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 
 function touches(first: number, second: number, diagonal = false): boolean {
   const rows = Math.abs(Math.floor(first / 9) - Math.floor(second / 9))

@@ -1,6 +1,6 @@
 import { BOARD_SIZE, BOX_SIZE, UNIT_SIZE } from '@/core/sudoku/types'
 import type { ParseResult } from '@/core/sudoku/types'
-import type { SudokuUnit } from '@/core/sudoku/ruleTypes'
+import type { SudokuUnit } from '@/core/sudoku/rules/types'
 
 export function invalidRules(reason: string): ParseResult<never> {
   return { valid: false, issues: [reason] }
