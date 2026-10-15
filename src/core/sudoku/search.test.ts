@@ -118,7 +118,13 @@ it('retains bounded general search for large Killer cages', () => {
     })),
   }
   const context = compileRules(rules)
-  const result = countSolutions(solvedBoard, { maxSolutions: 2, nodeBudget: 1000, context })
+  // Node visits and aggregate preparation work are separate allowances.
+  const result = countSolutions(solvedBoard, {
+    maxSolutions: 2,
+    nodeBudget: 1000,
+    context,
+    workBudget: createWorkBudget(100000),
+  })
 
   expect(result).toMatchObject({ status: 'complete', count: 1, solution: solvedBoard })
   expect(countSolutions(emptyBoard, { maxSolutions: 2, nodeBudget: 0, context }).status).toBe(
@@ -147,7 +153,13 @@ it('never reports uniqueness after budget exhaustion', () => {
     nodesVisited: 0,
     workUsed: 0,
   })
-  expect(countSolutions(uniqueBoard, { maxSolutions: 2, nodeBudget: 1 })).toMatchObject({
+  expect(
+    countSolutions(uniqueBoard, {
+      maxSolutions: 2,
+      nodeBudget: 1,
+      workBudget: createWorkBudget(2),
+    }),
+  ).toMatchObject({
     status: 'budget-exhausted',
     nodesVisited: 1,
   })
@@ -157,4 +169,17 @@ it('does not mutate the source puzzle', () => {
   countSolutions(board, { maxSolutions: 2, nodeBudget: 1000000 })
 
   expect(board).toEqual(uniqueBoard)
+})
+
+it('charges standalone preparation before its first exact node', () => {
+  const budget = createWorkBudget(1)
+
+  expect(
+    countSolutions(uniqueBoard, { maxSolutions: 2, nodeBudget: 1000, workBudget: budget }),
+  ).toEqual({
+    status: 'budget-exhausted',
+    nodesVisited: 0,
+    workUsed: 1,
+  })
+  expect(budget.used).toBe(1)
 })
