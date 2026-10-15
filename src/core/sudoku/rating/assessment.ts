@@ -128,6 +128,7 @@ function createAssessmentOwner(
           difficulty: null,
         }
       }
+
       computation = prepared.computation
     }
 
@@ -180,6 +181,7 @@ function createAssessmentOwner(
         if (result.difficulty === target) {
           return { ...result, status: 'matching-target' }
         }
+
         return { ...result, status: 'below-target' }
       }
       if (result.status === 'budget-exhausted') {
@@ -251,6 +253,7 @@ function screenPolicies(
       workspace = createLogicalWorkspace(snapshot.board, context, support)
       previousSteps = []
     }
+
     const result = analyzeLogicalWorkspace(
       workspace,
       policy,
@@ -266,6 +269,7 @@ function screenPolicies(
         difficulty,
       }
     }
+
     feedback = {
       remainingCells: result.board.filter((digit) => digit === 0).length,
       deductions: result.steps.length,
@@ -292,6 +296,7 @@ function screenPolicies(
     if (difficulty === target) {
       break
     }
+
     previousOrder = order
     previousSteps = result.steps
   }

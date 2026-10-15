@@ -8,9 +8,11 @@ import type { CellValue } from '@/core/sudoku/types'
 
 function fixture(entries: readonly [number, number][], base = 511): LogicalState {
   const candidates = Array<number>(81).fill(base)
+
   for (const [cell, mask] of entries) {
     candidates[cell] = mask
   }
+
   return { board: Array<CellValue>(81).fill(0), candidates, context: CLASSIC_CONTEXT }
 }
 
@@ -19,6 +21,7 @@ const naked = fixture([
   [1, 6],
   [2, 5],
 ])
+
 const hidden = fixture(
   [
     [0, 11],
@@ -27,6 +30,7 @@ const hidden = fixture(
   ],
   504,
 )
+
 // Digit 1 is restricted to columns 2 and 7 in rows 1 and 4.
 const xWing = fixture(
   [
@@ -38,6 +42,7 @@ const xWing = fixture(
   ],
   510,
 )
+
 // Three rows use the cyclic pairs (2,5), (5,8), (2,8).
 const swordfish = fixture(
   [
@@ -51,11 +56,13 @@ const swordfish = fixture(
   ],
   510,
 )
+
 const wing = fixture([
   [0, 3],
   [4, 5],
   [27, 6],
 ])
+
 const coloring = fixture(
   [
     [0, 511],
@@ -82,10 +89,12 @@ it.each([
   if (result.status !== 'complete' || !result.step) {
     throw new Error('Missing expected deduction')
   }
+
   expect(result.step).toMatchObject({ kind: 'elimination' })
   if (result.step.kind !== 'elimination') {
     throw new Error('Expected elimination')
   }
+
   expect(result.step.removals).toContainEqual({ cell, digit })
   expect(validateAdvancedStep(state, result.step)).toBe(true)
   expect(validateAdvancedStep(state, { ...result.step, removals: [{ cell: 80, digit: 9 }] })).toBe(
@@ -161,10 +170,12 @@ it('rejects filled cells, no-op removals and invented strong links in a proof', 
   if (result.status !== 'complete' || !result.step || result.step.evidence.kind !== 'coloring') {
     throw new Error('Expected wrap proof')
   }
+
   const step = result.step
   if (step.evidence.kind !== 'coloring') {
     throw new Error('Expected coloring proof')
   }
+
   const filled = { ...state, board: state.board.map((value, cell) => (cell === 0 ? 1 : value)) }
 
   expect(validateAdvancedStep(filled, step)).toBe(false)
@@ -230,6 +241,7 @@ it('rejects triple near misses and patterns with no effective elimination', () =
     [8, 9],
   ])
   const hiddenMasks = Array<number>(81).fill(511)
+
   for (let cell = 0; cell < 9; cell++) {
     hiddenMasks[cell] = 504
   }
@@ -244,9 +256,11 @@ it('rejects triple near misses and patterns with no effective elimination', () =
     [8, 5],
   ])
   const noOpMasks = [...noOp.candidates]
+
   for (const cell of [1, 2, 3, 5, 6, 7]) {
     noOpMasks[cell] = 504
   }
+
   const noOpTriple = { ...noOp, candidates: noOpMasks }
   const noOpWing = fixture([
     [0, 3],
@@ -279,6 +293,7 @@ it('rejects triple near misses and patterns with no effective elimination', () =
 
 it('rejects a Swordfish whose three base rows need four cover columns', () => {
   const masks = Array<number>(81).fill(511)
+
   for (const row of [0, 3, 6]) {
     for (let column = 0; column < 9; column++) {
       masks[row * 9 + column] = 510
@@ -287,6 +302,7 @@ it('rejects a Swordfish whose three base rows need four cover columns', () => {
   for (const cell of [1, 4, 31, 34, 55, 61, 60]) {
     masks[cell] = 511
   }
+
   const state = { ...naked, candidates: masks }
 
   expect(findAdvancedStep(state, 'swordfish', createWorkBudget(100000))).toEqual({

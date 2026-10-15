@@ -10,6 +10,7 @@ import { createWorkBudget } from '@/core/sudoku/budget'
 import { variantRulesMatter } from '@/core/sudoku/generation/variant'
 
 const variants = ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const
+
 it.each(
   variants.flatMap((variant) =>
     (['easy', 'medium', 'hard'] as const).map((difficulty) => ({ variant, difficulty })),
@@ -49,6 +50,7 @@ it.each(
   },
   60000,
 )
+
 it('returns construction exhaustion without substituting an authored variant puzzle', () => {
   const input = {
     variant: 'arrow',
@@ -71,6 +73,7 @@ it('returns construction exhaustion without substituting an authored variant puz
     },
   })
 })
+
 it('rejects missing rules and solutions that violate their clues', () => {
   const fixture = VARIANT_FIXTURES.thermo
   const metadata = { seed: 'shape', difficulty: 'easy', puzzleVersion: 'sudoku-variants-v1' }

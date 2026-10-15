@@ -7,6 +7,7 @@ it('isolates terminal and geometry streams from failed candidate exploration', (
   const terminal = createGenerationRandom(input, 'terminal', 1)
   const candidates = createGenerationRandom(input, 'candidate', 0, 1)
   const before = createGenerationRandom(input, 'geometry', 1)()
+
   for (let index = 0; index < 1000; index++) {
     candidates()
   }

@@ -1,11 +1,11 @@
 import { calculateBaseCandidates, maskOf, PEERS } from '@/core/sudoku/board'
 import type { RuleContext } from '@/core/sudoku/rules/types'
 import type { Board } from '@/core/sudoku/types'
-import type { LogicalStep } from '@/core/sudoku/logic/types'
+import type { LogicalStep, LogicalWorkspace } from '@/core/sudoku/logic/types'
 import { CLASSIC_CONTEXT } from '@/core/sudoku/rules/context'
 import type { PreparedConstraintSupport } from '@/core/sudoku/constraints/types'
-import type { LogicalWorkspace } from '@/core/sudoku/logic/types'
 
+/** Copies the board and creates fresh mutable candidates, premises and local support memo. */
 export function createLogicalWorkspace(
   board: Board,
   context: RuleContext = CLASSIC_CONTEXT,
@@ -25,6 +25,7 @@ export function createLogicalWorkspace(
   }
 }
 
+/** Mutates this workspace; rule premises survive eliminations until the next placement. */
 export function applyLogicalStep(state: LogicalWorkspace, step: LogicalStep): void {
   if (step.kind === 'elimination') {
     for (const removal of step.removals) {

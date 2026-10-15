@@ -8,6 +8,7 @@ it('retains valid v7 saved puzzles while new generation rejects their historical
   if (!fixture) {
     throw new Error('Missing authored Easy fixture')
   }
+
   const storedPuzzle = {
     givens: fixture.givens,
     solution: fixture.solution,

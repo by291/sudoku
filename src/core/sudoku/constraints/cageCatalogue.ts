@@ -31,19 +31,25 @@ export function compileCageCatalogue(
     if (assigned.length === combination.length) {
       if (tuples.length >= capacity) {
         overflow = true
+
         return
       }
+
       tuples.push(assigned.map(maskOf))
+
       return
     }
+
     for (const digit of combination) {
       if ((used & maskOf(digit)) !== 0) {
         continue
       }
       if (!consumeWork(budget)) {
         exhausted = true
+
         return
       }
+
       assigned.push(digit)
       permute(used | maskOf(digit))
       assigned.pop()
@@ -58,22 +64,28 @@ export function compileCageCatalogue(
       if (sum === cage.sum) {
         permute(0)
       }
+
       return
     }
+
     const remaining = cage.cells.length - combination.length
+
     for (const digit of DIGITS) {
       if (digit < start || digit > 10 - remaining) {
         continue
       }
       if (!consumeWork(budget)) {
         exhausted = true
+
         return
       }
+
       const minimum = sum + remaining * digit + (remaining * (remaining - 1)) / 2
       const maximum = sum + digit + (remaining - 1) * 9 - ((remaining - 1) * (remaining - 2)) / 2
       if (minimum > cage.sum || maximum < cage.sum) {
         continue
       }
+
       combination.push(digit)
       combine(digit + 1, sum + digit)
       combination.pop()
@@ -102,8 +114,10 @@ export function filterCageCatalogue(
   budget: WorkBudget,
 ): ConstraintSupport {
   const supports = cells.map(() => 0)
+
   for (const tuple of tuples) {
     let compatible = true
+
     for (let index = 0; index < cells.length; index++) {
       if (!consumeWork(budget)) {
         return { status: 'budget-exhausted' }
@@ -113,6 +127,7 @@ export function filterCageCatalogue(
         break
       }
     }
+
     if (compatible) {
       tuple.forEach((mask, index) => {
         supports[index] |= mask

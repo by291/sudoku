@@ -25,12 +25,15 @@ it.each(RATING_FIXTURES)(
     if (result.status !== 'matching-target') {
       throw new Error('Expected independently labeled target')
     }
+
     const used = budget.used
     const completed = result.complete()
+
     expect(completed).toEqual(expected)
     if (completed.trace[0]) {
       completed.trace[0].technique = 'swordfish'
     }
+
     expect(result.complete()).toEqual(expected)
     expect(budget.used).toBe(used)
   },
@@ -41,10 +44,12 @@ it('stops a Hard screen before Expert and retains bounded stalled feedback', () 
   if (!fixture) {
     throw new Error('Missing independent Expert fixture')
   }
+
   const prepared = prepareRuleComputation(fixture.rules, createWorkBudget(limits.maxWork))
   if (prepared.status !== 'ready') {
     throw new Error('Expected prepared Classic')
   }
+
   const owner = prepareAssessmentWithComputation(prepared.computation, limits)
   const spy = vi.spyOn(logic, 'analyzeLogicalWorkspace')
   const targetBudget = createWorkBudget(limits.maxWork)
@@ -65,10 +70,12 @@ it('stops a Hard screen before Expert and retains bounded stalled feedback', () 
   if (result.status !== 'target-stalled') {
     throw new Error('Expert fixture must stall through Hard')
   }
+
   expect(result.feedback.remainingCells).toBeGreaterThan(0)
   expect(result.feedback.remainingCells).toBeLessThanOrEqual(81)
   spy.mockRestore()
   const fullBudget = createWorkBudget(limits.maxWork)
+
   expect(owner.assess(fixture.board, fullBudget)).toMatchObject({
     status: 'rated',
     summary: { difficulty: 'expert' },
@@ -116,12 +123,14 @@ it('retains a trial snapshot across later clue widening and new workspaces', () 
   if (!fixture) {
     throw new Error('Missing Killer fixture')
   }
+
   const board = [...fixture.board]
   const owner = prepareAssessment(fixture.rules, limits)
   const result = owner.screenTarget(board, 'hard', createWorkBudget(limits.maxWork))
   if (result.status !== 'matching-target') {
     throw new Error('Expected matching owned trial')
   }
+
   const expected = result.complete()
 
   board.fill(0)

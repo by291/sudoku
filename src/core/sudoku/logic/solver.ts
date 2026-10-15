@@ -6,12 +6,17 @@ import {
   isAdvancedTechnique,
 } from '@/core/sudoku/logic/techniques'
 import { findAdvancedStep } from '@/core/sudoku/logic/advancedTechniques'
-import type { LogicalStep, Technique } from '@/core/sudoku/logic/types'
+import type {
+  LogicalStep,
+  Technique,
+  StepOutcome,
+  LogicalWorkspace,
+  LogicalOptions,
+  LogicResult,
+} from '@/core/sudoku/logic/types'
 import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { findVariantStep } from '@/core/sudoku/logic/variantTechniques'
-import type { StepOutcome } from '@/core/sudoku/logic/types'
-import type { LogicalWorkspace, LogicalOptions, LogicResult } from '@/core/sudoku/logic/types'
 import { createLogicalWorkspace, applyLogicalStep } from '@/core/sudoku/logic/workspace'
 import { findBasicStep } from '@/core/sudoku/logic/basicTechniques'
 

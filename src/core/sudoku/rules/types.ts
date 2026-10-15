@@ -34,6 +34,7 @@ export type RuleConstraint =
   | { kind: 'thermo'; id: string; index: number; cells: readonly number[] }
   | (Arrow & { kind: 'arrow'; id: string; index: number })
 
+/** Full nine-digit units, duplicate exclusion and related-cell highlights have distinct meanings. */
 export type RuleContext = {
   readonly cellUnits: readonly (readonly number[])[]
   readonly cellConstraints: readonly (readonly number[])[]

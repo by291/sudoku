@@ -1,4 +1,8 @@
-import { filterCageCatalogue } from '@/core/sudoku/constraints/cageCatalogue'
+import {
+  filterCageCatalogue,
+  DEFAULT_CATALOGUE_LIMITS,
+  compileCageCatalogue,
+} from '@/core/sudoku/constraints/cageCatalogue'
 import { digitsIn, maskOf } from '@/core/sudoku/board'
 import { consumeWork, withWorkStage } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
@@ -10,10 +14,6 @@ import type {
   PreparedConstraintSupport,
   CatalogueLimits,
 } from '@/core/sudoku/constraints/types'
-import {
-  DEFAULT_CATALOGUE_LIMITS,
-  compileCageCatalogue,
-} from '@/core/sudoku/constraints/cageCatalogue'
 
 // Local support is a proof of possibility only within this clue and duplicate peers.
 // Unsupported values can be removed; exhaustion cannot prove an unsupported value.
@@ -135,10 +135,12 @@ export function prepareConstraintSupport(
   return withWorkStage(budget, 'arithmetic', () => {
     const catalogues = new Map<RuleConstraint, readonly (readonly NoteMask[])[]>()
     let retainedTuples = 0
+
     for (const constraint of context.constraints) {
       if (constraint.kind !== 'cage' || constraint.cells.length > 4) {
         continue
       }
+
       const capacity = Math.min(
         limits.maxTuplesPerConstraint,
         limits.maxTuplesPerLayout - retainedTuples,
@@ -161,10 +163,12 @@ export function prepareConstraintSupport(
             if (!context.constraints.includes(constraint)) {
               throw new TypeError('Constraint belongs to a different prepared context')
             }
+
             const tuples = catalogues.get(constraint)
             if (!tuples) {
               return enumerateConstraintSupport(board, candidates, context, constraint, queryBudget)
             }
+
             const cells = constraintCells(constraint)
             const domains = cells.map((cell) =>
               board[cell] === 0 ? candidates[cell] : maskOf(board[cell]),
@@ -181,6 +185,7 @@ export function prepareConstraintSupport(
             if (domainCombinations <= tuples.length) {
               return enumerateConstraintSupport(board, candidates, context, constraint, queryBudget)
             }
+
             return filterCageCatalogue(cells, domains, tuples, queryBudget)
           })
         },

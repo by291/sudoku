@@ -2,6 +2,7 @@ import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import type { Difficulty } from '@/core/sudoku/types'
 
 const standard: readonly Difficulty[] = ['easy', 'medium', 'hard']
+
 export const DIFFICULTY_CAPABILITIES = {
   classic: [...standard, 'expert'],
   diagonal: standard,

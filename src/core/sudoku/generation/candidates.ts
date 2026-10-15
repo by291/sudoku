@@ -7,11 +7,15 @@ import { shuffle } from '@/core/sudoku/random'
 import { BOARD_SIZE } from '@/core/sudoku/types'
 import type { Board, Difficulty } from '@/core/sudoku/types'
 
+/** Bit N selects the clue at cell N; the 81-bit mask stays internal to clue exploration. */
 export type GivenMask = bigint
 
 const FULL_GIVEN_MASK = (1n << BigInt(BOARD_SIZE)) - 1n
+
 const CELLS = Array.from({ length: BOARD_SIZE }, (_, cell) => cell)
+
 const CELL_BITS = CELLS.map((cell) => 1n << BigInt(cell))
+
 const TIER_ORDER = { easy: 0, medium: 1, hard: 2, expert: 3 } as const
 
 export const GENERATION_SEARCH_BOUNDS = Object.freeze({
@@ -80,6 +84,7 @@ export function materializeCandidate(terminal: Board, mask: GivenMask): Board {
 
 function clueCount(mask: GivenMask): number {
   let count = 0
+
   for (let remaining = mask; remaining !== 0n; remaining &= remaining - 1n) {
     count++
   }
@@ -125,6 +130,7 @@ function neighboringProposal(entry: FrontierEntry, budget: WorkBudget): Candidat
   if (!order || !present || !missing) {
     throw new Error('Missing seeded candidate edit order')
   }
+
   const intermediateMasks: GivenMask[] = []
   let mask = checkpoint.mask
 
@@ -132,8 +138,10 @@ function neighboringProposal(entry: FrontierEntry, budget: WorkBudget): Candidat
     if (!consumeWork(budget)) {
       return false
     }
+
     intermediateMasks.push(mask)
     mask = restore ? mask | CELL_BITS[cell] : mask & ~CELL_BITS[cell]
+
     return true
   }
 
@@ -147,6 +155,7 @@ function neighboringProposal(entry: FrontierEntry, budget: WorkBudget): Candidat
       }
     }
   }
+
   let kind: CandidateProposal['kind']
   if (sweepCell !== undefined) {
     kind = 'remove'
@@ -164,15 +173,18 @@ function neighboringProposal(entry: FrontierEntry, budget: WorkBudget): Candidat
   } else if (missing.length > 0 && present.length > 0) {
     kind = 'exchange'
     const restores = cursor % 2 === 0 && missing.length > 1 ? 2 : 1
+
     for (let index = 0; index < restores; index++) {
       if (!edit(missing[(cursor + index) % missing.length], true)) {
         return null
       }
     }
+
     const removals =
       checkpoint.kind === 'stalled'
         ? Math.max(1, restores - 1)
         : Math.min(present.length, restores + 1)
+
     for (let index = 0; index < removals; index++) {
       if (!edit(present[(cursor + index) % present.length], false)) {
         return null
@@ -243,6 +255,7 @@ export function createCandidateFrontier(
       if (continuingSweep) {
         sweepEntry = retained
       }
+
       const solved = entries
         .filter((entry) => entry.checkpoint.kind === 'solved')
         .sort((a, b) => compareCheckpoints(a.checkpoint, b.checkpoint, target))
@@ -264,6 +277,7 @@ export function createCandidateFrontier(
       if (sweepEntry && !retainedSolved.includes(sweepEntry)) {
         retainedSolved[retainedSolved.length - 1] = sweepEntry
       }
+
       entries = [...retainedSolved, ...stalled.slice(0, stalledCapacity)]
 
       return improved || continuingSweep
@@ -277,6 +291,7 @@ export function createCandidateFrontier(
           if (eligible.length === 0 || !consumeWork(budget)) {
             return null
           }
+
           const desired = selections++ % 2 === 0 ? 'solved' : 'stalled'
           const pool = eligible.filter((entry) => entry.checkpoint.kind === desired)
           const ranked = (pool.length > 0 ? pool : eligible).sort((a, b) =>
@@ -286,6 +301,7 @@ export function createCandidateFrontier(
           if (!best) {
             throw new Error('Missing candidate checkpoint')
           }
+
           const tied = ranked.filter(
             (entry) => compareCheckpoints(entry.checkpoint, best.checkpoint, target) === 0,
           )
@@ -295,6 +311,7 @@ export function createCandidateFrontier(
           ) {
             sweepEntry = null
           }
+
           const selected = sweepEntry ?? tied[Math.floor(random() * tied.length)]
           if (!selected.order) {
             selected.order = shuffle(CELLS, random)
@@ -307,6 +324,7 @@ export function createCandidateFrontier(
               (cell) => (selected.checkpoint.mask & CELL_BITS[cell]) === 0n,
             )
           }
+
           const proposal = neighboringProposal(selected, budget)
           selected.cursor++
           if (!proposal || seen.has(proposal.mask)) {
@@ -315,6 +333,7 @@ export function createCandidateFrontier(
             }
             continue
           }
+
           pendingMask = proposal.mask
           pendingParent = selected
           pendingKind = proposal.kind

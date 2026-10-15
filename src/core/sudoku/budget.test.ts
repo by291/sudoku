@@ -23,6 +23,7 @@ it('attributes nested work exclusively and restores the stage on every exit', ()
   }
 
   consumeWork(budget)
+
   expect(() =>
     withWorkStage(budget, 'arithmetic', () => {
       consumeWork(budget, 2)

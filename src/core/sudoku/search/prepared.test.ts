@@ -24,6 +24,7 @@ it.each(fixtures)('isolates prepared $rules.kind probes and returned solutions',
   if (preparation.status !== 'ready') {
     throw new Error('Expected prepared fixture')
   }
+
   const validator = prepareExactValidator(preparation.computation)
   const initial = validator.count(fixture.givens, createWorkBudget(100000), 1000)
   const contradiction = [...fixture.solution]
@@ -42,6 +43,7 @@ it.each(fixtures)('isolates prepared $rules.kind probes and returned solutions',
   if (initial.status !== 'complete' || !initial.solution) {
     throw new Error('Expected owned unique solution')
   }
+
   Reflect.set(initial.solution, 0, 9)
 
   expect(validator.count(fixture.givens, createWorkBudget(100000), 1000)).toMatchObject({
@@ -64,6 +66,7 @@ it('distinguishes independent zero one and multiple counts with reused topology'
   if (prepared.status !== 'ready') {
     throw new Error('Expected static topology')
   }
+
   const validator = prepareExactValidator(prepared.computation)
 
   for (const [board, count] of [
@@ -85,10 +88,12 @@ it('restores failed branches and every interrupted traversal before the next pro
   if (!fixture) {
     throw new Error('Missing fixed Expert branch fixture')
   }
+
   const prepared = prepareRuleComputation({ kind: 'classic' }, createWorkBudget(10000))
   if (prepared.status !== 'ready') {
     throw new Error('Expected prepared fixture')
   }
+
   const validator = prepareExactValidator(prepared.computation)
   const complete = validator.count(fixture.givens, createWorkBudget(100000), 10000)
 

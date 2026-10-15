@@ -122,10 +122,12 @@ it('finishes the prepared authored Killer Hard trace without repeating lower-pol
   if (!fixture) {
     throw new Error('Missing known Killer Hard fixture')
   }
+
   const prepared = prepareRuleComputation(fixture.rules, createWorkBudget(100000))
   if (prepared.status !== 'ready') {
     throw new Error('Expected charged fixture preparation')
   }
+
   const budget = createWorkBudget(15000)
   const owner = prepareAssessmentWithComputation(prepared.computation, {
     maxSteps: 500,
@@ -149,11 +151,13 @@ it('restarts from original candidates when a higher policy changes technique pri
   if (!fixture) {
     throw new Error('Missing known Killer Medium fixture')
   }
+
   const policies = RATING_POLICIES.killer
   const descriptor = Object.getOwnPropertyDescriptor(policies, 'medium')
   if (!descriptor) {
     throw new Error('Missing policy descriptor')
   }
+
   const changedPriority = [
     'cage-combination',
     ...policies.medium.filter((technique) => technique !== 'cage-combination'),
@@ -180,6 +184,7 @@ it('retains the independently authored Classic Hard pair in the complete trace',
   if (!fixture) {
     throw new Error('Missing known hard fixture')
   }
+
   const result = rated(assessPuzzle(createAssessmentInput(fixture.board, fixture.rules)))
 
   // The authored hard fixture requires the row-4 pair {2, 4} in cells 33 and 34.
@@ -202,8 +207,10 @@ it.each(
     if (!witness) {
       throw new Error(`Missing fixed witness: ${fixture.id}`)
     }
+
     const result = rated(assessPuzzle(createAssessmentInput(fixture.board, fixture.rules)))
     const index = result.trace.findIndex((step) => step.technique === witness.technique)
+
     expect(index).toBeGreaterThanOrEqual(0)
     const step = result.trace[index]
     const state = referenceRatingState(fixture.board, fixture.rules, result.trace.slice(0, index))
@@ -211,8 +218,10 @@ it.each(
     // Literal candidate facts are checked by a separate peer-and-action replay, not engine masks.
     for (const [cell, digits] of witness.domains) {
       const actual = state.board[cell] === 0 ? state.candidates[cell] : [state.board[cell]]
+
       expect(actual, `${fixture.id} cell ${cell}`).toEqual(digits)
     }
+
     if (witness.technique === 'arrow-combination') {
       expect(fixture.rules).toMatchObject({
         kind: 'arrow',
@@ -237,7 +246,9 @@ it.each(
       const pairs = [1, 5, 7, 9].flatMap((x) =>
         [2, 4].filter((y) => x + y === 3).map((y) => [x, y]),
       )
+
       expect(pairs).toEqual([[1, 2]])
+
       return
     }
 
@@ -257,6 +268,7 @@ it.each(
     if (!unit) {
       throw new Error(`Missing independent unit: ${fixture.id}`)
     }
+
     const positions = (digit: number) =>
       unit.filter((cell) => state.candidates[cell].includes(digit))
     if (witness.technique === 'locked-candidate') {
@@ -265,6 +277,7 @@ it.each(
       if (!target) {
         throw new Error(`Missing independent target: ${fixture.id}`)
       }
+
       for (const cell of witness.cells) {
         expect(target).toContain(cell)
       }
@@ -321,5 +334,6 @@ it('returns distinct invalid, ungraded and budget-exhausted outcomes', () => {
     assessPuzzle(createAssessmentInput(thermo.givens, thermo.rules, { maxSteps: 500, maxWork: 0 })),
   ).toMatchObject({ status: 'budget-exhausted', stage: 'validation' })
   const wrong = thermo.solution.map((digit, cell) => (cell === 0 ? 9 : digit))
+
   expect(assessPuzzle(createAssessmentInput(wrong, thermo.rules)).status).toBe('invalid')
 })

@@ -1,6 +1,7 @@
 import type { RuleEvidence, LogicalStep } from '@/core/sudoku/logic/types'
 
 /** Copy nested proof data so independently completed trials cannot edit one another. */
+/** Copies every nested proof array so later caller edits cannot corrupt a completed trial. */
 export function copyLogicalStep(step: LogicalStep): LogicalStep {
   const evidence = copyStepEvidence(step.evidence)
 

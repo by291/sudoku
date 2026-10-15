@@ -13,6 +13,7 @@ import type { Board } from '@/core/sudoku/types'
 import { DIGITS } from '@/core/sudoku/types'
 
 const empty: Board = Array(81).fill(0)
+
 it('bounds a nine-cell thermo to digits one through nine', () => {
   const result = evaluateCandidates(
     empty,
@@ -28,6 +29,7 @@ it('bounds a nine-cell thermo to digits one through nine', () => {
   expect(result.candidates[0]).toBe(maskOf(1))
   expect(result.candidates[8]).toBe(maskOf(9))
 })
+
 it('retains supported repeated arrow digits', () => {
   const context = compileRules(ARROW_REPEAT_RULES)
 
@@ -44,6 +46,7 @@ it('retains supported repeated arrow digits', () => {
     expect(result.candidates[40]).toBe(maskOf(2))
   }
 })
+
 it('rejects an impossible partial cage total without using a stored solution', () => {
   const context = compileRules({
     kind: 'killer',
@@ -62,6 +65,7 @@ it('rejects an impossible partial cage total without using a stored solution', (
     message: expect.stringContaining('总和'),
   })
 })
+
 it('returns inconclusive when support enumeration exhausts', () => {
   const context = compileRules(ARROW_REPEAT_RULES)
   const budget = createWorkBudget(0)
@@ -70,6 +74,7 @@ it('returns inconclusive when support enumeration exhausts', () => {
   expect(evaluateConflicts(empty, context, budget).status).toBe('budget-exhausted')
   expect(budget.used).toBe(0)
 })
+
 it('charges repeated propagation against the same budget', () => {
   const budget = createWorkBudget(7)
   const result = evaluateCandidates(empty, compileRules(FULL_LENGTH_THERMO_RULES), budget)
@@ -77,6 +82,7 @@ it('charges repeated propagation against the same budget', () => {
   expect(result.status).toBe('budget-exhausted')
   expect(budget.used).toBeLessThanOrEqual(7)
 })
+
 it('reports direct order violations and rejects full Classic boards under additional rules', () => {
   const board: Board = Array.from(
     { length: 81 },

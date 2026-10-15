@@ -16,17 +16,21 @@ it('has a uniquely solvable authored Expert fixture requiring a deduction beyond
   if (!template) {
     throw new Error('Missing Expert fixture')
   }
+
   const rules = { kind: 'classic' } as const
+
   expect(referenceCountSolutions(template.givens, rules)).toEqual({
     count: 1,
     solution: template.solution,
   })
   expect(analyzeLogic(template.givens, RATING_POLICIES.classic.hard, 500).status).toBe('stalled')
   const result = assessPuzzle(createAssessmentInput(template.givens, rules))
+
   expect(result.status).toBe('rated')
   if (result.status !== 'rated') {
     throw new Error('Expected Expert assessment')
   }
+
   expect(result.summary.difficulty).toBe('expert')
   for (let index = 0; index < result.trace.length; index++) {
     const step = result.trace[index]
@@ -42,6 +46,7 @@ it('has a uniquely solvable authored Expert fixture requiring a deduction beyond
     if (step.evidence.kind === 'coloring') {
       for (const link of step.evidence.links) {
         const cells = state.units.get(`${link.unit.kind}:${link.unit.index}`)
+
         expect(
           cells?.filter((cell) => state.candidates[cell].includes(step.evidence.digits[0])),
         ).toEqual([...link.cells])
@@ -57,6 +62,7 @@ it.each(['expert-limited-a', 'expert-limited-b', 'expert-limited-c', 'expert-lim
       ...DEFAULT_GENERATION_LIMITS,
       maxLayouts: 0,
     })
+
     expect(result).toMatchObject({
       status: 'budget-exhausted',
       stage: 'construction',
@@ -69,9 +75,11 @@ it('validates every advanced proof against the actual replayed board and rejects
   if (!template) {
     throw new Error('Missing Expert fixture')
   }
+
   const result = analyzeLogic(template.givens, RATING_POLICIES.classic.hard, 500)
   const hint = analyzeHint(result.board, template.solution, 500)
   const rules = { kind: 'classic' } as const
+
   expect(hint.kind).toBe('deduction')
   expect(parseHint(hint)).toEqual(hint)
   expect(validateHintEvidence(hint, rules, result.board).valid).toBe(true)
@@ -79,11 +87,13 @@ it('validates every advanced proof against the actual replayed board and rejects
   if (hint.kind !== 'deduction') {
     throw new Error('Expected advanced hint')
   }
+
   const changed = structuredClone(hint)
   const proof = changed.steps.find((step) => step.evidence.kind === 'coloring')?.evidence
   if (!proof || proof.kind !== 'coloring') {
     throw new Error('Expected coloring evidence')
   }
+
   const forged = {
     ...changed,
     steps: changed.steps.map((step) =>
@@ -100,5 +110,6 @@ it('validates every advanced proof against the actual replayed board and rejects
         : step,
     ),
   }
+
   expect(validateHintEvidence(forged, rules, result.board).valid).toBe(false)
 })

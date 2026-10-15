@@ -6,8 +6,7 @@ import { explainStep } from '@/features/game/model/techniquePresentation'
 import { TECHNIQUES } from '@/core/sudoku/logic/techniques'
 import { emptyBoard, uniqueBoard, solvedBoard } from '../../../../tests/fixtures/sudoku'
 import { createLogicalWorkspace } from '@/core/sudoku/logic/workspace'
-import type { Technique, LogicalStep } from '@/core/sudoku/logic/types'
-import type { LogicalState } from '@/core/sudoku/logic/types'
+import type { Technique, LogicalStep, LogicalState } from '@/core/sudoku/logic/types'
 
 function state(candidates: number[]): LogicalState {
   return { board: emptyBoard, candidates }
@@ -24,6 +23,7 @@ it.each([0, 9, 80])('places a naked single at cell %i with its evidence', (cell)
     evidence: { cells: [cell], digits: [5] },
   })
 })
+
 it('places a hidden single instead of confusing it with a naked single', () => {
   const candidates = Array(81).fill(511)
 
@@ -96,6 +96,7 @@ it('does not eliminate a hidden pair when a digit has a third location', () => {
 it('does not infer a locked digit whose box locations span rows and columns', () => {
   expect(classicStep(state(Array(81).fill(511)), ['locked-candidate'])).toBeNull()
 })
+
 it('eliminates only the two naked-pair digits from other cells', () => {
   const candidates = Array(81).fill(511)
   candidates[0] = candidates[1] = 3
@@ -117,12 +118,14 @@ it('eliminates only the two naked-pair digits from other cells', () => {
   })
   expect(step && explainStep(step)).toContain('显性数对')
 })
+
 it('does not treat three cells with the same pair as a naked pair', () => {
   const candidates = Array(81).fill(511)
   candidates[0] = candidates[1] = candidates[2] = 3
 
   expect(classicStep(state(candidates), ['naked-pair'])).toBeNull()
 })
+
 it('removes extra digits from a hidden pair but preserves the pair', () => {
   const candidates = Array(81).fill(511)
   candidates[0] = 7
@@ -141,6 +144,7 @@ it('removes extra digits from a hidden pair but preserves the pair', () => {
     evidence: { cells: [0, 1], digits: [1, 2] },
   })
 })
+
 it('points a box digit into one row', () => {
   const candidates = Array(81).fill(511)
 
@@ -154,6 +158,7 @@ it('points a box digit into one row', () => {
     removals: [3, 4, 5, 6, 7, 8].map((cell) => ({ cell, digit: 1 })),
   })
 })
+
 it('claims a row digit inside one box', () => {
   const candidates = Array(81).fill(511)
 
@@ -167,6 +172,7 @@ it('claims a row digit inside one box', () => {
     removals: [9, 10, 11, 18, 19, 20].map((cell) => ({ cell, digit: 1 })),
   })
 })
+
 it('solves the known easy puzzle using singles and preserves its input', () => {
   expect(analyzeLogic(uniqueBoard, TECHNIQUES.slice(0, 2), 500)).toMatchObject({
     status: 'solved',

@@ -1,7 +1,6 @@
 import type { Unit, RuleContext } from '@/core/sudoku/rules/types'
 import type { Board, Digit, NoteMask, CellValue } from '@/core/sudoku/types'
 import type { CageSupportMemo, PreparedConstraintSupport } from '@/core/sudoku/constraints/types'
-
 import type { WorkBudget } from '@/core/sudoku/budget'
 
 export type BasicClassicTechnique =

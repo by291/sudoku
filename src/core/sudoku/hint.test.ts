@@ -14,6 +14,7 @@ it('flags an incorrect entry without silently changing it', () => {
   })
   expect(unsatisfiableBoard[2]).toBe(1)
 })
+
 it('returns a provable placement from filled values only', () => {
   const board = solvedBoard.map((value, cell) => (cell === 0 ? 0 : value))
 
@@ -23,6 +24,7 @@ it('returns a provable placement from filled values only', () => {
     steps: [{ kind: 'placement', cell: 0, digit: 5 }],
   })
 })
+
 it('never exposes search answers for unsupported positions', () => {
   expect(analyzeHint(emptyBoard, solvedBoard, 500)).toEqual({
     kind: 'unavailable',

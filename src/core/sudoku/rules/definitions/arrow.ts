@@ -5,8 +5,8 @@ import {
   invalidRules,
   parseCells,
   isOrderedPath,
-  isCellIndex,
 } from '@/core/sudoku/rules/topology'
+import { isCellIndex } from '@/core/sudoku/types'
 
 export const ARROW_RULE_DEFINITION: VariantRuleDefinition<'arrow'> = {
   parse(value) {

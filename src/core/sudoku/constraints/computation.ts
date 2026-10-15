@@ -13,6 +13,7 @@ export function prepareRuleComputation(
   if (compiled.status !== 'ready') {
     return compiled
   }
+
   const prepared = prepareConstraintSupport(compiled.context, budget)
   if (prepared.status !== 'ready') {
     return prepared

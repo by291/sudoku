@@ -2,7 +2,7 @@ import { digitsIn, maskOf, PEERS, UNITS } from '@/core/sudoku/board'
 import type { SudokuUnit, Unit } from '@/core/sudoku/rules/types'
 import type { LogicalState, LogicalStep } from '@/core/sudoku/logic/types'
 import { isAdvancedTechnique, isAdvancedEvidence } from '@/core/sudoku/logic/techniques'
-import { available, collision } from '@/core/sudoku/logic/patternFacts'
+import { candidatePositions, hasPeerCollision } from '@/core/sudoku/logic/patternFacts'
 
 function unitFor(unit: Unit): SudokuUnit | undefined {
   return UNITS.find((candidate) => candidate.kind === unit.kind && candidate.index === unit.index)
@@ -36,6 +36,7 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
   ) {
     return false
   }
+
   const removals = step.removals
   if (
     !removals.length ||
@@ -59,7 +60,7 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
       return false
     }
     if (evidence.hidden) {
-      const positions = evidence.digits.map((digit) => available(state, unit.cells, digit))
+      const positions = evidence.digits.map((digit) => candidatePositions(state, unit.cells, digit))
       return (
         positions.every((cells) => cells.length >= 2) &&
         equalSet([...new Set(positions.flat())], evidence.cells) &&
@@ -68,6 +69,7 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
         )
       )
     }
+
     return (
       evidence.cells.every((cell) => digitsIn(state.candidates[cell]).length >= 2) &&
       equalSet(
@@ -97,6 +99,7 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
     ) {
       return false
     }
+
     const kind = bases[0].kind
     if (
       (kind !== 'row' && kind !== 'column') ||
@@ -107,7 +110,8 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
     ) {
       return false
     }
-    const positions = bases.map((unit) => available(state, unit.cells, digit))
+
+    const positions = bases.map((unit) => candidatePositions(state, unit.cells, digit))
     return (
       positions.every((cells) => cells.length >= 2 && cells.length <= size) &&
       equalSet(positions.flat(), evidence.cells) &&
@@ -147,6 +151,7 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
       )
     )
   }
+
   const [first, second] = evidence.colors
   const digit = evidence.digits[0]
   if (
@@ -155,17 +160,19 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
     !first.length ||
     !second.length ||
     !equalSet([...first, ...second], evidence.cells) ||
-    !evidence.cells.every((cell) => available(state, [cell], digit).length === 1)
+    !evidence.cells.every((cell) => candidatePositions(state, [cell], digit).length === 1)
   ) {
     return false
   }
+
   const linked = new Set<number>([first[0]])
+
   for (const link of evidence.links) {
     const unit = unitFor(link.unit)
     if (
       !unit ||
       unit.cells.some((cell) => state.board[cell] === digit) ||
-      !equalSet(available(state, unit.cells, digit), link.cells) ||
+      !equalSet(candidatePositions(state, unit.cells, digit), link.cells) ||
       !link.cells.every((cell) => evidence.cells.includes(cell)) ||
       first.includes(link.cells[0]) === first.includes(link.cells[1])
     ) {
@@ -180,10 +187,12 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
       }
     }
   }
+
   if (linked.size !== evidence.cells.length) {
     return false
   }
-  const conflicts = [collision(first), collision(second)]
+
+  const conflicts = [hasPeerCollision(first), hasPeerCollision(second)]
   if (evidence.mode === 'wrap') {
     return (
       conflicts[0] !== conflicts[1] &&
@@ -193,6 +202,7 @@ export function validateAdvancedStep(state: LogicalState, step: LogicalStep): bo
       )
     )
   }
+
   return (
     !conflicts.some(Boolean) &&
     removals.every(

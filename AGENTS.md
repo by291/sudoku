@@ -133,3 +133,11 @@ Primary references:
 - Use fixed seeds and explicit fixtures for algorithm tests. Validate hint conclusions against known facts rather than asking the implementation under test to confirm itself.
 - Use player-oriented Playwright locators and assertions for keyboard input, touch controls, pauses, persistence, lessons, and completion.
 - Run the relevant checks for the change. Documentation-only edits require content and formatting review, not unrelated application test runs.
+
+## Sudoku core organization
+
+- Import value, rule, logical, rating and generation contracts from their explicit owner (`types.ts` or the subsystem's `types.ts`), rather than an operation module or re-export facade.
+- Keep rule definitions in `core/sudoku/rules/definitions/`, generation geometry in `generation/variants/`, arithmetic support in `constraints/`, exact counting in `search/`, human deductions in `logic/`, and assessment in `rating/`. Generation composes these owners; lower layers must not import it. Preserve enforced static and dynamic dependency boundaries.
+- Keep Chinese technique presentation in `features/game/model/techniquePresentation.ts`. Engine and Worker validators use the pure `logic/techniques.ts` catalogue and `isTechnique` guard.
+- Keep prepared immutable layout data separate from mutable board workspaces and owned returned evidence. Document borrowing, mutation, incomplete results and units where the signature alone cannot express their semantics. TypeScript `readonly` does not establish deep runtime immutability.
+- Core uses explicit type-only imports and prohibits non-null assertions. Keep related constants together and divide functions into meaningful stages with blank lines; do not treat automatic formatting as a substitute for logical grouping.

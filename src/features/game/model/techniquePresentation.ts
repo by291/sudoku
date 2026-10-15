@@ -89,6 +89,7 @@ export function explainStepEvidence(step: LogicalStep): readonly string[] {
         ),
       )
     }
+
     return details
   }
 

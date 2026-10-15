@@ -8,6 +8,7 @@ it('reports consumed construction work without resetting abandoned layouts or su
       ...DEFAULT_GENERATION_LIMITS,
       maxWork: 1,
     })
+
     expect(result).toMatchObject({
       status: 'budget-exhausted',
       stage: 'construction',

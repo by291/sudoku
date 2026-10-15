@@ -91,6 +91,7 @@ it.each(RATING_FIXTURES)(
         result.trace.some((step) => TECHNIQUE_TIERS[step.technique] === fixture.difficulty),
       ).toBe(true)
     }
+
     expect(JSON.stringify(fixture)).toBe(original)
   },
   20000,
@@ -121,6 +122,7 @@ it('round-trips a valid versioned summary and every compact outcome', () => {
   ]) {
     expect(parseAssessmentOutcome(outcome)).toEqual({ valid: true, value: outcome })
   }
+
   expect(parseAssessmentOutcome({ status: 'invalid', issues: [] }).valid).toBe(false)
   expect(
     parseAssessmentOutcome({

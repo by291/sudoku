@@ -116,6 +116,7 @@ export function variantRulesMatter(
 }
 
 const SYMMETRIES: readonly SpatialSymmetry[] = [0, 1, 2, 3, 4, 5, 6, 7]
+
 function freshGeometryInput(rules: PuzzleRules): PuzzleRules {
   if (rules.kind === 'thermo') {
     return { kind: 'thermo', paths: [] }
@@ -123,6 +124,7 @@ function freshGeometryInput(rules: PuzzleRules): PuzzleRules {
   if (rules.kind === 'arrow') {
     return { kind: 'arrow', arrows: [] }
   }
+
   return rules
 }
 
@@ -158,6 +160,7 @@ export function constructVariantLayout(
   if (!examples.length) {
     return { status: 'failed', reason: 'No geometry example for this type and difficulty' }
   }
+
   const base = seededTransform(
     examples[Math.floor(random.geometry() * examples.length)],
     random.geometry,
@@ -168,8 +171,10 @@ export function constructVariantLayout(
     if (prepared.status !== 'ready') {
       return prepared
     }
+
     terminalContext = prepared.context
   }
+
   const terminal = constructUnitTerminal(terminalContext, random.terminal, budget)
   if (terminal.status !== 'ready') {
     return terminal
@@ -186,6 +191,7 @@ export function constructVariantLayout(
       ? { status: 'budget-exhausted' }
       : { status: 'attempt-exhausted' }
   }
+
   const parsed = parseRules(rules)
   if (!parsed.valid || parsed.value.kind === 'classic' || parsed.value.kind !== variant) {
     return { status: 'attempt-exhausted' }

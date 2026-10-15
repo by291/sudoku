@@ -8,6 +8,7 @@ export type VariantTemplate = {
   solution: Board
   difficulty: Difficulty
 }
+
 function literalBoard(text: string): Board {
   const parsed = parseBoard(Array.from(text, Number))
   if (!parsed.valid) {
@@ -30,13 +31,16 @@ function tiers(
   })
   return { easy: [make('easy')], medium: [make('medium')], hard: [make('hard')], expert: [] }
 }
+
 // Authored teaching/grading examples and region presets. Generation never delivers these boards.
 // Their uniqueness is independently checked in tests.
 // Difficulty follows the explained rule-aware trace, and removing variant rules changes solvability.
 const diagonalRules: PuzzleRules = { kind: 'diagonal' }
+
 const diagonalSolution = literalBoard(
   '123456789456789123789123456935241867617538294842697531298314675371865942564972318',
 )
+
 const jigsawRules: PuzzleRules = {
   kind: 'jigsaw',
   regions: [
@@ -51,9 +55,11 @@ const jigsawRules: PuzzleRules = {
     [60, 61, 62, 69, 70, 71, 78, 79, 80],
   ],
 }
+
 const jigsawSolution = literalBoard(
   '123645789789312456456978123234756891567189234891423567345867912678291345912534678',
 )
+
 const killerRules: PuzzleRules = {
   kind: 'killer',
   cages: [
@@ -86,14 +92,19 @@ const killerRules: PuzzleRules = {
     { cells: [78, 79, 80], sum: 21 },
   ],
 }
+
 const killerSolution = literalBoard(
   '123456789456789123789123456234567891567891234891234567345678912678912345912345678',
 )
+
 const thermoRules: PuzzleRules = { kind: 'thermo', paths: [[0, 1, 2, 3, 4, 5, 6, 7, 8]] }
+
 const thermoSolution = literalBoard(
   '123456789456789123789123456234567891567891234891234567345678912678912345912345678',
 )
+
 const arrowRules: PuzzleRules = { kind: 'arrow', arrows: [{ circle: 8, shaft: [16, 24, 32, 40] }] }
+
 const arrowSolution = literalBoard(
   '567219348189374526234658179658743291793821654412965783325486917876192435941537862',
 )

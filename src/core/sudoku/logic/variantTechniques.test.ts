@@ -121,6 +121,7 @@ it('keeps cage proofs separate from changed clue geometry, sums and rule context
   if (constraint.kind !== 'cage') {
     throw new Error('Missing arithmetic fixture')
   }
+
   findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(100))
   constraint.sum = 5
 
@@ -169,6 +170,7 @@ it('owns the cage proof independently of returned deduction evidence', () => {
   if (first.status !== 'complete' || !first.step) {
     throw new Error('Missing cage proof')
   }
+
   Object.assign(first.step.evidence.cells, { 0: 80 })
   Object.assign(first.step.evidence.digits, { 0: 9 })
 
@@ -191,6 +193,7 @@ it('keeps combination deductions outside the easy policy', () => {
   expect(RATING_POLICIES.arrow.medium).toContain('arrow-combination')
   expect(RATING_POLICIES.arrow.hard).toContain('hidden-pair')
 })
+
 it('solves a one-unknown arrow equation without excluding permitted repeats', () => {
   const board = [...ARROW_REPEAT_BOARD]
   board[40] = 0
@@ -217,6 +220,7 @@ it('solves a one-unknown arrow equation without excluding permitted repeats', ()
 
   expect(explainStep(step.step)).toContain('总和')
 })
+
 it('explains the cage premise before its resulting single', () => {
   const solution = VARIANT_FIXTURES.thermo.solution
   const rules = {
@@ -246,6 +250,7 @@ it('explains the cage premise before its resulting single', () => {
     expect(explainStep(result.step)).toContain('笼')
   }
 })
+
 it('explains thermo positional bounds with independently known digits', () => {
   const context = compileRules(FULL_LENGTH_THERMO_RULES)
   const result = analyzeHint(Array(81).fill(0), VARIANT_FIXTURES.thermo.solution, 500, {
@@ -259,6 +264,7 @@ it('explains thermo positional bounds with independently known digits', () => {
     expect(explainStep(result.steps[0])).toContain('递增')
   }
 })
+
 it.each(['diagonal', 'jigsaw'] as const)('uses %s units for hidden singles', (variant) => {
   const context = compileRules(VARIANT_FIXTURES[variant].rules)
   const targetUnit = context.units.find(
@@ -284,6 +290,7 @@ it.each(['diagonal', 'jigsaw'] as const)('uses %s units for hidden singles', (va
     },
   })
 })
+
 it('returns an explicit arithmetic budget outcome rather than a claimed difficulty', () => {
   expect(
     assessPuzzleWithBudget(

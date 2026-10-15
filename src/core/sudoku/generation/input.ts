@@ -14,6 +14,7 @@ export function createGenerationInput(
   if (!supportsDifficulty(variant, difficulty)) {
     throw new TypeError('Expert difficulty is supported only for Classic')
   }
+
   return variant === 'classic'
     ? { variant, difficulty, seed, puzzleVersion: PUZZLE_VERSION }
     : { variant, difficulty, seed, puzzleVersion: VARIANT_PUZZLE_VERSION }
@@ -56,6 +57,7 @@ export function parseGenerationLimits(value: unknown): ParseResult<GenerationLim
   }
 
   const limits = { ...DEFAULT_GENERATION_LIMITS }
+
   for (const key of ['maxLayouts', 'maxWork', 'maxSteps'] as const) {
     const limit = value[key]
     if (
@@ -66,6 +68,7 @@ export function parseGenerationLimits(value: unknown): ParseResult<GenerationLim
     ) {
       return { valid: false, issues: [`Invalid generation limit: ${key}`] }
     }
+
     limits[key] = limit
   }
 

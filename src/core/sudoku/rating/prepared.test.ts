@@ -29,6 +29,7 @@ it('owns the rule and limit snapshots across caller mutations', () => {
   if (!fixture || fixture.rules.kind !== 'thermo') {
     throw new Error('Missing Thermo Hard fixture')
   }
+
   const paths = fixture.rules.paths.map((path) => [...path])
   const rules = { kind: 'thermo' as const, paths }
   const mutableLimits = { ...limits }
@@ -50,6 +51,7 @@ it('uses separate logical state and traces for every board', () => {
   if (result.status !== 'rated' || !result.trace[0]) {
     throw new Error('Missing known unique trace')
   }
+
   result.trace[0].technique = 'x-wing'
 
   expect(prepared.assess(board, createWorkBudget(limits.maxWork))).toEqual(expected)
@@ -89,6 +91,7 @@ function reverseClueGeometry(value: unknown, visited = new Set<object>()): void 
   if (visited.has(value)) {
     return
   }
+
   visited.add(value)
 
   for (const [key, member] of Object.entries(value)) {
@@ -99,6 +102,7 @@ function reverseClueGeometry(value: unknown, visited = new Set<object>()): void 
     ) {
       member.reverse()
     }
+
     reverseClueGeometry(member, visited)
   }
 }
@@ -110,6 +114,7 @@ it.each(['killer-hard', 'thermo-hard', 'arrow-hard'])(
     if (!fixture) {
       throw new Error(`Missing ${id} fixture`)
     }
+
     const prepared = prepareAssessment(fixture.rules, limits)
     const expected = prepared.assess(fixture.board, createWorkBudget(limits.maxWork))
     const result = prepared.assess(fixture.board, createWorkBudget(limits.maxWork))
@@ -128,11 +133,13 @@ it('owns variant evidence digits instead of exposing the engine constant', () =>
   if (!fixture) {
     throw new Error('Missing Thermo Hard fixture')
   }
+
   const prepared = prepareAssessment(fixture.rules, limits)
   const result = prepared.assess(fixture.board, createWorkBudget(limits.maxWork))
   if (result.status !== 'rated') {
     throw new Error('Missing known rated trace')
   }
+
   const step = result.trace.find((item) => item.evidence.kind === 'thermo')
   if (!step) {
     throw new Error('Missing Thermo evidence')

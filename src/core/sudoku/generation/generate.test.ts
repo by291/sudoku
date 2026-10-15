@@ -94,12 +94,14 @@ it('returns reproducible construction exhaustion without substituting an authore
 
 it('uses only current generation versions and returns an accepted assessment', () => {
   const input = createGenerationInput('classic', 'easy', 'current-generation')
+
   expect(input.puzzleVersion).toBe('sudoku-v10')
   for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
     expect(createGenerationInput(variant, 'easy', 'current-generation').puzzleVersion).toBe(
       'sudoku-variants-v10',
     )
   }
+
   const killerInput = createGenerationInput('killer', 'hard', 'current-generation')
 
   expect(killerInput.puzzleVersion).toBe('sudoku-variants-v10')
@@ -118,6 +120,7 @@ it('uses only current generation versions and returns an accepted assessment', (
 
 it('delivers generated puzzles from independently different terminal classes', () => {
   const counts = new Set<number>()
+
   for (let index = 1; index <= 4; index++) {
     const seed = `classic-v2-corpus-${String(index).padStart(2, '0')}`
     const result = generatePuzzle(createGenerationInput('classic', 'easy', seed))
@@ -126,6 +129,7 @@ it('delivers generated puzzles from independently different terminal classes', (
     if (result.status !== 'ready') {
       throw new Error(seed)
     }
+
     expect(countReferenceSolutions(result.puzzle.givens, 2)).toBe(1)
     counts.add(countIntercalates(result.puzzle.solution))
   }

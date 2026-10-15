@@ -17,13 +17,17 @@ import { CLASSIC_PUZZLE_FIXTURES } from '../../../../tests/fixtures/classicPuzzl
 import { referenceCountSolutions } from '../../../../tests/support/referenceVariants'
 
 const hard = CLASSIC_PUZZLE_FIXTURES.find((fixture) => fixture.difficulty === 'hard')
+
 if (!hard) {
   throw new Error('Missing independently verified Hard fixture')
 }
+
 const complete = rating.assessPuzzle(createAssessmentInput(hard.givens, { kind: 'classic' }))
+
 if (complete.status !== 'rated') {
   throw new Error('Missing fixed Hard assessment')
 }
+
 const hardAssessment = complete
 
 afterEach(() => vi.restoreAllMocks())
@@ -40,6 +44,7 @@ function scriptedSearch(
       if (!consumeWork(budget)) {
         return { status: 'budget-exhausted' }
       }
+
       return { status: 'ready', terminal: [...terminal], rules }
     })
   const finish = vi.fn(() => ({
@@ -53,10 +58,12 @@ function scriptedSearch(
       if (!withWorkStage(budget, 'logic', () => consumeWork(budget))) {
         return { status: 'budget-exhausted', cause: 'work-limit' }
       }
+
       const special = screenOverride?.(board, ++screens)
       if (special) {
         return special
       }
+
       const clues = board.filter(Boolean).length
       return {
         status: clues <= 31 ? 'matching-target' : 'below-target',
@@ -70,6 +77,7 @@ function scriptedSearch(
     if (!withWorkStage(budget, 'exact', () => consumeWork(budget))) {
       return { status: 'budget-exhausted', nodesVisited: 0, workUsed: 0 }
     }
+
     return {
       status: 'complete',
       count: 1,
@@ -87,6 +95,7 @@ it('keeps matching grades above the clue cap as checkpoints and still exact-coun
   let saw31 = false
   const mocks = scriptedSearch((board) => {
     saw31 ||= board.filter(Boolean).length === 31
+
     return null
   })
   const result = generatePuzzle(createGenerationInput('classic', 'hard', 'shared-matching-cap'))
@@ -97,6 +106,7 @@ it('keeps matching grades above the clue cap as checkpoints and still exact-coun
   if (result.status !== 'ready') {
     throw new Error('Expected a completed target')
   }
+
   expect(result.puzzle.givens.filter(Boolean).length).toBeLessThanOrEqual(30)
   expect(mocks.count.mock.lastCall?.[0]).toEqual(result.puzzle.givens)
   expect(Object.values(result.metrics.workByStage).reduce((a, b) => a + b, 0)).toBe(
@@ -110,6 +120,7 @@ it('continues retained work after 40 attempts even if the later terminals fail',
   )
   mocks.construction.mockImplementation((_input, _random, budget) => {
     consumeWork(budget)
+
     return mocks.construction.mock.calls.length === 1
       ? { status: 'ready', terminal: [...solvedBoard], rules: { kind: 'classic' } }
       : { status: 'attempt-exhausted' }
@@ -154,6 +165,7 @@ it.each([0, 1, 20])('never publishes an incomplete repair with %i work units', (
 
 it('distinguishes blocked creation from step exhaustion and lost known solutions', () => {
   const mocks = scriptedSearch(() => ({ status: 'budget-exhausted', cause: 'logical-step-limit' }))
+
   expect(
     generatePuzzle(createGenerationInput('classic', 'hard', 'no-layouts'), {
       ...DEFAULT_GENERATION_LIMITS,
@@ -173,6 +185,7 @@ it('distinguishes blocked creation from step exhaustion and lost known solutions
     nodesVisited: 1,
     workUsed: 0,
   }))
+
   expect(
     generatePuzzle(createGenerationInput('classic', 'hard', 'lost-known-solution')),
   ).toMatchObject({ status: 'failed', reason: expect.stringContaining('known solution') })
@@ -185,6 +198,7 @@ it('independently verifies a real shared-engine result', () => {
   if (result.status !== 'ready') {
     throw new Error('Expected fixed-seed real generation')
   }
+
   expect(referenceCountSolutions(result.puzzle.givens, result.puzzle.rules)).toEqual({
     count: 1,
     solution: result.puzzle.solution,
@@ -201,6 +215,7 @@ it('lets a progressing second layout finish its sweep before replacement', () =>
   if (!original) {
     throw new Error('Missing typed screening fixture')
   }
+
   vi.mocked(rating.prepareAssessmentWithComputation).mockImplementation((computation, limits) => {
     const owner = original(computation, limits)
     const index = mocks.construction.mock.calls.length
@@ -211,8 +226,10 @@ it('lets a progressing second layout finish its sweep before replacement', () =>
         screensByLayout.set(owner, seen)
         if (index === 1) {
           consumeWork(budget)
+
           return { status: 'budget-exhausted', cause: 'logical-step-limit' }
         }
+
         return owner.screenTarget(board, target, budget)
       },
     }
@@ -233,11 +250,13 @@ it('uses a stalled checkpoint to restore clues before finding the target', () =>
     const clues = board.filter(Boolean).length
     if (!restored && clues === 30) {
       stalledMask = givenMask(board)
+
       return { status: 'target-stalled', feedback: { remainingCells: 5, deductions: 46 } }
     }
     if (stalledMask !== null && clues === 31 && (givenMask(board) & stalledMask) === stalledMask) {
       restored = true
     }
+
     return null
   })
   const result = generatePuzzle(
@@ -264,6 +283,7 @@ it('feeds unnecessary variant rules back into exploration before publishing', ()
   if (result.status !== 'ready') {
     throw new Error('Expected a rule-dependent completed candidate')
   }
+
   expect(necessity.mock.lastCall?.[0].givens).toEqual(result.puzzle.givens)
 })
 
@@ -284,6 +304,7 @@ it('finishes a costly progressing sweep before spending work on another layout',
   if (!original) {
     throw new Error('Missing typed screening fixture')
   }
+
   vi.mocked(rating.prepareAssessmentWithComputation).mockImplementation((computation, limits) => {
     const owner = original(computation, limits)
     return {
@@ -292,6 +313,7 @@ it('finishes a costly progressing sweep before spending work on another layout',
         if (!consumeWork(budget, 20000)) {
           return { status: 'budget-exhausted', cause: 'work-limit' }
         }
+
         return owner.screenTarget(board, target, budget)
       },
     }

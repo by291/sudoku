@@ -5,7 +5,6 @@ import type { Puzzle } from '@/core/sudoku/puzzle'
 import type { NewSudokuVariant, SudokuVariant, RulesFor } from '@/core/sudoku/rules/types'
 
 export const PUZZLE_VERSION = 'sudoku-v10'
-
 export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v10'
 
 export type GenerationInput = { seed: string; difficulty: Difficulty } & (
@@ -42,6 +41,7 @@ export type GenerationAttemptResult =
 
 export type GenerationResult = GenerationAttemptResult & { metrics: Readonly<GenerationMetrics> }
 
+/** Arithmetic variants restrict digit/complement transforms to preserve clue equations. */
 export type VariantGenerationStrategy<K extends NewSudokuVariant> = {
   readonly allowsDigitMap: boolean
   readonly allowsComplement: boolean

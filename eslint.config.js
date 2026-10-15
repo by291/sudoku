@@ -13,6 +13,25 @@ const compositionImportPatterns = [
   },
 ]
 
+const coreImportPatterns = [
+  ...sourceImportPatterns,
+  { regex: '^@/(?!core/)', message: 'The Sudoku engine must remain independent.' },
+]
+const coreExternalPackages = ['vue', 'pinia', 'vue-router', 'naive-ui', 'idb']
+
+// Each entry includes the base engine policy because flat-config rule options replace it.
+const coreDependencyPolicies = [
+  { files: ['src/core/sudoku/{types,budget,random}.ts'], forbidden: 'logic|rating|generation' },
+  {
+    files: ['src/core/sudoku/rules/**/*.ts'],
+    forbidden: 'constraints|search|logic|rating|generation',
+  },
+  { files: ['src/core/sudoku/constraints/**/*.ts'], forbidden: 'search|logic|rating|generation' },
+  { files: ['src/core/sudoku/search/**/*.ts'], forbidden: 'logic|rating|generation' },
+  { files: ['src/core/sudoku/logic/**/*.ts'], forbidden: 'rating|generation' },
+  { files: ['src/core/sudoku/rating/**/*.ts'], forbidden: 'generation' },
+]
+
 function restrictImports({ paths = [], patterns }) {
   // Static import restrictions do not inspect import(). Generate both from one policy.
   const dynamicImports = [
@@ -66,12 +85,14 @@ export default [
     ignores: ['src/**/*.test.ts'],
     rules: {
       ...restrictImports({
-        paths: ['vue', 'pinia', 'vue-router', 'naive-ui', 'idb'],
-        patterns: [
-          ...sourceImportPatterns,
-          { regex: '^@/(?!core/)', message: 'The Sudoku engine must remain independent.' },
-        ],
+        paths: coreExternalPackages,
+        patterns: coreImportPatterns,
       }),
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
+      ],
+      '@typescript-eslint/no-non-null-assertion': 'error',
       'no-restricted-globals': [
         'error',
         'window',
@@ -82,6 +103,35 @@ export default [
         'performance',
       ],
     },
+  },
+  ...coreDependencyPolicies.map(({ files, forbidden }) => ({
+    files,
+    ignores: ['src/**/*.test.ts'],
+    rules: restrictImports({
+      paths: coreExternalPackages,
+      patterns: [
+        ...coreImportPatterns,
+        {
+          regex: `^@/core/sudoku/(?:${forbidden})(?:/|$)`,
+          message: 'Import a lower-level owner; Sudoku dependencies must not point upward.',
+        },
+      ],
+    }),
+  })),
+  {
+    files: ['src/core/sudoku/rules/definitions/**/*.ts'],
+    rules: restrictImports({
+      paths: coreExternalPackages,
+      patterns: [
+        ...coreImportPatterns,
+        {
+          regex:
+            '^@/core/sudoku/(?:constraints|search|logic|rating|generation)(?:/|$)|^@/core/sudoku/rules/(?:registry|context)(?:[./]|$)',
+          message:
+            'Rule definitions must remain independent of registries and higher-level operations.',
+        },
+      ],
+    }),
   },
   {
     files: ['src/runtime.ts', 'src/{features,storage,worker,shared}/**/*.{ts,vue}'],

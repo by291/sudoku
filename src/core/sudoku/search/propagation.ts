@@ -38,6 +38,7 @@ export function countPropagationSolutions(
       if (!change) {
         throw new Error('Missing reversible domain change')
       }
+
       domains[change.cell] = change.previous
     }
   }
@@ -53,8 +54,10 @@ export function countPropagationSolutions(
   function charge(): boolean {
     if (!consumeWork(budget)) {
       exhausted = true
+
       return false
     }
+
     return true
   }
 
@@ -81,6 +84,7 @@ export function countPropagationSolutions(
       if (reduced === domains[cell]) {
         return true
       }
+
       assign(cell, reduced)
       cells.push(cell)
       for (const index of unitMemberships[cell]) {
@@ -89,6 +93,7 @@ export function countPropagationSolutions(
       for (const index of constraintMemberships[cell]) {
         constraints.add(index)
       }
+
       return true
     }
 
@@ -97,10 +102,12 @@ export function countPropagationSolutions(
         if (!charge()) {
           return false
         }
+
         const cell = cells.pop()
         if (cell === undefined) {
           throw new Error('Missing propagation cell')
         }
+
         const mask = domains[cell]
         if (mask === 0) {
           return false
@@ -108,6 +115,7 @@ export function countPropagationSolutions(
         if ((mask & (mask - 1)) !== 0) {
           continue
         }
+
         for (const peer of context.duplicatePeers[cell]) {
           if (!reduce(peer, domains[peer] & ~mask)) {
             return false
@@ -123,10 +131,12 @@ export function countPropagationSolutions(
         if (!charge()) {
           return false
         }
+
         for (const digit of DIGITS) {
           const bit = maskOf(digit)
           let lastPosition = -1
           let positions = 0
+
           for (const cell of context.units[unitIndex].cells) {
             if (domains[cell] & bit) {
               lastPosition = cell
@@ -136,6 +146,7 @@ export function countPropagationSolutions(
               }
             }
           }
+
           if (positions === 0) {
             return false
           }
@@ -150,10 +161,12 @@ export function countPropagationSolutions(
       if (constraintIndex === undefined) {
         continue
       }
+
       constraints.delete(constraintIndex)
       if (!charge()) {
         return false
       }
+
       const support = preparedSupport.get(
         unassigned,
         domains,
@@ -162,8 +175,10 @@ export function countPropagationSolutions(
       )
       if (support.status === 'budget-exhausted') {
         exhausted = true
+
         return false
       }
+
       for (let position = 0; position < support.cells.length; position++) {
         const cell = support.cells[position]
         if (!reduce(cell, domains[cell] & support.supports[position])) {
@@ -171,14 +186,17 @@ export function countPropagationSolutions(
         }
       }
     }
+
     return true
   }
 
   function visit(changedCell?: number): void {
     if (nodesVisited >= nodeLimit || !charge()) {
       exhausted = true
+
       return
     }
+
     nodesVisited++
     if (!propagate(changedCell)) {
       return
@@ -186,6 +204,7 @@ export function countPropagationSolutions(
 
     let target = -1
     let fewest = UNIT_SIZE + 1
+
     for (let cell = 0; cell < BOARD_SIZE; cell++) {
       const size = digitsIn(domains[cell]).length
       if (size > 1 && size < fewest) {
@@ -193,12 +212,14 @@ export function countPropagationSolutions(
         fewest = size
       }
     }
+
     if (target === -1) {
       const completed = domains.map((mask) => digitsIn(mask)[0])
       if (isComplete(completed, context)) {
         count = count === 0 ? 1 : 2
         solution ??= completed
       }
+
       return
     }
 

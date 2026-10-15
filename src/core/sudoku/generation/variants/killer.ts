@@ -38,12 +38,14 @@ export const KILLER_GENERATION_STRATEGY: VariantGenerationStrategy<'killer'> = {
         if (!consumeWork(budget)) {
           return null
         }
+
         const openSides = unusedNeighbourCount(cell, remaining)
         if (openSides < fewestOpenSides) {
           first = cell
           fewestOpenSides = openSides
         }
       }
+
       if (first === undefined) {
         throw new Error('Missing unused cage cell')
       }
@@ -57,6 +59,7 @@ export const KILLER_GENERATION_STRATEGY: VariantGenerationStrategy<'killer'> = {
       while (cells.length < size) {
         const choices: number[] = []
         const crowded: number[] = []
+
         for (const cell of remaining) {
           if (!consumeWork(budget)) {
             return null
@@ -67,11 +70,13 @@ export const KILLER_GENERATION_STRATEGY: VariantGenerationStrategy<'killer'> = {
           ) {
             continue
           }
+
           choices.push(cell)
           if (unusedNeighbourCount(cell, remaining) <= 1) {
             crowded.push(cell)
           }
         }
+
         if (!choices.length) {
           break
         }

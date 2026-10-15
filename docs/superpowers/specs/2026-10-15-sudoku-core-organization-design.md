@@ -2,7 +2,7 @@
 
 Date: 2026-10-15
 
-Status: Approved by the user on 2026-10-15. Product source has not been modified.
+Status: Approved by the user on 2026-10-15. Implementation is in progress on `refactor/sudoku-core-organization`.
 
 ## Intent
 
@@ -67,6 +67,7 @@ src/core/sudoku/
     basicTechniques.ts
     advancedTechniques.ts
     advancedEvidence.ts
+    patternFacts.ts         # Shared pure candidate/peer predicates
     variantTechniques.ts
   rating/
     types.ts

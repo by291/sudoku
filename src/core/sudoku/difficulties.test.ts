@@ -52,6 +52,7 @@ it('accepts Classic Expert without interpreting a stored board as a generation r
     }).valid,
   ).toBe(true)
   const template = CLASSIC_PUZZLE_FIXTURES[0]
+
   expect(
     parsePuzzle({
       ...template,

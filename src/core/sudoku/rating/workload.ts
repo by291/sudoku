@@ -4,7 +4,8 @@ import type { LogicalStep, Technique } from '@/core/sudoku/logic/types'
 import { RATING_POLICIES, TECHNIQUE_TIERS } from '@/core/sudoku/rating/policies'
 import type { Board, ParseResult } from '@/core/sudoku/types'
 import type { RuleContext } from '@/core/sudoku/rules/types'
-import { isCellIndex, maskOf } from '@/core/sudoku/board'
+import { isCellIndex } from '@/core/sudoku/types'
+import { maskOf } from '@/core/sudoku/board'
 import type { ReasoningWorkload } from '@/core/sudoku/rating/types'
 
 export function emptyTechniqueCounts(): Record<Technique, number> {

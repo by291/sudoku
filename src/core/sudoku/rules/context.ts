@@ -31,11 +31,13 @@ function memberships(
   budget?: WorkBudget,
 ): readonly (readonly number[])[] | null {
   const result = Array.from({ length: BOARD_SIZE }, (): number[] => [])
+
   for (const [index, cells] of groups.entries()) {
     for (const cell of cells) {
       if (budget && !consumeWork(budget)) {
         return null
       }
+
       result[cell].push(index)
     }
   }
@@ -48,6 +50,7 @@ function relationships(
   budget?: WorkBudget,
 ): readonly (readonly number[])[] | null {
   const peers = Array.from({ length: BOARD_SIZE }, () => new Set<number>())
+
   for (const cells of groups) {
     for (const cell of cells) {
       for (const peer of cells) {
@@ -126,6 +129,7 @@ function buildRuleContext(rules: PuzzleRules, budget?: WorkBudget): RuleContext 
   if (budget && !consumeWork(budget)) {
     return null
   }
+
   const ownedRules = freezeRules(parsed.value)
   const {
     units: sourceUnits,
@@ -146,6 +150,7 @@ function buildRuleContext(rules: PuzzleRules, budget?: WorkBudget): RuleContext 
   if (!cellUnits || !cellConstraints) {
     return null
   }
+
   const duplicatePeers = relationships(duplicateGroups, budget)
   const relatedCells = relationships(
     [...duplicateGroups, ...constraints.map(constraintCells)],
@@ -185,6 +190,7 @@ export function prepareRuleContext(
     if (rules.kind === 'classic') {
       return { status: 'ready', context: CLASSIC_CONTEXT }
     }
+
     const context = buildRuleContext(rules, budget)
 
     return context ? { status: 'ready', context } : { status: 'budget-exhausted' }

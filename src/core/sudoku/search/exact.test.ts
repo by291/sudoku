@@ -56,6 +56,7 @@ it.each(propagationFixtures)(
       nodeBudget: 1000000,
       context,
     })
+
     expect(complete.status).toBe('complete')
     const budget = createWorkBudget(complete.workUsed + 4)
     budget.used = 5
@@ -79,6 +80,7 @@ it('agrees with independent counting on zero and multiple small-cage Killer solu
   if (fixture.rules.kind !== 'killer') {
     throw new Error('Expected Killer rules')
   }
+
   const nearlyComplete = [...fixture.solution]
   nearlyComplete[0] = 0
   nearlyComplete[8] = 0
@@ -100,6 +102,7 @@ it('agrees with independent counting on zero and multiple small-cage Killer solu
 
   const empty = Array(81).fill(0)
   const independent = referenceCountSolutions(empty, fixture.rules)
+
   expect(independent.count).toBe(2)
   expect(
     countSolutions(empty, {
@@ -148,6 +151,7 @@ it.each([
     expect(result).toMatchObject({ solution: solvedBoard })
   }
 })
+
 it('never reports uniqueness after budget exhaustion', () => {
   expect(countSolutions(emptyBoard, { maxSolutions: 2, nodeBudget: 0 })).toEqual({
     status: 'budget-exhausted',
@@ -165,6 +169,7 @@ it('never reports uniqueness after budget exhaustion', () => {
     nodesVisited: 1,
   })
 })
+
 it('does not mutate the source puzzle', () => {
   const board = [...uniqueBoard]
   countSolutions(board, { maxSolutions: 2, nodeBudget: 1000000 })

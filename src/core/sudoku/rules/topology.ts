@@ -1,13 +1,9 @@
-import { BOARD_SIZE, BOX_SIZE, UNIT_SIZE } from '@/core/sudoku/types'
+import { BOARD_SIZE, BOX_SIZE, UNIT_SIZE, isCellIndex } from '@/core/sudoku/types'
 import type { ParseResult } from '@/core/sudoku/types'
 import type { SudokuUnit } from '@/core/sudoku/rules/types'
 
 export function invalidRules(reason: string): ParseResult<never> {
   return { valid: false, issues: [reason] }
-}
-
-export function isCellIndex(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < BOARD_SIZE
 }
 
 export function parseCells(value: unknown, minimum: number, maximum: number): number[] | null {

@@ -29,6 +29,7 @@ import type { Board } from '@/core/sudoku/types'
 import { variantRulesMatter } from '@/core/sudoku/generation/variant'
 
 const CLUE_TARGETS = { easy: 36, medium: 32, hard: 30, expert: 28 } as const
+
 const TIER_ORDER = { easy: 0, medium: 1, hard: 2, expert: 3 } as const
 
 export type PreparedLayout = {
@@ -79,6 +80,7 @@ function acceptedCandidate(
   ) {
     return { status: 'failed', reason: 'Invalid constructed puzzle identity or terminal' }
   }
+
   const completed = trial.complete()
   if (
     completed.summary.ratingVersion !== RATING_VERSION ||
@@ -87,6 +89,7 @@ function acceptedCandidate(
   ) {
     return { status: 'failed', reason: 'Accepted assessment identity does not match the request' }
   }
+
   const exact = layout.validator.count(board, budget, budget.limit - budget.used)
   if (exact.status !== 'complete') {
     return { status: 'budget-exhausted', stage: 'construction', cause: 'work-limit' }
@@ -101,10 +104,12 @@ function acceptedCandidate(
   if (exact.count !== 1) {
     return { status: 'rejected' }
   }
+
   const rules = parseRules(context.rules)
   if (!rules.valid) {
     return { status: 'failed', reason: rules.issues.join('; ') }
   }
+
   const puzzle = {
     rules: rules.value,
     solution: [...layout.terminal],
@@ -156,8 +161,10 @@ function evaluateCandidate(
     if (result.count !== 1) {
       return { status: 'continue', improved: false, stepLimited: false, screened: false }
     }
+
     exact = 'unique'
   }
+
   const trial = layout.assessor.screenTarget(board, input.difficulty, budget)
   if (trial.status === 'invalid') {
     return { status: 'failed', reason: trial.issues.join('; ') }
@@ -167,6 +174,7 @@ function evaluateCandidate(
       ? { status: 'work-limit' }
       : { status: 'continue', improved: false, stepLimited: true, screened: true }
   }
+
   const identity = { layoutId: layout.id, mask, feedback: trial.feedback }
   let improved: boolean
   if (trial.status === 'target-stalled') {
@@ -188,6 +196,7 @@ function evaluateCandidate(
       layout.bestTier = tier
       layout.bestProgress = progress
     }
+
     const meetsCluePolicy =
       input.variant !== 'classic' || board.filter(Boolean).length <= CLUE_TARGETS[input.difficulty]
     if (trial.status === 'matching-target' && meetsCluePolicy) {
@@ -230,6 +239,7 @@ export function searchGeneration(
           if (expansionRequestedBy === active[index]) {
             expansionRequestedBy = null
           }
+
           active.splice(index, 1)
         }
       }
@@ -270,6 +280,7 @@ export function searchGeneration(
         if (result.status === 'attempt-exhausted') {
           continue
         }
+
         const prepared = prepareRuleComputation(result.rules, budget)
         if (prepared.status !== 'ready') {
           workExhausted = true
@@ -281,6 +292,7 @@ export function searchGeneration(
         ) {
           return { status: 'failed', reason: 'Constructed layout has an invalid terminal' }
         }
+
         const terminal = Object.freeze([...result.terminal])
         const frontier = createCandidateFrontier(id, terminal, input.difficulty)
         frontier.retain({
@@ -312,6 +324,7 @@ export function searchGeneration(
           expansionRequestedBy.expandedAt = expansionRequestedBy.visits
           expansionRequestedBy = null
         }
+
         active.push(layout)
       }
       if (active.length === 0) {
@@ -333,6 +346,7 @@ export function searchGeneration(
         }
         continue
       }
+
       layout.visits++
       metrics.candidateVisits++
       const evaluationWorkStarted = budget.used
@@ -351,6 +365,7 @@ export function searchGeneration(
           stepLimitedScreens++
         }
       }
+
       layout.frontier.recordEvaluation(result.improved)
       if (
         layout.frontier.stagnant &&

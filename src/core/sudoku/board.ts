@@ -1,8 +1,13 @@
-import { ALL_DIGITS_MASK, BOARD_SIZE, DIGITS, UNIT_SIZE, isDigit } from '@/core/sudoku/types'
+import {
+  ALL_DIGITS_MASK,
+  BOARD_SIZE,
+  DIGITS,
+  UNIT_SIZE,
+  isDigit,
+  isCellIndex,
+} from '@/core/sudoku/types'
 import type { Board, CellValue, Digit, NoteMask, ParseResult } from '@/core/sudoku/types'
-
-import type { SudokuUnit } from '@/core/sudoku/rules/types'
-import type { RuleContext } from '@/core/sudoku/rules/types'
+import type { SudokuUnit, RuleContext } from '@/core/sudoku/rules/types'
 import { CLASSIC_CONTEXT, satisfiesConstraint } from '@/core/sudoku/rules/context'
 
 export const UNITS: readonly SudokuUnit[] = CLASSIC_CONTEXT.units
@@ -13,10 +18,6 @@ export function maskOf(digit: Digit): NoteMask {
 
 export function digitsIn(mask: NoteMask): readonly Digit[] {
   return DIGITS.filter((digit) => (mask & maskOf(digit)) !== 0)
-}
-
-export function isCellIndex(cell: number): boolean {
-  return Number.isInteger(cell) && cell >= 0 && cell < BOARD_SIZE
 }
 
 export function getPeers(cell: number): readonly number[] {

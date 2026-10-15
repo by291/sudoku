@@ -6,6 +6,7 @@ import type {
   GenerationStrategy,
   LayoutConstructionResult,
   LayoutRandomStreams,
+  GenerationInput,
 } from '@/core/sudoku/generation/types'
 import { VARIANT_RULE_DEFINITIONS } from '@/core/sudoku/rules/registry'
 import type {
@@ -13,7 +14,6 @@ import type {
   SudokuVariant,
   VariantRuleDefinition,
 } from '@/core/sudoku/rules/types'
-import type { GenerationInput } from '@/core/sudoku/generation/types'
 import type { WorkBudget } from '@/core/sudoku/budget'
 
 function variantStrategy<K extends NewSudokuVariant>(
@@ -30,6 +30,7 @@ function variantStrategy<K extends NewSudokuVariant>(
       if (result.status !== 'ready') {
         return result
       }
+
       const parsed = definition.parse(result.rules)
       if (!parsed.valid) {
         return { status: 'failed', reason: parsed.issues.join('; ') }

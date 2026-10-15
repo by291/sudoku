@@ -65,6 +65,7 @@ export function countSolutions(
   if (prepared.status !== 'ready') {
     return { status: 'budget-exhausted', nodesVisited: 0, workUsed: budget.used - started }
   }
+
   const result = prepareExactValidator(prepared.computation).count(
     board,
     budget,

@@ -14,6 +14,7 @@ export type Puzzle = {
   rules: PuzzleRules
 }
 
+/** Validates stored snapshots without requiring the current generation version. */
 export function parsePuzzle(value: unknown): ParseResult<Puzzle> {
   if (
     !isRecord(value) ||

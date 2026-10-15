@@ -8,6 +8,7 @@ import type { Technique } from '@/core/sudoku/logic/types'
 import type { Difficulty } from '@/core/sudoku/types'
 
 export const RATING_VERSION = 'sudoku-rating-v2'
+
 export type RatingVersion = typeof RATING_VERSION
 
 type TierPolicies = Readonly<Record<Difficulty, readonly Technique[]>>
@@ -20,6 +21,7 @@ const easy: readonly Technique[] = [
   'thermo-bound',
   'arrow-equation',
 ]
+
 const medium: readonly Technique[] = [
   ...easy,
   'locked-candidate',

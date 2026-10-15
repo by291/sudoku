@@ -8,6 +8,7 @@ export type Board = readonly CellValue[]
 export type NoteMask = number
 
 export type StandardDifficulty = 'easy' | 'medium' | 'hard'
+
 export type Difficulty = StandardDifficulty | 'expert'
 
 export type ParseResult<T> = { valid: true; value: T } | { valid: false; issues: readonly string[] }
@@ -25,7 +26,9 @@ export type SearchResult =
 export const BOARD_SIZE = 81
 export const UNIT_SIZE = 9
 export const BOX_SIZE = 3
+
 export const ALL_DIGITS_MASK = (1 << UNIT_SIZE) - 1
+
 export const DIGITS: readonly Digit[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 export function isDigit(value: unknown): value is Digit {
@@ -38,4 +41,8 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function isDifficulty(value: unknown): value is Difficulty {
   return value === 'easy' || value === 'medium' || value === 'hard' || value === 'expert'
+}
+
+export function isCellIndex(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < BOARD_SIZE
 }

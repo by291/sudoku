@@ -21,6 +21,7 @@ it.each(RATING_FIXTURES)('classifies $id before producing its complete assessmen
   if (trial.status !== 'rated') {
     throw new Error('Missing known rated trial')
   }
+
   const workBeforeCompletion = trialBudget.used
 
   expect(trial.complete()).toEqual(expected)
@@ -41,6 +42,7 @@ it('retains an owned screened board after later clue changes and assessments', (
   if (trial.status !== 'rated') {
     throw new Error('Missing known rated trial')
   }
+
   expect(trial.complete()).toEqual(expected)
 })
 

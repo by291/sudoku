@@ -20,6 +20,7 @@ it('finds a unique Expert in a nearby clue mask within a three-terminal allowanc
   if (result.status !== 'ready') {
     throw new Error('Missing shared Expert exploration')
   }
+
   expect(result.metrics.layouts).toBeLessThanOrEqual(3)
   expect(referenceCountSolutions(result.puzzle.givens, result.puzzle.rules)).toEqual({
     count: 1,
@@ -30,6 +31,7 @@ it('finds a unique Expert in a nearby clue mask within a three-terminal allowanc
 
 it('constructs independently valid deterministic terminals across transformation classes', () => {
   const counts = new Set<number>()
+
   for (let index = 1; index <= 16; index++) {
     const seed = `classic-terminal-v2-${String(index).padStart(2, '0')}`
     const budget = createWorkBudget(1000000)
@@ -40,6 +42,7 @@ it('constructs independently valid deterministic terminals across transformation
     if (result.status !== 'ready') {
       throw new Error(seed)
     }
+
     expect(referenceCountSolutions(result.solution, { kind: 'classic' })).toEqual({
       count: 1,
       solution: result.solution,

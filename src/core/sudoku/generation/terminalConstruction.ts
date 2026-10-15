@@ -38,6 +38,7 @@ export function constructUnitTerminal(
   if (maxNodes < 0 || (!Number.isSafeInteger(maxNodes) && maxNodes !== Infinity)) {
     throw new RangeError('Terminal node limit must be a nonnegative integer')
   }
+
   const unitMasks = context.units.map(() => 0)
   const memberships = Array.from({ length: BOARD_SIZE }, (_, cell) =>
     context.units.flatMap((unit, index) => (unit.cells.includes(cell) ? [index] : [])),
@@ -65,10 +66,13 @@ export function constructUnitTerminal(
       if (value !== 0) {
         return 0
       }
+
       let used = 0
+
       for (const index of memberships[cell]) {
         used |= unitMasks[index]
       }
+
       return ALL_DIGITS_MASK & ~used
     })
   }
@@ -76,21 +80,26 @@ export function constructUnitTerminal(
   function visit(): boolean {
     if (nodes >= maxNodes) {
       attemptExhausted = true
+
       return false
     }
     if (!consumeWork(budget)) {
       exhausted = true
+
       return false
     }
+
     nodes++
 
     const candidates = candidatesForTerminal()
     let target = -1
     let smallest = 10
+
     for (let cell = 0; cell < BOARD_SIZE; cell++) {
       if (board[cell] !== 0) {
         continue
       }
+
       const choices = digitsIn(candidates[cell]).length
       if (choices === 0) {
         return false
@@ -100,6 +109,7 @@ export function constructUnitTerminal(
         smallest = choices
       }
     }
+
     if (target === -1) {
       return isComplete(board, context)
     }
@@ -110,12 +120,15 @@ export function constructUnitTerminal(
       // that constraint to avoid exploring impossible regional grids; Classic stays unchanged.
       for (let index = 0; index < context.units.length; index++) {
         const unit = context.units[index]
+
         for (const digit of DIGITS) {
           const bit = 1 << (digit - 1)
           if (unitMasks[index] & bit) {
             continue
           }
+
           const positions: number[] = []
+
           for (const cell of unit.cells) {
             if (candidates[cell] & bit) {
               positions.push(cell)
@@ -126,6 +139,7 @@ export function constructUnitTerminal(
               }
             }
           }
+
           if (positions.length === 0) {
             return false
           }
@@ -142,6 +156,7 @@ export function constructUnitTerminal(
       if (visit()) {
         return true
       }
+
       assign(cell, 0)
       if (exhausted || attemptExhausted) {
         return false
@@ -156,10 +171,12 @@ export function constructUnitTerminal(
     // digit-label symmetry. It does not exclude regional solution families.
     const digits = shuffle(DIGITS, random)
     const unit = context.units[0]
+
     for (let index = 0; index < unit.cells.length; index++) {
       if (!consumeWork(budget)) {
         return { status: 'budget-exhausted' }
       }
+
       assign(unit.cells[index], digits[index])
     }
   }
@@ -171,6 +188,7 @@ export function constructUnitTerminal(
     // A slow terminal must leave aggregate allowance for a different regional layout.
     return { status: 'attempt-exhausted' }
   }
+
   return exhausted
     ? { status: 'budget-exhausted' }
     : { status: 'failed', reason: 'No complete terminal satisfies these units' }

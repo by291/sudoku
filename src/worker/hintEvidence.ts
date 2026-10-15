@@ -1,6 +1,6 @@
 import type { Board, Digit, ParseResult } from '@/core/sudoku/types'
 import type { HintResult } from '@/core/sudoku/hint'
-import { isCellIndex } from '@/core/sudoku/board'
+import { isCellIndex } from '@/core/sudoku/types'
 import { ALL_DIGITS_MASK, isDigit, isRecord } from '@/core/sudoku/types'
 import {
   isClassicTechnique,

@@ -15,13 +15,16 @@ it.each(['classic', 'diagonal', 'jigsaw'] as const)(
         ? CLASSIC_CONTEXT
         : compileRules(VARIANT_TEMPLATES[variant].easy[0].rules)
     const families = new Set<number>()
+
     for (let seed = 0; seed < 16; seed++) {
       const budget = createWorkBudget(1000000)
       const result = constructUnitTerminal(context, seededRandom(`terminal-corpus-${seed}`), budget)
+
       expect(result.status).toBe('ready')
       if (result.status !== 'ready') {
         throw new Error(`Incomplete ${variant} terminal`)
       }
+
       expect(referenceCountSolutions(result.solution, context.rules)).toEqual({
         count: 1,
         solution: result.solution,
@@ -30,6 +33,7 @@ it.each(['classic', 'diagonal', 'jigsaw'] as const)(
       expect(budget.used).toBeLessThanOrEqual(budget.limit)
       families.add(countIntercalates(result.solution))
     }
+
     expect(families.size).toBeGreaterThanOrEqual(4)
   },
   30000,
@@ -67,10 +71,12 @@ it('rejects partial units and arithmetic constraints as terminal construction in
       index === 0 ? { ...unit, cells: unit.cells.slice(1) } : unit,
     ),
   }
+
   expect(
     constructUnitTerminal(incomplete, seededRandom('partial'), createWorkBudget(1000)).status,
   ).toBe('failed')
   const killer = compileRules(VARIANT_TEMPLATES.killer.easy[0].rules)
+
   expect(
     constructUnitTerminal(killer, seededRandom('arithmetic'), createWorkBudget(1000)).status,
   ).toBe('failed')

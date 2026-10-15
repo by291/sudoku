@@ -10,6 +10,7 @@ import type { Board, NoteMask } from '@/core/sudoku/types'
 import { ARROW_REPEAT_BOARD, ARROW_REPEAT_RULES } from '../../../../tests/fixtures/variants'
 
 const empty: Board = Array(81).fill(0)
+
 const allDomains: readonly NoteMask[] = Array(81).fill(511)
 
 function cageContext(cages: readonly Cage[]): RuleContext {
@@ -36,8 +37,10 @@ function referenceCage(domains: readonly (readonly number[])[], total: number): 
           supports[index] |= 1 << (digit - 1)
         })
       }
+
       return
     }
+
     for (const digit of domains[values.length]) {
       visit([...values, digit])
     }
@@ -59,10 +62,12 @@ it('preserves ordered complete cage support and fixed digits', () => {
   ).toEqual({ status: 'complete', cells: [1, 0], supports: [3, 3] })
   const fixed = [...empty]
   fixed[1] = 1
+
   expect(
     prepared.support.get(fixed, allDomains, context.constraints[0], createWorkBudget(1000)),
   ).toEqual({ status: 'complete', cells: [1, 0], supports: [1, 2] })
   fixed[0] = 1
+
   expect(
     prepared.support.get(fixed, allDomains, context.constraints[0], createWorkBudget(1000)),
   ).toEqual({ status: 'complete', cells: [1, 0], supports: [0, 0] })
@@ -74,6 +79,7 @@ it('matches independent Cartesian support for fixed domain profiles', () => {
   if (prepared.status !== 'ready') {
     throw new Error('Expected prepared support')
   }
+
   const profiles = [
     [[1], [2, 3], [2, 3]],
     [[1, 2], [1, 2], [3]],
@@ -126,6 +132,7 @@ it('falls back completely at catalogue bounds and retains spent preparation work
   if (prepared.status !== 'ready' || layoutLimited.status !== 'ready') {
     throw new Error('Expected bounded fallback')
   }
+
   const spent = budget.used
 
   for (const owner of [prepared.support, layoutLimited.support]) {
@@ -137,6 +144,7 @@ it('falls back completely at catalogue bounds and retains spent preparation work
       })
     }
   }
+
   expect(budget.used).toBeGreaterThan(spent)
   expect(spent).toBeGreaterThan(0)
   expect(() =>
@@ -150,6 +158,7 @@ it('falls back completely at catalogue bounds and retains spent preparation work
 it('keeps large cages and repeated Arrow digits on exact enumeration', () => {
   const large = cageContext([{ cells: [0, 1, 2, 3, 4], sum: 15 }])
   const arrow = compileRules(ARROW_REPEAT_RULES)
+
   for (const [context, board] of [
     [large, empty],
     [arrow, ARROW_REPEAT_BOARD],
@@ -186,6 +195,7 @@ it('never publishes incomplete catalogues or partial filtering support', () => {
   if (prepared.status !== 'ready') {
     throw new Error('Expected prepared support')
   }
+
   expect(
     prepared.support.get(empty, allDomains, context.constraints[0], createWorkBudget(1)),
   ).toEqual({ status: 'budget-exhausted' })
@@ -198,6 +208,7 @@ it('never publishes incomplete catalogues or partial filtering support', () => {
   if (result.status !== 'complete') {
     throw new Error('Expected complete support')
   }
+
   expect(Reflect.set(result.supports, 0, 0)).toBe(true)
   expect(
     prepared.support.get(empty, allDomains, context.constraints[0], createWorkBudget(1000)),
@@ -213,6 +224,7 @@ it('uses bounded enumeration for a singleton local domain instead of scanning a 
   if (prepared.status !== 'ready') {
     throw new Error('Expected a complete size-four catalogue')
   }
+
   const board = [...empty]
   board[0] = 5
   board[1] = 3

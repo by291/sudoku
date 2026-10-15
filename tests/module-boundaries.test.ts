@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { ESLint } from 'eslint'
+import { readFileSync, readdirSync } from 'node:fs'
+import { resolve } from 'node:path'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 const lint = new ESLint()
@@ -21,6 +24,32 @@ async function boundaryMessages(filePath: string, target: string, kind: 'static'
 
 describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)', (kind) => {
   it.each([
+    ['src/core/sudoku/types.ts', '@/core/sudoku/logic/solver'],
+    ['src/core/sudoku/types.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/types.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/budget.ts', '@/core/sudoku/logic/solver'],
+    ['src/core/sudoku/budget.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/budget.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/random.ts', '@/core/sudoku/logic/solver'],
+    ['src/core/sudoku/random.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/random.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/constraints/support'],
+    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/search/exact'],
+    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/logic/solver'],
+    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/search/exact'],
+    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/logic/solver'],
+    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/search/fixture.ts', '@/core/sudoku/logic/solver'],
+    ['src/core/sudoku/search/fixture.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/search/fixture.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/logic/fixture.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/logic/fixture.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/rating/fixture.ts', '@/core/sudoku/generation/generate'],
+    ['src/core/sudoku/rules/definitions/fixture.ts', '@/core/sudoku/rules/registry'],
+    ['src/core/sudoku/rules/definitions/fixture.ts', '@/core/sudoku/rules/context'],
     ['src/core/sudoku/fixture.ts', 'vue'],
     ['src/core/sudoku/fixture.ts', 'naive-ui'],
     ['src/core/sudoku/fixture.ts', '@/shared/components/SudokuBoard.vue'],
@@ -52,6 +81,12 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
   })
 
   it.each([
+    ['src/core/sudoku/generation/fixture.ts', '@/core/sudoku/rating/assessment'],
+    ['src/core/sudoku/generation/fixture.ts', '@/core/sudoku/search/exact'],
+    ['src/core/sudoku/rating/fixture.ts', '@/core/sudoku/logic/solver'],
+    ['src/core/sudoku/hint.ts', '@/core/sudoku/rating/policies'],
+    ['src/core/sudoku/board.ts', '@/core/sudoku/rules/context'],
+    ['src/features/learning/model/fixture.ts', '@/features/game/model/techniquePresentation'],
     ['src/core/sudoku/fixture.ts', '@/core/sudoku/types'],
     ['src/shared/components/Fixture.vue', '@/core/sudoku/types'],
     ['src/shared/components/Fixture.vue', 'naive-ui'],
@@ -88,3 +123,150 @@ it.each(['void import(target)', 'void import(`@/features/game/stores/useGameStor
     expect(result.messages.some((message) => message.ruleId === 'no-restricted-syntax')).toBe(true)
   },
 )
+
+function runtimeModules(source: string): readonly string[] {
+  const syntax = ts.createSourceFile('fixture.ts', source, ts.ScriptTarget.Latest, true)
+  const modules = new Set<string>()
+
+  function visit(node: ts.Node): void {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const clause = node.importClause
+      const bindings = clause?.namedBindings
+      const erased =
+        clause?.isTypeOnly ||
+        (!clause?.name &&
+          bindings &&
+          ts.isNamedImports(bindings) &&
+          bindings.elements.length > 0 &&
+          bindings.elements.every((binding) => binding.isTypeOnly))
+      if (!erased) {
+        modules.add(node.moduleSpecifier.text)
+      }
+    }
+
+    if (
+      ts.isExportDeclaration(node) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      const exports = node.exportClause
+      const erased =
+        node.isTypeOnly ||
+        (exports &&
+          ts.isNamedExports(exports) &&
+          exports.elements.length > 0 &&
+          exports.elements.every((binding) => binding.isTypeOnly))
+      if (!erased) {
+        modules.add(node.moduleSpecifier.text)
+      }
+    }
+
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const target = node.arguments[0]
+      if (target && ts.isStringLiteral(target)) {
+        modules.add(target.text)
+      }
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(syntax)
+
+  return [...modules]
+}
+
+function findRuntimeCycle(graph: ReadonlyMap<string, readonly string[]>): readonly string[] | null {
+  const visited = new Set<string>()
+  const active = new Set<string>()
+  const path: string[] = []
+
+  function visit(module: string): readonly string[] | null {
+    if (active.has(module)) {
+      return [...path.slice(path.indexOf(module)), module]
+    }
+    if (visited.has(module)) {
+      return null
+    }
+
+    active.add(module)
+    path.push(module)
+    for (const dependency of graph.get(module) ?? []) {
+      const cycle = visit(dependency)
+      if (cycle) {
+        return cycle
+      }
+    }
+
+    path.pop()
+    active.delete(module)
+    visited.add(module)
+
+    return null
+  }
+
+  for (const module of graph.keys()) {
+    const cycle = visit(module)
+    if (cycle) {
+      return cycle
+    }
+  }
+
+  return null
+}
+
+it('recognizes runtime imports and exports while ignoring erased type dependencies', () => {
+  const modules = runtimeModules(`
+    import type { Board } from 'types-only'
+    import { type RuleContext } from 'inline-types-only'
+    export type { Technique } from 'exported-types-only'
+    export { type LogicalStep } from 'inline-exported-types-only'
+    import { maskOf, type Digit } from 'board'
+    import 'side-effect'
+    export { solve } from 'solver'
+    export * from 'registry'
+    void import('lazy')
+  `)
+
+  expect(modules).toEqual(['board', 'side-effect', 'solver', 'registry', 'lazy'])
+})
+
+it('finds an actual runtime cycle without rejecting a shared dependency', () => {
+  const cyclic = new Map([
+    ['first', ['second']],
+    ['second', ['first']],
+  ])
+  const acyclic = new Map([
+    ['first', ['shared']],
+    ['second', ['shared']],
+    ['shared', []],
+  ])
+
+  expect(findRuntimeCycle(cyclic)).toEqual(['first', 'second', 'first'])
+  expect(findRuntimeCycle(acyclic)).toBeNull()
+})
+
+it('keeps the production Sudoku runtime import graph acyclic', () => {
+  const root = resolve('src/core/sudoku')
+  const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(
+    (file) => file.endsWith('.ts') && !file.endsWith('.test.ts'),
+  )
+  const graph = new Map(
+    files.map((file) => {
+      const path = `@/core/sudoku/${file.slice(0, -3)}`
+      const dependencies = runtimeModules(readFileSync(resolve(root, file), 'utf8')).filter(
+        (target) => target.startsWith('@/core/sudoku/'),
+      )
+
+      return [path, dependencies] as const
+    }),
+  )
+
+  for (const dependencies of graph.values()) {
+    for (const dependency of dependencies) {
+      expect(graph.has(dependency), `Missing runtime dependency: ${dependency}`).toBe(true)
+    }
+  }
+
+  expect(findRuntimeCycle(graph)).toBeNull()
+})

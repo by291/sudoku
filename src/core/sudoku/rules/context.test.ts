@@ -12,6 +12,7 @@ import { ARROW_REPEAT_RULES } from '../../../../tests/fixtures/variants'
 const rows = Array.from({ length: 9 }, (_, row) =>
   Array.from({ length: 9 }, (_, col) => row * 9 + col),
 )
+
 const singletonCages = Array.from({ length: 81 }, (_, cell) => ({ cells: [cell], sum: 1 }))
 
 describe('rule geometry validation', () => {
