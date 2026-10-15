@@ -19,6 +19,17 @@ export type ConstraintSupport =
   | { status: 'complete'; cells: readonly number[]; supports: readonly NoteMask[] }
   | { status: 'budget-exhausted' }
 
+export type CageSupportMemo = Map<
+  Extract<RuleConstraint, { kind: 'cage' }>,
+  {
+    context: RuleContext
+    sum: number
+    cells: readonly number[]
+    domains: readonly NoteMask[]
+    supports: readonly NoteMask[]
+  }
+>
+
 // Local support is a proof of possibility only within this clue and duplicate peers.
 // Unsupported values can be removed; exhaustion cannot prove an unsupported value.
 export function getConstraintSupport(

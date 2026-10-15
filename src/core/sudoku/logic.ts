@@ -25,12 +25,14 @@ import { consumeWork, createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { findVariantStep } from '@/core/sudoku/variantTechniques'
 import type { StepOutcome } from '@/core/sudoku/variantTechniques'
+import type { CageSupportMemo } from '@/core/sudoku/constraints'
 
 export type LogicalWorkspace = {
   board: CellValue[]
   candidates: NoteMask[]
   context: RuleContext
   premises: RuleEvidence[]
+  cageSupportMemo: CageSupportMemo
 }
 
 export type LogicalOptions = {
@@ -56,6 +58,8 @@ export function createLogicalWorkspace(
     candidates: [...calculateBaseCandidates(board, base)],
     context,
     premises: [],
+    // Never carry deductions or support snapshots into another trial clue mask.
+    cageSupportMemo: new Map(),
   }
 }
 

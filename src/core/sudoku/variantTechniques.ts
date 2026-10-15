@@ -2,6 +2,7 @@ import { digitsIn, maskOf } from '@/core/sudoku/board'
 import { consumeWork } from '@/core/sudoku/budget'
 import type { WorkBudget } from '@/core/sudoku/budget'
 import { getConstraintSupport } from '@/core/sudoku/constraints'
+import type { ConstraintSupport } from '@/core/sudoku/constraints'
 import { constraintCells } from '@/core/sudoku/rules'
 import type { RuleConstraint, RuleContext } from '@/core/sudoku/rules'
 import { DIGITS, isDigit } from '@/core/sudoku/types'
@@ -11,6 +12,50 @@ import { matchesRuleTechnique } from '@/core/sudoku/techniques'
 
 export type StepOutcome =
   { status: 'complete'; step: LogicalStep | null } | { status: 'budget-exhausted' }
+
+function combinationSupport(
+  state: LogicalState,
+  context: RuleContext,
+  constraint: RuleConstraint,
+  budget: WorkBudget,
+): ConstraintSupport {
+  const memo = state.cageSupportMemo
+  if (constraint.kind !== 'cage' || !memo) {
+    return getConstraintSupport(state.board, state.candidates, context, constraint, budget)
+  }
+
+  const cells = constraint.cells
+  const domains = cells.map((cell) =>
+    state.board[cell] === 0 ? state.candidates[cell] : maskOf(state.board[cell]),
+  )
+  const previous = memo.get(constraint)
+  // The caller charges each constraint visit. Only unchanged, complete enumeration
+  // is avoided; compiled peer relationships are read-only within this workspace.
+  if (
+    previous?.context === context &&
+    previous.sum === constraint.sum &&
+    previous.cells.length === cells.length &&
+    cells.every(
+      (cell, index) => cell === previous.cells[index] && domains[index] === previous.domains[index],
+    )
+  ) {
+    return { status: 'complete', cells: [...previous.cells], supports: [...previous.supports] }
+  }
+
+  const support = getConstraintSupport(state.board, state.candidates, context, constraint, budget)
+  if (support.status === 'complete') {
+    // One owned snapshot per cage bounds memory; partial support is never a proof.
+    memo.set(constraint, {
+      context,
+      sum: constraint.sum,
+      cells: [...cells],
+      domains,
+      supports: [...support.supports],
+    })
+  }
+
+  return support
+}
 
 function deduction(
   state: LogicalState,
@@ -177,13 +222,7 @@ export function findVariantStep(
         continue
       }
 
-      const support = getConstraintSupport(
-        state.board,
-        state.candidates,
-        context,
-        constraint,
-        budget,
-      )
+      const support = combinationSupport(state, context, constraint, budget)
       if (support.status === 'budget-exhausted') {
         return support
       }

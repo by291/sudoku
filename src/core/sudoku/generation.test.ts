@@ -85,15 +85,15 @@ it('returns reproducible construction exhaustion without substituting an authore
 
 it('uses only current generation versions and returns an accepted assessment', () => {
   const input = createGenerationInput('classic', 'easy', 'current-generation')
-  expect(input.puzzleVersion).toBe('sudoku-v8')
+  expect(input.puzzleVersion).toBe('sudoku-v9')
   for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
     expect(createGenerationInput(variant, 'easy', 'current-generation').puzzleVersion).toBe(
-      'sudoku-variants-v8',
+      'sudoku-variants-v9',
     )
   }
   const killerInput = createGenerationInput('killer', 'hard', 'current-generation')
 
-  expect(killerInput.puzzleVersion).toBe('sudoku-variants-v8')
+  expect(killerInput.puzzleVersion).toBe('sudoku-variants-v9')
   expect(parseGenerationInput(killerInput)).toEqual({ valid: true, value: killerInput })
   expect(parseGenerationInput({ ...killerInput, puzzleVersion: 'sudoku-variants-v6' }).valid).toBe(
     false,
@@ -191,5 +191,5 @@ it('retains valid v7 saved puzzles while new generation rejects their historical
   expect(parseGenerationInput({ ...input, puzzleVersion: storedPuzzle.puzzleVersion }).valid).toBe(
     false,
   )
-  expect(input.puzzleVersion).toBe('sudoku-v8')
+  expect(input.puzzleVersion).toBe('sudoku-v9')
 })

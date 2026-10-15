@@ -15,6 +15,170 @@ import {
 } from '../../../tests/fixtures/variants'
 import type { Board } from '@/core/sudoku/types'
 
+function sumThreeWorkspace() {
+  const solution = VARIANT_FIXTURES.thermo.solution
+  const context = compileRules({
+    kind: 'killer',
+    cages: [
+      { cells: [0, 1], sum: 3 },
+      ...Array.from({ length: 79 }, (_, index) => ({
+        cells: [index + 2],
+        sum: solution[index + 2],
+      })),
+    ],
+  })
+  const workspace = createLogicalWorkspace(Array(81).fill(0), context)
+  // A distinct sum of three supports exactly {1, 2} in each cell.
+  workspace.candidates[0] = 7
+  workspace.candidates[1] = 7
+
+  return workspace
+}
+
+it('reuses complete cage support with one charged visit when local domains are unchanged', () => {
+  const workspace = sumThreeWorkspace()
+  const first = findVariantStep(
+    workspace,
+    workspace.context,
+    ['cage-combination'],
+    createWorkBudget(100),
+  )
+  const nextBudget = createWorkBudget(1)
+
+  const next = findVariantStep(workspace, workspace.context, ['cage-combination'], nextBudget)
+
+  expect(first).toMatchObject({
+    status: 'complete',
+    step: {
+      kind: 'elimination',
+      removals: [
+        { cell: 0, digit: 3 },
+        { cell: 1, digit: 3 },
+      ],
+    },
+  })
+  expect(next).toEqual(first)
+  expect(nextBudget.used).toBe(1)
+  expect(
+    findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(0)),
+  ).toEqual({ status: 'budget-exhausted' })
+})
+
+it('recomputes cage support after candidate elimination or a fixed digit changes its domains', () => {
+  const workspace = sumThreeWorkspace()
+  findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(100))
+  workspace.candidates[0] = 5
+  const changedBudget = createWorkBudget(100)
+
+  const changed = findVariantStep(workspace, workspace.context, ['cage-combination'], changedBudget)
+
+  expect(changed).toMatchObject({
+    status: 'complete',
+    step: { kind: 'placement', cell: 0, digit: 1 },
+  })
+  expect(changedBudget.used).toBeGreaterThan(1)
+
+  workspace.board[0] = 2
+  const fixedBudget = createWorkBudget(100)
+  const fixed = findVariantStep(workspace, workspace.context, ['cage-combination'], fixedBudget)
+
+  expect(fixed).toMatchObject({
+    status: 'complete',
+    step: { kind: 'placement', cell: 1, digit: 1 },
+  })
+  expect(fixedBudget.used).toBeGreaterThan(1)
+})
+
+it('never reuses incomplete enumeration or another board workspace as a cage proof', () => {
+  const workspace = sumThreeWorkspace()
+
+  expect(
+    findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(2)),
+  ).toEqual({ status: 'budget-exhausted' })
+  expect(
+    findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(1)),
+  ).toEqual({ status: 'budget-exhausted' })
+  findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(100))
+  const other = createLogicalWorkspace(workspace.board, workspace.context)
+  other.candidates[0] = 7
+  other.candidates[1] = 7
+
+  expect(findVariantStep(other, other.context, ['cage-combination'], createWorkBudget(1))).toEqual({
+    status: 'budget-exhausted',
+  })
+})
+
+it('keeps cage proofs separate from changed clue geometry, sums and rule contexts', () => {
+  const workspace = sumThreeWorkspace()
+  const constraint = workspace.context.constraints[0]
+  if (constraint.kind !== 'cage') {
+    throw new Error('Missing arithmetic fixture')
+  }
+  findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(100))
+  constraint.sum = 5
+
+  expect(
+    findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(100)),
+  ).toMatchObject({
+    status: 'complete',
+    step: {
+      kind: 'elimination',
+      removals: [
+        { cell: 0, digit: 1 },
+        { cell: 1, digit: 1 },
+      ],
+    },
+  })
+
+  constraint.sum = 3
+  constraint.cells = [0, 2]
+  workspace.candidates[2] = 7
+
+  expect(
+    findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(100)),
+  ).toMatchObject({
+    status: 'complete',
+    step: {
+      kind: 'elimination',
+      removals: [
+        { cell: 0, digit: 3 },
+        { cell: 2, digit: 3 },
+      ],
+    },
+  })
+  expect(
+    findVariantStep(workspace, { ...workspace.context }, ['cage-combination'], createWorkBudget(1)),
+  ).toEqual({ status: 'budget-exhausted' })
+})
+
+it('owns the cage proof independently of returned deduction evidence', () => {
+  const workspace = sumThreeWorkspace()
+  const first = findVariantStep(
+    workspace,
+    workspace.context,
+    ['cage-combination'],
+    createWorkBudget(100),
+  )
+  if (first.status !== 'complete' || !first.step) {
+    throw new Error('Missing cage proof')
+  }
+  Object.assign(first.step.evidence.cells, { 0: 80 })
+  Object.assign(first.step.evidence.digits, { 0: 9 })
+
+  expect(
+    findVariantStep(workspace, workspace.context, ['cage-combination'], createWorkBudget(1)),
+  ).toMatchObject({
+    status: 'complete',
+    step: {
+      evidence: { cells: [0, 1], digits: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+      removals: [
+        { cell: 0, digit: 3 },
+        { cell: 1, digit: 3 },
+      ],
+    },
+  })
+})
+
 it('keeps combination deductions outside the easy policy', () => {
   expect(RATING_POLICIES.arrow.easy).not.toContain('arrow-combination')
   expect(RATING_POLICIES.arrow.medium).toContain('arrow-combination')

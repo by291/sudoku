@@ -6,18 +6,18 @@ import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 import { countReferenceSolutions } from '../support/referenceSudoku'
 import { assessPuzzle, createAssessmentInput } from '@/core/sudoku/rating'
 import { createGenerationInput, generatePuzzle } from '@/core/sudoku/generation'
-import { KILLER_HARD_REGRESSION_SEEDS } from '../fixtures/generationCorpus'
 import { explainStep } from '@/core/sudoku/techniques'
 import { referenceCountSolutions } from '../support/referenceVariants'
 import {
   GENERATION_LATENCY_INPUTS,
   GENERATION_EXHAUSTION_INPUTS,
+  KILLER_HARD_RECOVERY_INPUT,
 } from '../fixtures/generationLatency'
 
 test('reports construction exhaustion without publishing a replacement puzzle at both roots', async ({
   page,
 }) => {
-  // The v8 corpus records one Killer Hard request exhausting the shared work allowance.
+  // The v9 corpus records a Classic Hard request exhausting its layout allowance.
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
     for (const { variant, difficulty, seed } of GENERATION_EXHAUSTION_INPUTS) {
@@ -116,26 +116,27 @@ test('delivers the slowest observed request from every type and tier within thre
 test('delivers a freshly constructed Killer Hard puzzle from the real Worker at both roots', async ({
   page,
 }) => {
-  const request = KILLER_HARD_REGRESSION_SEEDS.map((seed) => {
-    const input = createGenerationInput('killer', 'hard', seed)
-    return { input, result: generatePuzzle(input) }
-  }).find(({ result }) => result.status === 'ready' && result.source === 'generated')
-  if (!request || request.result.status !== 'ready') {
+  const { variant, difficulty, seed } = KILLER_HARD_RECOVERY_INPUT
+  const input = createGenerationInput(variant, difficulty, seed)
+  const result = generatePuzzle(input)
+  if (result.status !== 'ready') {
     throw new Error('Missing fresh Killer Hard regression fixture')
   }
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+    const started = performance.now()
     const response = parseWorkerResponse(
       await runWorker(
         page,
         {
           kind: 'generate',
           requestId: `fresh-killer-${base}`,
-          input: request.input,
+          input,
         },
         base,
       ),
     )
+    expect(performance.now() - started).toBeLessThan(3000)
     if (
       !response.valid ||
       response.value.kind !== 'generate' ||
@@ -145,14 +146,14 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
     }
     const puzzle = response.value.outcome.value
 
-    expect(puzzle).toEqual(request.result.puzzle)
+    expect(puzzle).toEqual(result.puzzle)
     expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
       count: 1,
       solution: puzzle.solution,
     })
     expect(response.value.outcome.assessment).toEqual({
       status: 'rated',
-      summary: request.result.assessment,
+      summary: result.assessment,
     })
   }
 })
