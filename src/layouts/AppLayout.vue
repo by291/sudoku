@@ -39,7 +39,7 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'inner-page': backTarget !== null }">
     <a class="skip-link" href="#main-content" @click.prevent="focusMain">跳到主要内容</a>
     <header class="site-header">
       <RouterLink class="brand" to="/" aria-label="一格一念，返回首页">
@@ -96,6 +96,9 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
 
 <style scoped>
 .app-shell {
+  --page-top-space: 24px;
+  --page-heading-space: 32px;
+
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -128,19 +131,23 @@ main {
 .brand {
   display: flex;
   align-items: center;
+  min-height: 44px;
   gap: 12px;
   color: var(--text);
   text-decoration: none;
   font-size: 22px;
+  line-height: 1.2;
   font-weight: 700;
 }
 .brand-mark {
   color: var(--accent);
   font-size: 40px;
+  line-height: 1;
 }
 .brand-subtitle {
   display: block;
   font-size: 10px;
+  line-height: 1.6;
   letter-spacing: 2px;
   color: var(--muted);
   margin-top: 3px;
@@ -163,6 +170,34 @@ main {
   color: var(--muted);
   font-size: 12px;
   text-align: center;
+}
+/* Keep short desktop windows useful without changing touch layouts or browser zoom. */
+@media (min-width: 801px) and (max-height: 1000px) {
+  .inner-page {
+    --page-top-space: 12px;
+    --page-heading-space: 16px;
+  }
+  .site-header {
+    padding: 12px 0;
+  }
+  .inner-page .page-navigation {
+    padding-top: 12px;
+  }
+  .inner-page .site-footer {
+    padding: 20px 0;
+  }
+}
+/* A board workspace can claim the remaining viewport; recovery and small screens keep normal flow. */
+@media (min-width: 801px) and (min-height: 720px) and (pointer: fine) {
+  .app-shell:has([data-viewport-fit]) {
+    height: 100dvh;
+  }
+  .app-shell:has([data-viewport-fit]) main {
+    min-height: 0;
+  }
+  .app-shell:has([data-viewport-fit]) .site-footer {
+    display: none;
+  }
 }
 @media (max-width: 600px) {
   .app-shell {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NAlert, NButton, NCard } from 'naive-ui'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { RouterLink } from 'vue-router'
 import type { LogicalStep } from '@/core/sudoku/logic/types'
@@ -15,6 +15,7 @@ import { useGameKeyboard } from '@/features/game/composables/useGameKeyboard'
 import { useGameLifecycle } from '@/features/game/composables/useGameLifecycle'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
+import SelectedCellRules from '@/shared/components/SelectedCellRules.vue'
 import GameControls from '@/features/game/components/GameControls.vue'
 import HintPanel from '@/features/game/components/HintPanel.vue'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
@@ -22,6 +23,7 @@ import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
 import GameSettingsDialog from '@/features/game/components/GameSettingsDialog.vue'
 import GenerationStatus from '@/features/game/components/GenerationStatus.vue'
 import { useGameEntry } from '@/features/game/composables/useGameEntry'
+import { useBoardSize } from '@/features/game/composables/useBoardSize'
 
 const props = withDefaults(
   defineProps<{
@@ -88,6 +90,17 @@ const {
   startSelected,
   resumeTarget,
 } = entry
+
+const boardSpace = useTemplateRef<HTMLElement>('boardSpace')
+const boardSizeStyle = useBoardSize(boardSpace)
+const fitViewport = computed(
+  () =>
+    active.value &&
+    (phase.value === 'playing' || phase.value === 'paused') &&
+    !readOnly.value &&
+    !error.value &&
+    !saveMessage.value,
+)
 
 const settingsOpen = ref(false)
 const generating = computed(() => phase.value === 'generating')
@@ -259,15 +272,14 @@ function erase() {
 }
 </script>
 <template>
-  <section class="game-page">
-    <div class="page-heading">
-      <div>
-        <p v-if="!active" class="eyebrow">一格一念 / {{ heading }}</p>
-        <h1>
-          {{ heading
-          }}<template v-if="active"> · {{ getVariantPresentation(activeVariant).label }}</template>
-        </h1>
-      </div>
+  <section
+    class="game-page"
+    :data-viewport-fit="fitViewport ? '' : undefined"
+    :style="boardSizeStyle"
+  >
+    <div v-if="!active" class="page-heading">
+      <p class="eyebrow">一格一念 / {{ heading }}</p>
+      <h1>{{ heading }}</h1>
     </div>
     <slot :active="active" />
     <NAlert
@@ -320,41 +332,53 @@ function erase() {
         :class="{ 'has-feedback': hint || checkedCells.length || checkIsCurrent }"
       >
         <div class="play-surface">
-          <p v-if="session.metadata.kind === 'daily'" class="session-context">
-            {{ session.metadata.challengeDate }} ·
-            {{ session.metadata.formalAttempt ? '正式挑战' : '练习重玩' }}
-          </p>
-          <div class="session-bar">
-            <span
-              >{{ DIFFICULTY_NAMES[session.puzzle.difficulty] }}
-              <span class="badge">{{
-                session.assistance.assisted ? '已使用辅助' : '独立思考'
-              }}</span></span
-            ><span v-if="showTimer" aria-label="游戏用时">{{ formatDuration(elapsedMs) }}</span
-            ><NButton v-if="phase === 'playing'" @click="game.pause">暂停</NButton
-            ><NButton v-else-if="phase === 'paused'" @click="game.resume">
-              {{ readOnly ? '尝试接管' : '继续游戏' }}
-            </NButton>
-          </div>
-          <div class="board-wrap">
-            <SudokuBoard
-              :board="board"
-              :givens="session.puzzle.givens"
-              :notes="session.notes"
-              :rules="session.puzzle.rules"
-              :related-cells="relatedCells"
-              :selected-cell="selectedCell"
-              :conflicts="displayedConflicts"
-              :hint-cells="highlightedCells"
-              :disabled="phase === 'paused' || phase === 'generating'"
-              :obscured="phase === 'paused' || phase === 'generating'"
-              @select="game.selectCell"
-            />
-            <div v-if="phase === 'paused'" class="pause-cover">
-              <span>稍作停留</span
-              ><NButton type="primary" @click="game.resume">
+          <header class="session-heading">
+            <h1>{{ heading }} · {{ getVariantPresentation(activeVariant).label }}</h1>
+            <p v-if="session.metadata.kind === 'daily'" class="session-context">
+              {{ session.metadata.challengeDate }} ·
+              {{ session.metadata.formalAttempt ? '正式挑战' : '练习重玩' }}
+            </p>
+            <div class="session-bar">
+              <div class="session-summary">
+                <span
+                  >{{ DIFFICULTY_NAMES[session.puzzle.difficulty] }}
+                  <span class="badge">{{
+                    session.assistance.assisted ? '已使用辅助' : '独立思考'
+                  }}</span>
+                </span>
+                <span class="save-status" role="status">{{ saveLabel }}</span>
+              </div>
+              <span v-if="showTimer" class="session-timer" aria-label="游戏用时">
+                {{ formatDuration(elapsedMs) }}
+              </span>
+              <NButton v-if="phase === 'playing'" @click="game.pause">暂停</NButton>
+              <NButton v-else-if="phase === 'paused'" @click="game.resume">
                 {{ readOnly ? '尝试接管' : '继续游戏' }}
               </NButton>
+            </div>
+          </header>
+          <div ref="boardSpace" class="board-space">
+            <div class="board-wrap">
+              <SudokuBoard
+                :board="board"
+                :givens="session.puzzle.givens"
+                :notes="session.notes"
+                :rules="session.puzzle.rules"
+                :show-selected-rules="false"
+                :related-cells="relatedCells"
+                :selected-cell="selectedCell"
+                :conflicts="displayedConflicts"
+                :hint-cells="highlightedCells"
+                :disabled="phase === 'paused' || phase === 'generating'"
+                :obscured="phase === 'paused' || phase === 'generating'"
+                @select="game.selectCell"
+              />
+              <div v-if="phase === 'paused'" class="pause-cover">
+                <span>稍作停留</span
+                ><NButton type="primary" @click="game.resume">
+                  {{ readOnly ? '尝试接管' : '继续游戏' }}
+                </NButton>
+              </div>
             </div>
           </div>
           <GameControls
@@ -390,11 +414,14 @@ function erase() {
             @new="requestNew()"
             @restart="requestRestart()"
           />
-          <div class="board-footer">
-            <span role="status">{{ saveLabel }}</span>
-          </div>
         </div>
-        <div v-if="hint || checkedCells.length || checkIsCurrent" class="game-feedback">
+        <div class="game-feedback">
+          <SelectedCellRules
+            class="selected-context"
+            :rules="session.puzzle.rules"
+            :selected-cell="selectedCell"
+            :obscured="phase === 'paused' || phase === 'generating'"
+          />
           <HintPanel
             v-if="hint"
             :hint="hint"
@@ -489,16 +516,12 @@ function erase() {
   font-size: 14px;
 }
 .page-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  max-width: clamp(320px, calc(100dvh - 440px), 560px);
+  max-width: 560px;
   margin: 0 auto;
 }
 .page-heading h1 {
   margin: 4px 0;
-  font-size: 30px;
+  font-size: 28px;
 }
 .eyebrow {
   color: var(--muted);
@@ -506,14 +529,35 @@ function erase() {
   letter-spacing: 1px;
   margin: 0;
 }
+.session-heading {
+  margin-bottom: 12px;
+}
+.session-heading h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  line-height: 1.3;
+}
 .session-bar {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin: 8px 0;
 }
 .session-bar > :first-child {
   margin-right: auto;
+}
+.session-summary {
+  display: grid;
+  gap: 2px;
+}
+.session-timer {
+  font-variant-numeric: tabular-nums;
+}
+.save-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+.selected-context {
+  margin: 0 0 16px;
 }
 .badge {
   display: inline-block;
@@ -531,7 +575,8 @@ function erase() {
   gap: 24px;
   align-items: start;
 }
-.game-layout.has-feedback {
+.game-layout.has-feedback,
+.game-layout:has(.selected-context) {
   grid-template-columns: minmax(0, 560px) minmax(0, 340px);
 }
 .play-surface {
@@ -547,8 +592,14 @@ function erase() {
 .game-feedback :deep(.hint-panel) {
   margin-top: 0;
 }
+.game-feedback:empty {
+  display: none;
+}
 .board-wrap {
   position: relative;
+}
+.board-space {
+  min-width: 0;
 }
 .pause-cover {
   position: absolute;
@@ -559,14 +610,6 @@ function erase() {
   align-items: center;
   gap: 18px;
   font-size: 24px;
-}
-.board-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 6px;
 }
 .settings-heading {
   margin: 20px 0 8px;
@@ -587,9 +630,49 @@ function erase() {
   font-size: 70px;
   color: var(--accent);
 }
+@media (min-width: 801px) and (min-height: 720px) and (pointer: fine) {
+  .game-page[data-viewport-fit] {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding-bottom: 16px;
+  }
+  [data-viewport-fit] .game-layout {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  [data-viewport-fit] .play-surface {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    max-width: 560px;
+  }
+  [data-viewport-fit] .board-space {
+    display: grid;
+    place-items: start center;
+    flex: 1;
+    min-height: 320px;
+    max-height: 560px;
+  }
+  [data-viewport-fit] .board-wrap {
+    width: var(--board-side, 320px);
+    max-width: 100%;
+  }
+  [data-viewport-fit] .play-surface > :not(.board-space) {
+    flex-shrink: 0;
+    align-self: center;
+    width: var(--board-side, 320px);
+    max-width: 100%;
+  }
+}
 @media (max-width: 800px) {
   .game-layout,
-  .game-layout.has-feedback {
+  .game-layout.has-feedback,
+  .game-layout:has(.selected-context) {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
@@ -611,14 +694,9 @@ function erase() {
   }
   .session-bar {
     gap: 6px;
-    margin: 8px 0;
   }
   .badge {
     margin-left: 4px;
-  }
-  .board-footer {
-    flex-wrap: wrap;
-    font-size: 12px;
   }
 }
 @media (pointer: coarse) {

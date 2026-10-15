@@ -4,33 +4,29 @@ import type { Board, NoteMask } from '@/core/sudoku/types'
 import { DIGITS } from '@/core/sudoku/types'
 import { digitsIn, maskOf } from '@/core/sudoku/board'
 import type { PuzzleRules } from '@/core/sudoku/rules/types'
-import {
-  getBoardGeometry,
-  getCellRuleContext,
-  getSelectedRuleDescriptions,
-} from '@/shared/model/boardGeometry'
+import { getBoardGeometry, getCellRuleContext } from '@/shared/model/boardGeometry'
 import SudokuClues from '@/shared/components/SudokuClues.vue'
+import SelectedCellRules from '@/shared/components/SelectedCellRules.vue'
 
-const props = defineProps<{
-  board: Board
-  givens: Board
-  notes: readonly NoteMask[]
-  selectedCell: number | null
-  conflicts: readonly number[]
-  hintCells: readonly number[]
-  disabled: boolean
-  obscured: boolean
-  rules: PuzzleRules
-  relatedCells: readonly number[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    board: Board
+    givens: Board
+    notes: readonly NoteMask[]
+    selectedCell: number | null
+    conflicts: readonly number[]
+    hintCells: readonly number[]
+    disabled: boolean
+    obscured: boolean
+    rules: PuzzleRules
+    relatedCells: readonly number[]
+    showSelectedRules?: boolean
+  }>(),
+  { showSelectedRules: true },
+)
 const emit = defineEmits<{ select: [cell: number] }>()
 const root = useTemplateRef<HTMLDivElement>('root')
 const geometry = computed(() => getBoardGeometry(props.rules))
-const selectedRules = computed(() =>
-  !props.obscured && props.selectedCell !== null
-    ? getSelectedRuleDescriptions(props.selectedCell, props.rules)
-    : [],
-)
 const cageAnchors = computed(
   () =>
     new Set(geometry.value.clues.flatMap((clue) => (clue.kind === 'cage' ? [clue.anchor] : []))),
@@ -171,9 +167,12 @@ watch(
       </button>
       <SudokuClues :geometry="geometry" :obscured="obscured" />
     </div>
-    <ul v-if="selectedRules.length" class="selected-rules" aria-label="所选格子的规则">
-      <li v-for="description in selectedRules" :key="description">{{ description }}</li>
-    </ul>
+    <SelectedCellRules
+      v-if="showSelectedRules"
+      :rules="rules"
+      :selected-cell="selectedCell"
+      :obscured="obscured"
+    />
   </div>
 </template>
 <style scoped>
@@ -304,12 +303,5 @@ watch(
 }
 .cage-anchor .value {
   transform: translateY(12%);
-}
-.selected-rules {
-  padding-left: 20px;
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.6;
 }
 </style>
