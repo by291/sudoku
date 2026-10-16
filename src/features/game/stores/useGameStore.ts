@@ -7,8 +7,14 @@ import { restartDailySession } from '@/features/game/model/daily'
 import type { HintResult } from '@/sudoku/contracts'
 import { isCellIndex } from '@/sudoku/values'
 import type { PreparedPuzzle } from '@/sudoku/mainEngine'
-import type { RuleMetadata, ConflictWorkDto } from '@/sudoku/contracts'
-import type { GameAction, GameSession, SessionPhase } from '@/features/game/model/session'
+import type { RuleMetadata } from '@/sudoku/contracts'
+import { useConflictAnalysis } from '@/features/game/composables/useConflictAnalysis'
+import type {
+  GameAction,
+  GameSession,
+  SessionPhase,
+  SessionActionResult,
+} from '@/features/game/model/session'
 import {
   applySessionAction,
   commitBoardEdit,
@@ -57,6 +63,10 @@ export const useGameStore = defineStore('game', () => {
     startDaily,
     failedGeneration,
   } = transitions
+  const notesLoading = ref(false)
+  let notesGeneration = 0
+  let notesController: AbortController | null = null
+  let layerRevision = 0
   let hintBoardIdentity = ''
 
   function activateClock() {
@@ -86,16 +96,14 @@ export const useGameStore = defineStore('game', () => {
     },
     { flush: 'sync' },
   )
-  const conflictEvaluation = computed<ConflictWorkDto['result']>(() =>
-    prepared.value
-      ? prepared.value.conflicts({ board: [...board.value] }).result
-      : { status: 'complete', violations: [] },
-  )
+  const editable = computed(() => phase.value === 'playing' && !readOnly.value)
+  const conflictAnalysis = useConflictAnalysis(prepared, board, editable, runtime.worker)
+  const conflictEvaluation = conflictAnalysis.evaluation
+  const conflictAnalysisState = conflictAnalysis.state
   const conflicts = computed(() => [
     ...new Set(conflictEvaluation.value.violations.flatMap((violation) => violation.cells)),
   ])
   const elapsedMs = computed(() => Math.floor(readElapsed(clock.value, now.value)))
-  const editable = computed(() => phase.value === 'playing' && !readOnly.value)
   const canUndo = computed(() => editable.value && !!session.value?.undoStack.length)
   const canRedo = computed(() => editable.value && !!session.value?.redoStack.length)
   const checkIsCurrent = computed(() => checkedBoard.value === board.value.join(','))
@@ -107,7 +115,31 @@ export const useGameStore = defineStore('game', () => {
     now.value = runtime.monotonicNow()
   }
 
+  function cancelNotes() {
+    notesGeneration++
+    notesController?.abort()
+    notesController = null
+    notesLoading.value = false
+  }
+
+  // The layer revision ignores elapsed time and assistance facts but fences every playable snapshot.
+  const stopNoteRevision = watch(
+    [
+      () => session.value?.id,
+      () => session.value?.puzzle,
+      () => session.value?.entries.join(','),
+      () => session.value?.notes.join(','),
+      editable,
+    ],
+    () => {
+      layerRevision++
+      cancelNotes()
+    },
+    { flush: 'sync' },
+  )
+
   function cancelOperation() {
+    cancelNotes()
     transitions.cancel()
     hintLoading.value = false
   }
@@ -198,6 +230,10 @@ export const useGameStore = defineStore('game', () => {
       error.value = '数独计算尚未就绪，请重新打开本局。'
       return
     }
+    if (action.kind === 'generate-notes' && layout.liveExecution === 'worker') {
+      void requestNotes()
+      return
+    }
     const outcome =
       action.kind === 'enter' ||
       action.kind === 'erase' ||
@@ -214,6 +250,10 @@ export const useGameStore = defineStore('game', () => {
             action,
           )
         : applySessionAction(session.value, action)
+    commitAction(outcome, action, layout)
+  }
+
+  function commitAction(outcome: SessionActionResult, action: GameAction, layout: PreparedPuzzle) {
     if (outcome.status === 'budget-exhausted') {
       error.value = '候选计算超出预算，原有笔记已保留。请减少空格后重试。'
 
@@ -235,10 +275,10 @@ export const useGameStore = defineStore('game', () => {
 
     if (action.kind === 'check') {
       checkedBoard.value = board.value.join(',')
-      checkedCells.value = layout.reviewEntries(board.value, session.value.puzzle.solution)
+      checkedCells.value = layout.reviewEntries(board.value, outcome.session.puzzle.solution)
     }
 
-    if (layout.isComplete(board.value)) {
+    if (session.value && layout.isComplete(board.value)) {
       clock.value = pauseClock(clock.value, runtime.monotonicNow())
       tick()
       session.value = completeSession(
@@ -252,6 +292,59 @@ export const useGameStore = defineStore('game', () => {
     }
 
     void save()
+  }
+
+  async function requestNotes() {
+    const captured = session.value
+    const layout = prepared.value
+    if (!captured || !layout || !editable.value || notesLoading.value) {
+      return
+    }
+
+    const revision = layerRevision
+    const generation = ++notesGeneration
+    const owner = new AbortController()
+    notesController = owner
+    notesLoading.value = true
+    try {
+      const result = await runtime.worker.generateNotes(
+        {
+          givens: captured.puzzle.givens,
+          entries: captured.entries,
+          notes: captured.notes,
+          rules: captured.puzzle.rules,
+        },
+        owner.signal,
+      )
+      // Identity and revision both matter: the same session id can be restored with new layers.
+      if (
+        generation !== notesGeneration ||
+        revision !== layerRevision ||
+        owner.signal.aborted ||
+        !editable.value ||
+        session.value?.id !== captured.id ||
+        session.value.puzzle !== captured.puzzle
+      ) {
+        return
+      }
+      notesController = null
+      notesLoading.value = false
+      if (result.status !== 'completed') {
+        error.value = '候选数暂时无法生成，原有笔记已保留。请重试。'
+        return
+      }
+      commitAction(
+        commitBoardEdit(session.value, result.value.computation.result, { kind: 'generate-notes' }),
+        { kind: 'generate-notes' },
+        layout,
+      )
+    } catch {
+      if (generation === notesGeneration && !owner.signal.aborted) {
+        notesController = null
+        notesLoading.value = false
+        error.value = '候选数暂时无法生成，原有笔记已保留。请重试。'
+      }
+    }
   }
 
   function selectCell(cell: number) {
@@ -394,6 +487,8 @@ export const useGameStore = defineStore('game', () => {
       return
     }
     disposed = true
+    stopNoteRevision()
+    conflictAnalysis.dispose()
     stopPreparing()
     prepared.value?.dispose()
     prepared.value = null
@@ -412,6 +507,8 @@ export const useGameStore = defineStore('game', () => {
     noteMode,
     hint,
     hintLoading,
+    notesLoading,
+    conflictAnalysisState,
     checkedCells,
     checkIsCurrent,
     canRetryGeneration,

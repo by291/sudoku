@@ -25,11 +25,11 @@ Approved behavior: the user selected the focused Worker option on 2026-10-16 and
 
 **Owners:** a focused game conflict-analysis composable, `useGameStore.ts`, session model contracts and their tests.
 
-- [ ] Keep ordinary layouts on the current immediate path. For heavy layouts, publish only sound cheap duplicate preview while full conflicts run, with an explicit pending/failed state.
-- [ ] Own the current conflict generation/controller separately from hints/generation. Watch puzzle owner and board identity rather than clock or assistance-only changes; terminate stale work.
-- [ ] Generate heavy notes asynchronously with captured session/puzzle/layer revision. Commit only if still editable and current, using `commitBoardEdit` and latest assistance facts.
-- [ ] Test input, note changes, undo/redo, pause, switch, lease loss, reset/import and disposal during pending jobs. Exhaustion/failure/staleness must preserve layers/history/assistance; a current successful no-change result keeps the original assistance policy.
-- [ ] Preserve save-before-switch, immutable snapshots, revisions, leases and epochs. Commit `feat(game): fence asynchronous live analysis`.
+- [x] Keep ordinary layouts on the current immediate path. For heavy layouts, publish only sound cheap duplicate preview while full conflicts run, with an explicit pending/failed state.
+- [x] Own the current conflict generation/controller separately from hints/generation. Watch puzzle owner and board identity rather than clock or assistance-only changes; terminate stale work.
+- [x] Generate heavy notes asynchronously with captured session/puzzle/layer revision. Commit only if still editable and current, using `commitBoardEdit` and latest assistance facts.
+- [x] Test input, note changes, undo/redo, pause, switch, lease loss, reset/import and disposal during pending jobs. Exhaustion/failure/staleness must preserve layers/history/assistance; a current successful no-change result keeps the original assistance policy.
+- [x] Preserve save-before-switch, immutable snapshots, revisions, leases and epochs. Commit `feat(game): fence asynchronous live analysis`.
 
 ## Task 4: Present pending states and verify real player behavior
 
