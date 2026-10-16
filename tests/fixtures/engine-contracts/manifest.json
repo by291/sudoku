@@ -332,7 +332,7 @@
       "cases": 19
     },
     {
-      "file": "benchmark-inputs.json",
+      "file": "exact-inputs.json",
       "sha256": "e865049e39f0031e41a1414b5e89855e41a22254bcc369f0ebcbc05c6eacd5d9",
       "bytes": 580933,
       "cases": 220

@@ -1,5 +1,7 @@
 # Portable Rust Sudoku Core and Browser WASM Implementation Plan
 
+> Post-migration cleanup: the user requested removal of experiment and benchmark code. The completed benchmark tasks below describe historical work; their harnesses have been retired. Correctness suites and recorded audit reports remain maintained.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace production TypeScript Sudoku computation with a reusable native Rust core and a separate typed browser WASM adapter, adopting a new deterministic byte-seed generation contract while preserving mathematical/player behavior and saved facts.

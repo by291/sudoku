@@ -1,5 +1,7 @@
 # Browser WASM Sudoku Core Performance Comparison
 
+> Historical report: the experiment and benchmark harnesses were removed after migration at the user's request. Their sources remain in Git at commit `c3dfbcb`; the recorded measurements and raw artifacts below are preserved unchanged. Current correctness checks are documented in [migration evidence](../../../tests/migration/README.md).
+
 Date: 2026-10-16. Follow-up to the [native Rust comparison](2026-10-16-rust-core-benchmark.md), using the same reference-checked corpus and unchanged production engine.
 
 ## Result
@@ -75,12 +77,6 @@ The measured core speedup survives ordinary input/output copies, which supports 
 
 No application Worker, mobile hardware or complete generation flow was benchmarked, and no WASM implementation was integrated into the product. WebKit here is Playwright's headless runtime, not a measurement of a user's installed Safari. Native Rust versus Node figures remain a separate comparison.
 
-## Reproduce
+## Historical artifacts
 
-After installing the compiler target and exact binding tool as described in the [experiment README](../../../experiments/rust-core-benchmark/README.md):
-
-```sh
-node experiments/rust-core-benchmark/run-wasm.mjs
-```
-
-[Raw browser samples, checksums, setup observations and source/artifact hashes](2026-10-16-wasm-core-benchmark.json). Build products and the generated corpus remain under ignored `.superpowers/rust-core-benchmark/`. Root package dependencies, production code, persisted records and Worker protocols are unchanged.
+[Raw browser samples, checksums, setup observations and source/artifact hashes](2026-10-16-wasm-core-benchmark.json) retain the original results. The retired browser harness and tool setup are available in `experiments/rust-core-benchmark/` at Git commit `c3dfbcb`.

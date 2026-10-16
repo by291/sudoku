@@ -27,20 +27,19 @@ Open the Local URL printed by Vite. No server account, API keys, or backend serv
 
 ## Commands
 
-| Command                             | Purpose                                                                                                |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `pnpm bench:core`                   | Audit retained kernels, complete v11 generation, emitted Workers, startup/memory and interactive tails |
-| `pnpm wasm:build`                   | Build pinned Rust/WASM and generated TypeScript contracts                                              |
-| `pnpm dev`                          | Start the development server on loopback                                                               |
-| `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types                                        |
-| `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries                                              |
-| `pnpm format:check` / `pnpm format` | Check or apply formatting                                                                              |
-| `pnpm test:unit`                    | Run domain, store, component, and storage tests                                                        |
-| `pnpm build`                        | Create the production `dist/` directory                                                                |
-| `pnpm build:subpath`                | Create the `/sudoku/` verification build in `dist-subpath/`                                            |
-| `pnpm preview`                      | Serve the production build locally                                                                     |
-| `pnpm test:e2e`                     | Test the production build in Chromium, Firefox, and mobile WebKit                                      |
-| `pnpm check`                        | Run all type, lint, formatting, unit, build, and browser checks                                        |
+| Command                             | Purpose                                                           |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `pnpm wasm:build`                   | Build pinned Rust/WASM and generated TypeScript contracts         |
+| `pnpm dev`                          | Start the development server on loopback                          |
+| `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types   |
+| `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries         |
+| `pnpm format:check` / `pnpm format` | Check or apply formatting                                         |
+| `pnpm test:unit`                    | Run domain, store, component, and storage tests                   |
+| `pnpm build`                        | Create the production `dist/` directory                           |
+| `pnpm build:subpath`                | Create the `/sudoku/` verification build in `dist-subpath/`       |
+| `pnpm preview`                      | Serve the production build locally                                |
+| `pnpm test:e2e`                     | Test the production build in Chromium, Firefox, and mobile WebKit |
+| `pnpm check`                        | Run all type, lint, formatting, unit, build, and browser checks   |
 
 Build before running `test:e2e` directly. Playwright starts preview servers on ports 4173 and 4174; its second server builds and tests `/sudoku/` deployment in `dist-subpath/`. Test output, traces, and screenshots are ignored by Git. Tests use isolated browser contexts, fixture records for lengthy completion scenarios, and real production workers for generation and hints.
 
@@ -68,9 +67,9 @@ All Sudoku computation lives in [`crates/sudoku-core`](crates/sudoku-core/README
 
 Generation requests use exactly 32 byte seeds, independent of UUID session IDs. New stored/share identities use strict lowercase 64-character hex with `sudoku-v11` / `sudoku-variants-v11`; rating remains `sudoku-rating-v2`. Daily roots derive from ASCII `daily:YYYY-MM-DD`. Existing daily attempts and historical saved boards/rules/progress/results remain authoritative; historical seed/version strings are never decoded or regenerated.
 
-Run `pnpm test:migration -- --suite all --engine native` for 5,742 complete comparisons, and the `wasm-chromium`, `wasm-firefox` or `wasm-webkit` adapters for 4,262 comparisons each. See [migration evidence](tests/migration/README.md) for sealed inputs, independent oracles and the test-only v11 recipe. Run `pnpm bench:core` on a controlled idle host after checks; it builds required artifacts before timing. `--smoke` is wiring diagnostics and cannot establish release acceptance. Reports retain every generation sample, full metrics and source/artifact/toolchain hashes, and mark unavailable browsers explicitly.
+Run `pnpm test:migration -- --suite all --engine native` for 5,742 complete comparisons, and the `wasm-chromium`, `wasm-firefox` or `wasm-webkit` adapters for 4,262 comparisons each. See [migration evidence](tests/migration/README.md) for sealed inputs, independent oracles and the test-only v11 recipe.
 
-The migration's verification status, focused asynchronous live analysis and interactive performance gate are recorded in the [release audit](docs/superpowers/verification/2026-10-16-rust-core-migration.md). Earlier benchmark reports remain historical prototype measurements.
+The migration's verification status, asynchronous live analysis and historical performance measurements are recorded in the [release audit](docs/superpowers/verification/2026-10-16-rust-core-migration.md). Experimental and benchmark harnesses have been removed; their reports remain historical evidence. Independent correctness fixtures and Worker deadline regressions remain maintained.
 
 ## Internal assessment
 

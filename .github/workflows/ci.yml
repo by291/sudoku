@@ -146,7 +146,6 @@ jobs:
           --project=${{ matrix.project }}
           --workers=${{ matrix.workers }}
           --reporter='line,html'
-          --grep-invert='@performance'
           --global-timeout=900000
 
       - name: Upload browser report and failure evidence
@@ -157,6 +156,5 @@ jobs:
           path: |
             playwright-report/
             test-results/
-            .superpowers/worker-timings/
           retention-days: 7
           if-no-files-found: ignore

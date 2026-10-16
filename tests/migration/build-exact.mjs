@@ -10,7 +10,7 @@ const engine = await loadEngine({ v11: true })
 const { referenceCountSolutions } = await import(
   pathToFileURL(resolve(referenceRoot, 'tests/support/referenceVariants.ts')).href
 )
-const boards = JSON.parse(readFileSync(resolve(fixtureRoot, 'benchmark-inputs.json'), 'utf8'))
+const boards = JSON.parse(readFileSync(resolve(fixtureRoot, 'exact-inputs.json'), 'utf8'))
 const rows = []
 for (const board of boards) {
   const setup = engine.createWorkBudget(4000000)

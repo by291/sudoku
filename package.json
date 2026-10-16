@@ -20,8 +20,7 @@
     "test:e2e": "playwright test",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm build && pnpm test:e2e",
     "test:migration": "node tests/migration/run.mjs",
-    "wasm:build": "node scripts/build-sudoku-wasm.mjs",
-    "bench:core": "node benchmarks/sudoku-core/run.mjs"
+    "wasm:build": "node scripts/build-sudoku-wasm.mjs"
   },
   "dependencies": {
     "idb": "8.0.4",

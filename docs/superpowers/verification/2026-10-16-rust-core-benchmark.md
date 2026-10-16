@@ -1,5 +1,7 @@
 # Rust Sudoku Core Performance Comparison
 
+> Historical report: the experiment and benchmark harnesses were removed after migration at the user's request. Their sources remain in Git at commit `c3dfbcb`; the recorded measurements and raw artifacts below are preserved unchanged. Current correctness checks are documented in [migration evidence](../../../tests/migration/README.md).
+
 Date: 2026-10-16. This is an independent native prototype; application runtime and engine source are unchanged.
 
 A subsequent [browser WASM comparison](2026-10-16-wasm-core-benchmark.md) measures the same core in actual browser runtimes. This report retains the earlier native measurements and source snapshots.
@@ -48,12 +50,6 @@ The exact-search path shows a substantial measured native benefit on this corpus
 
 These inputs are accepted puzzles, not a sampled distribution of intermediate generation probes. This result cannot predict the full generator, logical rating or hint speedup. The subsequent report measures browser WASM; actual generation CPU profiling remains necessary before estimating product benefits. No production replacement is proposed by this experiment.
 
-## Reproduction and artifacts
+## Historical artifacts
 
-Run from the repository root:
-
-```sh
-node experiments/rust-core-benchmark/run.mjs
-```
-
-[Experiment source and detailed methodology](../../../experiments/rust-core-benchmark/README.md), [Rust propagation search](../../../experiments/rust-core-benchmark/src/search.rs), and [raw samples, checksums and fingerprints](2026-10-16-rust-core-benchmark.json). Generated corpus and build outputs remain under ignored `.superpowers/rust-core-benchmark/`.
+[Raw samples, checksums and fingerprints](2026-10-16-rust-core-benchmark.json) retain the original results. To inspect the retired implementation and methodology, use `experiments/rust-core-benchmark/` at Git commit `c3dfbcb`.

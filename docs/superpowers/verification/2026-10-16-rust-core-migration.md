@@ -1,5 +1,7 @@
 # Portable Sudoku Engine Migration Audit
 
+> Historical report: the experiment and benchmark harnesses were removed after migration at the user's request. Their sources remain in Git at commit `c3dfbcb`; the recorded measurements and raw artifacts below are preserved unchanged. Current correctness checks are documented in [migration evidence](../../../tests/migration/README.md).
+
 Date: 2026-10-16. Implementation and verification are in the isolated `rust-sudoku-core` worktree. No push, publication or merge is part of this audit.
 
 ## Scope and status
@@ -67,7 +69,7 @@ The final benchmark retains raw heavy-kernel timings as evidence, then gates act
 
 ## Performance methodology
 
-Run `pnpm bench:core` after builds and correctness checks finish. The harness performs setup before timing, verifies complete payload equality before each measured operation and rejects a deliberately wrong payload nonzero. It records source/corpus/toolchain/artifact fingerprints, 171 retained kernel inputs, all 2,241 v11 outputs, all 19 supported variant/tier combinations, 152 boundary outcomes, actual emitted Workers at both deployment roots, startup conditions, memory and repeated disposal.
+At the time of this audit, the retired harness performed setup before timing, verified complete payload equality before each measured operation and rejected a deliberately wrong payload nonzero. It recorded source/corpus/toolchain/artifact fingerprints, 171 retained kernel inputs, all 2,241 v11 outputs, all 19 supported variant/tier combinations, 152 boundary outcomes, actual emitted Workers at both deployment roots, startup conditions, memory and repeated disposal.
 
 Same-v11-recipe comparisons measure language/binding differences with unchanged mathematical work. Earlier [native](2026-10-16-rust-core-benchmark.md) and [browser WASM](2026-10-16-wasm-core-benchmark.md) v10 prototype reports remain historical product diagnostics; their different seeded work must not be treated as v11 generation speedups.
 
@@ -85,7 +87,7 @@ The serialized speedup/deadline/resource gates below pass for native, Chromium a
 
 Implementation rulings and their costs are recorded in the appendix below; none changes the approved byte identity, mathematical quotas or saved-data behavior.
 
-## Reproduction
+## Maintained correctness checks
 
 ```sh
 pnpm install --frozen-lockfile
@@ -102,11 +104,10 @@ node tests/migration/run.mjs --suite all --engine wasm-chromium
 node tests/migration/run.mjs --suite all --engine wasm-webkit
 pnpm build
 pnpm build:subpath
-pnpm exec playwright test --project desktop --project mobile --project webkit --grep-invert @performance
-pnpm bench:core
+pnpm exec playwright test --project desktop --project mobile --project webkit
 ```
 
-Install the matching Playwright browsers and run Firefox contracts/player checks on a host where Firefox launches. CI includes all four configured player projects plus actual Chromium/Firefox/WebKit WASM contracts. Controlled-host timing is a release audit rather than a shared-runner CI threshold.
+Install the matching Playwright browsers and run Firefox contracts/player checks on a host where Firefox launches. CI includes all four configured player projects plus actual Chromium/Firefox/WebKit WASM contracts. The timing results above are historical audit evidence; the dedicated harness is no longer maintained.
 
 ## Implementation ruling record
 

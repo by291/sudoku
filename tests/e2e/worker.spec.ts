@@ -1,5 +1,4 @@
 import { runWorker, parseWorkerResponse, generateReference } from './workerHarness'
-import { mkdirSync, writeFileSync } from 'node:fs'
 import { test, expect, makeVariantHintSession } from './support'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 import { countReferenceSolutions } from '../support/referenceSudoku'
@@ -64,15 +63,7 @@ test('verifies current-identity puzzles for historical recovery seeds at both ro
 
 test('keeps historical type-and-tier latency inputs within the current Worker deadline', async ({
   page,
-  browser,
-}, testInfo) => {
-  const timings: {
-    base: string
-    variant: string
-    difficulty: string
-    seed: string
-    milliseconds: number
-  }[] = []
+}) => {
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
     for (const { variant, difficulty, seed, expectedStatus } of GENERATION_LATENCY_INPUTS) {
@@ -89,7 +80,6 @@ test('keeps historical type-and-tier latency inputs within the current Worker de
         ),
       )
       const milliseconds = performance.now() - started
-      timings.push({ base, variant, difficulty, seed, milliseconds })
 
       expect(milliseconds, `${variant}/${difficulty}/${base}`).toBeLessThan(3000)
       if (expectedStatus === 'completed') {
@@ -113,19 +103,6 @@ test('keeps historical type-and-tier latency inputs within the current Worker de
       }
     }
   }
-  await testInfo.attach('all-type-worker-timings', {
-    body: JSON.stringify(timings),
-    contentType: 'application/json',
-  })
-  mkdirSync('.superpowers', { recursive: true })
-  writeFileSync(
-    `.superpowers/generation-worker-timings-${testInfo.project.name}.json`,
-    JSON.stringify(
-      { project: testInfo.project.name, browserVersion: browser.version(), timings },
-      null,
-      2,
-    ),
-  )
 })
 
 test('delivers a freshly constructed Killer Hard puzzle from the real Worker at both roots', async ({
@@ -175,15 +152,13 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
 
 test('delivers fixed regional regression seeds within the production Worker timeout at both roots', async ({
   page,
-}, testInfo) => {
-  const timings: { base: string; difficulty: string; milliseconds: number }[] = []
+}) => {
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
     for (const [difficulty, seed] of [
       ['medium', '006'],
       ['hard', '010'],
     ] as const) {
-      const started = performance.now()
       const response = parseWorkerResponse(
         await runWorker(
           page,
@@ -195,7 +170,6 @@ test('delivers fixed regional regression seeds within the production Worker time
           base,
         ),
       )
-      timings.push({ base, difficulty, milliseconds: performance.now() - started })
       expect(response).toMatchObject({
         valid: true,
         value: {
@@ -208,10 +182,6 @@ test('delivers fixed regional regression seeds within the production Worker time
       })
     }
   }
-  await testInfo.attach('regional-worker-timings', {
-    body: JSON.stringify(timings),
-    contentType: 'application/json',
-  })
 })
 
 test('verifies fixed production-worker seeds and a known logical conclusion', async ({ page }) => {

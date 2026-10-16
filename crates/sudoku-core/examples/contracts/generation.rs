@@ -91,7 +91,7 @@ use sudoku_core::rating::assessment::{assess_puzzle, assess_puzzle_with_budget};
 use sudoku_core::rating::input::create_assessment_input;
 use sudoku_core::rating::types::AssessmentLimits;
 
-pub fn decode(
+fn decode(
     input: GenerationInputDto,
 ) -> Result<(GenerationInput, GenerationLimits), Box<dyn std::error::Error>> {
     let request = GenerationInput::from_version(
@@ -115,13 +115,10 @@ pub fn decode(
 
 pub fn evaluate(input: GenerationInputDto) -> Result<Value, Box<dyn std::error::Error>> {
     let (request, limits) = decode(input)?;
-    project(generate_puzzle(&request, &limits)?, true)
+    project(generate_puzzle(&request, &limits)?)
 }
 
-pub fn project(
-    result: GenerationResult,
-    include_standalone: bool,
-) -> Result<Value, Box<dyn std::error::Error>> {
+fn project(result: GenerationResult) -> Result<Value, Box<dyn std::error::Error>> {
     let metrics = result.metrics;
     let by_stage: serde_json::Map<String, Value> = WorkStage::ALL
         .into_iter()
@@ -147,18 +144,16 @@ pub fn project(
             projected["source"] = json!("generated");
             projected["assessment"] = crate::assessment_contracts::project_summary(&assessment);
             projected["puzzle"] = json!({"givens":content.givens.values().to_vec(),"solution":content.solution.values().to_vec(),"rules":project_rule_value(&content.rules),"difficulty":content.difficulty.as_str(),"seed":seed,"puzzleVersion":puzzle.puzzle_version.as_str()});
-            if include_standalone {
-                let input = create_assessment_input(
-                    &content.givens,
-                    &content.rules,
-                    AssessmentLimits::default(),
-                );
-                let first = assess_puzzle(&input);
-                let second = assess_puzzle_with_budget(&input, &mut WorkBudget::new(4000000));
-                standalone = Some(
-                    json!({"result":crate::assessment_contracts::project_result(&first),"budgeted":crate::assessment_contracts::project_result(&second)}),
-                );
-            }
+            let input = create_assessment_input(
+                &content.givens,
+                &content.rules,
+                AssessmentLimits::default(),
+            );
+            let first = assess_puzzle(&input);
+            let second = assess_puzzle_with_budget(&input, &mut WorkBudget::new(4000000));
+            standalone = Some(
+                json!({"result":crate::assessment_contracts::project_result(&first),"budgeted":crate::assessment_contracts::project_result(&second)}),
+            );
         }
         GenerationOutcome::BudgetExhausted { cause } => {
             projected["status"] = json!("budget-exhausted");
