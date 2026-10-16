@@ -1,12 +1,16 @@
 # Sudoku · 一格一念
 
-A browser-local Sudoku game with a Chinese interface, built with a reusable Rust Sudoku core, wasm-bindgen, Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB (`idb`), and native CSS. Repository documentation and code identifiers are in English.
+A local Sudoku game with Chinese Web and native Android interfaces. The Web client uses the reusable Rust core through wasm-bindgen, Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB (`idb`), and native CSS. Android uses Kotlin, Compose, Room, and generated UniFFI bindings over the same core. Repository documentation and code identifiers are in English.
 
-The product remains browser-local and statically hosted. Accounts, cloud and cross-device synchronization, friends, global leaderboards, and PWA/offline installation are outside the product scope.
+The Web client remains browser-local and statically hosted; Android runs independently offline. Backup files transfer player data between clients. Accounts, automatic cloud synchronization, friends, global leaderboards, and Web PWA/offline installation are outside the product scope.
 
 The approved [Local Product Roadmap](docs/superpowers/plans/2026-10-14-sudoku-local-product-roadmap.md) is implemented and locally verified: LF consistency, advanced Classic play, 32 course units, broader variant generation, and local backup/restore. See the [delivery and verification report](docs/superpowers/verification/2026-10-14-sudoku-local-roadmap.md) for evidence and practical limits. Difficulty feedback, manual playtest calibration, and a separate release-acceptance project are outside this roadmap.
 
-## Requirements and setup
+## Native Android client
+
+The project lives under [`android/`](android/README.md), with app/core/feature modules and its dedicated Rust adapter in `android/ffi`. It supports six variants, all 19 difficulty combinations, the shared 32-course catalogue, daily challenges, local records, and compatible backup import/export. See the [Android build guide](android/README.md) and [verification report](android/docs/verification.md) for requirements, APK locations, screenshots, actual test results, and remaining device coverage.
+
+## Web requirements and setup
 
 Use Node.js 26 or later and the repository-pinned pnpm 12.11.2. Development was verified on Windows with Node.js 26.10.0. TypeScript is pinned to 6.0.3 for compatibility with the installed lint tooling.
 
