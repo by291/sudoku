@@ -124,3 +124,47 @@ pub fn prepare_rules(
         }
     }))
 }
+
+/// Called only with a validated constraint from an immutable prepared layout.
+pub(crate) fn satisfies_constraint(
+    board: &crate::types::Board,
+    constraint: &super::types::RuleConstraint,
+) -> bool {
+    use super::types::RuleConstraint;
+    let values = board.values();
+    if constraint.cells().iter().any(|&cell| values[cell] == 0) {
+        return false;
+    }
+    match constraint {
+        RuleConstraint::Thermo { cells, .. } => {
+            if !cells
+                .windows(2)
+                .all(|pair| values[pair[0]] < values[pair[1]])
+            {
+                return false;
+            }
+        }
+        RuleConstraint::Arrow { cells, .. } => {
+            let total: u16 = cells[1..].iter().map(|&cell| u16::from(values[cell])).sum();
+            if total != u16::from(values[cells[0]]) {
+                return false;
+            }
+        }
+        RuleConstraint::Cage { cells, sum, .. } => {
+            let mut seen = 0_u16;
+            let mut total = 0_u16;
+            for &cell in cells {
+                let bit = 1 << (values[cell] - 1);
+                if seen & bit != 0 {
+                    return false;
+                }
+                seen |= bit;
+                total += u16::from(values[cell]);
+            }
+            if total != *sum {
+                return false;
+            }
+        }
+    }
+    true
+}

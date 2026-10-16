@@ -1,4 +1,4 @@
-use crate::rules::types::{PreparedRules, RuleConstraint};
+use crate::rules::types::PreparedRules;
 use crate::types::{ALL_DIGITS_MASK, BOARD_SIZE, Board, CandidateMask};
 
 /// Full-board completion is distinct from the feasibility of a partial arithmetic clue.
@@ -17,40 +17,10 @@ pub fn is_complete(board: &Board, prepared: &PreparedRules) -> bool {
             return false;
         }
     }
-    for constraint in &context.constraints {
-        match constraint {
-            RuleConstraint::Thermo { cells, .. } => {
-                if !cells
-                    .windows(2)
-                    .all(|pair| values[pair[0]] < values[pair[1]])
-                {
-                    return false;
-                }
-            }
-            RuleConstraint::Arrow { cells, .. } => {
-                let total: u16 = cells[1..].iter().map(|&cell| u16::from(values[cell])).sum();
-                if total != u16::from(values[cells[0]]) {
-                    return false;
-                }
-            }
-            RuleConstraint::Cage { cells, sum, .. } => {
-                let mut seen = 0_u16;
-                let mut total = 0_u16;
-                for &cell in cells {
-                    let bit = 1 << (values[cell] - 1);
-                    if seen & bit != 0 {
-                        return false;
-                    }
-                    seen |= bit;
-                    total += u16::from(values[cell]);
-                }
-                if total != *sum {
-                    return false;
-                }
-            }
-        }
-    }
-    true
+    context
+        .constraints
+        .iter()
+        .all(|constraint| crate::rules::context::satisfies_constraint(board, constraint))
 }
 
 /// Base candidates apply duplicate peers only; arithmetic refinement belongs to constraints.

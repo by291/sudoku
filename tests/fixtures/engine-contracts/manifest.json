@@ -391,6 +391,12 @@
       "cases": 19
     },
     {
+      "file": "support.json",
+      "sha256": "88c21e18640a99b69d26e7f6ed0611d1f2132b0d28aff45dea1baac893177b4a",
+      "bytes": 756425,
+      "cases": 148
+    },
+    {
       "file": "validation.json",
       "sha256": "5307d9a5185c55eb45fe3f22c8d3e891f3136e22ce27cd6c6e210ca91db9ecad",
       "bytes": 78585,

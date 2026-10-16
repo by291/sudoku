@@ -33,6 +33,27 @@ export async function computeCase(engine, suite, input) {
       }
       break
     }
+    case 'support': {
+      const { prepareConstraintSupport } = await import(
+        pathToFileURL(resolve(referenceRoot, 'src/core/sudoku/constraints/support.ts')).href
+      )
+      const context = engine.compileRules(input.rules)
+      const preparation = engine.createWorkBudget(input.prepareLimit)
+      const prepared = prepareConstraintSupport(context, preparation, input.limits)
+      assert.equal(prepared.status, 'ready')
+      const query = engine.createWorkBudget(input.queryLimit)
+      result = {
+        result: prepared.support.get(
+          input.board,
+          input.domains,
+          context.constraints[input.index],
+          query,
+        ),
+        prepareWork: preparation.used,
+        queryWork: query.used,
+      }
+      break
+    }
     case 'exact':
       result = engine.countSolutions(input.board, {
         maxSolutions: 2,
@@ -109,7 +130,10 @@ export async function computeCase(engine, suite, input) {
     default:
       throw new Error(`Unsupported migration suite: ${suite}`)
   }
-  return plain({ ...result, ...(suite === 'generation' ? {} : { workUsed: budget.used }) })
+  return plain({
+    ...result,
+    ...(['generation', 'support'].includes(suite) ? {} : { workUsed: budget.used }),
+  })
 }
 
 export async function runMigration(args) {
@@ -139,6 +163,7 @@ export async function runMigration(args) {
       ? [
           'rules',
           'constraints',
+          'support',
           'exact',
           'logic',
           'hints',

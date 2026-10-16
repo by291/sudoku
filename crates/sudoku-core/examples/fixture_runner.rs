@@ -1,4 +1,6 @@
 //! Test-only JSONL adapter; the reusable library performs no I/O or platform work.
+#[path = "contracts/constraints.rs"]
+mod constraint_contracts;
 #[path = "../tests/support/rules.rs"]
 pub mod fixtures;
 
@@ -13,6 +15,10 @@ use sudoku_core::types::Board;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, tag = "suite", content = "input")]
 enum Request {
+    #[serde(rename = "constraints")]
+    Constraints(constraint_contracts::ConstraintInput),
+    #[serde(rename = "support")]
+    Support(constraint_contracts::SupportInput),
     #[serde(rename = "random")]
     Random { seed: Vec<u8>, count: usize },
     #[serde(rename = "rules")]
@@ -21,6 +27,8 @@ enum Request {
 
 fn evaluate(request: Request) -> Result<Value, Box<dyn std::error::Error>> {
     match request {
+        Request::Constraints(input) => constraint_contracts::evaluate(input),
+        Request::Support(input) => constraint_contracts::evaluate_support(input),
         Request::Random { seed, count } => {
             if count > 10000 {
                 return Err("Fixture stream length exceeds 10000 words".into());

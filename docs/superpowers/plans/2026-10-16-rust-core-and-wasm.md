@@ -121,12 +121,12 @@ The plan dependency chain is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 �
 
 **Interfaces:** Produces `PreparedComputation`, `prepare_computation`, `SupportResult`, `CandidateResult`, `ConflictResult`, structured violation codes, `evaluate_candidates(&Board, &PreparedRules, &mut WorkBudget) -> CandidateResult`, and `evaluate_conflicts(&Board, &PreparedRules, &mut WorkBudget) -> ConflictResult`. Prepared and raw support paths remain explicit; callers retain their current charging mode.
 
-- [ ] Add `catalogue_overflow_discards_partial_support`, `large_cages_use_bounded_fallback`, `last_work_unit_cannot_publish_incomplete_support`, `partial_conflicts_remain_marked_incomplete`, and `prepared_geometry_cannot_be_mutated_by_results`. Assert exact masks/charges/status at full and one-unit-short limits, zero/512/8,192 tuple capacity cases, and Arrow non-peer repetition.
-- [ ] Run `cargo test -p sudoku-core --test constraint_support --test constraint_evaluation`; verify unimplemented support fails the known-mask expectations.
-- [ ] Port enumeration, combination/permutation ordering, filtering, raw/prepared dispatch and refinement convergence. Preparation remains charged even on overflow/fallback; incomplete support is never cached or returned as complete.
-- [ ] Return semantic violation facts rather than Chinese strings; add explicit canonical projection that reconstructs the current text for differential tests. Preserve existing conflict ordering and partial-result semantics.
-- [ ] Run constraint tests and `pnpm test:migration -- --suite constraints --engine native`; compare complete outcomes and budget totals. Re-run all existing native tests.
-- [ ] Commit as `feat(core): port bounded arithmetic support and analysis`.
+- [x] Add `catalogue_overflow_discards_partial_support`, `large_cages_use_bounded_fallback`, `last_work_unit_cannot_publish_incomplete_support`, `partial_conflicts_remain_marked_incomplete`, and `prepared_geometry_cannot_be_mutated_by_results`. Assert exact masks/charges/status at full and one-unit-short limits, zero/512/8,192 tuple capacity cases, and Arrow non-peer repetition.
+- [x] Run `cargo test -p sudoku-core --test constraint_support --test constraint_evaluation`; verify unimplemented support fails the known-mask expectations.
+- [x] Port enumeration, combination/permutation ordering, filtering, raw/prepared dispatch and refinement convergence. Preparation remains charged even on overflow/fallback; incomplete support is never cached or returned as complete.
+- [x] Return semantic violation facts rather than Chinese strings; add explicit canonical projection that reconstructs the current text for differential tests. Preserve existing conflict ordering and partial-result semantics.
+- [x] Run constraint tests and `pnpm test:migration -- --suite constraints --engine native`; compare complete outcomes and budget totals. Re-run all existing native tests.
+- [x] Commit as `feat(core): port bounded arithmetic support and analysis`.
 
 ## Task 5: Port exact search and pure Sudoku editing
 

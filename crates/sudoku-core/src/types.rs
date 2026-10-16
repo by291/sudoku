@@ -122,6 +122,12 @@ impl TryFrom<usize> for CellIndex {
 pub struct CandidateMask(u16);
 
 impl CandidateMask {
+    // Internal unions/intersections preserve nine-bit validity; external bits must use TryFrom.
+    pub(crate) fn from_computed_bits(bits: u16) -> Self {
+        debug_assert_eq!(bits & !ALL_DIGITS_MASK, 0);
+        Self(bits)
+    }
+
     pub const EMPTY: Self = Self(0);
     pub const ALL: Self = Self(ALL_DIGITS_MASK);
 

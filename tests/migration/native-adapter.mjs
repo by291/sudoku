@@ -4,7 +4,10 @@ import { spawnSync } from 'node:child_process'
 const MAX_FIXTURE_OUTPUT_BYTES = 256 * 1024 * 1024
 
 export function nativeResults(suite, rows) {
-  assert.equal(suite, 'rules', 'This native suite is not implemented yet')
+  assert.ok(
+    ['rules', 'constraints', 'support'].includes(suite),
+    'This native suite is not implemented yet',
+  )
   const requests = rows.map((row) => JSON.stringify({ suite, input: row.input })).join('\n') + '\n'
   const result = spawnSync(
     'cargo',
