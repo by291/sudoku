@@ -1,8 +1,12 @@
 //! Test-only JSONL adapter; the reusable library performs no I/O or platform work.
 #[path = "contracts/constraints.rs"]
 mod constraint_contracts;
+#[path = "contracts/editing.rs"]
+mod editing_contracts;
 #[path = "../tests/support/rules.rs"]
 pub mod fixtures;
+#[path = "contracts/search.rs"]
+mod search_contracts;
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -15,6 +19,12 @@ use sudoku_core::types::Board;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, tag = "suite", content = "input")]
 enum Request {
+    #[serde(rename = "exact")]
+    Exact(search_contracts::ExactInput),
+    #[serde(rename = "exact-prepared")]
+    ExactPrepared(search_contracts::PreparedInput),
+    #[serde(rename = "editing")]
+    Editing(editing_contracts::EditingInput),
     #[serde(rename = "constraints")]
     Constraints(constraint_contracts::ConstraintInput),
     #[serde(rename = "support")]
@@ -27,6 +37,9 @@ enum Request {
 
 fn evaluate(request: Request) -> Result<Value, Box<dyn std::error::Error>> {
     match request {
+        Request::Exact(input) => search_contracts::evaluate(input),
+        Request::ExactPrepared(input) => search_contracts::evaluate_prepared(input),
+        Request::Editing(input) => editing_contracts::evaluate(input),
         Request::Constraints(input) => constraint_contracts::evaluate(input),
         Request::Support(input) => constraint_contracts::evaluate_support(input),
         Request::Random { seed, count } => {

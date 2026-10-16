@@ -62,6 +62,17 @@ export async function computeCase(engine, suite, input) {
         workBudget: budget,
       })
       break
+    case 'exact-prepared': {
+      const setup = engine.createWorkBudget(4000000)
+      const prepared = engine.prepareRuleComputation(input.rules, setup)
+      assert.equal(prepared.status, 'ready')
+      const query = engine.createWorkBudget(input.workLimit)
+      query.used = input.initialWork
+      const result = engine
+        .prepareExactValidator(prepared.computation)
+        .count(input.board, query, input.nodeLimit)
+      return plain({ result, used: query.used })
+    }
     case 'logic':
       result = engine.analyzeLogic(
         input.board,
@@ -165,6 +176,7 @@ export async function runMigration(args) {
           'constraints',
           'support',
           'exact',
+          'exact-prepared',
           'logic',
           'hints',
           'assessment',

@@ -3,9 +3,11 @@
 pub mod board;
 pub mod budget;
 pub mod constraints;
+pub mod editing;
 pub mod generation;
 pub mod puzzle;
 pub mod random;
 pub mod rating;
 pub mod rules;
+pub mod search;
 pub mod types;

@@ -5,7 +5,7 @@ const MAX_FIXTURE_OUTPUT_BYTES = 256 * 1024 * 1024
 
 export function nativeResults(suite, rows) {
   assert.ok(
-    ['rules', 'constraints', 'support'].includes(suite),
+    ['rules', 'constraints', 'support', 'exact', 'exact-prepared', 'editing'].includes(suite),
     'This native suite is not implemented yet',
   )
   const requests = rows.map((row) => JSON.stringify({ suite, input: row.input })).join('\n') + '\n'

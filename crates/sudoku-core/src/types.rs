@@ -56,6 +56,17 @@ pub enum Bounded<T> {
 pub struct Board([u8; BOARD_SIZE]);
 
 impl Board {
+    pub const EMPTY: Self = Self([0; BOARD_SIZE]);
+
+    // Computed boards contain only existing validated values or digits selected from nine-bit domains.
+    pub(crate) fn from_computed_values(values: [u8; BOARD_SIZE]) -> Self {
+        assert!(
+            values.iter().all(|&value| usize::from(value) <= UNIT_SIZE),
+            "Computed board values must remain valid Sudoku values"
+        );
+        Self(values)
+    }
+
     pub fn values(&self) -> &[u8; BOARD_SIZE] {
         &self.0
     }
