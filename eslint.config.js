@@ -61,6 +61,9 @@ export default [
       'dist/**',
       'dist-subpath/**',
       'node_modules/**',
+      'target/**',
+      'packages/sudoku-wasm/pkg/**',
+      '.tools/**',
       '.superpowers/**',
       'tests/reference/typescript-engine/**',
       '.agents/**',
@@ -71,7 +74,7 @@ export default [
   },
   // Reference snapshots remain byte exact; executable migration tools use Node globals.
   {
-    files: ['tests/migration/**/*.mjs'],
+    files: ['tests/migration/**/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
   js.configs.recommended,

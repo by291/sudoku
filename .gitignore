@@ -6,3 +6,7 @@ playwright-report/
 test-results/
 .superpowers/
 *.tsbuildinfo
+
+target/
+packages/sudoku-wasm/pkg/
+.tools/

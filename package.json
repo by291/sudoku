@@ -19,14 +19,16 @@
     "build:subpath": "vite build --base /sudoku/ --outDir dist-subpath",
     "test:e2e": "playwright test",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm build && pnpm test:e2e",
-    "test:migration": "node tests/migration/run.mjs"
+    "test:migration": "node tests/migration/run.mjs",
+    "wasm:build": "node scripts/build-sudoku-wasm.mjs"
   },
   "dependencies": {
     "idb": "8.0.4",
     "naive-ui": "2.45.3",
     "pinia": "4.0.3",
     "vue": "3.5.43",
-    "vue-router": "5.4.0"
+    "vue-router": "5.4.0",
+    "@sudoku/wasm": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
