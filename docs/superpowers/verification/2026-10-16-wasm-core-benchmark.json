@@ -1,0 +1,807 @@
+{
+  "createdAt": "2026-10-16T04:41:23.784Z",
+  "host": {
+    "cpu": "Apple M4 Pro",
+    "architecture": "arm64",
+    "platform": "darwin",
+    "release": "27.0.0"
+  },
+  "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+  "wasmBindgen": "wasm-bindgen 0.2.129",
+  "commit": "7c95fb7832e614d4ee8d5089f69bac71d4886c36",
+  "sourceFingerprint": "874a462db763ef6a3d0019badf35106b253d6e0c7f60614d259a03828a35df80",
+  "sources": [
+    {
+      "file": "board.ts",
+      "sha256": "f6f6fcff01a743ff68e0d3246c311e478362796eb762ef357a797b6e37884b13"
+    },
+    {
+      "file": "budget.ts",
+      "sha256": "d05d61c7e66bd3948762eba859d1562e7aca2e5cdf75dfcbcc38823705780dea"
+    },
+    {
+      "file": "constraints/cageCatalogue.ts",
+      "sha256": "27add05553e7ae1b74aedf1e6620d802328450b6680a562bad0847e34ea0a892"
+    },
+    {
+      "file": "constraints/candidates.ts",
+      "sha256": "06e15820082cca1eb99adf6b1c75ba88d80f28413012546a8b596cee58883582"
+    },
+    {
+      "file": "constraints/computation.ts",
+      "sha256": "1f631cadfa7e99abf370cdb95410c0ea04b73da0ea3cd2bb970c7d01b6f63816"
+    },
+    {
+      "file": "constraints/conflicts.ts",
+      "sha256": "50a843a5626f3b340aa40da14a699bbdfbb90ba3a97b1921c4aea186d3a53bb8"
+    },
+    {
+      "file": "constraints/support.ts",
+      "sha256": "72e235eed902611a5756cd88ce269a920d5748866eec84daa8928757b56e4bf4"
+    },
+    {
+      "file": "constraints/types.ts",
+      "sha256": "29226c2c19773df22c3a8ab7cb084aa7560fff51fb25b15e4efaf2594ef28a0d"
+    },
+    {
+      "file": "difficulties.ts",
+      "sha256": "55d4f940508fe664608609908dc5a4b7c4db68644ba594bafb55f7ec6407d307"
+    },
+    {
+      "file": "examples/variants.ts",
+      "sha256": "d30a9220d4e138527ab059eb583d9d11903fa6c4ca920e8758d007eae3b8cf4f"
+    },
+    {
+      "file": "generation/candidates.ts",
+      "sha256": "72f6ac177dc6e5007049dc0a9d04ec11896fd3299d629016733089ea120d65a8"
+    },
+    {
+      "file": "generation/classic.ts",
+      "sha256": "817e9006fa93b48e77d492b89ecd9d9c69595c0f5691a4dbe26af5d76d1ee203"
+    },
+    {
+      "file": "generation/generate.ts",
+      "sha256": "728690f2d8b02cbefbc5053f63eed498410e969b99962d39dcdba53cf2a1df22"
+    },
+    {
+      "file": "generation/input.ts",
+      "sha256": "6ea4dbaf1300b21c93ec0d2151cca0254af69c92ec489ad1da3d7f6b7f286ed8"
+    },
+    {
+      "file": "generation/layouts.ts",
+      "sha256": "8c013316f9460f48afb16f26abd838238bd75aa0a85bb4ef5bb0faa9d2c2db90"
+    },
+    {
+      "file": "generation/random.ts",
+      "sha256": "b0e20655b83c0c7f3856a7c3f0de0a38dac5a7f37970e9ffb8701a846bae0dfb"
+    },
+    {
+      "file": "generation/search.ts",
+      "sha256": "8f2597495f27cc235c56d2b7414397f8a08287819147ce9c484b2d2b27698e57"
+    },
+    {
+      "file": "generation/terminalConstruction.ts",
+      "sha256": "c5abe2e27181ac6e75fce53e073b0b9cea708b60685c52c86e9efb86e197e2dc"
+    },
+    {
+      "file": "generation/types.ts",
+      "sha256": "e50aa9440d665fd274b659e6ad509a394971f1e834dcbee90e013f36050cd828"
+    },
+    {
+      "file": "generation/variant.ts",
+      "sha256": "fa0900c333a16b3c263ed9d53d42059cac2d3217238c6755f2d373720629f2c6"
+    },
+    {
+      "file": "generation/variantStrategies.ts",
+      "sha256": "62917883a348d3dffd1f1d9e7547587d15357d327a9d2e3227c94d2cbef2d115"
+    },
+    {
+      "file": "generation/variants/arrow.ts",
+      "sha256": "b691f2693d6275c91a1acb058fd9ecb756646f32275e41e64a6949c4dac8f070"
+    },
+    {
+      "file": "generation/variants/diagonal.ts",
+      "sha256": "85c9d31c849cd14874dfb41123128294c47820a9fd051df242bb0e815bfa4e89"
+    },
+    {
+      "file": "generation/variants/jigsaw.ts",
+      "sha256": "bd284ac0cf082aea6f9bda07fc72d7173f7a0e4e4f1d19f55bae218236770bb3"
+    },
+    {
+      "file": "generation/variants/killer.ts",
+      "sha256": "1ed6a7fcabc0733dc42dc00f79add4bd9ff22259b99f3d9aa171612556657338"
+    },
+    {
+      "file": "generation/variants/thermo.ts",
+      "sha256": "635ae70d3d7bdad1d3b3aa31ec4d06c9ef114b5f3c838c59b885ce952a7ffb15"
+    },
+    {
+      "file": "hint.ts",
+      "sha256": "c011144c1e84db55d4516981ccaf768eb3840cbcc93c6cc2c84933059c6c3fac"
+    },
+    {
+      "file": "logic/advancedEvidence.ts",
+      "sha256": "cbd91844611c89289548797d442506abb594952ed2941371db4f835e87a33ccb"
+    },
+    {
+      "file": "logic/advancedTechniques.ts",
+      "sha256": "1a37c2aa3e4c60c72576b2cd18539118d73fd547c2ffdece7ff7e867d861fd1a"
+    },
+    {
+      "file": "logic/basicTechniques.ts",
+      "sha256": "3d2094e853cda50747d26582cb56d4963d9418ac881232013fd2e9b4d8b79fe3"
+    },
+    {
+      "file": "logic/evidence.ts",
+      "sha256": "ac09f297c5a66564e885d48acab88f7e827b040b4ea696f8b40c1dfc8e8d829f"
+    },
+    {
+      "file": "logic/patternFacts.ts",
+      "sha256": "add342b1d12e8823cbaf49e0df72160b1c71c549c36ce58af6869b1d4c3a529d"
+    },
+    {
+      "file": "logic/solver.ts",
+      "sha256": "2952ccebd03e745b3c710b3e78d379ce9261f493c41e2ebf02d4e009635b3f34"
+    },
+    {
+      "file": "logic/techniques.ts",
+      "sha256": "54bbd49ff88b04dc81b58a7f21256a3a1987a9d708d0e6ce3af63437c91d96cd"
+    },
+    {
+      "file": "logic/types.ts",
+      "sha256": "6f89e2244237ee8e6fce5fe6231ad68e33b59f3c0605475c330691382f4310df"
+    },
+    {
+      "file": "logic/variantTechniques.ts",
+      "sha256": "0e462e8c0dfb88fd81dbc6e3e1cecffb120a32999b9d5ad9f47cdba05ea5e708"
+    },
+    {
+      "file": "logic/workspace.ts",
+      "sha256": "0d71e55a27e7e45bc8a915f31363e5bf8fdb0b2d45d9fc96b3151a4a20ee2c1a"
+    },
+    {
+      "file": "puzzle.ts",
+      "sha256": "af4e1b1267440f2a11a4d38b5df76d8c8f4de5b5e183de8cc91a0ff2a923c7e1"
+    },
+    {
+      "file": "random.ts",
+      "sha256": "9c1b4493af1df082566742eeabbdd660ec1e3b7686a7c77fe8c79649f6365eec"
+    },
+    {
+      "file": "rating/assessment.ts",
+      "sha256": "bc1a92e7c33b491b62de3093fec02a4298c4e8e70404210d5e88a20e3ee3cdff"
+    },
+    {
+      "file": "rating/decoding.ts",
+      "sha256": "d3b737e550031f042cc7118e216325cfbcb42165d872d27abd2598ff7ebd8c07"
+    },
+    {
+      "file": "rating/input.ts",
+      "sha256": "5be869a63ba07fbc322a54c1ea4e875ec19893d122dd8775735e835c483b1d88"
+    },
+    {
+      "file": "rating/policies.ts",
+      "sha256": "12c59082e41416697a6436bb1b85ba23d694937887d5405c6e7d7d3919e10a39"
+    },
+    {
+      "file": "rating/types.ts",
+      "sha256": "7600bec1de74cfa158cb65d0d01e20694838c9b829683aa4ae4e0d6b9fb9bc97"
+    },
+    {
+      "file": "rating/workload.ts",
+      "sha256": "447ccf0125a943c012c5f1e0564922661d4f909616e7d7f9fb059b8f58fe570e"
+    },
+    {
+      "file": "rules/context.ts",
+      "sha256": "7084b21354df0cea59404e259cefc588f3c64e2ab396a5f4cd2662db789d3c14"
+    },
+    {
+      "file": "rules/definitions/arrow.ts",
+      "sha256": "a96d6b0b2ea45774964b18babf0b748b01c3b5ba0c260d77de795ab24c566869"
+    },
+    {
+      "file": "rules/definitions/classic.ts",
+      "sha256": "a13ffdda418f73743ef4f446bc586499c8406ac1846500e70a9be9a7d7c5b5e4"
+    },
+    {
+      "file": "rules/definitions/diagonal.ts",
+      "sha256": "3c4045fc2050ec280ec120a58cff1d25127b27ca3f8e2a58ee16908f119c235a"
+    },
+    {
+      "file": "rules/definitions/jigsaw.ts",
+      "sha256": "3f40e6061b5059d1103a9c6b80b5cf54520493199c76abc3c2274ec1efd4a553"
+    },
+    {
+      "file": "rules/definitions/killer.ts",
+      "sha256": "8f0600cbef6fd418bf2acfcba96e694c6e90e10b3b04f5bbbcdc9643453a9602"
+    },
+    {
+      "file": "rules/definitions/thermo.ts",
+      "sha256": "f50f0ef1ad54e1657c8a7fc403faea82eb5cfe9bbb53cf39967bed35fcf351f8"
+    },
+    {
+      "file": "rules/registry.ts",
+      "sha256": "020528e4f2c1031630878aef8fa58edc5917681bf7ca697f60671b21738eddb6"
+    },
+    {
+      "file": "rules/topology.ts",
+      "sha256": "ce243f20b9cc219f91e6c3df193bab2c946eef23fbf22f222eb6736689883fec"
+    },
+    {
+      "file": "rules/types.ts",
+      "sha256": "75f426ee09fe796a4a55e47609ab5d155e763c047335f04fbddd750431a11175"
+    },
+    {
+      "file": "search/exact.ts",
+      "sha256": "49f3404ad6298d5365c9fd0dc7fed34ed13081d121e1cb03db6bd6744d20fb80"
+    },
+    {
+      "file": "search/propagation.ts",
+      "sha256": "cb022283cedc673ba06cce6e11132959b7b3de6bae431c4da4d17c6e325eef2f"
+    },
+    {
+      "file": "types.ts",
+      "sha256": "9195df771899e19c3d83aca62138340c2ab10922c180f574d9fa67b8bffa52ab"
+    }
+  ],
+  "benchmarkSourceFingerprint": "90052a34d00fcf3ac54023de9a9d0716eb2517ed36f263e6bb1edf90e0af9f98",
+  "benchmarkSources": [
+    {
+      "file": "Cargo.lock",
+      "sha256": "23c3f069f50bf21e4fa4e45749faa9436e0afeed8345b82cc4dc881135077eda"
+    },
+    {
+      "file": "Cargo.toml",
+      "sha256": "70bc3235fb39a02c80fc514f73372d985c98fef88a17f31c1594762d5571baed"
+    },
+    {
+      "file": "browser.config.mjs",
+      "sha256": "fa57f2bc738a725fcdf8dbc4dd0d3b3666a75a84f817aa3b8093795efa92b6e7"
+    },
+    {
+      "file": "browser.html",
+      "sha256": "a8a54e4ab74b34d8e3ff3d3aa27bf29cc930d78c8db69b22a245f54a4573b9e0"
+    },
+    {
+      "file": "browser.mjs",
+      "sha256": "c5c7e97f1a186c58f8f5113a4a9a4143b36193727af012ff9ca4223e0b2ea8f2"
+    },
+    {
+      "file": "corpus.mjs",
+      "sha256": "51da69d2aecd431e16efe040b08141cc4c47b17a372845a4b4b9cc250e7ca437"
+    },
+    {
+      "file": "engine.mjs",
+      "sha256": "3bbfcbdc4a225a921b8f25e97a7b51c74cc8e650d6bdf481c4f09623085ff38f"
+    },
+    {
+      "file": "run-wasm.mjs",
+      "sha256": "f92e4cab21561edb62e90b4c42a40e82ab21d7ee864e125606bafb40031d3651"
+    },
+    {
+      "file": "run.mjs",
+      "sha256": "e7868c54eda129acb445f53bb18ba3907146cd6dfae9da179e56733aedb43e34"
+    },
+    {
+      "file": "src/lib.rs",
+      "sha256": "2db0ea53bc2554b583896ebafadc07416e5ce0cce382bbfa1da8a44e9e2ad75b"
+    },
+    {
+      "file": "src/main.rs",
+      "sha256": "125da9510d4491edc6e96d1bf8091a2b97ba6d45b50dc8c47abdd281b88b07db"
+    },
+    {
+      "file": "src/search.rs",
+      "sha256": "c38160cc62f29af34ff005ee78f860d2a8e32d81aeb1956ff4fa0270223c29bd"
+    },
+    {
+      "file": "src/support.rs",
+      "sha256": "5f65a720b63e080a2cc39990f6a42d4b6b28661a743f5c3b21a8f56dc751491a"
+    },
+    {
+      "file": "src/wasm.rs",
+      "sha256": "b79245565c35b1a2f2dbf56da01975819217fe11160d80deb4f7fa9456b1daed"
+    },
+    {
+      "file": "tests/contracts.rs",
+      "sha256": "447237a28e6f7a9e65670049384a30ad21f781578216ccb2cf852b3096a80cc0"
+    },
+    {
+      "file": "worker.mjs",
+      "sha256": "41a9ccc0dca5993edd3897d2d4c61245b37d0a852480c900846a3f5d41d71145"
+    }
+  ],
+  "corpusSha256": "a7e6d12457df254c87c4411ea218d844ff3498ccd91672d865ca086a0de8e6fd",
+  "wasm": {
+    "bytes": 179417,
+    "sha256": "67896b4cd32bd0d2b954e236b9660bb1bc4fa57dd1901f0f7145b049ddece7bd",
+    "gzipBytes": 69769
+  },
+  "browsers": [
+    {
+      "name": "chromium",
+      "version": "156.0.8078.4",
+      "status": "passed",
+      "rows": [
+        {
+          "group": "candidates",
+          "boards": 220,
+          "probes": 1320,
+          "count": 171,
+          "iterations": 300,
+          "samples": {
+            "typescript": [
+              181, 175.5, 180.3999999910593, 180.29999999701977, 186.79999999701977,
+              170.20000000298023, 170.1000000089407
+            ],
+            "wasmBatch": [
+              109.29999999701977, 103.79999999701977, 98.1000000089407, 97.5, 99.5,
+              104.19999998807907, 100.90000000596046
+            ],
+            "wasmBoundary": [
+              123.70000000298023, 113.20000000298023, 110.3999999910593, 112, 113.8999999910593,
+              110.80000001192093, 146.5
+            ]
+          },
+          "checksums": {
+            "typescript": [
+              24825529200, 24825529200, 24825529200, 24825529200, 24825529200, 24825529200,
+              24825529200
+            ],
+            "wasmBatch": [
+              24825529200, 24825529200, 24825529200, 24825529200, 24825529200, 24825529200,
+              24825529200
+            ],
+            "wasmBoundary": [
+              24825529200, 24825529200, 24825529200, 24825529200, 24825529200, 24825529200,
+              24825529200
+            ]
+          },
+          "timings": {
+            "typescript": 3.5146198829828417,
+            "wasmBatch": 1.9668615985567344,
+            "wasmBoundary": 2.206627680369985
+          },
+          "loadMs": 6.200000002980232,
+          "wasmPreparationMs": 24.5,
+          "typescriptPreparationMs": 44.70000000298023
+        },
+        {
+          "group": "classic",
+          "boards": 220,
+          "probes": 1320,
+          "count": 36,
+          "iterations": 86,
+          "samples": {
+            "typescript": [
+              159.70000000298023, 160.59999999403954, 160.90000000596046, 172.29999999701977,
+              172.40000000596046, 172.70000000298023, 169.29999999701977
+            ],
+            "wasmBatch": [
+              59.79999999701977, 53.900000005960464, 60.20000000298023, 55.900000005960464,
+              56.19999998807907, 55.6000000089407, 56.5
+            ],
+            "wasmBoundary": [
+              54.69999998807907, 57, 62.30000001192093, 57.30000001192093, 58, 55.599999994039536,
+              63.70000000298023
+            ]
+          },
+          "checksums": {
+            "typescript": [89220270, 89220270, 89220270, 89220270, 89220270, 89220270, 89220270],
+            "wasmBatch": [89220270, 89220270, 89220270, 89220270, 89220270, 89220270, 89220270],
+            "wasmBoundary": [89220270, 89220270, 89220270, 89220270, 89220270, 89220270, 89220270]
+          },
+          "timings": {
+            "typescript": 54.683462531337135,
+            "wasmBatch": 18.15245477651133,
+            "wasmBoundary": 18.507751941834925
+          },
+          "loadMs": 2,
+          "wasmPreparationMs": 17,
+          "typescriptPreparationMs": 43.400000005960464
+        },
+        {
+          "group": "diagonal",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 90,
+          "samples": {
+            "typescript": [
+              183.80000001192093, 182.59999999403954, 183.6000000089407, 182, 183.69999998807907,
+              198.5, 200.79999999701977
+            ],
+            "wasmBatch": [
+              64.90000000596046, 60.69999998807907, 59.79999999701977, 65.1000000089407,
+              60.900000005960464, 59.79999999701977, 63.099999994039536
+            ],
+            "wasmBoundary": [
+              61, 60.79999999701977, 60.5, 64, 60.6000000089407, 62.20000000298023, 68
+            ]
+          },
+          "checksums": {
+            "typescript": [82133910, 82133910, 82133910, 82133910, 82133910, 82133910, 82133910],
+            "wasmBatch": [82133910, 82133910, 82133910, 82133910, 82133910, 82133910, 82133910],
+            "wasmBoundary": [82133910, 82133910, 82133910, 82133910, 82133910, 82133910, 82133910]
+          },
+          "timings": {
+            "typescript": 75.59670781402431,
+            "wasmBatch": 25.061728397514596,
+            "wasmBoundary": 25.102880658436217
+          },
+          "loadMs": 1.7999999970197678,
+          "wasmPreparationMs": 16.700000002980232,
+          "typescriptPreparationMs": 43.6000000089407
+        },
+        {
+          "group": "jigsaw",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 113,
+          "samples": {
+            "typescript": [
+              169.19999998807907, 170.5, 169.79999999701977, 193.6000000089407, 188.59999999403954,
+              186.80000001192093, 182.79999999701977
+            ],
+            "wasmBatch": [
+              53.79999999701977, 56.70000000298023, 53.099999994039536, 58, 59.70000000298023,
+              59.20000000298023, 59.6000000089407
+            ],
+            "wasmBoundary": [
+              59.79999999701977, 62.29999999701977, 54.70000000298023, 59.29999999701977,
+              62.1000000089407, 63.20000000298023, 58.30000001192093
+            ]
+          },
+          "checksums": {
+            "typescript": [92099859, 92099859, 92099859, 92099859, 92099859, 92099859, 92099859],
+            "wasmBatch": [92099859, 92099859, 92099859, 92099859, 92099859, 92099859, 92099859],
+            "wasmBoundary": [92099859, 92099859, 92099859, 92099859, 92099859, 92099859, 92099859]
+          },
+          "timings": {
+            "typescript": 59.914782037699034,
+            "wasmBatch": 19.010160603080955,
+            "wasmBoundary": 19.60013110357908
+          },
+          "loadMs": 2,
+          "wasmPreparationMs": 16.599999994039536,
+          "typescriptPreparationMs": 43.400000005960464
+        },
+        {
+          "group": "killer",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 24,
+          "samples": {
+            "typescript": [
+              184.3999999910593, 184, 186.70000000298023, 186.20000000298023, 185.19999998807907,
+              187.3999999910593, 191.09999999403954
+            ],
+            "wasmBatch": [
+              42.900000005960464, 42.599999994039536, 43.20000000298023, 43, 43.20000000298023, 44,
+              43.5
+            ],
+            "wasmBoundary": [
+              43.5, 43.20000000298023, 42.900000005960464, 42.599999994039536, 44.70000000298023,
+              44.5, 43.70000000298023
+            ]
+          },
+          "checksums": {
+            "typescript": [
+              210263136, 210263136, 210263136, 210263136, 210263136, 210263136, 210263136
+            ],
+            "wasmBatch": [
+              210263136, 210263136, 210263136, 210263136, 210263136, 210263136, 210263136
+            ],
+            "wasmBoundary": [
+              210263136, 210263136, 210263136, 210263136, 210263136, 210263136, 210263136
+            ]
+          },
+          "timings": {
+            "typescript": 287.3456790169448,
+            "wasmBatch": 66.66666667126579,
+            "wasmBoundary": 67.12962962962963
+          },
+          "loadMs": 2,
+          "wasmPreparationMs": 17,
+          "typescriptPreparationMs": 43.6000000089407
+        },
+        {
+          "group": "thermo",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 95,
+          "samples": {
+            "typescript": [
+              186.09999999403954, 185.40000000596046, 184.79999999701977, 189.09999999403954,
+              206.40000000596046, 202.90000000596046, 202.20000000298023
+            ],
+            "wasmBatch": [
+              64.30000001192093, 64.5, 69.30000001192093, 66.6000000089407, 71.40000000596046,
+              63.70000000298023, 66.20000000298023
+            ],
+            "wasmBoundary": [
+              68.29999999701977, 68.70000000298023, 72.59999999403954, 67.59999999403954,
+              65.90000000596046, 65.5, 72.59999999403954
+            ]
+          },
+          "checksums": {
+            "typescript": [96344535, 96344535, 96344535, 96344535, 96344535, 96344535, 96344535],
+            "wasmBatch": [96344535, 96344535, 96344535, 96344535, 96344535, 96344535, 96344535],
+            "wasmBoundary": [96344535, 96344535, 96344535, 96344535, 96344535, 96344535, 96344535]
+          },
+          "timings": {
+            "typescript": 73.72319687876785,
+            "wasmBatch": 25.808966862760325,
+            "wasmBoundary": 26.62768031072895
+          },
+          "loadMs": 1.9000000059604645,
+          "wasmPreparationMs": 16.899999991059303,
+          "typescriptPreparationMs": 44.5
+        },
+        {
+          "group": "arrow",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 95,
+          "samples": {
+            "typescript": [
+              178.5, 177.29999999701977, 175.6000000089407, 178.90000000596046, 200, 189, 191.5
+            ],
+            "wasmBatch": [
+              59.8999999910593, 58.400000005960464, 59.69999998807907, 59.70000000298023,
+              59.20000000298023, 61.3999999910593, 61.5
+            ],
+            "wasmBoundary": [
+              69.1000000089407, 61.599999994039536, 61.8999999910593, 62.70000000298023,
+              64.70000000298023, 66.59999999403954, 62.1000000089407
+            ]
+          },
+          "checksums": {
+            "typescript": [97762885, 97762885, 97762885, 97762885, 97762885, 97762885, 97762885],
+            "wasmBatch": [97762885, 97762885, 97762885, 97762885, 97762885, 97762885, 97762885],
+            "wasmBoundary": [97762885, 97762885, 97762885, 97762885, 97762885, 97762885, 97762885]
+          },
+          "timings": {
+            "typescript": 69.74658869628088,
+            "wasmBatch": 23.274853802331474,
+            "wasmBoundary": 24.44444444560633
+          },
+          "loadMs": 1.9000000059604645,
+          "wasmPreparationMs": 16.799999997019768,
+          "typescriptPreparationMs": 44.80000001192093
+        }
+      ],
+      "weightedExact": {
+        "batchMs": {
+          "typescript": 17.259432421108496,
+          "wasmBatch": 4.968692533052143,
+          "wasmBoundary": 5.064707755901523
+        },
+        "residentSpeedup": 3.4736366370624387,
+        "boundarySpeedup": 3.4077844671289035
+      }
+    },
+    {
+      "name": "webkit",
+      "version": "27.2",
+      "status": "passed",
+      "rows": [
+        {
+          "group": "candidates",
+          "boards": 220,
+          "probes": 1320,
+          "count": 171,
+          "iterations": 180,
+          "samples": {
+            "typescript": [134, 134, 134, 129, 129, 128, 129],
+            "wasmBatch": [85, 80, 78, 76, 80, 83, 84],
+            "wasmBoundary": [92, 89, 95, 94, 96, 96, 89]
+          },
+          "checksums": {
+            "typescript": [
+              14895317520, 14895317520, 14895317520, 14895317520, 14895317520, 14895317520,
+              14895317520
+            ],
+            "wasmBatch": [
+              14895317520, 14895317520, 14895317520, 14895317520, 14895317520, 14895317520,
+              14895317520
+            ],
+            "wasmBoundary": [
+              14895317520, 14895317520, 14895317520, 14895317520, 14895317520, 14895317520,
+              14895317520
+            ]
+          },
+          "timings": {
+            "typescript": 4.1910331384015596,
+            "wasmBatch": 2.599090318388564,
+            "wasmBoundary": 3.0539311241065623
+          },
+          "loadMs": 6,
+          "wasmPreparationMs": 21,
+          "typescriptPreparationMs": 65
+        },
+        {
+          "group": "classic",
+          "boards": 220,
+          "probes": 1320,
+          "count": 36,
+          "iterations": 60,
+          "samples": {
+            "typescript": [160, 157, 161, 155, 158, 159, 169],
+            "wasmBatch": [42, 39, 38, 42, 39, 42, 42],
+            "wasmBoundary": [38, 39, 40, 40, 42, 42, 40]
+          },
+          "checksums": {
+            "typescript": [62246700, 62246700, 62246700, 62246700, 62246700, 62246700, 62246700],
+            "wasmBatch": [62246700, 62246700, 62246700, 62246700, 62246700, 62246700, 62246700],
+            "wasmBoundary": [62246700, 62246700, 62246700, 62246700, 62246700, 62246700, 62246700]
+          },
+          "timings": {
+            "typescript": 73.61111111111111,
+            "wasmBatch": 19.444444444444443,
+            "wasmBoundary": 18.51851851851852
+          },
+          "loadMs": 4,
+          "wasmPreparationMs": 17,
+          "typescriptPreparationMs": 63
+        },
+        {
+          "group": "diagonal",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 60,
+          "samples": {
+            "typescript": [170, 167, 184, 168, 169, 169, 194],
+            "wasmBatch": [43, 45, 41, 41, 45, 43, 44],
+            "wasmBoundary": [42, 42, 42, 41, 41, 41, 43]
+          },
+          "checksums": {
+            "typescript": [54755940, 54755940, 54755940, 54755940, 54755940, 54755940, 54755940],
+            "wasmBatch": [54755940, 54755940, 54755940, 54755940, 54755940, 54755940, 54755940],
+            "wasmBoundary": [54755940, 54755940, 54755940, 54755940, 54755940, 54755940, 54755940]
+          },
+          "timings": {
+            "typescript": 104.32098765432099,
+            "wasmBatch": 26.54320987654321,
+            "wasmBoundary": 25.925925925925927
+          },
+          "loadMs": 4,
+          "wasmPreparationMs": 16,
+          "typescriptPreparationMs": 65
+        },
+        {
+          "group": "jigsaw",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 90,
+          "samples": {
+            "typescript": [193, 189, 215, 193, 191, 197, 198],
+            "wasmBatch": [47, 45, 46, 44, 45, 51, 49],
+            "wasmBoundary": [51, 49, 47, 44, 48, 49, 45]
+          },
+          "checksums": {
+            "typescript": [73353870, 73353870, 73353870, 73353870, 73353870, 73353870, 73353870],
+            "wasmBatch": [73353870, 73353870, 73353870, 73353870, 73353870, 73353870, 73353870],
+            "wasmBoundary": [73353870, 73353870, 73353870, 73353870, 73353870, 73353870, 73353870]
+          },
+          "timings": {
+            "typescript": 79.4238683127572,
+            "wasmBatch": 18.930041152263374,
+            "wasmBoundary": 19.75308641975309
+          },
+          "loadMs": 3,
+          "wasmPreparationMs": 16,
+          "typescriptPreparationMs": 64
+        },
+        {
+          "group": "killer",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 14,
+          "samples": {
+            "typescript": [170, 165, 166, 166, 169, 178, 169],
+            "wasmBatch": [25, 24, 24, 25, 24, 25, 24],
+            "wasmBoundary": [25, 25, 24, 25, 25, 24, 25]
+          },
+          "checksums": {
+            "typescript": [
+              122653496, 122653496, 122653496, 122653496, 122653496, 122653496, 122653496
+            ],
+            "wasmBatch": [
+              122653496, 122653496, 122653496, 122653496, 122653496, 122653496, 122653496
+            ],
+            "wasmBoundary": [
+              122653496, 122653496, 122653496, 122653496, 122653496, 122653496, 122653496
+            ]
+          },
+          "timings": {
+            "typescript": 447.0899470899471,
+            "wasmBatch": 63.49206349206349,
+            "wasmBoundary": 66.13756613756614
+          },
+          "loadMs": 3,
+          "wasmPreparationMs": 16,
+          "typescriptPreparationMs": 65
+        },
+        {
+          "group": "thermo",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 60,
+          "samples": {
+            "typescript": [160, 161, 158, 184, 160, 161, 161],
+            "wasmBatch": [41, 41, 42, 41, 41, 45, 44],
+            "wasmBoundary": [43, 43, 46, 46, 42, 41, 42]
+          },
+          "checksums": {
+            "typescript": [60849180, 60849180, 60849180, 60849180, 60849180, 60849180, 60849180],
+            "wasmBatch": [60849180, 60849180, 60849180, 60849180, 60849180, 60849180, 60849180],
+            "wasmBoundary": [60849180, 60849180, 60849180, 60849180, 60849180, 60849180, 60849180]
+          },
+          "timings": {
+            "typescript": 99.38271604938272,
+            "wasmBatch": 25.308641975308642,
+            "wasmBoundary": 26.54320987654321
+          },
+          "loadMs": 4,
+          "wasmPreparationMs": 16,
+          "typescriptPreparationMs": 61
+        },
+        {
+          "group": "arrow",
+          "boards": 220,
+          "probes": 1320,
+          "count": 27,
+          "iterations": 60,
+          "samples": {
+            "typescript": [157, 168, 156, 153, 163, 155, 154],
+            "wasmBatch": [39, 41, 41, 39, 38, 41, 40],
+            "wasmBoundary": [39, 40, 40, 40, 44, 41, 40]
+          },
+          "checksums": {
+            "typescript": [61744980, 61744980, 61744980, 61744980, 61744980, 61744980, 61744980],
+            "wasmBatch": [61744980, 61744980, 61744980, 61744980, 61744980, 61744980, 61744980],
+            "wasmBoundary": [61744980, 61744980, 61744980, 61744980, 61744980, 61744980, 61744980]
+          },
+          "timings": {
+            "typescript": 96.29629629629629,
+            "wasmBatch": 24.691358024691358,
+            "wasmBoundary": 24.691358024691358
+          },
+          "loadMs": 4,
+          "wasmPreparationMs": 17,
+          "typescriptPreparationMs": 60
+        }
+      ],
+      "weightedExact": {
+        "batchMs": {
+          "typescript": 24.96587301587302,
+          "wasmBatch": 4.992063492063492,
+          "wasmBoundary": 5.06904761904762
+        },
+        "residentSpeedup": 5.001112877583466,
+        "boundarySpeedup": 4.925160482229528
+      }
+    },
+    {
+      "name": "firefox",
+      "status": "unavailable",
+      "error": "Error: browserType.launch: Failed to launch the browser process.\nBrowser logs:\n\n<launching> /Users/by291/devel/sudoku/.superpowers/playwright-browsers/firefox-1555/firefox/Nightly.app/Contents/MacOS/firefox -no-remote -headless -profile /var/folders/qh/0_6q18gd1k190948f9b8w5_80000gn/T/playwright_firefoxdev_profile-jas9Oc -juggler-pipe -silent\n<launched> pid=86278\n[pid=86278][err] *** You are running in headless mode.\n[pid=86278][err] Could not find profile folder.\n[pid=86278] <process did exit: exitCode=1, signal=null>\n[pid=86278] starting temporary directories cleanup\nCall log:\n\u001b[2m  - <launching> /Users/by291/devel/sudoku/.superpowers/playwright-browsers/firefox-1555/firefox/Nightly.app/Contents/MacOS/firefox -no-remote -headless -profile /var/folders/qh/0_6q18gd1k190948f9b8w5_80000gn/T/playwright_firefoxdev_profile-jas9Oc -juggler-pipe -silent\u001b[22m\n\u001b[2m  - <launched> pid=86278\u001b[22m\n\u001b[2m  - [pid=86278][err] *** You are running in headless mode.\u001b[22m\n\u001b[2m  - [pid=86278][err] Could not find profile folder.\u001b[22m\n\u001b[2m  - [pid=86278] <process did exit: exitCode=1, signal=null>\u001b[22m\n\u001b[2m  - [pid=86278] starting temporary directories cleanup\u001b[22m\n\u001b[2m  - [pid=86278] <gracefully close start>\u001b[22m\n\u001b[2m  - [pid=86278] <kill>\u001b[22m\n\u001b[2m  - [pid=86278] <skipped force kill spawnedProcess.killed=false processClosed=true>\u001b[22m\n\u001b[2m  - [pid=86278] finished temporary directories cleanup\u001b[22m\n\u001b[2m  - [pid=86278] <gracefully close end>\u001b[22m\n"
+    }
+  ],
+  "buildAssets": [
+    {
+      "file": "browser-6dplsS3i.js",
+      "bytes": 16757,
+      "sha256": "890e455e7032853b10f2755c76b33dccbcb68b1940e1a391343f524082343a64"
+    }
+  ]
+}

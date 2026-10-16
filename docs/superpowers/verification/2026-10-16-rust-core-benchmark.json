@@ -1,0 +1,451 @@
+{
+  "createdAt": "2026-10-16T04:36:50.996Z",
+  "host": {
+    "cpu": "Apple M4 Pro",
+    "platform": "darwin",
+    "release": "27.0.0",
+    "architecture": "arm64"
+  },
+  "node": "v26.11.1",
+  "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+  "commit": "7c95fb7832e614d4ee8d5089f69bac71d4886c36",
+  "sourceFingerprint": "874a462db763ef6a3d0019badf35106b253d6e0c7f60614d259a03828a35df80",
+  "sources": [
+    {
+      "file": "board.ts",
+      "sha256": "f6f6fcff01a743ff68e0d3246c311e478362796eb762ef357a797b6e37884b13"
+    },
+    {
+      "file": "budget.ts",
+      "sha256": "d05d61c7e66bd3948762eba859d1562e7aca2e5cdf75dfcbcc38823705780dea"
+    },
+    {
+      "file": "constraints/cageCatalogue.ts",
+      "sha256": "27add05553e7ae1b74aedf1e6620d802328450b6680a562bad0847e34ea0a892"
+    },
+    {
+      "file": "constraints/candidates.ts",
+      "sha256": "06e15820082cca1eb99adf6b1c75ba88d80f28413012546a8b596cee58883582"
+    },
+    {
+      "file": "constraints/computation.ts",
+      "sha256": "1f631cadfa7e99abf370cdb95410c0ea04b73da0ea3cd2bb970c7d01b6f63816"
+    },
+    {
+      "file": "constraints/conflicts.ts",
+      "sha256": "50a843a5626f3b340aa40da14a699bbdfbb90ba3a97b1921c4aea186d3a53bb8"
+    },
+    {
+      "file": "constraints/support.ts",
+      "sha256": "72e235eed902611a5756cd88ce269a920d5748866eec84daa8928757b56e4bf4"
+    },
+    {
+      "file": "constraints/types.ts",
+      "sha256": "29226c2c19773df22c3a8ab7cb084aa7560fff51fb25b15e4efaf2594ef28a0d"
+    },
+    {
+      "file": "difficulties.ts",
+      "sha256": "55d4f940508fe664608609908dc5a4b7c4db68644ba594bafb55f7ec6407d307"
+    },
+    {
+      "file": "examples/variants.ts",
+      "sha256": "d30a9220d4e138527ab059eb583d9d11903fa6c4ca920e8758d007eae3b8cf4f"
+    },
+    {
+      "file": "generation/candidates.ts",
+      "sha256": "72f6ac177dc6e5007049dc0a9d04ec11896fd3299d629016733089ea120d65a8"
+    },
+    {
+      "file": "generation/classic.ts",
+      "sha256": "817e9006fa93b48e77d492b89ecd9d9c69595c0f5691a4dbe26af5d76d1ee203"
+    },
+    {
+      "file": "generation/generate.ts",
+      "sha256": "728690f2d8b02cbefbc5053f63eed498410e969b99962d39dcdba53cf2a1df22"
+    },
+    {
+      "file": "generation/input.ts",
+      "sha256": "6ea4dbaf1300b21c93ec0d2151cca0254af69c92ec489ad1da3d7f6b7f286ed8"
+    },
+    {
+      "file": "generation/layouts.ts",
+      "sha256": "8c013316f9460f48afb16f26abd838238bd75aa0a85bb4ef5bb0faa9d2c2db90"
+    },
+    {
+      "file": "generation/random.ts",
+      "sha256": "b0e20655b83c0c7f3856a7c3f0de0a38dac5a7f37970e9ffb8701a846bae0dfb"
+    },
+    {
+      "file": "generation/search.ts",
+      "sha256": "8f2597495f27cc235c56d2b7414397f8a08287819147ce9c484b2d2b27698e57"
+    },
+    {
+      "file": "generation/terminalConstruction.ts",
+      "sha256": "c5abe2e27181ac6e75fce53e073b0b9cea708b60685c52c86e9efb86e197e2dc"
+    },
+    {
+      "file": "generation/types.ts",
+      "sha256": "e50aa9440d665fd274b659e6ad509a394971f1e834dcbee90e013f36050cd828"
+    },
+    {
+      "file": "generation/variant.ts",
+      "sha256": "fa0900c333a16b3c263ed9d53d42059cac2d3217238c6755f2d373720629f2c6"
+    },
+    {
+      "file": "generation/variantStrategies.ts",
+      "sha256": "62917883a348d3dffd1f1d9e7547587d15357d327a9d2e3227c94d2cbef2d115"
+    },
+    {
+      "file": "generation/variants/arrow.ts",
+      "sha256": "b691f2693d6275c91a1acb058fd9ecb756646f32275e41e64a6949c4dac8f070"
+    },
+    {
+      "file": "generation/variants/diagonal.ts",
+      "sha256": "85c9d31c849cd14874dfb41123128294c47820a9fd051df242bb0e815bfa4e89"
+    },
+    {
+      "file": "generation/variants/jigsaw.ts",
+      "sha256": "bd284ac0cf082aea6f9bda07fc72d7173f7a0e4e4f1d19f55bae218236770bb3"
+    },
+    {
+      "file": "generation/variants/killer.ts",
+      "sha256": "1ed6a7fcabc0733dc42dc00f79add4bd9ff22259b99f3d9aa171612556657338"
+    },
+    {
+      "file": "generation/variants/thermo.ts",
+      "sha256": "635ae70d3d7bdad1d3b3aa31ec4d06c9ef114b5f3c838c59b885ce952a7ffb15"
+    },
+    {
+      "file": "hint.ts",
+      "sha256": "c011144c1e84db55d4516981ccaf768eb3840cbcc93c6cc2c84933059c6c3fac"
+    },
+    {
+      "file": "logic/advancedEvidence.ts",
+      "sha256": "cbd91844611c89289548797d442506abb594952ed2941371db4f835e87a33ccb"
+    },
+    {
+      "file": "logic/advancedTechniques.ts",
+      "sha256": "1a37c2aa3e4c60c72576b2cd18539118d73fd547c2ffdece7ff7e867d861fd1a"
+    },
+    {
+      "file": "logic/basicTechniques.ts",
+      "sha256": "3d2094e853cda50747d26582cb56d4963d9418ac881232013fd2e9b4d8b79fe3"
+    },
+    {
+      "file": "logic/evidence.ts",
+      "sha256": "ac09f297c5a66564e885d48acab88f7e827b040b4ea696f8b40c1dfc8e8d829f"
+    },
+    {
+      "file": "logic/patternFacts.ts",
+      "sha256": "add342b1d12e8823cbaf49e0df72160b1c71c549c36ce58af6869b1d4c3a529d"
+    },
+    {
+      "file": "logic/solver.ts",
+      "sha256": "2952ccebd03e745b3c710b3e78d379ce9261f493c41e2ebf02d4e009635b3f34"
+    },
+    {
+      "file": "logic/techniques.ts",
+      "sha256": "54bbd49ff88b04dc81b58a7f21256a3a1987a9d708d0e6ce3af63437c91d96cd"
+    },
+    {
+      "file": "logic/types.ts",
+      "sha256": "6f89e2244237ee8e6fce5fe6231ad68e33b59f3c0605475c330691382f4310df"
+    },
+    {
+      "file": "logic/variantTechniques.ts",
+      "sha256": "0e462e8c0dfb88fd81dbc6e3e1cecffb120a32999b9d5ad9f47cdba05ea5e708"
+    },
+    {
+      "file": "logic/workspace.ts",
+      "sha256": "0d71e55a27e7e45bc8a915f31363e5bf8fdb0b2d45d9fc96b3151a4a20ee2c1a"
+    },
+    {
+      "file": "puzzle.ts",
+      "sha256": "af4e1b1267440f2a11a4d38b5df76d8c8f4de5b5e183de8cc91a0ff2a923c7e1"
+    },
+    {
+      "file": "random.ts",
+      "sha256": "9c1b4493af1df082566742eeabbdd660ec1e3b7686a7c77fe8c79649f6365eec"
+    },
+    {
+      "file": "rating/assessment.ts",
+      "sha256": "bc1a92e7c33b491b62de3093fec02a4298c4e8e70404210d5e88a20e3ee3cdff"
+    },
+    {
+      "file": "rating/decoding.ts",
+      "sha256": "d3b737e550031f042cc7118e216325cfbcb42165d872d27abd2598ff7ebd8c07"
+    },
+    {
+      "file": "rating/input.ts",
+      "sha256": "5be869a63ba07fbc322a54c1ea4e875ec19893d122dd8775735e835c483b1d88"
+    },
+    {
+      "file": "rating/policies.ts",
+      "sha256": "12c59082e41416697a6436bb1b85ba23d694937887d5405c6e7d7d3919e10a39"
+    },
+    {
+      "file": "rating/types.ts",
+      "sha256": "7600bec1de74cfa158cb65d0d01e20694838c9b829683aa4ae4e0d6b9fb9bc97"
+    },
+    {
+      "file": "rating/workload.ts",
+      "sha256": "447ccf0125a943c012c5f1e0564922661d4f909616e7d7f9fb059b8f58fe570e"
+    },
+    {
+      "file": "rules/context.ts",
+      "sha256": "7084b21354df0cea59404e259cefc588f3c64e2ab396a5f4cd2662db789d3c14"
+    },
+    {
+      "file": "rules/definitions/arrow.ts",
+      "sha256": "a96d6b0b2ea45774964b18babf0b748b01c3b5ba0c260d77de795ab24c566869"
+    },
+    {
+      "file": "rules/definitions/classic.ts",
+      "sha256": "a13ffdda418f73743ef4f446bc586499c8406ac1846500e70a9be9a7d7c5b5e4"
+    },
+    {
+      "file": "rules/definitions/diagonal.ts",
+      "sha256": "3c4045fc2050ec280ec120a58cff1d25127b27ca3f8e2a58ee16908f119c235a"
+    },
+    {
+      "file": "rules/definitions/jigsaw.ts",
+      "sha256": "3f40e6061b5059d1103a9c6b80b5cf54520493199c76abc3c2274ec1efd4a553"
+    },
+    {
+      "file": "rules/definitions/killer.ts",
+      "sha256": "8f0600cbef6fd418bf2acfcba96e694c6e90e10b3b04f5bbbcdc9643453a9602"
+    },
+    {
+      "file": "rules/definitions/thermo.ts",
+      "sha256": "f50f0ef1ad54e1657c8a7fc403faea82eb5cfe9bbb53cf39967bed35fcf351f8"
+    },
+    {
+      "file": "rules/registry.ts",
+      "sha256": "020528e4f2c1031630878aef8fa58edc5917681bf7ca697f60671b21738eddb6"
+    },
+    {
+      "file": "rules/topology.ts",
+      "sha256": "ce243f20b9cc219f91e6c3df193bab2c946eef23fbf22f222eb6736689883fec"
+    },
+    {
+      "file": "rules/types.ts",
+      "sha256": "75f426ee09fe796a4a55e47609ab5d155e763c047335f04fbddd750431a11175"
+    },
+    {
+      "file": "search/exact.ts",
+      "sha256": "49f3404ad6298d5365c9fd0dc7fed34ed13081d121e1cb03db6bd6744d20fb80"
+    },
+    {
+      "file": "search/propagation.ts",
+      "sha256": "cb022283cedc673ba06cce6e11132959b7b3de6bae431c4da4d17c6e325eef2f"
+    },
+    {
+      "file": "types.ts",
+      "sha256": "9195df771899e19c3d83aca62138340c2ab10922c180f574d9fa67b8bffa52ab"
+    }
+  ],
+  "benchmarkSourceFingerprint": "558b43a54b3f7c77295ab5102fcc3fb193de902131a041b71cfbfd77030b096e",
+  "benchmarkSources": [
+    {
+      "file": "Cargo.lock",
+      "sha256": "ebcda0e1c2cf325743fae80df1aaa3a2aa1f7165ce227ccddc6a579cb2497abd"
+    },
+    {
+      "file": "Cargo.toml",
+      "sha256": "3cd7d1a2e17427d68837c9ca49bfc6163941ba2fefd88da21ff03f7b81bc7753"
+    },
+    {
+      "file": "corpus.mjs",
+      "sha256": "51da69d2aecd431e16efe040b08141cc4c47b17a372845a4b4b9cc250e7ca437"
+    },
+    {
+      "file": "engine.mjs",
+      "sha256": "3bbfcbdc4a225a921b8f25e97a7b51c74cc8e650d6bdf481c4f09623085ff38f"
+    },
+    {
+      "file": "run.mjs",
+      "sha256": "e7868c54eda129acb445f53bb18ba3907146cd6dfae9da179e56733aedb43e34"
+    },
+    {
+      "file": "src/lib.rs",
+      "sha256": "cf8b083b2e8225dfadc8d177ede13f33698950cbb21dd38cc6f226f153972e91"
+    },
+    {
+      "file": "src/main.rs",
+      "sha256": "125da9510d4491edc6e96d1bf8091a2b97ba6d45b50dc8c47abdd281b88b07db"
+    },
+    {
+      "file": "src/search.rs",
+      "sha256": "c38160cc62f29af34ff005ee78f860d2a8e32d81aeb1956ff4fa0270223c29bd"
+    },
+    {
+      "file": "src/support.rs",
+      "sha256": "5f65a720b63e080a2cc39990f6a42d4b6b28661a743f5c3b21a8f56dc751491a"
+    },
+    {
+      "file": "tests/contracts.rs",
+      "sha256": "447237a28e6f7a9e65670049384a30ad21f781578216ccb2cf852b3096a80cc0"
+    },
+    {
+      "file": "worker.mjs",
+      "sha256": "41a9ccc0dca5993edd3897d2d4c61245b37d0a852480c900846a3f5d41d71145"
+    }
+  ],
+  "corpusSha256": "a7e6d12457df254c87c4411ea218d844ff3498ccd91672d865ca086a0de8e6fd",
+  "boards": 220,
+  "probes": 1320,
+  "rows": [
+    {
+      "group": "candidates",
+      "count": 171,
+      "iterations": 285,
+      "samples": {
+        "typescript": [
+          165.86825000000005, 162.74325000000005, 183.26737499999996, 174.195875,
+          164.53745799999996, 162.05283300000002, 170.03020800000002
+        ],
+        "rust": [
+          93.820209, 99.064708, 111.13187500000001, 96.389125, 97.73633299999999, 114.29025,
+          98.42208299999999
+        ]
+      },
+      "checksums": {
+        "typescript": [
+          23584252740, 23584252740, 23584252740, 23584252740, 23584252740, 23584252740, 23584252740
+        ],
+        "rust": [
+          23584252740, 23584252740, 23584252740, 23584252740, 23584252740, 23584252740, 23584252740
+        ]
+      },
+      "typescriptUs": 3.4034728634451636,
+      "rustUs": 2.0195359187442286,
+      "speedup": 1.6852747365649647
+    },
+    {
+      "group": "classic",
+      "count": 36,
+      "iterations": 89,
+      "samples": {
+        "typescript": [
+          181.603291, 178.87570800000003, 184.309375, 182.39883300000002, 180.40187499999996,
+          183.43508400000002, 186.13187499999998
+        ],
+        "rust": [44.670541, 44.377334, 43.68425, 43.722625, 42.465917, 49.369375, 41.863708]
+      },
+      "checksums": {
+        "typescript": [92332605, 92332605, 92332605, 92332605, 92332605, 92332605, 92332605],
+        "rust": [92332605, 92332605, 92332605, 92332605, 92332605, 92332605, 92332605]
+      },
+      "typescriptUs": 56.92847471910113,
+      "rustUs": 13.646262484394507,
+      "speedup": 4.171726491719105
+    },
+    {
+      "group": "diagonal",
+      "count": 27,
+      "iterations": 87,
+      "samples": {
+        "typescript": [
+          185.19879200000003, 189.98979199999997, 189.52745800000002, 185.002167, 188.389167,
+          182.719375, 188.55587499999996
+        ],
+        "rust": [
+          49.176667, 46.079625, 48.378583000000006, 48.524875, 46.098292, 46.202583,
+          44.327875000000006
+        ]
+      },
+      "checksums": {
+        "typescript": [79396113, 79396113, 79396113, 79396113, 79396113, 79396113, 79396113],
+        "rust": [79396113, 79396113, 79396113, 79396113, 79396113, 79396113, 79396113]
+      },
+      "typescriptUs": 80.19973052362708,
+      "rustUs": 19.66904342273308,
+      "speedup": 4.077459630341447
+    },
+    {
+      "group": "jigsaw",
+      "count": 27,
+      "iterations": 101,
+      "samples": {
+        "typescript": [
+          167.38454099999996, 170.481291, 164.81295799999998, 166.83525000000003,
+          175.13516699999997, 166.856, 164.99983400000002
+        ],
+        "rust": [38.252333, 40.209875, 41.49675, 38.4905, 36.220124999999996, 39.562167, 35.755083]
+      },
+      "checksums": {
+        "typescript": [82319343, 82319343, 82319343, 82319343, 82319343, 82319343, 82319343],
+        "rust": [82319343, 82319343, 82319343, 82319343, 82319343, 82319343, 82319343]
+      },
+      "typescriptUs": 61.186651998533186,
+      "rustUs": 14.114594792812614,
+      "speedup": 4.334991751211338
+    },
+    {
+      "group": "killer",
+      "count": 27,
+      "iterations": 20,
+      "samples": {
+        "typescript": [
+          171.937167, 173.611, 170.94937500000003, 170.97170800000004, 173.94095799999997,
+          169.06275, 170.854625
+        ],
+        "rust": [
+          33.794290999999994, 33.226042, 34.80375, 30.416708, 32.427499999999995,
+          31.777041999999998, 34.3555
+        ]
+      },
+      "checksums": {
+        "typescript": [175219280, 175219280, 175219280, 175219280, 175219280, 175219280, 175219280],
+        "rust": [175219280, 175219280, 175219280, 175219280, 175219280, 175219280, 175219280]
+      },
+      "typescriptUs": 316.61427407407416,
+      "rustUs": 61.529707407407415,
+      "speedup": 5.145713955336601
+    },
+    {
+      "group": "thermo",
+      "count": 27,
+      "iterations": 82,
+      "samples": {
+        "typescript": [
+          188.582041, 181.03049999999996, 173.96529099999998, 181.227625, 186.062, 168.827,
+          168.75766700000003
+        ],
+        "rust": [49.991625, 54.11325, 54.355458000000006, 49.05575, 50.58825, 46.652583, 50.279583]
+      },
+      "checksums": {
+        "typescript": [83160546, 83160546, 83160546, 83160546, 83160546, 83160546, 83160546],
+        "rust": [83160546, 83160546, 83160546, 83160546, 83160546, 83160546, 83160546]
+      },
+      "typescriptUs": 81.76626016260161,
+      "rustUs": 22.70983875338753,
+      "speedup": 3.600477354794291
+    },
+    {
+      "group": "arrow",
+      "count": 27,
+      "iterations": 98,
+      "samples": {
+        "typescript": [
+          190.41574999999995, 195.45420800000005, 188.13291700000002, 192.33445799999993,
+          192.50970799999993, 186.421834, 188.99679199999997
+        ],
+        "rust": [47.573, 54.635416, 50.5085, 48.765792000000005, 48.498125, 49.692042, 53.449166]
+      },
+      "checksums": {
+        "typescript": [100850134, 100850134, 100850134, 100850134, 100850134, 100850134, 100850134],
+        "rust": [100850134, 100850134, 100850134, 100850134, 100850134, 100850134, 100850134]
+      },
+      "typescriptUs": 71.96362433862431,
+      "rustUs": 18.780061224489796,
+      "speedup": 3.8319163861287877
+    }
+  ],
+  "weightedExact": {
+    "boards": 171,
+    "typescriptBatchMs": 18.56614969951907,
+    "rustBatchMs": 4.184953080660624,
+    "speedup": 4.436405699580334
+  }
+}
