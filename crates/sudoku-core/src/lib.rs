@@ -5,6 +5,7 @@ pub mod budget;
 pub mod constraints;
 pub mod editing;
 pub mod generation;
+pub mod logic;
 pub mod puzzle;
 pub mod random;
 pub mod rating;

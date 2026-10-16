@@ -5,6 +5,8 @@ mod constraint_contracts;
 mod editing_contracts;
 #[path = "../tests/support/rules.rs"]
 pub mod fixtures;
+#[path = "contracts/logic.rs"]
+mod logic_contracts;
 #[path = "contracts/search.rs"]
 mod search_contracts;
 
@@ -19,6 +21,8 @@ use sudoku_core::types::Board;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, tag = "suite", content = "input")]
 enum Request {
+    #[serde(rename = "logic")]
+    Logic(logic_contracts::LogicInput),
     #[serde(rename = "exact")]
     Exact(search_contracts::ExactInput),
     #[serde(rename = "exact-prepared")]
@@ -37,6 +41,7 @@ enum Request {
 
 fn evaluate(request: Request) -> Result<Value, Box<dyn std::error::Error>> {
     match request {
+        Request::Logic(input) => logic_contracts::evaluate(input),
         Request::Exact(input) => search_contracts::evaluate(input),
         Request::ExactPrepared(input) => search_contracts::evaluate_prepared(input),
         Request::Editing(input) => editing_contracts::evaluate(input),

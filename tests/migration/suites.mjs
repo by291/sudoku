@@ -73,6 +73,7 @@ export async function computeCase(engine, suite, input) {
         .count(input.board, query, input.nodeLimit)
       return plain({ result, used: query.used })
     }
+    case 'logic-basic':
     case 'logic':
       result = engine.analyzeLogic(
         input.board,
@@ -187,7 +188,7 @@ export async function runMigration(args) {
       : [suite]
   let checked = 0
   for (const name of suites) {
-    const rows =
+    let rows =
       name === 'generation'
         ? ['full', 'targeted', 'feedback', 'hard058'].flatMap((family) =>
             gunzipSync(readFileSync(resolve(fixtureRoot, `generation-v11-${family}.jsonl.gz`)))
@@ -196,7 +197,27 @@ export async function runMigration(args) {
               .split('\n')
               .map((line) => JSON.parse(line)),
           )
-        : JSON.parse(readFileSync(resolve(fixtureRoot, name + '.json'), 'utf8'))
+        : JSON.parse(
+            readFileSync(
+              resolve(fixtureRoot, (name === 'logic-basic' ? 'logic' : name) + '.json'),
+              'utf8',
+            ),
+          )
+    if (name === 'logic-basic') {
+      rows = rows.filter((row) =>
+        row.expected.steps.every(
+          (step) =>
+            ![
+              'naked-triple',
+              'hidden-triple',
+              'x-wing',
+              'swordfish',
+              'xy-wing',
+              'simple-coloring',
+            ].includes(step.technique),
+        ),
+      )
+    }
     const native = selectedEngine === 'native' ? nativeResults(name, rows) : null
     for (const [index, row] of rows.entries()) {
       assert.deepStrictEqual(

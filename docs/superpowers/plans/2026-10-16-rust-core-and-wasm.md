@@ -147,12 +147,12 @@ The plan dependency chain is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 �
 
 **Interfaces:** Produces all logical domain types from the common contract table; `create_workspace(&Board, &PreparedRules) -> LogicalWorkspace`, `apply_step(&mut LogicalWorkspace, &LogicalStep)`, and `find_step(&mut LogicalWorkspace, &[Technique], &mut WorkBudget) -> StepOutcome`. Workspaces may borrow immutable prepared support; returned evidence always owns data.
 
-- [ ] Write `basic_and_variant_steps_match_ordered_evidence`, `incomplete_support_is_never_memoized`, and `new_clue_masks_never_reuse_reduced_domains`. Assert full authored steps/premises, not just placements; mutate returned evidence in JS/native fixtures and retry; exercise finite step/work exhaustion and overlapping clues.
-- [ ] Run `cargo test -p sudoku-core --test logic`; confirm missing deduction behavior fails independently known placements/removals.
-- [ ] Port the technique catalogue, logical state/application, five basic detectors, variant support/memo contracts and ordered scheduler. Keep technique names, action kinds, priority and every work charge. Add no generic detector framework.
-- [ ] Extend native migration `logic` projection for the supported basic/variant techniques and owned evidence; advanced fixtures remain pending Task 7, explicitly selected by fixture technique IDs.
-- [ ] Run logical tests, native migration `logic-basic` and all existing native contracts. Preserve independent known-solution facts for every removal/placement.
-- [ ] Commit as `feat(core): port basic and variant logical deductions`.
+- [x] Write `basic_and_variant_steps_match_ordered_evidence`, `incomplete_support_is_never_memoized`, and `new_clue_masks_never_reuse_reduced_domains`. Assert full authored steps/premises, not just placements; mutate returned evidence in JS/native fixtures and retry; exercise finite step/work exhaustion and overlapping clues.
+- [x] Run `cargo test -p sudoku-core --test logic`; confirm missing deduction behavior fails independently known placements/removals.
+- [x] Port the technique catalogue, logical state/application, five basic detectors, variant support/memo contracts and ordered scheduler. Keep technique names, action kinds, priority and every work charge. Add no generic detector framework.
+- [x] Extend native migration `logic` projection for the supported basic/variant techniques and owned evidence; advanced fixtures remain pending Task 7, explicitly selected by fixture technique IDs.
+- [x] Run logical tests, native migration `logic-basic` and all existing native contracts. Preserve independent known-solution facts for every removal/placement.
+- [x] Commit as `feat(core): port basic and variant logical deductions`.
 
 ## Task 7: Port advanced deductions, proof validation and hint orchestration
 
