@@ -256,6 +256,21 @@ pub fn validate_hint_evidence(
     rules: &PuzzleRules,
     board: Option<&Board>,
 ) -> CoreResult<HintResult> {
+    validate_hint_evidence_with_budget(
+        hint,
+        rules,
+        board,
+        &mut WorkBudget::new(HINT_VALIDATION_WORK_LIMIT),
+    )
+}
+
+/// Replay owns its state while the caller retains work and cancellation accounting.
+pub fn validate_hint_evidence_with_budget(
+    hint: &HintResult,
+    rules: &PuzzleRules,
+    board: Option<&Board>,
+    budget: &mut WorkBudget,
+) -> CoreResult<HintResult> {
     let mut parsed = validate_hint_shape(hint)?;
     let HintResult::Deduction { steps, .. } = &mut parsed else {
         return Ok(parsed);
@@ -263,15 +278,8 @@ pub fn validate_hint_evidence(
 
     let context = compile_rules(rules)?;
     let mut state = board.map(|board| create_workspace(board, &context));
-    let mut budget = WorkBudget::new(HINT_VALIDATION_WORK_LIMIT);
     for step in steps {
-        validate_step_and_apply(
-            step,
-            &context,
-            &mut state,
-            &mut budget,
-            ValidationMode::Hint,
-        )?;
+        validate_step_and_apply(step, &context, &mut state, budget, ValidationMode::Hint)?;
     }
     Ok(parsed)
 }
@@ -400,6 +408,23 @@ pub fn validate_teaching_step(
     rules: &PuzzleRules,
     step: &LogicalStep,
 ) -> CoreResult<()> {
+    validate_teaching_step_with_budget(
+        board,
+        candidates,
+        rules,
+        step,
+        &mut WorkBudget::new(HINT_VALIDATION_WORK_LIMIT),
+    )
+}
+
+/// Validate one owned teaching snapshot with a caller-owned cancellation/work budget.
+pub fn validate_teaching_step_with_budget(
+    board: &Board,
+    candidates: [CandidateMask; BOARD_SIZE],
+    rules: &PuzzleRules,
+    step: &LogicalStep,
+    budget: &mut WorkBudget,
+) -> CoreResult<()> {
     if !valid_step_shape(step)
         || board
             .values()
@@ -414,12 +439,11 @@ pub fn validate_teaching_step(
     workspace.candidates = candidates;
     let mut state = Some(workspace);
     let mut step = step.clone();
-    let mut budget = WorkBudget::new(HINT_VALIDATION_WORK_LIMIT);
     validate_step_and_apply(
         &mut step,
         &context,
         &mut state,
-        &mut budget,
+        budget,
         ValidationMode::Teaching,
     )
 }

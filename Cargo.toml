@@ -1,5 +1,5 @@
 [workspace]
-members = ["sudoku/core", "sudoku/wasm"]
+members = ["sudoku/core", "sudoku/wasm", "android/ffi"]
 resolver = "3"
 
 [workspace.package]

@@ -268,7 +268,7 @@ pub(super) fn search_generation(
     let mut logical_screens = 0;
     let mut step_limited_screens = 0;
     let mut work_exhausted = false;
-    while budget.remaining() > 0 {
+    while budget.remaining() > 0 && !budget.is_cancelled() {
         active.retain(|layout| !layout.frontier.exhausted());
         if expansion_requested_by.is_some_and(|id| !active.iter().any(|layout| layout.id == id)) {
             expansion_requested_by = None;

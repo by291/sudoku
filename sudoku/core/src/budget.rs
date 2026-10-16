@@ -45,12 +45,26 @@ impl WorkAccounting {
     }
 }
 
+/// A host supplies only a signal; core never reads a deadline, runtime, or platform clock.
+pub trait CancellationProbe: std::fmt::Debug + Send + Sync {
+    fn is_cancelled(&self) -> bool;
+}
+
+/// Cancellation is settled after work has unwound normally, preserving restoration and charges.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Controlled<T> {
+    Complete(T),
+    Cancelled { work_used: u64 },
+}
+
 #[derive(Clone, Debug)]
 pub struct WorkBudget {
     limit: u64,
     used: u64,
+    exhausted: bool,
     stage: WorkStage,
     accounting: WorkAccounting,
+    cancellation: Option<std::sync::Arc<dyn CancellationProbe>>,
 }
 
 impl WorkBudget {
@@ -58,9 +72,39 @@ impl WorkBudget {
         Self {
             limit,
             used: 0,
+            exhausted: false,
             stage: WorkStage::Preparation,
             accounting: WorkAccounting::default(),
+            cancellation: None,
         }
+    }
+
+    pub fn with_cancellation(limit: u64, probe: std::sync::Arc<dyn CancellationProbe>) -> Self {
+        Self {
+            cancellation: Some(probe),
+            ..Self::new(limit)
+        }
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancellation
+            .as_ref()
+            .is_some_and(|probe| probe.is_cancelled())
+    }
+
+    pub fn finish<T>(&self, result: T) -> Controlled<T> {
+        if self.is_cancelled() {
+            Controlled::Cancelled {
+                work_used: self.used,
+            }
+        } else {
+            Controlled::Complete(result)
+        }
+    }
+
+    /// True after a rejected work charge, independently of cancellation and unspent remainder.
+    pub fn is_exhausted(&self) -> bool {
+        self.exhausted
     }
 
     pub fn used(&self) -> u64 {
@@ -77,7 +121,11 @@ impl WorkBudget {
 
     /// Charge before doing work. Rejection leaves all counters unchanged.
     pub fn consume(&mut self, units: u64) -> bool {
+        if self.is_cancelled() {
+            return false;
+        }
         if units > self.remaining() {
+            self.exhausted = true;
             return false;
         }
 
