@@ -95,6 +95,11 @@ fn build(rules: &PuzzleRules, mut budget: Option<&mut WorkBudget>) -> Option<Pre
     }))
 }
 
+/// Validate rule geometry without building or charging topology.
+pub fn validate_rules(rules: &PuzzleRules) -> CoreResult<()> {
+    definitions::validate(rules)
+}
+
 /// Validate and own an immutable layout. Native callers may choose this unbounded convenience API.
 pub fn compile_rules(rules: &PuzzleRules) -> CoreResult<PreparedRules> {
     definitions::validate(rules)?;

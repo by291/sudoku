@@ -17,10 +17,18 @@ export function nativeResults(suite, rows) {
       'advanced',
       'hints',
       'hint-chains',
+      'assessment',
+      'assessment-screening',
+      'assessment-generated',
+      'assessment-metadata',
+      'validation',
     ].includes(suite),
     'This native suite is not implemented yet',
   )
-  const requestSuite = { 'logic-basic': 'logic', 'hint-chains': 'hints' }[suite] ?? suite
+  const requestSuite =
+    { 'logic-basic': 'logic', 'hint-chains': 'hints', 'assessment-generated': 'assessment' }[
+      suite
+    ] ?? suite
   const requests =
     rows
       .map((row) =>

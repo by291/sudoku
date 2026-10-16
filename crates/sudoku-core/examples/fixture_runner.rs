@@ -1,6 +1,8 @@
 //! Test-only JSONL adapter; the reusable library performs no I/O or platform work.
 #[path = "contracts/advanced.rs"]
 mod advanced_contracts;
+#[path = "contracts/assessment.rs"]
+mod assessment_contracts;
 #[path = "contracts/constraints.rs"]
 mod constraint_contracts;
 #[path = "contracts/editing.rs"]
@@ -13,8 +15,12 @@ mod hint_contracts;
 mod logic_contracts;
 #[path = "contracts/projection.rs"]
 mod logical_projection;
+#[path = "contracts/metadata.rs"]
+mod metadata_contracts;
 #[path = "contracts/search.rs"]
 mod search_contracts;
+#[path = "contracts/violations.rs"]
+mod violation_projection;
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -27,6 +33,14 @@ use sudoku_core::types::Board;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, tag = "suite", content = "input")]
 enum Request {
+    #[serde(rename = "assessment-metadata")]
+    AssessmentMetadata(metadata_contracts::MetadataInput),
+    #[serde(rename = "validation")]
+    Validation(metadata_contracts::ValidationInput),
+    #[serde(rename = "assessment")]
+    Assessment(assessment_contracts::AssessmentInputDto),
+    #[serde(rename = "assessment-screening")]
+    AssessmentScreening(assessment_contracts::ScreeningInput),
     #[serde(rename = "advanced")]
     Advanced(advanced_contracts::AdvancedInput),
     #[serde(rename = "hints")]
@@ -51,6 +65,10 @@ enum Request {
 
 fn evaluate(request: Request) -> Result<Value, Box<dyn std::error::Error>> {
     match request {
+        Request::AssessmentMetadata(input) => metadata_contracts::evaluate(input),
+        Request::Validation(input) => metadata_contracts::evaluate_validation(input),
+        Request::Assessment(input) => assessment_contracts::evaluate(input),
+        Request::AssessmentScreening(input) => assessment_contracts::evaluate_screening(input),
         Request::Advanced(input) => advanced_contracts::evaluate(input),
         Request::Hints(input) => hint_contracts::evaluate(input),
         Request::Logic(input) => logic_contracts::evaluate(input),

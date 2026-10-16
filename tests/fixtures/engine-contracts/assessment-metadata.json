@@ -1,0 +1,4666 @@
+[
+  {
+    "id": "valid:classic-easy",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 51,
+          "placements": 51,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 51,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 51,
+          "placements": 51,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "variantSteps": 0,
+          "techniqueCounts": {
+            "naked-single": 51,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:classic-medium",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 53,
+          "placements": 51,
+          "eliminations": 2,
+          "candidateRemovals": 4,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 6,
+            "locked-candidate": 2,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 53,
+          "placements": 51,
+          "eliminations": 2,
+          "candidateRemovals": 4,
+          "variantSteps": 0,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 6,
+            "locked-candidate": 2,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:classic-hard",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 57,
+          "placements": 54,
+          "eliminations": 3,
+          "candidateRemovals": 9,
+          "techniqueCounts": {
+            "naked-single": 47,
+            "hidden-single": 7,
+            "locked-candidate": 2,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 57,
+          "placements": 54,
+          "eliminations": 3,
+          "candidateRemovals": 9,
+          "variantSteps": 0,
+          "techniqueCounts": {
+            "naked-single": 47,
+            "hidden-single": 7,
+            "locked-candidate": 2,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:classic-expert",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "expert",
+        "workload": {
+          "steps": 61,
+          "placements": 53,
+          "eliminations": 8,
+          "candidateRemovals": 22,
+          "techniqueCounts": {
+            "naked-single": 42,
+            "hidden-single": 11,
+            "locked-candidate": 3,
+            "naked-pair": 1,
+            "hidden-pair": 1,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 3,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "simple-coloring",
+          "highestTier": "expert",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "expert",
+        "workload": {
+          "steps": 61,
+          "placements": 53,
+          "eliminations": 8,
+          "candidateRemovals": 22,
+          "variantSteps": 0,
+          "techniqueCounts": {
+            "naked-single": 42,
+            "hidden-single": 11,
+            "locked-candidate": 3,
+            "naked-pair": 1,
+            "hidden-pair": 1,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 3,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "simple-coloring",
+          "highestTier": "expert"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:diagonal-easy",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "diagonal",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 40,
+          "placements": 40,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 40,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 9
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "diagonal",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 40,
+          "placements": 40,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "variantSteps": 9,
+          "techniqueCounts": {
+            "naked-single": 40,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:diagonal-medium",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "diagonal",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 61,
+          "placements": 58,
+          "eliminations": 3,
+          "candidateRemovals": 5,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 13,
+            "locked-candidate": 3,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium",
+          "variantSteps": 15
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "diagonal",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 61,
+          "placements": 58,
+          "eliminations": 3,
+          "candidateRemovals": 5,
+          "variantSteps": 15,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 13,
+            "locked-candidate": 3,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:diagonal-hard",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "diagonal",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 71,
+          "placements": 62,
+          "eliminations": 9,
+          "candidateRemovals": 25,
+          "techniqueCounts": {
+            "naked-single": 39,
+            "hidden-single": 23,
+            "locked-candidate": 8,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard",
+          "variantSteps": 17
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "diagonal",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 71,
+          "placements": 62,
+          "eliminations": 9,
+          "candidateRemovals": 25,
+          "variantSteps": 17,
+          "techniqueCounts": {
+            "naked-single": 39,
+            "hidden-single": 23,
+            "locked-candidate": 8,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:jigsaw-easy",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "jigsaw",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 51,
+          "placements": 51,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 6,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-single",
+          "highestTier": "easy",
+          "variantSteps": 51
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "jigsaw",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 51,
+          "placements": 51,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "variantSteps": 51,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 6,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-single",
+          "highestTier": "easy"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:jigsaw-medium",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "jigsaw",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 57,
+          "placements": 56,
+          "eliminations": 1,
+          "candidateRemovals": 2,
+          "techniqueCounts": {
+            "naked-single": 51,
+            "hidden-single": 5,
+            "locked-candidate": 1,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium",
+          "variantSteps": 57
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "jigsaw",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 57,
+          "placements": 56,
+          "eliminations": 1,
+          "candidateRemovals": 2,
+          "variantSteps": 57,
+          "techniqueCounts": {
+            "naked-single": 51,
+            "hidden-single": 5,
+            "locked-candidate": 1,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:jigsaw-hard",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "jigsaw",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 51,
+          "placements": 50,
+          "eliminations": 1,
+          "candidateRemovals": 4,
+          "techniqueCounts": {
+            "naked-single": 42,
+            "hidden-single": 8,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 1,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-pair",
+          "highestTier": "hard",
+          "variantSteps": 51
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "jigsaw",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 51,
+          "placements": 50,
+          "eliminations": 1,
+          "candidateRemovals": 4,
+          "variantSteps": 51,
+          "techniqueCounts": {
+            "naked-single": 42,
+            "hidden-single": 8,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 1,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-pair",
+          "highestTier": "hard"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:killer-easy",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 33,
+          "placements": 33,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 32,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 1,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "cage-remainder",
+          "highestTier": "easy",
+          "variantSteps": 1
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 33,
+          "placements": 33,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "variantSteps": 1,
+          "techniqueCounts": {
+            "naked-single": 32,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 1,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "cage-remainder",
+          "highestTier": "easy"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:killer-medium",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 55,
+          "placements": 53,
+          "eliminations": 2,
+          "candidateRemovals": 6,
+          "techniqueCounts": {
+            "naked-single": 37,
+            "hidden-single": 10,
+            "locked-candidate": 2,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 5,
+            "cage-combination": 1,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "cage-combination",
+          "highestTier": "medium",
+          "variantSteps": 6
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 55,
+          "placements": 53,
+          "eliminations": 2,
+          "candidateRemovals": 6,
+          "variantSteps": 6,
+          "techniqueCounts": {
+            "naked-single": 37,
+            "hidden-single": 10,
+            "locked-candidate": 2,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 5,
+            "cage-combination": 1,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "cage-combination",
+          "highestTier": "medium"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:killer-hard",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 112,
+          "placements": 67,
+          "eliminations": 45,
+          "candidateRemovals": 148,
+          "techniqueCounts": {
+            "naked-single": 54,
+            "hidden-single": 8,
+            "locked-candidate": 26,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 4,
+            "cage-combination": 19,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard",
+          "variantSteps": 47
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 112,
+          "placements": 67,
+          "eliminations": 45,
+          "candidateRemovals": 148,
+          "variantSteps": 47,
+          "techniqueCounts": {
+            "naked-single": 54,
+            "hidden-single": 8,
+            "locked-candidate": 26,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 4,
+            "cage-combination": 19,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:thermo-easy",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "thermo",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 46,
+          "placements": 46,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 1,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "thermo-bound",
+          "highestTier": "easy",
+          "variantSteps": 1
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "thermo",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 46,
+          "placements": 46,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "variantSteps": 1,
+          "techniqueCounts": {
+            "naked-single": 45,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 1,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "thermo-bound",
+          "highestTier": "easy"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:thermo-medium",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "thermo",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 58,
+          "placements": 54,
+          "eliminations": 4,
+          "candidateRemovals": 8,
+          "techniqueCounts": {
+            "naked-single": 39,
+            "hidden-single": 13,
+            "locked-candidate": 4,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 2,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium",
+          "variantSteps": 2
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "thermo",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 58,
+          "placements": 54,
+          "eliminations": 4,
+          "candidateRemovals": 8,
+          "variantSteps": 2,
+          "techniqueCounts": {
+            "naked-single": 39,
+            "hidden-single": 13,
+            "locked-candidate": 4,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 2,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:thermo-hard",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "thermo",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 64,
+          "placements": 62,
+          "eliminations": 2,
+          "candidateRemovals": 4,
+          "techniqueCounts": {
+            "naked-single": 35,
+            "hidden-single": 20,
+            "locked-candidate": 1,
+            "naked-pair": 0,
+            "hidden-pair": 1,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 7,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-pair",
+          "highestTier": "hard",
+          "variantSteps": 7
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "thermo",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 64,
+          "placements": 62,
+          "eliminations": 2,
+          "candidateRemovals": 4,
+          "variantSteps": 7,
+          "techniqueCounts": {
+            "naked-single": 35,
+            "hidden-single": 20,
+            "locked-candidate": 1,
+            "naked-pair": 0,
+            "hidden-pair": 1,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 7,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-pair",
+          "highestTier": "hard"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:arrow-easy",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 28,
+          "placements": 28,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 27,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 1,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "arrow-equation",
+          "highestTier": "easy",
+          "variantSteps": 1
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 28,
+          "placements": 28,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "variantSteps": 1,
+          "techniqueCounts": {
+            "naked-single": 27,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 1,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "arrow-equation",
+          "highestTier": "easy"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:arrow-medium",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 47,
+          "placements": 47,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 43,
+            "hidden-single": 3,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 1
+          },
+          "highestTechnique": "arrow-combination",
+          "highestTier": "medium",
+          "variantSteps": 1
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 47,
+          "placements": 47,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "variantSteps": 1,
+          "techniqueCounts": {
+            "naked-single": 43,
+            "hidden-single": 3,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 1
+          },
+          "highestTechnique": "arrow-combination",
+          "highestTier": "medium"
+        }
+      }
+    }
+  },
+  {
+    "id": "valid:arrow-hard",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 61,
+          "placements": 55,
+          "eliminations": 6,
+          "candidateRemovals": 14,
+          "techniqueCounts": {
+            "naked-single": 40,
+            "hidden-single": 12,
+            "locked-candidate": 4,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 1,
+            "arrow-combination": 3
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard",
+          "variantSteps": 5
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 61,
+          "placements": 55,
+          "eliminations": 6,
+          "candidateRemovals": 14,
+          "variantSteps": 5,
+          "techniqueCounts": {
+            "naked-single": 40,
+            "hidden-single": 12,
+            "locked-candidate": 4,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 1,
+            "arrow-combination": 3
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard"
+        }
+      }
+    }
+  },
+  {
+    "id": "workload:0",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": -1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment workload counts"]
+    }
+  },
+  {
+    "id": "workload:1",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 0.5,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment workload counts"]
+    }
+  },
+  {
+    "id": "workload:2",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 9007199254740992,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment workload counts"]
+    }
+  },
+  {
+    "id": "workload:3",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 2,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:4",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 1,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:5",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:6",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 2
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:7",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "hard",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:8",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-pair",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:9",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": null,
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:10",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "unknown",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:11",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "unknown",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:12",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment workload counts"]
+    }
+  },
+  {
+    "id": "workload:13",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "workload:14",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "counts:0",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Assessment technique counts must include every known technique"]
+    }
+  },
+  {
+    "id": "counts:1",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0,
+            "unknown": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Assessment technique counts must include every known technique"]
+    }
+  },
+  {
+    "id": "counts:2",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 1,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid or inapplicable assessment technique count"]
+    }
+  },
+  {
+    "id": "counts:3",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": -1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid or inapplicable assessment technique count"]
+    }
+  },
+  {
+    "id": "action:0",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:0",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:1",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 1,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-single",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:1",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 1,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "hidden-single",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:2",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 1,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "locked-candidate",
+          "highestTier": "medium",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:2",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "medium"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "medium",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 1,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "locked-candidate",
+            "highestTier": "medium",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:3",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:3",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "hard"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "hard",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 1,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-pair",
+            "highestTier": "hard",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:4",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 1,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "hidden-pair",
+          "highestTier": "hard",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:4",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "hard"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "hard",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 1,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "hidden-pair",
+            "highestTier": "hard",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:5",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 1,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "cage-remainder",
+          "highestTier": "easy",
+          "variantSteps": 1
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:5",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "killer",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "killer",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 1,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "cage-remainder",
+            "highestTier": "easy",
+            "variantSteps": 1
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:6",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 1,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "arrow-equation",
+          "highestTier": "easy",
+          "variantSteps": 1
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:6",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "arrow",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "arrow",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 1,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "arrow-equation",
+            "highestTier": "easy",
+            "variantSteps": 1
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:7",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 1,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 1,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 1
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:7",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy",
+            "variantSteps": 1
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:8",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 1,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "cage-distinct",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:8",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "killer",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "killer",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 1,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "cage-distinct",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:9",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "killer",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 1,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "cage-combination",
+          "highestTier": "medium",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:9",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "killer",
+        "difficulty": "medium"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "killer",
+          "difficulty": "medium",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 1,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "cage-combination",
+            "highestTier": "medium",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:10",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "thermo",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 1,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "thermo-bound",
+          "highestTier": "easy",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:10",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "thermo",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "thermo",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 1,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "thermo-bound",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "action:11",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "difficulty": "medium",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 1,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 1
+          },
+          "highestTechnique": "arrow-combination",
+          "highestTier": "medium",
+          "variantSteps": 0
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "action-decode:11",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "arrow",
+        "difficulty": "medium"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "arrow",
+          "difficulty": "medium",
+          "workload": {
+            "steps": 1,
+            "placements": 0,
+            "eliminations": 1,
+            "candidateRemovals": 1,
+            "techniqueCounts": {
+              "naked-single": 0,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 1
+            },
+            "highestTechnique": "arrow-combination",
+            "highestTier": "medium",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Contradictory assessment workload"]
+      }
+    }
+  },
+  {
+    "id": "finite:0",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "easy",
+        "workload": {
+          "steps": 82,
+          "placements": 82,
+          "eliminations": 0,
+          "candidateRemovals": 0,
+          "techniqueCounts": {
+            "naked-single": 82,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 0,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-single",
+          "highestTier": "easy",
+          "variantSteps": 0,
+          "technique": "naked-single"
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "finite:1",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 501,
+          "placements": 0,
+          "eliminations": 501,
+          "candidateRemovals": 501,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 501,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard",
+          "variantSteps": 0,
+          "technique": "naked-pair"
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "finite:2",
+    "input": {
+      "operation": "summary",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "difficulty": "hard",
+        "workload": {
+          "steps": 1,
+          "placements": 0,
+          "eliminations": 1,
+          "candidateRemovals": 730,
+          "techniqueCounts": {
+            "naked-single": 0,
+            "hidden-single": 0,
+            "locked-candidate": 0,
+            "naked-pair": 1,
+            "hidden-pair": 0,
+            "naked-triple": 0,
+            "hidden-triple": 0,
+            "x-wing": 0,
+            "swordfish": 0,
+            "xy-wing": 0,
+            "simple-coloring": 0,
+            "cage-distinct": 0,
+            "cage-remainder": 0,
+            "cage-combination": 0,
+            "thermo-bound": 0,
+            "arrow-equation": 0,
+            "arrow-combination": 0
+          },
+          "highestTechnique": "naked-pair",
+          "highestTier": "hard",
+          "variantSteps": 0,
+          "technique": "naked-pair"
+        }
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Contradictory assessment workload"]
+    }
+  },
+  {
+    "id": "outcome:0",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "variantSteps": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "outcome:1",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "ungraded",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic"
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "status": "ungraded",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic"
+      }
+    }
+  },
+  {
+    "id": "outcome:2",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "budget-exhausted",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "stage": "validation",
+        "difficulty": null
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "status": "budget-exhausted",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "stage": "validation",
+        "difficulty": null
+      }
+    }
+  },
+  {
+    "id": "outcome:3",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "budget-exhausted",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "stage": "logic",
+        "difficulty": "medium"
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "status": "budget-exhausted",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "stage": "logic",
+        "difficulty": "medium"
+      }
+    }
+  },
+  {
+    "id": "outcome:4",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "invalid",
+        "issues": ["Known conflicting givens"]
+      }
+    },
+    "expected": {
+      "valid": true,
+      "value": {
+        "status": "invalid",
+        "issues": ["Known conflicting givens"]
+      }
+    }
+  },
+  {
+    "id": "outcome:5",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "invalid",
+        "issues": []
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment failure issues"]
+    }
+  },
+  {
+    "id": "outcome:6",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "invalid",
+        "issues": [" "]
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment failure issues"]
+    }
+  },
+  {
+    "id": "outcome:7",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "budget-exhausted",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "stage": "logic",
+        "difficulty": null
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment outcome status or stage"]
+    }
+  },
+  {
+    "id": "outcome:8",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "budget-exhausted",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "arrow",
+        "stage": "logic",
+        "difficulty": "expert"
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment outcome status or stage"]
+    }
+  },
+  {
+    "id": "outcome:9",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "budget-exhausted",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic",
+        "stage": "validation",
+        "difficulty": "easy"
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment outcome status or stage"]
+    }
+  },
+  {
+    "id": "outcome:10",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": null
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment outcome"]
+    }
+  },
+  {
+    "id": "outcome:11",
+    "input": {
+      "operation": "outcome",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unknown"
+      }
+    },
+    "expected": {
+      "valid": false,
+      "issues": ["Invalid assessment outcome identity"]
+    }
+  },
+  {
+    "id": "absent",
+    "input": {
+      "operation": "decode",
+      "present": false,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      }
+    },
+    "expected": {
+      "present": false
+    }
+  },
+  {
+    "id": "null",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": null
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Invalid assessment outcome"]
+      }
+    }
+  },
+  {
+    "id": "rated",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "variantSteps": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "old-version",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v1",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "unsupported-version",
+        "issues": ["Unsupported rating version"]
+      }
+    }
+  },
+  {
+    "id": "missing-version",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "workload": null
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "unsupported-version",
+        "issues": ["Unsupported rating version"]
+      }
+    }
+  },
+  {
+    "id": "different-difficulty",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "medium"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "identity-mismatch",
+        "issues": ["Assessment does not match puzzle type or difficulty"]
+      }
+    }
+  },
+  {
+    "id": "different-variant",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "arrow",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "rated",
+        "summary": {
+          "ratingVersion": "sudoku-rating-v2",
+          "variant": "classic",
+          "difficulty": "easy",
+          "workload": {
+            "steps": 1,
+            "placements": 1,
+            "eliminations": 0,
+            "candidateRemovals": 0,
+            "techniqueCounts": {
+              "naked-single": 1,
+              "hidden-single": 0,
+              "locked-candidate": 0,
+              "naked-pair": 0,
+              "hidden-pair": 0,
+              "naked-triple": 0,
+              "hidden-triple": 0,
+              "x-wing": 0,
+              "swordfish": 0,
+              "xy-wing": 0,
+              "simple-coloring": 0,
+              "cage-distinct": 0,
+              "cage-remainder": 0,
+              "cage-combination": 0,
+              "thermo-bound": 0,
+              "arrow-equation": 0,
+              "arrow-combination": 0
+            },
+            "highestTechnique": "naked-single",
+            "highestTier": "easy",
+            "variantSteps": 0
+          }
+        }
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "identity-mismatch",
+        "issues": ["Assessment does not match puzzle type or difficulty"]
+      }
+    }
+  },
+  {
+    "id": "non-rated",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "ungraded",
+        "ratingVersion": "sudoku-rating-v2",
+        "variant": "classic"
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Expected puzzle assessment metadata"]
+      }
+    }
+  },
+  {
+    "id": "unavailable:ungraded",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "ungraded",
+        "issues": []
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "ungraded",
+        "issues": []
+      }
+    }
+  },
+  {
+    "id": "unavailable:budget-exhausted",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "budget-exhausted",
+        "issues": []
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "budget-exhausted",
+        "issues": []
+      }
+    }
+  },
+  {
+    "id": "unavailable:invalid-input",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-input",
+        "issues": []
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-input",
+        "issues": []
+      }
+    }
+  },
+  {
+    "id": "unavailable:invalid-summary",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": []
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": []
+      }
+    }
+  },
+  {
+    "id": "unavailable:unsupported-version",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "unsupported-version",
+        "issues": []
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "unsupported-version",
+        "issues": []
+      }
+    }
+  },
+  {
+    "id": "unavailable:identity-mismatch",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "identity-mismatch",
+        "issues": []
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "identity-mismatch",
+        "issues": []
+      }
+    }
+  },
+  {
+    "id": "unavailable:unknown",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "unknown",
+        "issues": []
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Invalid assessment outcome identity"]
+      }
+    }
+  },
+  {
+    "id": "bad-unavailable-issues",
+    "input": {
+      "operation": "decode",
+      "present": true,
+      "identity": {
+        "variant": "classic",
+        "difficulty": "easy"
+      },
+      "value": {
+        "status": "unavailable",
+        "reason": "ungraded",
+        "issues": [" "]
+      }
+    },
+    "expected": {
+      "present": true,
+      "value": {
+        "status": "unavailable",
+        "reason": "invalid-summary",
+        "issues": ["Invalid assessment outcome identity"]
+      }
+    }
+  }
+]

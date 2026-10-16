@@ -173,3 +173,16 @@ pub enum Difficulty {
     Hard,
     Expert,
 }
+
+impl Difficulty {
+    pub const ALL: [Self; 4] = [Self::Easy, Self::Medium, Self::Hard, Self::Expert];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Easy => "easy",
+            Self::Medium => "medium",
+            Self::Hard => "hard",
+            Self::Expert => "expert",
+        }
+    }
+}

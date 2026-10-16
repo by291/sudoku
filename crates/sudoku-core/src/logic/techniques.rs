@@ -1,5 +1,6 @@
 /// Stable engine identities; player-facing names belong to the presentation layer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
 pub enum Technique {
     NakedSingle,
     HiddenSingle,

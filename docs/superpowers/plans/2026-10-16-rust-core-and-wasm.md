@@ -173,12 +173,12 @@ The plan dependency chain is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 �
 
 **Interfaces:** Produces assessment input/result/workload types and `prepare_assessment(&PuzzleRules, limits: AssessmentLimits) -> CoreResult<PreparedAssessment>`. Its methods are `assess(&self, &Board, &mut WorkBudget) -> AssessmentResult`, `screen(&self, &Board, &mut WorkBudget) -> TrialAssessmentResult`, and `screen_target(&self, &Board, Difficulty, &mut WorkBudget) -> TargetScreenResult`. Ordinary preparation defers charged support construction until evaluation; the generation path explicitly borrows an already charged `PreparedComputation`. `RatedTrial::complete` owns deferred trace replay. `decode_puzzle_assessment` preserves absent versus unavailable outcomes from current decoding.
 
-- [ ] Add `policy_prefix_reuse_preserves_full_trace_and_charges`, `changed_priorities_reset_workspace`, `trial_completion_does_not_repeat_policy_search`, and `summary_absence_is_not_corruption`. Assert full authored/frozen assessments at exact and one-short work/step limits, matching/below/stalled target outcomes, and every existing saved-summary unavailability reason.
-- [ ] Run `cargo test -p sudoku-core --test assessment --test assessment_decoding`; verify missing assessment/screen behavior fails.
-- [ ] Port policy order, validation, workspace-prefix continuation, trace statistics, screening and checked summary decoding. Give deferred completion an owned Rust result with no JS closure in the core. All prior deductions count toward the current policy's 500-step limit.
-- [ ] Integrate the prepared-computation borrowing path used by generation without charging preparation twice or sharing domains across boards.
-- [ ] Run native `assessment` and `validation` migration suites, the complete native tests, and compare complete outputs/traces/work on all selected authored fixtures and generated boards.
-- [ ] Commit as `feat(core): port grading and target screening`.
+- [x] Add `policy_prefix_reuse_preserves_full_trace_and_charges`, `changed_priorities_reset_workspace`, `trial_completion_does_not_repeat_policy_search`, and `summary_absence_is_not_corruption`. Assert full authored/frozen assessments at exact and one-short work/step limits, matching/below/stalled target outcomes, and every existing saved-summary unavailability reason.
+- [x] Run `cargo test -p sudoku-core --test assessment --test assessment_decoding`; verify missing assessment/screen behavior fails.
+- [x] Port policy order, validation, workspace-prefix continuation, trace statistics, screening and checked summary decoding. Give deferred completion an owned Rust result with no JS closure in the core. All prior deductions count toward the current policy's 500-step limit.
+- [x] Integrate the prepared-computation borrowing path used by generation without charging preparation twice or sharing domains across boards.
+- [x] Run native `assessment` and `validation` migration suites, the complete native tests, and compare complete outputs/traces/work on all selected authored fixtures and generated boards.
+- [x] Commit as `feat(core): port grading and target screening`.
 
 ## Task 9: Port generation geometry, clue exploration and final generation scheduling
 

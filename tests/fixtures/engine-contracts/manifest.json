@@ -314,6 +314,18 @@
       "cases": 72
     },
     {
+      "file": "assessment-metadata.json",
+      "sha256": "e64cad976629f132249a5e73330231814e2556a88949cb6a4ef02b75b961865a",
+      "bytes": 121754,
+      "cases": 93
+    },
+    {
+      "file": "assessment-screening.jsonl.gz",
+      "sha256": "163bcf5d4a2a379c96d78e5caf6d7c88e3d188f71b94a6a2d2a6dca4518fbc02",
+      "bytes": 7595595,
+      "cases": 1070
+    },
+    {
       "file": "assessment.json",
       "sha256": "7de338bbb0eee2c1c7ebcf260d5b9a85b9af89f7185522cef19f6dffb7cba0e3",
       "bytes": 1733652,
@@ -348,6 +360,12 @@
       "sha256": "bc9c36466a657fc9f4bb18394cd4bb28dcfc0b0b228c54a346703e3d49c41a99",
       "bytes": 138185,
       "cases": 144
+    },
+    {
+      "file": "generated-assessment-work.json",
+      "sha256": "3b78154ae702d09134ec0e3cdb996c9a282f1271224952b89a3bb61a66724048",
+      "bytes": 120191,
+      "cases": 2241
     },
     {
       "file": "generation-v11-feedback.jsonl.gz",

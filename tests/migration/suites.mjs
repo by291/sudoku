@@ -1,3 +1,4 @@
+import { computeScreening } from './reference-assessment.mjs'
 import assert from 'node:assert/strict'
 import { nativeResults } from './native-adapter.mjs'
 import { gunzipSync } from 'node:zlib'
@@ -109,6 +110,18 @@ export async function computeCase(engine, suite, input) {
         workBudget: budget,
       })
       break
+    case 'assessment-metadata': {
+      if (input.operation === 'summary') return plain(engine.parseAssessmentSummary(input.value))
+      if (input.operation === 'outcome') return plain(engine.parseAssessmentOutcome(input.value))
+      const decoded = engine.decodePuzzleAssessment(
+        input.present ? input.value : undefined,
+        input.identity,
+      )
+      return decoded === undefined ? { present: false } : plain({ present: true, value: decoded })
+    }
+    case 'assessment-screening':
+      return computeScreening(engine, input)
+    case 'assessment-generated':
     case 'assessment': {
       const request = engine.createAssessmentInput(input.board, input.rules)
       result = {
@@ -199,6 +212,8 @@ export async function runMigration(args) {
           'hints',
           'hint-chains',
           'assessment',
+          'assessment-screening',
+          'assessment-metadata',
           'editing',
           'validation',
           'generation',
@@ -206,21 +221,48 @@ export async function runMigration(args) {
       : [suite]
   let checked = 0
   for (const name of suites) {
-    let rows =
-      name === 'generation'
-        ? ['full', 'targeted', 'feedback', 'hard058'].flatMap((family) =>
-            gunzipSync(readFileSync(resolve(fixtureRoot, `generation-v11-${family}.jsonl.gz`)))
-              .toString('utf8')
-              .trim()
-              .split('\n')
-              .map((line) => JSON.parse(line)),
-          )
-        : JSON.parse(
-            readFileSync(
-              resolve(fixtureRoot, (name === 'logic-basic' ? 'logic' : name) + '.json'),
-              'utf8',
-            ),
-          )
+    let files
+    if (name === 'generation' || name === 'assessment-generated') {
+      files = ['full', 'targeted', 'feedback', 'hard058'].map(
+        (family) => `generation-v11-${family}.jsonl.gz`,
+      )
+    } else if (name === 'assessment-screening') {
+      files = ['assessment-screening.jsonl.gz']
+    } else {
+      files = [(name === 'logic-basic' ? 'logic' : name) + '.json']
+    }
+    let rows = files.flatMap((file) => {
+      const stored = readFileSync(resolve(fixtureRoot, file))
+      if (file.endsWith('.gz'))
+        return gunzipSync(stored)
+          .toString('utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+      return JSON.parse(stored.toString('utf8'))
+    })
+    if (name === 'assessment-generated') {
+      const counts = new Map(
+        JSON.parse(
+          readFileSync(resolve(fixtureRoot, 'generated-assessment-work.json'), 'utf8'),
+        ).map((row) => [row.id, row.workUsed]),
+      )
+      rows = rows.map((row) => {
+        assert.equal(row.expected.result.status, 'ready')
+        const puzzle = row.expected.result.puzzle
+        return {
+          id: row.id,
+          input: {
+            board: puzzle.givens,
+            solution: puzzle.solution,
+            rules: puzzle.rules,
+            difficulty: puzzle.difficulty,
+            limit: 4000000,
+          },
+          expected: { ...row.expected.assessment, workUsed: counts.get(row.id) },
+        }
+      })
+    }
     if (name === 'logic-basic') {
       rows = rows.filter((row) =>
         row.expected.steps.every(
@@ -236,14 +278,22 @@ export async function runMigration(args) {
         ),
       )
     }
-    const native = selectedEngine === 'native' ? nativeResults(name, rows) : null
-    for (const [index, row] of rows.entries()) {
-      assert.deepStrictEqual(
-        native ? native[index] : await computeCase(engine, name, row.input),
-        row.expected,
-        `Migration result mismatch: ${name}/${row.id}`,
-      )
-      checked++
+    const batchSize = 128
+    for (let start = 0; start < rows.length; start += batchSize) {
+      const batch = rows.slice(start, start + batchSize)
+      const native = selectedEngine === 'native' ? nativeResults(name, batch) : null
+      for (const [index, row] of batch.entries()) {
+        assert.deepStrictEqual(
+          native ? native[index] : await computeCase(engine, name, row.input),
+          row.expected,
+          `Migration result mismatch: ${name}/${row.id}`,
+        )
+        checked++
+      }
+      if (rows.length > batchSize)
+        console.log(
+          `${selectedEngine} ${name}: ${Math.min(start + batchSize, rows.length)}/${rows.length}`,
+        )
     }
     console.log(`${selectedEngine} ${name}: ${rows.length} PASS`)
   }
