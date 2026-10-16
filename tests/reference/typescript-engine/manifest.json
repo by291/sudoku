@@ -1,0 +1,266 @@
+{
+  "commit": "7c95fb7832e614d4ee8d5089f69bac71d4886c36",
+  "coreSourceCount": 58,
+  "sources": [
+    {
+      "file": "src/core/sudoku/board.ts",
+      "sha256": "f6f6fcff01a743ff68e0d3246c311e478362796eb762ef357a797b6e37884b13"
+    },
+    {
+      "file": "src/core/sudoku/budget.ts",
+      "sha256": "d05d61c7e66bd3948762eba859d1562e7aca2e5cdf75dfcbcc38823705780dea"
+    },
+    {
+      "file": "src/core/sudoku/constraints/cageCatalogue.ts",
+      "sha256": "27add05553e7ae1b74aedf1e6620d802328450b6680a562bad0847e34ea0a892"
+    },
+    {
+      "file": "src/core/sudoku/constraints/candidates.ts",
+      "sha256": "06e15820082cca1eb99adf6b1c75ba88d80f28413012546a8b596cee58883582"
+    },
+    {
+      "file": "src/core/sudoku/constraints/computation.ts",
+      "sha256": "1f631cadfa7e99abf370cdb95410c0ea04b73da0ea3cd2bb970c7d01b6f63816"
+    },
+    {
+      "file": "src/core/sudoku/constraints/conflicts.ts",
+      "sha256": "50a843a5626f3b340aa40da14a699bbdfbb90ba3a97b1921c4aea186d3a53bb8"
+    },
+    {
+      "file": "src/core/sudoku/constraints/support.ts",
+      "sha256": "72e235eed902611a5756cd88ce269a920d5748866eec84daa8928757b56e4bf4"
+    },
+    {
+      "file": "src/core/sudoku/constraints/types.ts",
+      "sha256": "29226c2c19773df22c3a8ab7cb084aa7560fff51fb25b15e4efaf2594ef28a0d"
+    },
+    {
+      "file": "src/core/sudoku/difficulties.ts",
+      "sha256": "55d4f940508fe664608609908dc5a4b7c4db68644ba594bafb55f7ec6407d307"
+    },
+    {
+      "file": "src/core/sudoku/examples/variants.ts",
+      "sha256": "d30a9220d4e138527ab059eb583d9d11903fa6c4ca920e8758d007eae3b8cf4f"
+    },
+    {
+      "file": "src/core/sudoku/generation/candidates.ts",
+      "sha256": "72f6ac177dc6e5007049dc0a9d04ec11896fd3299d629016733089ea120d65a8"
+    },
+    {
+      "file": "src/core/sudoku/generation/classic.ts",
+      "sha256": "817e9006fa93b48e77d492b89ecd9d9c69595c0f5691a4dbe26af5d76d1ee203"
+    },
+    {
+      "file": "src/core/sudoku/generation/generate.ts",
+      "sha256": "728690f2d8b02cbefbc5053f63eed498410e969b99962d39dcdba53cf2a1df22"
+    },
+    {
+      "file": "src/core/sudoku/generation/input.ts",
+      "sha256": "6ea4dbaf1300b21c93ec0d2151cca0254af69c92ec489ad1da3d7f6b7f286ed8"
+    },
+    {
+      "file": "src/core/sudoku/generation/layouts.ts",
+      "sha256": "8c013316f9460f48afb16f26abd838238bd75aa0a85bb4ef5bb0faa9d2c2db90"
+    },
+    {
+      "file": "src/core/sudoku/generation/random.ts",
+      "sha256": "b0e20655b83c0c7f3856a7c3f0de0a38dac5a7f37970e9ffb8701a846bae0dfb"
+    },
+    {
+      "file": "src/core/sudoku/generation/search.ts",
+      "sha256": "8f2597495f27cc235c56d2b7414397f8a08287819147ce9c484b2d2b27698e57"
+    },
+    {
+      "file": "src/core/sudoku/generation/terminalConstruction.ts",
+      "sha256": "c5abe2e27181ac6e75fce53e073b0b9cea708b60685c52c86e9efb86e197e2dc"
+    },
+    {
+      "file": "src/core/sudoku/generation/types.ts",
+      "sha256": "e50aa9440d665fd274b659e6ad509a394971f1e834dcbee90e013f36050cd828"
+    },
+    {
+      "file": "src/core/sudoku/generation/variant.ts",
+      "sha256": "fa0900c333a16b3c263ed9d53d42059cac2d3217238c6755f2d373720629f2c6"
+    },
+    {
+      "file": "src/core/sudoku/generation/variantStrategies.ts",
+      "sha256": "62917883a348d3dffd1f1d9e7547587d15357d327a9d2e3227c94d2cbef2d115"
+    },
+    {
+      "file": "src/core/sudoku/generation/variants/arrow.ts",
+      "sha256": "b691f2693d6275c91a1acb058fd9ecb756646f32275e41e64a6949c4dac8f070"
+    },
+    {
+      "file": "src/core/sudoku/generation/variants/diagonal.ts",
+      "sha256": "85c9d31c849cd14874dfb41123128294c47820a9fd051df242bb0e815bfa4e89"
+    },
+    {
+      "file": "src/core/sudoku/generation/variants/jigsaw.ts",
+      "sha256": "bd284ac0cf082aea6f9bda07fc72d7173f7a0e4e4f1d19f55bae218236770bb3"
+    },
+    {
+      "file": "src/core/sudoku/generation/variants/killer.ts",
+      "sha256": "1ed6a7fcabc0733dc42dc00f79add4bd9ff22259b99f3d9aa171612556657338"
+    },
+    {
+      "file": "src/core/sudoku/generation/variants/thermo.ts",
+      "sha256": "635ae70d3d7bdad1d3b3aa31ec4d06c9ef114b5f3c838c59b885ce952a7ffb15"
+    },
+    {
+      "file": "src/core/sudoku/hint.ts",
+      "sha256": "c011144c1e84db55d4516981ccaf768eb3840cbcc93c6cc2c84933059c6c3fac"
+    },
+    {
+      "file": "src/core/sudoku/logic/advancedEvidence.ts",
+      "sha256": "cbd91844611c89289548797d442506abb594952ed2941371db4f835e87a33ccb"
+    },
+    {
+      "file": "src/core/sudoku/logic/advancedTechniques.ts",
+      "sha256": "1a37c2aa3e4c60c72576b2cd18539118d73fd547c2ffdece7ff7e867d861fd1a"
+    },
+    {
+      "file": "src/core/sudoku/logic/basicTechniques.ts",
+      "sha256": "3d2094e853cda50747d26582cb56d4963d9418ac881232013fd2e9b4d8b79fe3"
+    },
+    {
+      "file": "src/core/sudoku/logic/evidence.ts",
+      "sha256": "ac09f297c5a66564e885d48acab88f7e827b040b4ea696f8b40c1dfc8e8d829f"
+    },
+    {
+      "file": "src/core/sudoku/logic/patternFacts.ts",
+      "sha256": "add342b1d12e8823cbaf49e0df72160b1c71c549c36ce58af6869b1d4c3a529d"
+    },
+    {
+      "file": "src/core/sudoku/logic/solver.ts",
+      "sha256": "2952ccebd03e745b3c710b3e78d379ce9261f493c41e2ebf02d4e009635b3f34"
+    },
+    {
+      "file": "src/core/sudoku/logic/techniques.ts",
+      "sha256": "54bbd49ff88b04dc81b58a7f21256a3a1987a9d708d0e6ce3af63437c91d96cd"
+    },
+    {
+      "file": "src/core/sudoku/logic/types.ts",
+      "sha256": "6f89e2244237ee8e6fce5fe6231ad68e33b59f3c0605475c330691382f4310df"
+    },
+    {
+      "file": "src/core/sudoku/logic/variantTechniques.ts",
+      "sha256": "0e462e8c0dfb88fd81dbc6e3e1cecffb120a32999b9d5ad9f47cdba05ea5e708"
+    },
+    {
+      "file": "src/core/sudoku/logic/workspace.ts",
+      "sha256": "0d71e55a27e7e45bc8a915f31363e5bf8fdb0b2d45d9fc96b3151a4a20ee2c1a"
+    },
+    {
+      "file": "src/core/sudoku/puzzle.ts",
+      "sha256": "af4e1b1267440f2a11a4d38b5df76d8c8f4de5b5e183de8cc91a0ff2a923c7e1"
+    },
+    {
+      "file": "src/core/sudoku/random.ts",
+      "sha256": "9c1b4493af1df082566742eeabbdd660ec1e3b7686a7c77fe8c79649f6365eec"
+    },
+    {
+      "file": "src/core/sudoku/rating/assessment.ts",
+      "sha256": "bc1a92e7c33b491b62de3093fec02a4298c4e8e70404210d5e88a20e3ee3cdff"
+    },
+    {
+      "file": "src/core/sudoku/rating/decoding.ts",
+      "sha256": "d3b737e550031f042cc7118e216325cfbcb42165d872d27abd2598ff7ebd8c07"
+    },
+    {
+      "file": "src/core/sudoku/rating/input.ts",
+      "sha256": "5be869a63ba07fbc322a54c1ea4e875ec19893d122dd8775735e835c483b1d88"
+    },
+    {
+      "file": "src/core/sudoku/rating/policies.ts",
+      "sha256": "12c59082e41416697a6436bb1b85ba23d694937887d5405c6e7d7d3919e10a39"
+    },
+    {
+      "file": "src/core/sudoku/rating/types.ts",
+      "sha256": "7600bec1de74cfa158cb65d0d01e20694838c9b829683aa4ae4e0d6b9fb9bc97"
+    },
+    {
+      "file": "src/core/sudoku/rating/workload.ts",
+      "sha256": "447ccf0125a943c012c5f1e0564922661d4f909616e7d7f9fb059b8f58fe570e"
+    },
+    {
+      "file": "src/core/sudoku/rules/context.ts",
+      "sha256": "7084b21354df0cea59404e259cefc588f3c64e2ab396a5f4cd2662db789d3c14"
+    },
+    {
+      "file": "src/core/sudoku/rules/definitions/arrow.ts",
+      "sha256": "a96d6b0b2ea45774964b18babf0b748b01c3b5ba0c260d77de795ab24c566869"
+    },
+    {
+      "file": "src/core/sudoku/rules/definitions/classic.ts",
+      "sha256": "a13ffdda418f73743ef4f446bc586499c8406ac1846500e70a9be9a7d7c5b5e4"
+    },
+    {
+      "file": "src/core/sudoku/rules/definitions/diagonal.ts",
+      "sha256": "3c4045fc2050ec280ec120a58cff1d25127b27ca3f8e2a58ee16908f119c235a"
+    },
+    {
+      "file": "src/core/sudoku/rules/definitions/jigsaw.ts",
+      "sha256": "3f40e6061b5059d1103a9c6b80b5cf54520493199c76abc3c2274ec1efd4a553"
+    },
+    {
+      "file": "src/core/sudoku/rules/definitions/killer.ts",
+      "sha256": "8f0600cbef6fd418bf2acfcba96e694c6e90e10b3b04f5bbbcdc9643453a9602"
+    },
+    {
+      "file": "src/core/sudoku/rules/definitions/thermo.ts",
+      "sha256": "f50f0ef1ad54e1657c8a7fc403faea82eb5cfe9bbb53cf39967bed35fcf351f8"
+    },
+    {
+      "file": "src/core/sudoku/rules/registry.ts",
+      "sha256": "020528e4f2c1031630878aef8fa58edc5917681bf7ca697f60671b21738eddb6"
+    },
+    {
+      "file": "src/core/sudoku/rules/topology.ts",
+      "sha256": "ce243f20b9cc219f91e6c3df193bab2c946eef23fbf22f222eb6736689883fec"
+    },
+    {
+      "file": "src/core/sudoku/rules/types.ts",
+      "sha256": "75f426ee09fe796a4a55e47609ab5d155e763c047335f04fbddd750431a11175"
+    },
+    {
+      "file": "src/core/sudoku/search/exact.ts",
+      "sha256": "49f3404ad6298d5365c9fd0dc7fed34ed13081d121e1cb03db6bd6744d20fb80"
+    },
+    {
+      "file": "src/core/sudoku/search/propagation.ts",
+      "sha256": "cb022283cedc673ba06cce6e11132959b7b3de6bae431c4da4d17c6e325eef2f"
+    },
+    {
+      "file": "src/core/sudoku/types.ts",
+      "sha256": "9195df771899e19c3d83aca62138340c2ab10922c180f574d9fa67b8bffa52ab"
+    },
+    {
+      "file": "src/features/game/model/session.ts",
+      "sha256": "7c1819d76374b92e3a3e5483e5116a173e7da517416181b2ea1ab9ef28210b64"
+    },
+    {
+      "file": "src/worker/hintEvidence.ts",
+      "sha256": "5c4face970fef05bbaf4e25812fd6d67e8201586420c36a8986dc5cb5b7f5f98"
+    },
+    {
+      "file": "tests/fixtures/classicPuzzles.ts",
+      "sha256": "4c925c28a8c3d6b3b740abaead1e4711e00cd28ddfc6e44a581f1f4aa5522b68"
+    },
+    {
+      "file": "tests/fixtures/rating.ts",
+      "sha256": "3975f844b24cc51b78332519d29a7ba81ad5e3d73854579f20105538a60d33f2"
+    },
+    {
+      "file": "tests/fixtures/sudoku.ts",
+      "sha256": "ed51962e2da1b7fce519b4108f585212de7530f86daf62ae1506019a6fa1f1ec"
+    },
+    {
+      "file": "tests/fixtures/variants.ts",
+      "sha256": "50c6cf08d2248d54e933c025853b300a18664b563d0756648e77cb4bc1fb63bc"
+    },
+    {
+      "file": "tests/support/referenceVariants.ts",
+      "sha256": "e72564158b3bd937f73b566cf3020a1926f960860cef0e396574938b91c13d01"
+    }
+  ]
+}

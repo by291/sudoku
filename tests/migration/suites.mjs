@@ -1,0 +1,173 @@
+import assert from 'node:assert/strict'
+import { gunzipSync } from 'node:zlib'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { loadEngine } from './reference-loader.mjs'
+import { referenceRoot, sha256 } from './freeze-reference.mjs'
+
+export const fixtureRoot = fileURLToPath(new URL('../fixtures/engine-contracts/', import.meta.url))
+const plain = (value) => JSON.parse(JSON.stringify(value))
+
+export async function computeCase(engine, suite, input) {
+  const budget = engine.createWorkBudget(input.limit ?? 4000000)
+  let result
+  switch (suite) {
+    case 'rules': {
+      const context = engine.compileRules(input.rules)
+      result = {
+        context,
+        candidates: engine.calculateBaseCandidates(input.board, context),
+        complete: engine.isComplete(input.board, context),
+      }
+      break
+    }
+    case 'constraints': {
+      const context = engine.compileRules(input.rules)
+      const candidateBudget = engine.createWorkBudget(input.limit)
+      result = {
+        candidates: engine.evaluateCandidates(input.board, context, candidateBudget),
+        candidateWork: candidateBudget.used,
+        conflicts: engine.evaluateConflicts(input.board, context, budget),
+      }
+      break
+    }
+    case 'exact':
+      result = engine.countSolutions(input.board, {
+        maxSolutions: 2,
+        nodeBudget: input.nodes,
+        context: engine.compileRules(input.rules),
+        workBudget: budget,
+      })
+      break
+    case 'logic':
+      result = engine.analyzeLogic(
+        input.board,
+        input.rules.kind === 'classic'
+          ? engine.ALL_CLASSIC_TECHNIQUES
+          : engine.RATING_POLICIES[input.rules.kind].hard,
+        500,
+        {
+          context: engine.compileRules(input.rules),
+          workBudget: budget,
+        },
+      )
+      break
+    case 'hints':
+      result = engine.analyzeHint(input.board, input.solution, 500, {
+        context: engine.compileRules(input.rules),
+        workBudget: budget,
+      })
+      break
+    case 'assessment': {
+      const request = engine.createAssessmentInput(input.board, input.rules)
+      result = {
+        result: engine.assessPuzzle(request),
+        budgeted: engine.assessPuzzleWithBudget(request, budget),
+      }
+      break
+    }
+    case 'validation':
+      result = engine.parsePuzzle(input.puzzle)
+      break
+    case 'editing': {
+      const session = await import(
+        pathToFileURL(resolve(referenceRoot, 'src/features/game/model/session.ts')).href
+      )
+      const before = session.createSession(
+        input.puzzle,
+        { kind: 'free' },
+        'migration',
+        '2026-10-16T00:00:00.000Z',
+      )
+      const edit = session.applySessionAction(before, input.action, budget)
+      result = {
+        status: edit.status,
+        entries: edit.session.entries,
+        notes: edit.session.notes,
+        changed: edit.changed,
+        boardComplete: edit.boardComplete,
+      }
+      break
+    }
+    case 'generation': {
+      const seedHex = Buffer.from(input.seed).toString('hex')
+      const request = engine.createGenerationInput(input.variant, input.difficulty, seedHex)
+      assert.equal(request.puzzleVersion, input.puzzleVersion)
+      result = { result: engine.generatePuzzle(request) }
+      if (result.result.status === 'ready') {
+        const puzzle = result.result.puzzle
+        const request = engine.createAssessmentInput(puzzle.givens, puzzle.rules)
+        result.assessment = {
+          result: engine.assessPuzzle(request),
+          budgeted: engine.assessPuzzleWithBudget(request, budget),
+        }
+      }
+      break
+    }
+    default:
+      throw new Error(`Unsupported migration suite: ${suite}`)
+  }
+  return plain({ ...result, ...(suite === 'generation' ? {} : { workUsed: budget.used }) })
+}
+
+export async function runMigration(args) {
+  const option = (name, fallback) => {
+    const index = args.indexOf(name)
+    return index < 0 ? fallback : args[index + 1]
+  }
+  const suite = option('--suite', 'all')
+  const selectedEngine = option('--engine', 'typescript')
+  assert.equal(selectedEngine, 'typescript', 'Engine adapter not implemented yet')
+  const manifest = JSON.parse(readFileSync(resolve(fixtureRoot, 'manifest.json'), 'utf8'))
+  for (const patch of manifest.patch) {
+    assert.equal(
+      sha256(readFileSync(new URL(patch.file, import.meta.url))),
+      patch.sha256,
+      `Changed v11 reference patch: ${patch.file}`,
+    )
+  }
+  for (const fixture of manifest.fixtures) {
+    const stored = readFileSync(resolve(fixtureRoot, fixture.file))
+    const bytes = fixture.file.endsWith('.gz') ? gunzipSync(stored) : stored
+    assert.equal(sha256(bytes), fixture.sha256, `Changed fixture: ${fixture.file}`)
+  }
+  const engine = await loadEngine({ v11: true })
+  const suites =
+    suite === 'all'
+      ? [
+          'rules',
+          'constraints',
+          'exact',
+          'logic',
+          'hints',
+          'assessment',
+          'editing',
+          'validation',
+          'generation',
+        ]
+      : [suite]
+  let checked = 0
+  for (const name of suites) {
+    const rows =
+      name === 'generation'
+        ? ['full', 'targeted', 'feedback', 'hard058'].flatMap((family) =>
+            gunzipSync(readFileSync(resolve(fixtureRoot, `generation-v11-${family}.jsonl.gz`)))
+              .toString('utf8')
+              .trim()
+              .split('\n')
+              .map((line) => JSON.parse(line)),
+          )
+        : JSON.parse(readFileSync(resolve(fixtureRoot, name + '.json'), 'utf8'))
+    for (const row of rows) {
+      assert.deepStrictEqual(
+        await computeCase(engine, name, row.input),
+        row.expected,
+        `Migration result mismatch: ${name}/${row.id}`,
+      )
+      checked++
+    }
+    console.log(`${selectedEngine} ${name}: ${rows.length} PASS`)
+  }
+  console.log(`Migration contracts: ${checked} PASS`)
+}

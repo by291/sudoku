@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.e2e.json",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.e2e.json && tsc --noEmit -p tests/reference/tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -18,7 +18,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "build:subpath": "vite build --base /sudoku/ --outDir dist-subpath",
     "test:e2e": "playwright test",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm build && pnpm test:e2e"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm build && pnpm test:e2e",
+    "test:migration": "node tests/migration/run.mjs"
   },
   "dependencies": {
     "idb": "8.0.4",
@@ -29,6 +30,8 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@noble/ciphers": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "@playwright/test": "1.64.0",
     "@types/node": "26.6.5",
     "@vitejs/plugin-vue": "6.0.10",

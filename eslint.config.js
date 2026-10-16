@@ -62,11 +62,17 @@ export default [
       'dist-subpath/**',
       'node_modules/**',
       '.superpowers/**',
+      'tests/reference/typescript-engine/**',
       '.agents/**',
       '.codex/**',
       'test-results/**',
       'playwright-report/**',
     ],
+  },
+  // Reference snapshots remain byte exact; executable migration tools use Node globals.
+  {
+    files: ['tests/migration/**/*.mjs'],
+    languageOptions: { globals: globals.node },
   },
   js.configs.recommended,
   ...ts.configs.recommended,
