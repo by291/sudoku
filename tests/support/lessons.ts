@@ -1,6 +1,21 @@
 import { testEngine } from './semantics'
 import { createLessons } from '@/features/learning/model/lessons'
-import { createVariantExamples } from '@/features/learning/model/variantExamples'
+import type { NewSudokuVariant } from '@/sudoku/contracts'
 
 export const LESSONS = createLessons(testEngine)
-export const { VARIANT_EXAMPLES } = createVariantExamples(testEngine)
+
+function variantExample(variant: NewSudokuVariant) {
+  const stage = LESSONS.find((lesson) => lesson.id === `${variant}-rules`)?.guided
+  if (!stage || stage.step.kind !== 'placement') {
+    throw new Error(`Missing variant rule example: ${variant}`)
+  }
+  return { ...stage, step: stage.step }
+}
+
+export const VARIANT_EXAMPLES = {
+  diagonal: variantExample('diagonal'),
+  jigsaw: variantExample('jigsaw'),
+  killer: variantExample('killer'),
+  thermo: variantExample('thermo'),
+  arrow: variantExample('arrow'),
+}

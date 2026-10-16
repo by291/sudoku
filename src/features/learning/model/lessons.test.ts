@@ -1,7 +1,7 @@
 import { LESSONS, VARIANT_EXAMPLES } from '../../../../tests/support/lessons'
 import { expect, it } from 'vitest'
 import { checkExercise } from '@/features/learning/model/lessons'
-import { EXAMPLES } from '@/features/learning/model/examples'
+import { EXAMPLES } from '../../../../tests/fixtures/classicLessonExamples'
 import { solvedBoard } from '../../../../tests/fixtures/sudoku'
 import { UNITS, maskOf, digitsIn } from '@reference/core/sudoku/board'
 import { LESSON_IDS } from '@/features/learning/model/lessonIds'

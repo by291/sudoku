@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => ({
           }
         : {}),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@content': fileURLToPath(new URL('./content', import.meta.url)),
     },
   },
   worker: { format: 'es' },
