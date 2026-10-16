@@ -5,9 +5,9 @@ The [product design](superpowers/specs/2026-10-11-sudoku-design.md), [variant de
 ## Owners and dependencies
 
 ```text
-crates/
-  sudoku-core/src/{types,board,budget,random,rules,constraints,search,editing,logic,rating,generation,hint,puzzle}
-  sudoku-wasm/src/{dto,conversion,prepared}
+sudoku/
+  core/src/{types,board,budget,random,rules,constraints,search,editing,logic,rating,generation,hint,puzzle}
+  wasm/src/{dto,conversion,prepared}
 packages/sudoku-wasm/pkg/        # Generated and ignored
 src/
   main.ts, App.vue, ReadyApplication.vue, runtime.ts
@@ -26,8 +26,8 @@ src/
 
 | Owner                                                      | Responsibility                                                                                                   |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `crates/sudoku-core`                                       | Reusable synchronous Rust computation, with no browser, JS, Vue, storage, clock, entropy source or async runtime |
-| `crates/sudoku-wasm`                                       | Typed fallible conversion and owned WASM handles; no application policy or database behavior                     |
+| `sudoku/core`                                              | Reusable synchronous Rust computation, with no browser, JS, Vue, storage, clock, entropy source or async runtime |
+| `sudoku/wasm`                                              | Typed fallible conversion and owned WASM handles; no application policy or database behavior                     |
 | `src/sudoku/contracts.ts`                                  | Type-only aliases of generated DTOs and explicit frontend envelopes; read-only mapping preserves tuples          |
 | `src/sudoku/values.ts`, `catalogue.ts`                     | Scalar shape guards, technique IDs and presentation capabilities; no solving or WASM initialization              |
 | `src/sudoku/seed.ts`, `generationInput.ts`, `ruleInput.ts` | Owned request assembly, strict byte/hex identity, rule DTO copies                                                |

@@ -136,7 +136,7 @@ Primary references:
 
 ## Sudoku core organization
 
-- Keep reusable computation in `crates/sudoku-core`, typed browser conversion in `crates/sudoku-wasm`, and browser ownership/dispatch in `src/sudoku` and `src/worker`. Core must not depend on Vue, JS/WASM bindings, browser APIs, storage, clocks, OS entropy or an async runtime.
+- Keep reusable computation in `sudoku/core`, typed browser conversion in `sudoku/wasm`, and browser ownership/dispatch in `src/sudoku` and `src/worker`. Core must not depend on Vue, JS/WASM bindings, browser APIs, storage, clocks, OS entropy or an async runtime.
 - Import native contracts from their explicit owner (`types.rs` or subsystem `types.rs`); import frontend DTO contracts from `src/sudoku/contracts.ts`. Do not reintroduce a production TypeScript solver or a facade hiding dependency cycles.
 - Keep rule definitions under `rules/definitions/`, arithmetic support in `constraints/`, exact counting in `search/`, human deductions/evidence in `logic/`, assessment in `rating/` and geometry/frontier/scheduling in `generation/`. Lower layers must not import generation. Keep Chinese technique/violation presentation in game models.
 - Use checked board/digit/cell/mask values and forbid unsafe application code. Keep immutable prepared layout data separate from mutable workspaces and owned returned evidence. Document borrowing, mutation, incomplete outcomes and units. Read-only TypeScript types do not establish runtime ownership.

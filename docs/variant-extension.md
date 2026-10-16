@@ -6,7 +6,7 @@ Follow [Web Architecture](architecture.md) and the [portable engine design](supe
 
 | Contract                                        | Owner                                                                                                            |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Variant/rule payloads and prepared topology     | `crates/sudoku-core/src/rules/types.rs`                                                                          |
+| Variant/rule payloads and prepared topology     | `sudoku/core/src/rules/types.rs`                                                                                 |
 | Rule validation/compilation and units/peers     | `rules/definitions/`, `rules/context.rs`, `rules/topology.rs`                                                    |
 | Arithmetic support, candidates and conflicts    | `constraints/`                                                                                                   |
 | Exact propagation/counting                      | `search/`                                                                                                        |
@@ -15,7 +15,7 @@ Follow [Web Architecture](architecture.md) and the [portable engine design](supe
 | Generation capabilities and geometry            | `generation/variant_strategies.rs`, `generation/variants/`, `generation/variant.rs`                              |
 | Terminal/frontier/acceptance and budgets        | `generation/terminal_construction.rs`, `candidates.rs`, `search.rs`                                              |
 | Version-owned seed tags/framing                 | `generation/random.rs`, `generation/types.rs`, `random.rs`                                                       |
-| JS wire union/conversions                       | `crates/sudoku-wasm/src/dto/`, `conversion/`; regenerate rather than edit declarations                           |
+| JS wire union/conversions                       | `sudoku/wasm/src/dto/`, `conversion/`; regenerate rather than edit declarations                                  |
 | Frontend DTO contracts and shape/copy guards    | `src/sudoku/contracts.ts`, `values.ts`, `guards.ts`, `ruleInput.ts`, `generationInput.ts`, `catalogue.ts`        |
 | Player-facing names and explanations            | `features/game/model/variants.ts`, `techniquePresentation.ts`, `violationPresentation.ts`                        |
 | Accessible drawing and selected-clue text       | `shared/model/boardGeometry.ts`, `shared/components/`                                                            |

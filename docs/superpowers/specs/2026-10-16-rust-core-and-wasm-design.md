@@ -34,8 +34,8 @@ If a later Node.js consumer needs a native addon, add `sudoku-napi` depending on
 Cargo.toml                         # Workspace members and shared dependency policy
 Cargo.lock
 rust-toolchain.toml
-crates/
-  sudoku-core/
+sudoku/
+  core/
     src/
       lib.rs
       types.rs                     # Validated values and common outcomes
@@ -51,7 +51,7 @@ crates/
       rating/
       generation/
     tests/                         # Native contracts, independent facts and corpus tests
-  sudoku-wasm/
+  wasm/
     src/
       lib.rs                       # Named exported operations and lifecycle
       dto.rs                       # Serde/TypeScript boundary shapes

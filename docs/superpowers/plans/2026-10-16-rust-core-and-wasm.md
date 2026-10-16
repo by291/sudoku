@@ -42,9 +42,9 @@
 
 ## Ownership and common contracts
 
-Create `crates/sudoku-core/src/{types,board,budget,random,puzzle,editing,hint}.rs` and responsibility modules under `rules/`, `constraints/`, `search/`, `logic/`, `rating/` and `generation/`. Use `mod.rs` only for explicit module declarations and deliberate public contracts; do not re-export every subsystem through a facade.
+Create `sudoku/core/src/{types,board,budget,random,puzzle,editing,hint}.rs` and responsibility modules under `rules/`, `constraints/`, `search/`, `logic/`, `rating/` and `generation/`. Use `mod.rs` only for explicit module declarations and deliberate public contracts; do not re-export every subsystem through a facade.
 
-Create `crates/sudoku-wasm/src/{lib,dto,conversion}.rs` for exports, wire shapes and checked conversions. Use wasm-bindgen byte-slice parameters for seed input, not a custom string wrapper. Keep portable domain types in the core; the adapter's DTOs derive Serde/Tsify and map to those types. Tests can use dev-only fixture decoders without introducing an upward dependency from core to the WASM crate.
+Create `sudoku/wasm/src/{lib,dto,conversion}.rs` for exports, wire shapes and checked conversions. Use wasm-bindgen byte-slice parameters for seed input, not a custom string wrapper. Keep portable domain types in the core; the adapter's DTOs derive Serde/Tsify and map to those types. Tests can use dev-only fixture decoders without introducing an upward dependency from core to the WASM crate.
 
 Create `packages/sudoku-wasm/package.json`, `pnpm-workspace.yaml` and `scripts/build-sudoku-wasm.mjs` for the generated local package `@sudoku/wasm`. Generated files live in ignored `packages/sudoku-wasm/pkg/`. Exclude `experiments/rust-core-benchmark` from the root Cargo workspace so its existing standalone reproduction remains valid. Ignore root `target/` and generated package outputs in the appropriate Git/lint/format configuration.
 

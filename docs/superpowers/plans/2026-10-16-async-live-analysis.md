@@ -4,7 +4,7 @@ Approved behavior: the user selected the focused Worker option on 2026-10-16 and
 
 ## Task 1: Define cost classification and typed live-result boundaries
 
-**Owners:** `crates/sudoku-core/src/constraints/{types,computation}.rs`, core tests, `crates/sudoku-wasm/src/{prepared,lib}.rs`, DTO/conversion owners, `src/sudoku/{contracts,mainEngine,guards}.ts`.
+**Owners:** `sudoku/core/src/constraints/{types,computation}.rs`, core tests, `sudoku/wasm/src/{prepared,lib}.rs`, DTO/conversion owners, `src/sudoku/{contracts,mainEngine,guards}.ts`.
 
 - [x] Add native tests for all six rule families, conservative heavy-cage classification, cheap duplicate preview, complete/partial result parsing and invalid cells/boards/masks.
 - [x] Expose a pure native live-computation cost class, with cages larger than four cells conservatively classified as enumeration-heavy. The WASM adapter maps it to immediate/Worker execution; no browser dependency enters core.

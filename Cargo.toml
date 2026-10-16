@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/sudoku-core", "crates/sudoku-wasm"]
+members = ["sudoku/core", "sudoku/wasm"]
 resolver = "3"
 
 [workspace.package]

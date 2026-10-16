@@ -63,7 +63,7 @@ Set the variable in the same terminal for installation and subsequent test comma
 
 ## Portable engine
 
-All Sudoku computation lives in [`crates/sudoku-core`](crates/sudoku-core/README.md); [`crates/sudoku-wasm`](crates/sudoku-wasm/README.md) is the separate typed browser adapter. The frontend loads WASM before stores/storage decoding, owns disposable prepared layouts, and delegates heavy jobs to isolated Workers. There is no shipped TypeScript solver or fallback engine. NAPI is not required for browser WASM; an optional future native Node adapter can reuse the same Rust crate.
+All Sudoku computation lives in [`sudoku/core`](sudoku/core/README.md); [`sudoku/wasm`](sudoku/wasm/README.md) is the separate typed browser adapter. The frontend loads WASM before stores/storage decoding, owns disposable prepared layouts, and delegates heavy jobs to isolated Workers. There is no shipped TypeScript solver or fallback engine. NAPI is not required for browser WASM; an optional future native Node adapter can reuse the same Rust crate.
 
 Generation requests use exactly 32 byte seeds, independent of UUID session IDs. New stored/share identities use strict lowercase 64-character hex with `sudoku-v11` / `sudoku-variants-v11`; rating remains `sudoku-rating-v2`. Daily roots derive from ASCII `daily:YYYY-MM-DD`. Existing daily attempts and historical saved boards/rules/progress/results remain authoritative; historical seed/version strings are never decoded or regenerated.
 
@@ -135,8 +135,8 @@ Serve that output at the matching path. Changing the host/origin creates a separ
 
 ## Architecture and development guidance
 
-- `crates/sudoku-core/`: Portable rules, bounded search, byte-seeded generation, logic, rating, edits and validation.
-- `crates/sudoku-wasm/` and `src/sudoku/`: Typed WASM adaptation, readiness and owned browser resources.
+- `sudoku/core/`: Portable rules, bounded search, byte-seeded generation, logic, rating, edits and validation.
+- `sudoku/wasm/` and `src/sudoku/`: Typed WASM adaptation, readiness and owned browser resources.
 - `src/main.ts`, `src/runtime.ts`, `src/App.vue`, `src/layouts/`, `src/router/`, and `src/theme/`: Bootstrap, injected browser services, root providers, visual shell, hash routes, and theme synchronization.
 - `src/features/game/`: Game/daily views, session controls, composables, pure models, and Pinia orchestration.
 - `src/features/learning/` and `src/features/records/`: Lessons, progress, history, and statistics.
