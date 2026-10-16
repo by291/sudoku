@@ -1,5 +1,10 @@
+import {
+  applySessionAction,
+  completeSession,
+  createSession,
+} from '../../../../tests/support/semantics'
 import { expect, it } from 'vitest'
-import { applySessionAction, completeSession, createSession } from '@/features/game/model/session'
+
 import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { emptyBoard, solvedBoard } from '../../../../tests/fixtures/sudoku'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'

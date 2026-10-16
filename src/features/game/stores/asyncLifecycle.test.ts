@@ -1,3 +1,4 @@
+import { completeSession } from '../../../../tests/support/semantics'
 import { encodeSeed } from '@/sudoku/seed'
 import { expect, it, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -7,7 +8,7 @@ import GameView from '@/features/game/views/GameView.vue'
 import DailyView from '@/features/game/views/DailyView.vue'
 import { deferred } from '../../../../tests/support/deferred'
 import type { GameSession } from '@/features/game/model/session'
-import { completeSession } from '@/features/game/model/session'
+
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { useGameStore } from '@/features/game/stores/useGameStore'

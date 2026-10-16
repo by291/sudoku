@@ -1,3 +1,4 @@
+import { violationMessage } from '/src/features/game/model/violationPresentation.ts'
 // Test-only transport projection. Every mathematical operation runs in the emitted WASM.
 import { createBindings } from '/packages/sudoku-wasm/pkg/factory.js'
 
@@ -35,7 +36,13 @@ export function computeCase(suite, input, policies) {
         return {
           candidates: candidates.result,
           candidateWork: candidates.workUsed,
-          conflicts: conflicts.result,
+          conflicts: {
+            ...conflicts.result,
+            violations: conflicts.result.violations.map(({ code, ...facts }) => ({
+              ...facts,
+              message: violationMessage({ ...facts, code }),
+            })),
+          },
           workUsed: conflicts.workUsed,
         }
       } finally {

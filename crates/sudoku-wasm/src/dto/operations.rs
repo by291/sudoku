@@ -57,11 +57,20 @@ pub enum CandidateResultDto {
 }
 
 #[derive(Serialize, Tsify)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum ViolationCodeDto {
+    Duplicate,
+    CageTotal { index: u32, sum: u16 },
+    ThermoOrder { index: u32 },
+    ArrowTotal { index: u32 },
+}
+
+#[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct ViolationDto {
     pub constraint_id: String,
     pub cells: Vec<u32>,
-    pub message: String,
+    pub code: ViolationCodeDto,
 }
 
 #[derive(Serialize, Tsify)]

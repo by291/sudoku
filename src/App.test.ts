@@ -133,3 +133,34 @@ it('publishes_the_ready_runtime_to_the_pinia_application_context', async () => {
     host.remove()
   }
 })
+
+it('semantic_validation_awaits_ready_before_opening_transaction', async () => {
+  let resolveModule: (module: WebAssembly.Module) => void = () => {
+    throw new Error('Missing module resolver')
+  }
+  const pending = new Promise<WebAssembly.Module>((resolve) => {
+    resolveModule = resolve
+  })
+  vi.spyOn(moduleLoader, 'loadSudokuModule').mockReturnValue(pending)
+  const compose = vi
+    .spyOn(runtimeComposition, 'createGameRuntime')
+    .mockImplementation((engine) => ({ ...test.runtime, engine, dispose: () => engine.dispose() }))
+  const transactions = vi.spyOn(test.database, 'transaction')
+  const wrapper = mount(RootApp, {
+    props: { installRuntime() {} },
+    global: { plugins: [test.pinia, router] },
+  })
+
+  await flushPromises()
+
+  expect(compose).not.toHaveBeenCalled()
+  expect(transactions).not.toHaveBeenCalled()
+  expect(wrapper.text()).toContain('正在加载')
+  // Unmounting a pending bootstrap must release its late engine without touching storage.
+  wrapper.unmount()
+  resolveModule(getTestModule())
+  await flushPromises()
+
+  expect(compose).not.toHaveBeenCalled()
+  expect(transactions).not.toHaveBeenCalled()
+})

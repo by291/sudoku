@@ -105,6 +105,7 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
     ['src/features/game/model/fixture.ts', '@/core/sudoku/board'],
     ['src/features/game/model/fixture.ts', '@/sudoku/generationInput'],
     ['src/features/game/model/fixture.ts', '@/sudoku/seed'],
+    ['src/features/game/model/fixture.ts', '@/sudoku/ruleInput'],
     ['src/features/records/model/fixture.ts', '@/features/game/model/session'],
     ['src/runtime.ts', '@/features/game/model/session'],
     ['src/runtime.ts', '@/storage/ownership'],

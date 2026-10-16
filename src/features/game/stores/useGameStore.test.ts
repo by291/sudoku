@@ -1,7 +1,7 @@
 import { createTestEngine } from '../../../../tests/support/wasm'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { afterAll, expect, it } from 'vitest'
+import { afterAll, expect, it, vi } from 'vitest'
 import { gameRuntimeKey } from '@/runtime'
 import type { GameRuntime } from '@/runtime'
 import { useGameStore } from '@/features/game/stores/useGameStore'
@@ -244,4 +244,30 @@ it('reports deterministic generation exhaustion while keeping the old save and r
   expect(await test.database.count('sessions')).toBe(1)
   game.dispose()
   test.dispose()
+})
+
+it('reuses one prepared layout through moves and releases it when the session is dropped', async () => {
+  const prepare = vi.spyOn(engine, 'prepare')
+  const test = setup()
+  await test.store.restoreSession('fixture-free-session')
+  const layout = prepare.mock.results[0]?.value
+  if (!layout) {
+    throw new Error('Missing prepared layout')
+  }
+  const dispose = vi.spyOn(layout, 'dispose')
+  await test.store.resume()
+
+  test.store.dispatch({ kind: 'enter', cell: 2, digit: 4 })
+  test.store.dispatch({ kind: 'undo' })
+  test.store.dispatch({ kind: 'redo' })
+  expect(prepare).toHaveBeenCalledOnce()
+  expect(test.store.ruleMetadata?.units).toHaveLength(27)
+  expect(dispose).not.toHaveBeenCalled()
+
+  test.store.dropSession()
+  test.store.dispose()
+  test.store.dispose()
+
+  expect(dispose).toHaveBeenCalledOnce()
+  expect(test.store.ruleMetadata).toBeNull()
 })

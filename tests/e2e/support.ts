@@ -1,8 +1,9 @@
+import { parseSessionRecord } from '../support/semantics'
 import { seedForTest } from '../support/generation'
 import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { GameSession } from '@/features/game/model/session'
-import { parseSessionRecord } from '@/storage/records'
+
 import { makeSession } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
 import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'

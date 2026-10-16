@@ -1,8 +1,9 @@
+import { createGameRepository } from '../../tests/support/semantics'
 import 'fake-indexeddb/auto'
 import { afterEach, expect, it } from 'vitest'
 import { openSudokuDatabase } from '@/storage/database'
 import { createOwnershipCoordinator } from '@/storage/ownership'
-import { createGameRepository } from '@/storage/repository'
+
 import { makeSession } from '../../tests/support/gameFixtures'
 import { createSaveQueue } from '@/storage/saveQueue'
 

@@ -1,8 +1,13 @@
+import {
+  createGameRepository,
+  parseBackup,
+  applySessionAction,
+} from '../../tests/support/semantics'
 import 'fake-indexeddb/auto'
 import { afterEach, expect, it, vi } from 'vitest'
 import { deleteDB, unwrap } from 'idb'
-import { parseBackup, BACKUP_LIMITS } from '@/storage/backup'
-import { createGameRepository } from '@/storage/repository'
+import { BACKUP_LIMITS } from '@/storage/backup'
+
 import { openSudokuDatabase } from '@/storage/database'
 import { createOwnershipCoordinator } from '@/storage/ownership'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
@@ -10,7 +15,7 @@ import { makeSession, makeAssessment } from '../../tests/support/gameFixtures'
 import { CORPUS_COMBINATIONS } from '../../tests/fixtures/generationCorpus'
 import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../tests/fixtures/classicPuzzles'
-import { applySessionAction } from '@/features/game/model/session'
+
 import { createSaveQueue } from '@/storage/saveQueue'
 import { deferred } from '../../tests/support/deferred'
 

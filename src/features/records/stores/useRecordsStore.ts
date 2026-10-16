@@ -172,7 +172,13 @@ export const useRecordsStore = defineStore('records', () => {
     cancelRestore()
     backupError.value = null
     const current = ++backupOperation
-    const parsed = parseBackup(text)
+    let parsed
+    try {
+      parsed = parseBackup(text, runtime.engine)
+    } catch {
+      backupError.value = '备份校验暂时无法完成，请重试。本机数据没有改变。'
+      return
+    }
     if (!parsed.valid) {
       backupError.value = '备份文件无效、不兼容或超出限制，本机数据没有改变。'
       return

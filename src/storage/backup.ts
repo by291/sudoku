@@ -7,6 +7,7 @@ import type { ParseResult } from '@/core/sudoku/types'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import {
+  SnapshotValidationUnavailable,
   isIsoInstant,
   isNonnegativeInteger,
   parseLessonProgress,
@@ -14,7 +15,12 @@ import {
   parseSessionRecord,
   parseSettings,
 } from '@/storage/records'
-import type { LessonProgress, ResultRecord, SessionRecord } from '@/storage/records'
+import type {
+  SnapshotValidators,
+  LessonProgress,
+  ResultRecord,
+  SessionRecord,
+} from '@/storage/records'
 import type { Settings } from '@/features/settings/model/preferences'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 
@@ -116,7 +122,7 @@ function parseCollection<T>(
   return records
 }
 
-function validateBackup(value: unknown): LocalBackup {
+function validateBackup(value: unknown, validators: SnapshotValidators): LocalBackup {
   const issue = resourceIssues(value)
   if (issue) {
     throw new TypeError(issue)
@@ -133,10 +139,14 @@ function validateBackup(value: unknown): LocalBackup {
   }
   const sessions = parseCollection(
     value.sessions,
-    parseSessionRecord,
+    (value) => parseSessionRecord(value, validators),
     (record) => record.session.id,
   )
-  const results = parseCollection(value.results, parseResultRecord, (record) => record.session.id)
+  const results = parseCollection(
+    value.results,
+    (value) => parseResultRecord(value, validators),
+    (record) => record.session.id,
+  )
   const lessons = parseCollection(value.lessons, parseLessonProgress, (record) => record.lessonId)
   const activeSlots = new Set<string>()
   for (const { session } of sessions) {
@@ -183,13 +193,19 @@ function validateBackup(value: unknown): LocalBackup {
 }
 
 /** Validates the entire bounded file before returning any domain data; never writes storage. */
-export function parseBackup(text: string): ParseResult<LocalBackup> {
+export function parseBackup(
+  text: string,
+  validators: SnapshotValidators,
+): ParseResult<LocalBackup> {
   if (new TextEncoder().encode(text).byteLength > BACKUP_LIMITS.bytes) {
     return { valid: false, issues: ['Backup exceeds the 25 MiB file limit'] }
   }
   try {
-    return { valid: true, value: validateBackup(JSON.parse(text)) }
+    return { valid: true, value: validateBackup(JSON.parse(text), validators) }
   } catch (error) {
+    if (error instanceof SnapshotValidationUnavailable) {
+      throw error
+    }
     return { valid: false, issues: [error instanceof Error ? error.message : 'Invalid backup'] }
   }
 }
@@ -214,6 +230,7 @@ export function previewBackup(backup: LocalBackup): BackupPreview {
 export async function readBackupSnapshot(
   db: IDBPDatabase<SudokuDatabase>,
   exportedAt: string,
+  validators: SnapshotValidators,
 ): Promise<BackupExport> {
   const transaction = db.transaction(
     ['sessions', 'results', 'lessons', 'settings', 'quarantine'],
@@ -256,14 +273,17 @@ export async function readBackupSnapshot(
   if (!settings.valid) {
     excluded++
   }
-  const backup = validateBackup({
-    backupVersion: 1,
-    exportedAt,
-    sessions: validRecords(rawSessions, parseSessionRecord),
-    results: validRecords(rawResults, parseResultRecord),
-    lessons: validRecords(rawLessons, parseLessonProgress),
-    settings: settings.valid ? settings.value : DEFAULT_SETTINGS,
-  })
+  const backup = validateBackup(
+    {
+      backupVersion: 1,
+      exportedAt,
+      sessions: validRecords(rawSessions, (value) => parseSessionRecord(value, validators)),
+      results: validRecords(rawResults, (value) => parseResultRecord(value, validators)),
+      lessons: validRecords(rawLessons, parseLessonProgress),
+      settings: settings.valid ? settings.value : DEFAULT_SETTINGS,
+    },
+    validators,
+  )
   if (new TextEncoder().encode(JSON.stringify(backup)).byteLength > BACKUP_LIMITS.bytes) {
     throw new TypeError('Committed dataset exceeds backup limits')
   }

@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { violationMessage } from '@/features/game/model/violationPresentation'
 import { NAlert, NButton, NCard } from 'naive-ui'
 import { computed, ref, watch, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { RouterLink } from 'vue-router'
 import type { LogicalStep } from '@/core/sudoku/logic/types'
 import type { Difficulty, Digit } from '@/core/sudoku/types'
-import { compileRules } from '@/core/sudoku/rules/context'
 import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import { getVariantPresentation } from '@/features/game/model/variants'
 import type { SessionMetadata } from '@/features/game/model/session'
@@ -65,6 +65,7 @@ const {
   canRedo,
   activeVariant,
   conflictEvaluation,
+  ruleMetadata,
 } = storeToRefs(game)
 const entry = useGameEntry({
   metadata: () => props.metadata,
@@ -197,7 +198,7 @@ const highlightedCells = computed(() => [...new Set([...hintCells.value, ...chec
 const displayedConflicts = computed(() => (highlightConflicts.value ? conflicts.value : []))
 const relatedCells = computed(() =>
   session.value && selectedCell.value !== null
-    ? compileRules(session.value.puzzle.rules).relatedCells[selectedCell.value]
+    ? (ruleMetadata.value?.relatedCells[selectedCell.value] ?? [])
     : [],
 )
 const saveLabel = computed(
@@ -317,7 +318,7 @@ function erase() {
         class="rule-violations"
       >
         <li v-for="violation in conflictEvaluation.violations" :key="violation.constraintId">
-          {{ violation.message }}
+          {{ violationMessage(violation) }}
         </li>
       </ul>
       <NCard v-if="readOnly" class="feedback-message" size="small" role="status">

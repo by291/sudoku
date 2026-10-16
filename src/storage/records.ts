@@ -8,14 +8,40 @@ import type {
 import type { ParseResult } from '@/core/sudoku/types'
 import type { Board } from '@/core/sudoku/types'
 import { isRecord, ALL_DIGITS_MASK, BOARD_SIZE } from '@/core/sudoku/types'
-import { parsePuzzle } from '@/core/sudoku/puzzle'
+import { validatePuzzleSnapshot } from '@/sudoku/puzzleSnapshot'
+import type { MainSudokuEngine } from '@/sudoku/mainEngine'
 import type { Puzzle } from '@/core/sudoku/puzzle'
-import { CLASSIC_RULES, compileRules } from '@/core/sudoku/rules/context'
+import { CLASSIC_RULES } from '@/core/sudoku/rules/context'
 import { getDailyFormalId } from '@/features/game/model/daily'
-import { parseBoard, isComplete } from '@/core/sudoku/board'
+import { isBoard } from '@/sudoku/guards'
 import type { Settings } from '@/features/settings/model/preferences'
 import { isLessonId, lessonStageCount } from '@/features/learning/model/lessonIds'
-import { decodePuzzleAssessment } from '@/core/sudoku/rating/decoding'
+
+/** Ready, synchronous validators only: decoding must never await inside an IDB transaction. */
+export type SnapshotValidators = Pick<MainSudokuEngine, 'validatePuzzle' | 'validateAssessment'>
+
+/** Inconclusive computation is a service failure, never evidence of corrupt player data. */
+export class SnapshotValidationUnavailable extends Error {}
+
+function validateSnapshot<T>(operation: () => T): T {
+  try {
+    return operation()
+  } catch (error) {
+    throw new SnapshotValidationUnavailable(
+      error instanceof Error ? error.message : 'Semantic validator unavailable',
+    )
+  }
+}
+
+function parsePuzzle(value: unknown, validators: SnapshotValidators): ParseResult<Puzzle> {
+  const result = validateSnapshot(() => validatePuzzleSnapshot(value, validators))
+  if (result.status === 'budget-exhausted') {
+    throw new SnapshotValidationUnavailable('Puzzle validation exhausted its work budget')
+  }
+  return result.status === 'valid'
+    ? { valid: true, value: result.value }
+    : { valid: false, issues: [...result.issues] }
+}
 
 export type SessionRecord = { formatVersion: 2; revision: number; session: GameSession }
 
@@ -85,9 +111,9 @@ function parseLayers(value: unknown, givens: Board): BoardLayers | null {
     return null
   }
 
-  const entries = parseBoard(value.entries)
+  const entries = value.entries
   if (
-    !entries.valid ||
+    !isBoard(entries) ||
     !Array.isArray(value.notes) ||
     value.notes.length !== BOARD_SIZE ||
     !value.notes.every((mask: unknown) => isNonnegativeInteger(mask) && mask <= ALL_DIGITS_MASK)
@@ -105,15 +131,15 @@ function parseLayers(value: unknown, givens: Board): BoardLayers | null {
     notes.push(raw)
   }
 
-  if (entries.value.some((digit, cell) => givens[cell] !== 0 && digit !== 0)) {
+  if (entries.some((digit, cell) => givens[cell] !== 0 && digit !== 0)) {
     return null
   }
 
-  if (notes.some((mask, cell) => mask !== 0 && (givens[cell] !== 0 || entries.value[cell] !== 0))) {
+  if (notes.some((mask, cell) => mask !== 0 && (givens[cell] !== 0 || entries[cell] !== 0))) {
     return null
   }
 
-  return { entries: entries.value, notes }
+  return { entries: [...entries], notes }
 }
 
 function sameLayers(first: BoardLayers, second: BoardLayers): boolean {
@@ -170,7 +196,10 @@ function parseAssistance(value: unknown): Assistance | null {
   }
 }
 
-export function parseSession(value: unknown): ParseResult<GameSession> {
+export function parseSession(
+  value: unknown,
+  validators: SnapshotValidators,
+): ParseResult<GameSession> {
   const invalid = (message: string): ParseResult<GameSession> => ({
     valid: false,
     issues: [message],
@@ -184,7 +213,7 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
     return invalid('Invalid session identity or duration')
   }
 
-  const puzzle = parsePuzzle(value.puzzle)
+  const puzzle = parsePuzzle(value.puzzle, validators)
   const metadata = parseMetadata(value.metadata)
   const assistance = parseAssistance(value.assistance)
   if (!puzzle.valid || !metadata || metadata.kind !== value.mode || !assistance) {
@@ -239,7 +268,18 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
     const board = puzzle.value.givens.map((given, cell) =>
       given === 0 ? layers.entries[cell] : given,
     )
-    if (!isComplete(board, compileRules(puzzle.value.rules))) {
+    const solved = validateSnapshot(() =>
+      validators.validatePuzzle({
+        givens: [...puzzle.value.givens],
+        solution: board,
+        rules: puzzle.value.rules,
+        difficulty: puzzle.value.difficulty,
+      }),
+    )
+    if (solved.status === 'budget-exhausted') {
+      throw new SnapshotValidationUnavailable('Completion validation exhausted its work budget')
+    }
+    if (solved.status !== 'valid') {
       return invalid('Completed session is not solved')
     }
 
@@ -250,10 +290,14 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
   }
 
   // Optional assessment corruption must not quarantine an independently valid game.
-  const assessment = decodePuzzleAssessment(value.assessment, {
-    variant: puzzle.value.rules.kind,
-    difficulty: puzzle.value.difficulty,
-  })
+  const decoded = validateSnapshot(() =>
+    validators.validateAssessment({
+      present: value.assessment !== undefined,
+      value: value.assessment ?? null,
+      identity: { variant: puzzle.value.rules.kind, difficulty: puzzle.value.difficulty },
+    }),
+  )
+  const assessment = decoded.status === 'absent' ? undefined : decoded.value
 
   return {
     valid: true,
@@ -274,12 +318,12 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
   }
 }
 
-function parseLegacyPuzzle(value: unknown): ParseResult<Puzzle> {
+function parseLegacyPuzzle(value: unknown, validators: SnapshotValidators): ParseResult<Puzzle> {
   if (!isRecord(value)) {
     return { valid: false, issues: ['Invalid legacy puzzle'] }
   }
 
-  const parsed = parsePuzzle({ ...value, rules: value.rules ?? CLASSIC_RULES })
+  const parsed = parsePuzzle({ ...value, rules: value.rules ?? CLASSIC_RULES }, validators)
   if (parsed.valid && parsed.value.rules.kind !== 'classic') {
     return { valid: false, issues: ['Legacy records only support Classic Sudoku'] }
   }
@@ -287,17 +331,23 @@ function parseLegacyPuzzle(value: unknown): ParseResult<Puzzle> {
   return parsed
 }
 
-function parseLegacySession(value: unknown): ParseResult<GameSession> {
+function parseLegacySession(
+  value: unknown,
+  validators: SnapshotValidators,
+): ParseResult<GameSession> {
   if (!isRecord(value)) {
     return { valid: false, issues: ['Invalid legacy session'] }
   }
 
-  const puzzle = parseLegacyPuzzle(value.puzzle)
+  const puzzle = parseLegacyPuzzle(value.puzzle, validators)
 
-  return puzzle.valid ? parseSession({ ...value, puzzle: puzzle.value }) : puzzle
+  return puzzle.valid ? parseSession({ ...value, puzzle: puzzle.value }, validators) : puzzle
 }
 
-export function parseSessionRecord(value: unknown): ParseResult<SessionRecord> {
+export function parseSessionRecord(
+  value: unknown,
+  validators: SnapshotValidators,
+): ParseResult<SessionRecord> {
   if (
     !isRecord(value) ||
     (value.formatVersion !== 1 && value.formatVersion !== 2) ||
@@ -307,20 +357,27 @@ export function parseSessionRecord(value: unknown): ParseResult<SessionRecord> {
   }
 
   const session =
-    value.formatVersion === 1 ? parseLegacySession(value.session) : parseSession(value.session)
+    value.formatVersion === 1
+      ? parseLegacySession(value.session, validators)
+      : parseSession(value.session, validators)
 
   return session.valid
     ? { valid: true, value: { formatVersion: 2, revision: value.revision, session: session.value } }
     : session
 }
 
-export function parseResultRecord(value: unknown): ParseResult<ResultRecord> {
+export function parseResultRecord(
+  value: unknown,
+  validators: SnapshotValidators,
+): ParseResult<ResultRecord> {
   if (!isRecord(value) || (value.formatVersion !== 1 && value.formatVersion !== 2)) {
     return { valid: false, issues: ['Unsupported result format'] }
   }
 
   const session =
-    value.formatVersion === 1 ? parseLegacySession(value.session) : parseSession(value.session)
+    value.formatVersion === 1
+      ? parseLegacySession(value.session, validators)
+      : parseSession(value.session, validators)
   if (!session.valid) {
     return session
   }

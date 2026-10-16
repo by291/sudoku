@@ -1,12 +1,12 @@
-import { expect, it } from 'vitest'
 import {
   parseSessionRecord,
   parseResultRecord,
-  parseSettings,
-  parseLessonProgress,
-} from '@/storage/records'
+  applySessionAction,
+} from '../../tests/support/semantics'
+import { expect, it } from 'vitest'
+import { parseSettings, parseLessonProgress } from '@/storage/records'
 import { makeAssessment, makeSession } from '../../tests/support/gameFixtures'
-import { applySessionAction } from '@/features/game/model/session'
+
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 
 const fixture = { formatVersion: 2, revision: 0, session: makeSession() }
@@ -177,4 +177,38 @@ it('validates settings and lesson records independently', () => {
     parseLessonProgress({ lessonId: 'rules', completedAt: '2026-10-11T01:05:00.000Z' }).valid,
   ).toBe(true)
   expect(parseLessonProgress({ lessonId: '', completedAt: 'yesterday' }).valid).toBe(false)
+})
+
+it.each(['old-ascii', '旧的种子🌱', '\ud800', '\udfff'])(
+  'preserves historical text identities without decoding: %j',
+  (seed) => {
+    const session = makeSession()
+    session.puzzle = { ...session.puzzle, seed, puzzleVersion: `historical-${seed}` }
+
+    const decoded = parseSessionRecord({ formatVersion: 2, revision: 3, session })
+
+    expect(decoded).toEqual({ valid: true, value: { formatVersion: 2, revision: 3, session } })
+  },
+)
+
+it.each(['00', 'A'.repeat(64), ` ${'a'.repeat(64)}`, 'g'.repeat(64)])(
+  'rejects malformed v11 seed metadata: %j',
+  (seed) => {
+    const session = makeSession()
+    session.puzzle = { ...session.puzzle, seed, puzzleVersion: 'sudoku-v11' }
+
+    expect(parseSessionRecord({ formatVersion: 2, revision: 1, session }).valid).toBe(false)
+  },
+)
+
+it('owns decoded board layers independently of the untrusted snapshot', () => {
+  const session = makeSession()
+  const parsed = parseSessionRecord({ formatVersion: 2, revision: 1, session })
+  if (!parsed.valid) {
+    throw new Error(parsed.issues.join('; '))
+  }
+
+  expect(parsed.value.session.entries).not.toBe(session.entries)
+  expect(parsed.value.session.notes).not.toBe(session.notes)
+  expect(parsed.value.session.puzzle.givens).not.toBe(session.puzzle.givens)
 })

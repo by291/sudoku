@@ -1,16 +1,20 @@
 import { createSessionPersistence } from '@/features/game/stores/sessionPersistence'
 import { createSessionTransitions } from '@/features/game/stores/sessionTransitions'
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef, watch, onScopeDispose } from 'vue'
 import { defineStore } from 'pinia'
 import { useGameRuntime } from '@/runtime'
 import { restartDailySession } from '@/features/game/model/daily'
 import type { HintResult } from '@/core/sudoku/hint'
 import { isCellIndex } from '@/core/sudoku/types'
-import { compileRules } from '@/core/sudoku/rules/context'
-import { evaluateConflicts } from '@/core/sudoku/constraints/conflicts'
-import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
+import type { PreparedPuzzle } from '@/sudoku/mainEngine'
+import type { RuleMetadata, ConflictWorkDto } from '@/sudoku/contracts'
 import type { GameAction, GameSession, SessionPhase } from '@/features/game/model/session'
-import { applySessionAction, completeSession, sessionBoard } from '@/features/game/model/session'
+import {
+  applySessionAction,
+  commitBoardEdit,
+  completeSession,
+  sessionBoard,
+} from '@/features/game/model/session'
 import { pauseClock, readElapsed, resumeClock } from '@/features/game/model/timer'
 import type { RunClock } from '@/features/game/model/timer'
 import type { OwnershipToken } from '@/storage/ownership'
@@ -67,14 +71,25 @@ export const useGameStore = defineStore('game', () => {
 
   const board = computed(() => (session.value ? sessionBoard(session.value) : Array(81).fill(0)))
   const activeVariant = computed(() => session.value?.puzzle.rules.kind ?? 'classic')
-  const conflictEvaluation = computed(() =>
-    session.value
-      ? evaluateConflicts(
-          board.value,
-          compileRules(session.value.puzzle.rules),
-          createWorkBudget(DEFAULT_WORK_LIMIT),
-        )
-      : { status: 'complete' as const, violations: [] },
+  const prepared = shallowRef<PreparedPuzzle | null>(null)
+  const ruleMetadata = shallowRef<RuleMetadata | null>(null)
+  const stopPreparing = watch(
+    () => session.value?.puzzle,
+    (puzzle) => {
+      prepared.value?.dispose()
+      prepared.value = null
+      ruleMetadata.value = null
+      if (puzzle) {
+        prepared.value = runtime.engine.prepare(puzzle.rules)
+        ruleMetadata.value = prepared.value.metadata()
+      }
+    },
+    { flush: 'sync' },
+  )
+  const conflictEvaluation = computed<ConflictWorkDto['result']>(() =>
+    prepared.value
+      ? prepared.value.conflicts({ board: [...board.value] }).result
+      : { status: 'complete', violations: [] },
   )
   const conflicts = computed(() => [
     ...new Set(conflictEvaluation.value.violations.flatMap((violation) => violation.cells)),
@@ -178,7 +193,27 @@ export const useGameStore = defineStore('game', () => {
     }
 
     settle()
-    const outcome = applySessionAction(session.value, action)
+    const layout = prepared.value
+    if (!layout) {
+      error.value = '数独计算尚未就绪，请重新打开本局。'
+      return
+    }
+    const outcome =
+      action.kind === 'enter' ||
+      action.kind === 'erase' ||
+      action.kind === 'toggle-note' ||
+      action.kind === 'generate-notes'
+        ? commitBoardEdit(
+            session.value,
+            layout.edit({
+              givens: [...session.value.puzzle.givens],
+              entries: [...session.value.entries],
+              notes: [...session.value.notes],
+              action,
+            }).result,
+            action,
+          )
+        : applySessionAction(session.value, action)
     if (outcome.status === 'budget-exhausted') {
       error.value = '候选计算超出预算，原有笔记已保留。请减少空格后重试。'
 
@@ -205,13 +240,14 @@ export const useGameStore = defineStore('game', () => {
       )
     }
 
-    if (outcome.boardComplete) {
+    if (layout.isComplete(board.value)) {
       clock.value = pauseClock(clock.value, runtime.monotonicNow())
       tick()
       session.value = completeSession(
         session.value,
         runtime.wallNow().toISOString(),
         elapsedMs.value,
+        true,
       )
       phase.value = 'completed'
       cancelOperation()
@@ -354,12 +390,24 @@ export const useGameStore = defineStore('game', () => {
     }
   })
 
+  let disposed = false
   function dispose() {
+    if (disposed) {
+      return
+    }
+    disposed = true
+    stopPreparing()
+    prepared.value?.dispose()
+    prepared.value = null
+    ruleMetadata.value = null
     unsubscribe()
     void leaveGame()
   }
 
+  onScopeDispose(dispose)
+
   return {
+    ruleMetadata,
     session,
     phase,
     selectedCell,

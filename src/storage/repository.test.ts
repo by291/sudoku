@@ -1,8 +1,9 @@
+import { createGameRepository } from '../../tests/support/semantics'
 import 'fake-indexeddb/auto'
 import { afterEach, expect, it, vi } from 'vitest'
 import { deleteDB, unwrap } from 'idb'
 import { openSudokuDatabase } from '@/storage/database'
-import { createGameRepository } from '@/storage/repository'
+
 import { makeAssessment, makeSession } from '../../tests/support/gameFixtures'
 import { deferred } from '../../tests/support/deferred'
 import { createOwnershipCoordinator } from '@/storage/ownership'
@@ -344,5 +345,29 @@ it('upgrades a legacy completed save on write and quarantines unsupported bytes 
     expect(await database.count('results')).toBe(1)
   } finally {
     owner.dispose()
+  }
+})
+
+it('keeps saved records when synchronous semantic validation exhausts its budget', async () => {
+  const { database } = await setup()
+  const record = { formatVersion: 2, revision: 7, session: makeSession() }
+  await database.put('sessions', record)
+  const { createTestEngine } = await import('../../tests/support/wasm')
+  const engine = await createTestEngine()
+  const { createGameRepository: createRepository } = await import('@/storage/repository')
+  const repository = createRepository(() => Promise.resolve(database), {
+    ...engine,
+    validatePuzzle: () => ({ status: 'budget-exhausted' }),
+  })
+
+  try {
+    expect(await repository.listSessions()).toMatchObject({
+      ok: false,
+      error: { kind: 'unavailable' },
+    })
+    expect(await database.get('sessions', record.session.id)).toEqual(record)
+    expect(await database.count('quarantine')).toBe(0)
+  } finally {
+    engine.dispose()
   }
 })

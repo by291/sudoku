@@ -13,10 +13,12 @@ import {
   parseSettings,
   parseSession,
   isNonnegativeInteger,
+  SnapshotValidationUnavailable,
 } from '@/storage/records'
 import type { Settings } from '@/features/settings/model/preferences'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { parseBackup, readBackupSnapshot, replaceBackupSnapshot } from '@/storage/backup'
+import type { SnapshotValidators } from '@/storage/records'
 import type { BackupExport } from '@/storage/backup'
 
 export interface GameRepository {
@@ -50,16 +52,6 @@ export interface GameRepository {
 }
 
 export type { DatabaseProvider } from '@/storage/database'
-
-function isMatchingPrevious(raw: unknown, previous: { id: string; revision: number }): boolean {
-  const parsed = parseSessionRecord(raw)
-
-  return (
-    parsed.valid &&
-    parsed.value.session.id === previous.id &&
-    parsed.value.revision === previous.revision
-  )
-}
 
 function assertActive(signal?: AbortSignal) {
   if (signal?.aborted) {
@@ -97,8 +89,19 @@ export function storageError(
 
 export function createGameRepository(
   database: DatabaseProvider,
+  validators: SnapshotValidators,
   options: { now?: () => number; onReset?: () => void } = {},
 ): GameRepository {
+  function isMatchingPrevious(raw: unknown, previous: { id: string; revision: number }): boolean {
+    const parsed = parseSessionRecord(raw, validators)
+
+    return (
+      parsed.valid &&
+      parsed.value.session.id === previous.id &&
+      parsed.value.revision === previous.revision
+    )
+  }
+
   async function access<T>(
     operation: (db: IDBPDatabase<SudokuDatabase>) => Promise<T>,
     write = false,
@@ -116,7 +119,9 @@ export function createGameRepository(
         return { ok: false, error: { kind: error.kind, message: error.message } }
       }
 
-      return storageError(error, write ? 'write-failed' : 'unavailable')
+      const unavailable = error instanceof SnapshotValidationUnavailable || !write
+
+      return storageError(error, unavailable ? 'unavailable' : 'write-failed')
     }
   }
 
@@ -155,9 +160,14 @@ export function createGameRepository(
   }
 
   return {
-    exportBackup: (exportedAt) => access((db) => readBackupSnapshot(db, exportedAt)),
+    exportBackup: (exportedAt) => access((db) => readBackupSnapshot(db, exportedAt, validators)),
     restoreBackup: async (text, expectedEpoch) => {
-      const parsed = parseBackup(text)
+      let parsed
+      try {
+        parsed = parseBackup(text, validators)
+      } catch (error) {
+        return storageError(error, 'unavailable')
+      }
       if (!parsed.valid) {
         return storageError(new TypeError(parsed.issues.join('; ')), 'write-failed')
       }
@@ -172,7 +182,7 @@ export function createGameRepository(
     },
     writeSession: (session, expectedRevision, token, signal) =>
       access(async (db) => {
-        const parsed = parseSession(session)
+        const parsed = parseSession(session, validators)
         if (!parsed.valid || token.sessionId !== session.id) {
           throw new TypeError('Invalid session snapshot')
         }
@@ -183,7 +193,7 @@ export function createGameRepository(
           assertActive(signal)
           await assertOwnership(transaction, token, (options.now ?? Date.now)())
           const raw = await transaction.objectStore('sessions').get(session.id)
-          const current = raw === undefined ? null : parseSessionRecord(raw)
+          const current = raw === undefined ? null : parseSessionRecord(raw, validators)
           if (
             (raw !== undefined &&
               (!current?.valid || current.value.revision !== expectedRevision)) ||
@@ -206,7 +216,7 @@ export function createGameRepository(
               await results.put({ formatVersion: 2, session: parsed.value })
             } else {
               // Upgrade the original result rather than replacing its first completion facts.
-              const original = parseResultRecord(existing)
+              const original = parseResultRecord(existing, validators)
               if (original.valid) {
                 await results.put(original.value)
               }
@@ -220,7 +230,7 @@ export function createGameRepository(
       }, true),
     replaceActiveSession: (session, token, previous, signal) =>
       access(async (db) => {
-        const parsed = parseSession(session)
+        const parsed = parseSession(session, validators)
         if (!parsed.valid || token.sessionId !== session.id || session.mode === 'daily') {
           throw new TypeError('Invalid replacement')
         }
@@ -235,7 +245,7 @@ export function createGameRepository(
             .index('by-mode')
             .getAll(session.mode)
           const slot = records.filter((raw) => {
-            const current = parseSessionRecord(raw)
+            const current = parseSessionRecord(raw, validators)
             if (!current.valid) {
               throw new StorageConflict(
                 'revision-conflict',
@@ -256,7 +266,7 @@ export function createGameRepository(
           if (previous) {
             await assertOwnership(transaction, previous.token, (options.now ?? Date.now)())
             const raw = await transaction.objectStore('sessions').get(previous.id)
-            const previousRecord = parseSessionRecord(raw)
+            const previousRecord = parseSessionRecord(raw, validators)
             if (
               !isMatchingPrevious(raw, previous) ||
               !previousRecord.valid ||
@@ -310,9 +320,9 @@ export function createGameRepository(
 
       return result
     },
-    listSessions: () => list('sessions', parseSessionRecord),
+    listSessions: () => list('sessions', (value) => parseSessionRecord(value, validators)),
     countQuarantined: () => access((db) => db.count('quarantine')),
-    listResults: () => list('results', parseResultRecord),
+    listResults: () => list('results', (value) => parseResultRecord(value, validators)),
     readLessonProgress: () => list('lessons', parseLessonProgress),
     readDatasetEpoch: () =>
       access(async (db) => {

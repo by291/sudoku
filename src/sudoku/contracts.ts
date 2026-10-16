@@ -27,6 +27,7 @@ export type {
   EditInputDto,
   CandidateWorkDto,
   ConflictWorkDto,
+  ViolationDto as RuleViolation,
   EditWorkDto,
   SearchWorkDto,
 } from '@sudoku/wasm'

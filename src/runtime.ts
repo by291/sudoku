@@ -65,7 +65,9 @@ export function createGameRuntime(
     return opening
   }
   const ownership = createOwnershipCoordinator(provider)
-  const repository = createGameRepository(provider, { onReset: () => ownership.notifyReset() })
+  const repository = createGameRepository(provider, engine, {
+    onReset: () => ownership.notifyReset(),
+  })
   const worker = createSudokuWorkerClient(module, engine)
 
   return {

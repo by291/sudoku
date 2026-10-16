@@ -1,3 +1,4 @@
+import { validatePuzzleSnapshot } from '@/sudoku/puzzleSnapshot'
 import { copyGenerationInput } from '@/sudoku/generationInput'
 import { shallowRef } from 'vue'
 import type { Ref } from 'vue'
@@ -423,12 +424,26 @@ export function createSessionTransitions(
       error.value = '本机数据已被替换，请重新选择游戏。'
       return { status: 'cancelled' }
     }
+    const validated = validatePuzzleSnapshot(puzzle, runtime.engine)
+    if (validated.status !== 'valid') {
+      phase.value = session.value ? 'paused' : 'failed'
+      error.value =
+        validated.status === 'budget-exhausted'
+          ? '题目校验暂时无法完成，请重试。'
+          : '题目数据无效，请重新选择。'
+      return { status: 'blocked', reason: 'load' }
+    }
+    const assessment = runtime.engine.validateAssessment({
+      present: options.assessment !== undefined,
+      value: options.assessment ?? null,
+      identity: { variant: validated.value.rules.kind, difficulty: validated.value.difficulty },
+    })
     const next = createSession(
-      puzzle,
+      validated.value,
       metadata,
       id,
       runtime.wallNow().toISOString(),
-      options.assessment,
+      assessment.status === 'present' ? assessment.value : undefined,
     )
     if (datasetEpoch === null) {
       if (fence.ok) {

@@ -1,3 +1,4 @@
+import { applySessionAction } from '../support/semantics'
 import { readFile } from 'node:fs/promises'
 import {
   test,
@@ -9,7 +10,7 @@ import {
   enterExerciseDigit,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
-import { applySessionAction } from '@/features/game/model/session'
+
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'

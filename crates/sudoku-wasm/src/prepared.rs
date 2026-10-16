@@ -1,14 +1,17 @@
-use crate::conversion::rating::violation_message;
 use crate::conversion::rules::metadata_to_dto;
-use crate::conversion::values::{DEFAULT_QUERY_WORK, budget, counter, indices};
+use crate::conversion::values::{
+    DEFAULT_QUERY_WORK, budget, counter, index as index_to_dto, indices,
+};
 use crate::dto::operations::{
     BoardQueryDto, CandidateResultDto, ConflictResultDto, EditInputDto, EditResultDto,
-    PreparedCountInputDto, SearchResultDto, ViolationDto, WorkResultDto,
+    PreparedCountInputDto, SearchResultDto, ViolationCodeDto, ViolationDto, WorkResultDto,
 };
 use crate::dto::rules::{MetadataDto, PrepareInputDto};
 use crate::dto::values::BoardDto;
 use crate::js_error;
-use sudoku_core::constraints::types::{ConflictStatus, PreparedComputation, RuleViolation};
+use sudoku_core::constraints::types::{
+    ConflictStatus, PreparedComputation, RuleViolation, ViolationCode,
+};
 use sudoku_core::editing::{BoardEdit, BoardLayers, EditOutcome};
 use sudoku_core::search::types::SearchResult;
 use sudoku_core::types::{
@@ -44,11 +47,23 @@ fn violations_to_dto(violations: Vec<RuleViolation>) -> CoreResult<Vec<Violation
     violations
         .into_iter()
         .map(|violation| {
-            let message = violation_message(&violation);
+            let code = match violation.code {
+                ViolationCode::Duplicate => ViolationCodeDto::Duplicate,
+                ViolationCode::CageTotal { index, sum } => ViolationCodeDto::CageTotal {
+                    index: index_to_dto(index)?,
+                    sum,
+                },
+                ViolationCode::ThermoOrder { index } => ViolationCodeDto::ThermoOrder {
+                    index: index_to_dto(index)?,
+                },
+                ViolationCode::ArrowTotal { index } => ViolationCodeDto::ArrowTotal {
+                    index: index_to_dto(index)?,
+                },
+            };
             Ok(ViolationDto {
                 constraint_id: violation.constraint_id,
                 cells: indices(violation.cells)?,
-                message,
+                code,
             })
         })
         .collect()

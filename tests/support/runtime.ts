@@ -13,8 +13,8 @@ export async function createTestRuntime() {
   const database = await openSudokuDatabase(crypto.randomUUID())
   const provider = () => Promise.resolve(database)
   const ownership = createOwnershipCoordinator(provider, { channel: null })
-  const repository = createGameRepository(provider)
   const engine = await createTestEngine()
+  const repository = createGameRepository(provider, engine)
   const runtime: GameRuntime = {
     ready: true,
     engine,
