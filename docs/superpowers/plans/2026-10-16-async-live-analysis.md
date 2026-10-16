@@ -43,7 +43,7 @@ Approved behavior: the user selected the focused Worker option on 2026-10-16 and
 
 **Owners:** release harness, migration verification report, architecture/contributor/CI documents.
 
-- [ ] Retain raw heavy-kernel timings as evidence. Measure actual main-thread preview/post/commit blocking for Worker-dispatched operations and verify full Worker computation keeps the original budget/result.
-- [ ] Require p95 below 16.67 ms and no representative synchronous operation above 50 ms, with independent stale-result and notes-atomicity tests.
-- [ ] Resume original Task 15: full native/browser contracts, 171 kernels, all 2,241 generation outputs, 19 combinations, budgets/deadlines, startup/memory and one fresh whole-change review. Do not call an unavailable browser passed or claim full release coverage without it.
-- [ ] Update the original plan/report with the discovered failure, approved correction and final evidence. No push/PR/publication without user authorization.
+- [x] Retain raw heavy-kernel timings as evidence. Measure actual main-thread preview/post/commit blocking for Worker-dispatched operations and verify full Worker computation keeps the original budget/result.
+- [x] Require p95 below 16.67 ms and no representative synchronous operation above 50 ms, with independent stale-result and notes-atomicity tests.
+- [x] Resume original Task 15: full native/browser contracts, 171 kernels, all 2,241 generation outputs, 19 combinations, budgets/deadlines, startup/memory and one fresh whole-change review. Do not call an unavailable browser passed or claim full release coverage without it.
+- [x] Update the original plan/report with the discovered failure, approved correction and final evidence. No push/PR/publication without user authorization.

@@ -62,8 +62,17 @@ export default [
   },
   // Reference snapshots remain byte exact; executable migration tools use Node globals.
   {
-    files: ['tests/migration/**/*.mjs', 'tests/reference/*.mjs', 'scripts/**/*.mjs'],
+    files: [
+      'tests/migration/**/*.mjs',
+      'tests/reference/*.mjs',
+      'scripts/**/*.mjs',
+      'benchmarks/**/*.mjs',
+    ],
     languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['benchmarks/sudoku-core/browser.mjs', 'benchmarks/sudoku-core/contracts.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   js.configs.recommended,
   ...ts.configs.recommended,

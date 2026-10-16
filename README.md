@@ -1,6 +1,6 @@
 # Sudoku · 一格一念
 
-A browser-local Sudoku game with a Chinese interface, built with Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB (`idb`), and native CSS. Repository documentation and code identifiers are in English.
+A browser-local Sudoku game with a Chinese interface, built with a reusable Rust Sudoku core, wasm-bindgen, Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB (`idb`), and native CSS. Repository documentation and code identifiers are in English.
 
 The product remains browser-local and statically hosted. Accounts, cloud and cross-device synchronization, friends, global leaderboards, and PWA/offline installation are outside the product scope.
 
@@ -27,19 +27,20 @@ Open the Local URL printed by Vite. No server account, API keys, or backend serv
 
 ## Commands
 
-| Command                             | Purpose                                                           |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| `pnpm wasm:build`                   | Build pinned Rust/WASM and generated TypeScript contracts         |
-| `pnpm dev`                          | Start the development server on loopback                          |
-| `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types   |
-| `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries         |
-| `pnpm format:check` / `pnpm format` | Check or apply formatting                                         |
-| `pnpm test:unit`                    | Run domain, store, component, and storage tests                   |
-| `pnpm build`                        | Create the production `dist/` directory                           |
-| `pnpm build:subpath`                | Create the `/sudoku/` verification build in `dist-subpath/`       |
-| `pnpm preview`                      | Serve the production build locally                                |
-| `pnpm test:e2e`                     | Test the production build in Chromium, Firefox, and mobile WebKit |
-| `pnpm check`                        | Run all type, lint, formatting, unit, build, and browser checks   |
+| Command                             | Purpose                                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `pnpm bench:core`                   | Audit retained kernels, complete v11 generation, emitted Workers, startup/memory and interactive tails |
+| `pnpm wasm:build`                   | Build pinned Rust/WASM and generated TypeScript contracts                                              |
+| `pnpm dev`                          | Start the development server on loopback                                                               |
+| `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types                                        |
+| `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries                                              |
+| `pnpm format:check` / `pnpm format` | Check or apply formatting                                                                              |
+| `pnpm test:unit`                    | Run domain, store, component, and storage tests                                                        |
+| `pnpm build`                        | Create the production `dist/` directory                                                                |
+| `pnpm build:subpath`                | Create the `/sudoku/` verification build in `dist-subpath/`                                            |
+| `pnpm preview`                      | Serve the production build locally                                                                     |
+| `pnpm test:e2e`                     | Test the production build in Chromium, Firefox, and mobile WebKit                                      |
+| `pnpm check`                        | Run all type, lint, formatting, unit, build, and browser checks                                        |
 
 Build before running `test:e2e` directly. Playwright starts preview servers on ports 4173 and 4174; its second server builds and tests `/sudoku/` deployment in `dist-subpath/`. Test output, traces, and screenshots are ignored by Git. Tests use isolated browser contexts, fixture records for lengthy completion scenarios, and real production workers for generation and hints.
 
@@ -61,9 +62,19 @@ Set the variable in the same terminal for installation and subsequent test comma
 
 [Dependabot](.github/dependabot.yml) checks pnpm/npm packages and GitHub Actions every Monday at 09:00 Asia/Shanghai. Minor and patch version updates are grouped per ecosystem; major updates remain separate. Updates use pull requests and the same CI checks. The current updater includes [pnpm 12 support](https://github.com/dependabot/dependabot-core/pull/16169), even though the published support table may lag behind its implementation. These configurations take effect after they reach the GitHub default branch.
 
+## Portable engine
+
+All Sudoku computation lives in [`crates/sudoku-core`](crates/sudoku-core/README.md); [`crates/sudoku-wasm`](crates/sudoku-wasm/README.md) is the separate typed browser adapter. The frontend loads WASM before stores/storage decoding, owns disposable prepared layouts, and delegates heavy jobs to isolated Workers. There is no shipped TypeScript solver or fallback engine. NAPI is not required for browser WASM; an optional future native Node adapter can reuse the same Rust crate.
+
+Generation requests use exactly 32 byte seeds, independent of UUID session IDs. New stored/share identities use strict lowercase 64-character hex with `sudoku-v11` / `sudoku-variants-v11`; rating remains `sudoku-rating-v2`. Daily roots derive from ASCII `daily:YYYY-MM-DD`. Existing daily attempts and historical saved boards/rules/progress/results remain authoritative; historical seed/version strings are never decoded or regenerated.
+
+Run `pnpm test:migration -- --suite all --engine native` for 5,742 complete comparisons, and the `wasm-chromium`, `wasm-firefox` or `wasm-webkit` adapters for 4,262 comparisons each. See [migration evidence](tests/migration/README.md) for sealed inputs, independent oracles and the test-only v11 recipe. Run `pnpm bench:core` on a controlled idle host after checks; it builds required artifacts before timing. `--smoke` is wiring diagnostics and cannot establish release acceptance. Reports retain every generation sample, full metrics and source/artifact/toolchain hashes, and mark unavailable browsers explicitly.
+
+The migration's verification status, focused asynchronous live analysis and interactive performance gate are recorded in the [release audit](docs/superpowers/verification/2026-10-16-rust-core-migration.md). Earlier benchmark reports remain historical prototype measurements.
+
 ## Internal assessment
 
-Production workers call the pure TypeScript assessor directly, using `sudoku-rating-v2` and default limits of 500 steps per policy and four million shared work units. No external rater or runtime service is required. Browser tests verify actual emitted workers against authored fixture grades, explicit unavailable outcomes, and request budgets at both deployment roots.
+Production Workers call the pure Rust assessor through the isolated WASM adapter, using `sudoku-rating-v2` and default limits of 500 steps per policy and four million shared work units. No external rater or runtime service is required. Browser tests verify actual emitted workers against authored fixture grades, explicit unavailable outcomes, and request budgets at both deployment roots.
 
 Generation defaults for all types and tiers are `{ maxLayouts: 40, maxWork: 4000000, maxSteps: 500 }`. Construction, uniqueness, assessment, and variant necessity share `maxWork`. Exhaustion returns an explicit failure without substituting an authored puzzle. Ready generation includes its accepted compact assessment, which Worker delivery reuses.
 
@@ -125,7 +136,8 @@ Serve that output at the matching path. Changing the host/origin creates a separ
 
 ## Architecture and development guidance
 
-- `src/core/sudoku/`: Framework-independent board rules, bounded search, deterministic generation, logical techniques, and hints.
+- `crates/sudoku-core/`: Portable rules, bounded search, byte-seeded generation, logic, rating, edits and validation.
+- `crates/sudoku-wasm/` and `src/sudoku/`: Typed WASM adaptation, readiness and owned browser resources.
 - `src/main.ts`, `src/runtime.ts`, `src/App.vue`, `src/layouts/`, `src/router/`, and `src/theme/`: Bootstrap, injected browser services, root providers, visual shell, hash routes, and theme synchronization.
 - `src/features/game/`: Game/daily views, session controls, composables, pure models, and Pinia orchestration.
 - `src/features/learning/` and `src/features/records/`: Lessons, progress, history, and statistics.

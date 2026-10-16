@@ -4,8 +4,8 @@ import { loadSudokuModule } from '@/sudoku/wasmModule'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 
-export async function profileLiveOperations() {
-  const engine = await createMainEngine(await loadSudokuModule())
+export async function profileLiveOperations(compiled?: WebAssembly.Module) {
+  const engine = await createMainEngine(compiled ?? (await loadSudokuModule()))
   const fixtures = [
     { givens: uniqueBoard, solution: solvedBoard, rules: { kind: 'classic' as const } },
     ...Object.values(VARIANT_FIXTURES),
@@ -58,6 +58,26 @@ export async function profileLiveOperations() {
           if (result.status !== 'complete') {
             throw new Error('Incomplete edit profile')
           }
+        })
+        const noGivens = Array<0>(81).fill(0)
+        const filledEntry: (0 | 1)[] = [...noGivens]
+        filledEntry[0] = 1
+        for (const action of [
+          { kind: 'enter', cell: 0, digit: 1 },
+          { kind: 'erase', cell: 0 },
+          { kind: 'toggle-note', cell: 0, digit: 1 },
+        ] as const) {
+          measure(variant, action.kind, () => {
+            prepared.edit({
+              givens: noGivens,
+              entries: action.kind === 'erase' ? filledEntry : noGivens,
+              notes: Array(81).fill(511),
+              action,
+            })
+          })
+        }
+        measure(variant, 'review-entries', () => {
+          prepared.reviewEntries(fixture.givens, fixture.solution)
         })
         measure(variant, 'validate-content', () => {
           const result = engine.validatePuzzle({ ...fixture, difficulty: 'easy' })

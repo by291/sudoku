@@ -7,7 +7,7 @@ These instructions apply to the entire repository.
 - Write repository documentation in English, including README files, design documents, implementation plans, and this file.
 - Use English for identifiers, code comments, docstrings, and test descriptions.
 - Write player-facing interface copy in Chinese, as specified in the product design.
-- The selected stack is Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI for common controls, Web Workers, IndexedDB with idb, and native CSS. Use pnpm, ESLint, Prettier, Vitest, and Playwright for tooling.
+- The selected stack uses a reusable synchronous Rust core, a separate wasm-bindgen adapter, Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI for common controls, Web Workers, IndexedDB with idb, and native CSS. Use pnpm, ESLint, Prettier, Vitest, and Playwright for tooling.
 - Read the applicable design document in `docs/superpowers/specs/` before changing product behavior.
 - Read [Web Architecture](docs/architecture.md) before moving modules or changing their dependencies.
 
@@ -85,7 +85,7 @@ Primary references:
 
 ### Variant extension contracts
 
-- Keep each variant's data shape explicit in the `PuzzleRules` discriminated union. Keep runtime validation of rules, generated puzzles, worker messages, and saved records.
+- Keep each variant's data shape explicit in the Rust rule enum and generated `PuzzleRules` discriminated union. Keep runtime validation of rules, generated puzzles, worker messages, and saved records.
 - Use typed, statically assembled definition maps for common dispatch. Validate map completeness with `satisfies` or an equivalent mapped type; keep exhaustive narrowing at dispatch boundaries instead of unchecked casts or fallthrough to an unrelated variant.
 - Keep pure engine definitions independent of presentation, Vue, storage, and workers. Player-facing names, rule text, and clue rendering belong to presentation definitions, with compile-time coverage of every supported variant.
 - Compile variant rules into the shared rule model where possible. Distinguish full nine-digit units, duplicate-exclusion peers, related-cell highlights, and arithmetic/path constraints; these concepts are not interchangeable.
@@ -136,8 +136,11 @@ Primary references:
 
 ## Sudoku core organization
 
-- Import value, rule, logical, rating and generation contracts from their explicit owner (`types.ts` or the subsystem's `types.ts`), rather than an operation module or re-export facade.
-- Keep rule definitions in `core/sudoku/rules/definitions/`, generation geometry in `generation/variants/`, arithmetic support in `constraints/`, exact counting in `search/`, human deductions in `logic/`, and assessment in `rating/`. Generation composes these owners; lower layers must not import it. Preserve enforced static and dynamic dependency boundaries.
-- Keep Chinese technique presentation in `features/game/model/techniquePresentation.ts`. Engine and Worker validators use the pure `logic/techniques.ts` catalogue and `isTechnique` guard.
-- Keep prepared immutable layout data separate from mutable board workspaces and owned returned evidence. Document borrowing, mutation, incomplete results and units where the signature alone cannot express their semantics. TypeScript `readonly` does not establish deep runtime immutability.
-- Core uses explicit type-only imports and prohibits non-null assertions. Keep related constants together and divide functions into meaningful stages with blank lines; do not treat automatic formatting as a substitute for logical grouping.
+- Keep reusable computation in `crates/sudoku-core`, typed browser conversion in `crates/sudoku-wasm`, and browser ownership/dispatch in `src/sudoku` and `src/worker`. Core must not depend on Vue, JS/WASM bindings, browser APIs, storage, clocks, OS entropy or an async runtime.
+- Import native contracts from their explicit owner (`types.rs` or subsystem `types.rs`); import frontend DTO contracts from `src/sudoku/contracts.ts`. Do not reintroduce a production TypeScript solver or a facade hiding dependency cycles.
+- Keep rule definitions under `rules/definitions/`, arithmetic support in `constraints/`, exact counting in `search/`, human deductions/evidence in `logic/`, assessment in `rating/` and geometry/frontier/scheduling in `generation/`. Lower layers must not import generation. Keep Chinese technique/violation presentation in game models.
+- Use checked board/digit/cell/mask values and forbid unsafe application code. Keep immutable prepared layout data separate from mutable workspaces and owned returned evidence. Document borrowing, mutation, incomplete outcomes and units. Read-only TypeScript types do not establish runtime ownership.
+- Seeds contain exactly 32 bytes. New metadata uses strict lowercase 64-character hex and v11 identities. Do not add legacy string-generator adapters. Preserve historical saved text in JS and send only mathematical content to Rust.
+- Preserve random-call order, work charges, failed/abandoned work, finite limits, exact-search restoration and rating-prefix semantics. Do not lower allowances to pass performance tests. Measure hard arithmetic and near-exhaustion cases before choosing synchronous UI dispatch.
+- Run rustfmt, native tests, native/all-targets and wasm32 Clippy with warnings denied; inspect the normal core dependency tree. Rebuild generated WASM before type checking or testing frontend consumers. Do not edit generated bindings.
+- The sealed TypeScript engine exists only under `tests/reference` as an independent oracle. Test callers use `@reference`; normal builds cannot resolve it. Never update expected outputs from Rust, and identify equality-based reuse of independent evidence explicitly.

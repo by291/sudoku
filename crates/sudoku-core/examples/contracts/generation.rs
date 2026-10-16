@@ -82,16 +82,18 @@ struct GenerationLimitsDto {
     max_steps: u32,
 }
 
-pub fn evaluate(input: GenerationInputDto) -> Result<Value, Box<dyn std::error::Error>> {
-    use sudoku_core::budget::WorkStage;
-    use sudoku_core::generation::generate::generate_puzzle;
-    use sudoku_core::generation::types::{
-        GenerationExhaustionCause, GenerationLimits, GenerationOutcome,
-    };
-    use sudoku_core::rating::assessment::{assess_puzzle, assess_puzzle_with_budget};
-    use sudoku_core::rating::input::create_assessment_input;
-    use sudoku_core::rating::types::AssessmentLimits;
+use sudoku_core::budget::WorkStage;
+use sudoku_core::generation::generate::generate_puzzle;
+use sudoku_core::generation::types::{
+    GenerationExhaustionCause, GenerationLimits, GenerationOutcome, GenerationResult,
+};
+use sudoku_core::rating::assessment::{assess_puzzle, assess_puzzle_with_budget};
+use sudoku_core::rating::input::create_assessment_input;
+use sudoku_core::rating::types::AssessmentLimits;
 
+pub fn decode(
+    input: GenerationInputDto,
+) -> Result<(GenerationInput, GenerationLimits), Box<dyn std::error::Error>> {
     let request = GenerationInput::from_version(
         variant(&input.variant).ok_or("Unknown fixture variant")?,
         Difficulty::ALL
@@ -108,7 +110,18 @@ pub fn evaluate(input: GenerationInputDto) -> Result<Value, Box<dyn std::error::
             max_work: limits.max_work,
             max_steps: limits.max_steps,
         });
-    let result = generate_puzzle(&request, &limits)?;
+    Ok((request, limits))
+}
+
+pub fn evaluate(input: GenerationInputDto) -> Result<Value, Box<dyn std::error::Error>> {
+    let (request, limits) = decode(input)?;
+    project(generate_puzzle(&request, &limits)?, true)
+}
+
+pub fn project(
+    result: GenerationResult,
+    include_standalone: bool,
+) -> Result<Value, Box<dyn std::error::Error>> {
     let metrics = result.metrics;
     let by_stage: serde_json::Map<String, Value> = WorkStage::ALL
         .into_iter()
@@ -134,16 +147,18 @@ pub fn evaluate(input: GenerationInputDto) -> Result<Value, Box<dyn std::error::
             projected["source"] = json!("generated");
             projected["assessment"] = crate::assessment_contracts::project_summary(&assessment);
             projected["puzzle"] = json!({"givens":content.givens.values().to_vec(),"solution":content.solution.values().to_vec(),"rules":project_rule_value(&content.rules),"difficulty":content.difficulty.as_str(),"seed":seed,"puzzleVersion":puzzle.puzzle_version.as_str()});
-            let input = create_assessment_input(
-                &content.givens,
-                &content.rules,
-                AssessmentLimits::default(),
-            );
-            let first = assess_puzzle(&input);
-            let second = assess_puzzle_with_budget(&input, &mut WorkBudget::new(4000000));
-            standalone = Some(
-                json!({"result":crate::assessment_contracts::project_result(&first),"budgeted":crate::assessment_contracts::project_result(&second)}),
-            );
+            if include_standalone {
+                let input = create_assessment_input(
+                    &content.givens,
+                    &content.rules,
+                    AssessmentLimits::default(),
+                );
+                let first = assess_puzzle(&input);
+                let second = assess_puzzle_with_budget(&input, &mut WorkBudget::new(4000000));
+                standalone = Some(
+                    json!({"result":crate::assessment_contracts::project_result(&first),"budgeted":crate::assessment_contracts::project_result(&second)}),
+                );
+            }
         }
         GenerationOutcome::BudgetExhausted { cause } => {
             projected["status"] = json!("budget-exhausted");
