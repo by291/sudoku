@@ -100,6 +100,17 @@ impl PreparedPuzzle {
         self.preparation_work
     }
 
+    #[wasm_bindgen(getter, js_name = liveExecution)]
+    pub fn live_execution(&self) -> Result<Ts<crate::dto::operations::LiveExecutionDto>, JsError> {
+        use crate::dto::operations::LiveExecutionDto;
+        use sudoku_core::constraints::types::LiveComputationCost;
+        Ok(match self.computation.live_computation_cost() {
+            LiveComputationCost::Small => LiveExecutionDto::Immediate,
+            LiveComputationCost::HeavyEnumeration => LiveExecutionDto::Worker,
+        }
+        .into_ts()?)
+    }
+
     pub fn metadata(&self) -> Result<Ts<MetadataDto>, JsError> {
         Ok(metadata_to_dto(self.computation.rules())
             .map_err(js_error)?
@@ -112,6 +123,16 @@ impl PreparedPuzzle {
             &board,
             self.computation.rules(),
         ))
+    }
+
+    pub fn review_entries(
+        &self,
+        input: Ts<crate::dto::operations::ReviewInputDto>,
+    ) -> Result<Vec<u32>, JsError> {
+        let input = input.to_rust()?;
+        let board = input.board.try_into().map_err(js_error)?;
+        let solution = input.solution.try_into().map_err(js_error)?;
+        indices(sudoku_core::board::incorrect_entries(&board, &solution)).map_err(js_error)
     }
 
     pub fn base_candidates(&self, board: Ts<BoardDto>) -> Result<Vec<u16>, JsError> {

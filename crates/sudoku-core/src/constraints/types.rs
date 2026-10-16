@@ -68,7 +68,35 @@ pub struct PreparedComputation {
     pub(crate) support: PreparedConstraintSupport,
 }
 
+/// Cost policy is separate from rule semantics and catalogue memory limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LiveComputationCost {
+    Small,
+    HeavyEnumeration,
+}
+
 impl PreparedComputation {
+    pub fn live_computation_cost(&self) -> LiveComputationCost {
+        use crate::rules::types::RuleConstraint;
+        const MAX_IMMEDIATE_CAGE_CELLS: usize = 4;
+
+        // Exhaustive dispatch makes a new primitive choose its live-computation policy.
+        let heavy = self
+            .rules
+            .context()
+            .constraints
+            .iter()
+            .any(|constraint| match constraint {
+                RuleConstraint::Cage { cells, .. } => cells.len() > MAX_IMMEDIATE_CAGE_CELLS,
+                RuleConstraint::Thermo { .. } | RuleConstraint::Arrow { .. } => false,
+            });
+        if heavy {
+            LiveComputationCost::HeavyEnumeration
+        } else {
+            LiveComputationCost::Small
+        }
+    }
+
     pub fn rules(&self) -> &PreparedRules {
         &self.rules
     }

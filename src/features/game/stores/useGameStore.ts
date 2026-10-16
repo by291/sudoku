@@ -235,9 +235,7 @@ export const useGameStore = defineStore('game', () => {
 
     if (action.kind === 'check') {
       checkedBoard.value = board.value.join(',')
-      checkedCells.value = board.value.flatMap((digit, cell) =>
-        digit !== 0 && digit !== session.value?.puzzle.solution[cell] ? [cell] : [],
-      )
+      checkedCells.value = layout.reviewEntries(board.value, session.value.puzzle.solution)
     }
 
     if (layout.isComplete(board.value)) {

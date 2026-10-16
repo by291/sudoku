@@ -48,3 +48,84 @@ it('binding_factories_instantiate_distinct_owned_memories', async () => {
   expect(first.memory).not.toBe(second.memory)
   expect(first.memory.buffer).not.toBe(second.memory.buffer)
 })
+
+it('heavy_layouts_only_allow_cheap_preview_on_the_main_thread', async () => {
+  const engine = await createMainEngine(compiled)
+  const layout = engine.prepare({
+    kind: 'killer',
+    cages: Array.from({ length: 9 }, (_, row) => ({
+      cells: Array.from({ length: 9 }, (_, column) => row * 9 + column),
+      sum: 45,
+    })),
+  })
+  const board = Array<0 | 1>(81).fill(0)
+  board[0] = 1
+  board[1] = 1
+
+  expect(layout.liveExecution).toBe('worker')
+  expect(layout.previewConflicts(board).result.status).toBe('budget-exhausted')
+  expect(layout.previewConflicts(board).result.violations[0]?.cells).toEqual([0, 1])
+  expect(() => layout.conflicts({ board })).toThrow(/Worker/)
+  expect(() => layout.candidates({ board })).toThrow(/Worker/)
+  expect(() =>
+    layout.edit({
+      givens: Array(81).fill(0),
+      entries: board,
+      notes: Array(81).fill(0),
+      action: { kind: 'generate-notes' },
+    }),
+  ).toThrow(/Worker/)
+  expect(
+    layout.edit({
+      givens: Array(81).fill(0),
+      entries: board,
+      notes: Array(81).fill(0),
+      action: { kind: 'erase', cell: 0 },
+    }).result.status,
+  ).toBe('complete')
+  engine.dispose()
+})
+
+it('live_result_parsers_reject_invalid_values_and_preserve_partial_results', async () => {
+  const engine = await createMainEngine(compiled)
+  const partial = {
+    result: {
+      status: 'budget-exhausted',
+      violations: [{ constraintId: 'row:0', cells: [0, 1], code: { kind: 'duplicate' } }],
+    },
+    workUsed: 1000000,
+  }
+
+  expect(engine.parseConflicts(partial)).toEqual(partial)
+  expect(() => engine.parseConflicts({ ...partial, workUsed: 1000001 })).toThrow()
+  expect(() =>
+    engine.parseConflicts({
+      ...partial,
+      result: {
+        status: 'complete',
+        violations: [{ constraintId: 'row:0', cells: [81], code: { kind: 'duplicate' } }],
+      },
+    }),
+  ).toThrow()
+  const complete = {
+    result: {
+      status: 'complete',
+      entries: Array(81).fill(0),
+      notes: Array(81).fill(511),
+      changed: false,
+      boardComplete: false,
+    },
+    workUsed: 0,
+  }
+  expect(engine.parseEdit(complete)).toEqual(complete)
+  expect(() =>
+    engine.parseEdit({ ...complete, result: { ...complete.result, notes: [512] } }),
+  ).toThrow()
+  expect(() =>
+    engine.parseEdit({ ...complete, result: { ...complete.result, entries: Array(81).fill(10) } }),
+  ).toThrow()
+  expect(
+    engine.parseEdit({ result: { status: 'budget-exhausted' }, workUsed: 1000000 }).result.status,
+  ).toBe('budget-exhausted')
+  engine.dispose()
+})

@@ -20,3 +20,23 @@ fn rejects_invalid_board_digit_length_and_mask() {
     assert_eq!(CellIndex::try_from(80_usize).unwrap().value(), 80);
     assert_eq!(CandidateMask::try_from(511).unwrap().bits(), 511);
 }
+
+#[test]
+fn review_entries_ignores_blanks_and_reports_every_incorrect_value() {
+    let digits: Vec<u8> =
+        b"534678912672195348198342567859761423426853791713924856961537284287419635345286179"
+            .iter()
+            .map(|digit| digit - b'0')
+            .collect();
+    let solution = Board::try_from(digits.as_slice()).unwrap();
+    let mut values = [0_u8; 81];
+    values[0] = 5;
+    values[2] = 9;
+    values[80] = 1;
+    let board = Board::try_from(values.as_slice()).unwrap();
+
+    assert_eq!(
+        sudoku_core::board::incorrect_entries(&board, &solution),
+        vec![2, 80]
+    );
+}

@@ -56,3 +56,67 @@ fn prepared_geometry_cannot_be_mutated_by_results() {
     );
     assert_eq!(budget.used(), repeated.used());
 }
+
+#[test]
+fn live_cost_classifies_every_current_primitive_conservatively() {
+    use sudoku_core::constraints::computation::prepare_computation;
+    use sudoku_core::constraints::types::LiveComputationCost;
+    use sudoku_core::rules::types::{Arrow, Cage};
+    use sudoku_core::types::Bounded;
+
+    let small = [
+        PuzzleRules::Classic,
+        PuzzleRules::Diagonal,
+        PuzzleRules::Jigsaw {
+            regions: (0..9)
+                .map(|region| {
+                    (0..9)
+                        .map(|cell| (region / 3 * 3 + cell / 3) * 9 + region % 3 * 3 + cell % 3)
+                        .collect()
+                })
+                .collect(),
+        },
+        PuzzleRules::Killer {
+            cages: (0..81)
+                .map(|cell| Cage {
+                    cells: vec![cell],
+                    sum: 1,
+                })
+                .collect(),
+        },
+        PuzzleRules::Thermo {
+            paths: vec![vec![0, 10, 20]],
+        },
+        PuzzleRules::Arrow {
+            arrows: vec![Arrow {
+                circle: 0,
+                shaft: vec![1, 2],
+            }],
+        },
+    ];
+    for rules in small {
+        let Bounded::Complete(prepared) =
+            prepare_computation(&rules, &mut WorkBudget::new(1000000)).unwrap()
+        else {
+            panic!("Expected prepared rules");
+        };
+        assert_eq!(prepared.live_computation_cost(), LiveComputationCost::Small);
+    }
+    let large = PuzzleRules::Killer {
+        cages: (0..9)
+            .map(|row| Cage {
+                cells: (0..9).map(|column| row * 9 + column).collect(),
+                sum: 45,
+            })
+            .collect(),
+    };
+    let Bounded::Complete(prepared) =
+        prepare_computation(&large, &mut WorkBudget::new(1000000)).unwrap()
+    else {
+        panic!("Expected prepared rules");
+    };
+    assert_eq!(
+        prepared.live_computation_cost(),
+        LiveComputationCost::HeavyEnumeration
+    );
+}

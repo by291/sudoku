@@ -16,12 +16,16 @@ const REQUIRED_EXPORTS = [
   'validate_puzzle',
   'validate_rules',
   'parse_hint',
+  'parse_conflicts',
+  'parse_edit',
+  'preparedpuzzle_liveExecution',
   'validate_teaching_step',
   'validate_assessment',
   'validate_hint_evidence',
   'transform_rules',
   'preparedpuzzle_new',
   'preparedpuzzle_edit',
+  'preparedpuzzle_review_entries',
 ]
 
 export function validateModuleExports(module: WebAssembly.Module): void {

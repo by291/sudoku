@@ -6,11 +6,11 @@ Approved behavior: the user selected the focused Worker option on 2026-10-16 and
 
 **Owners:** `crates/sudoku-core/src/constraints/{types,computation}.rs`, core tests, `crates/sudoku-wasm/src/{prepared,lib}.rs`, DTO/conversion owners, `src/sudoku/{contracts,mainEngine,guards}.ts`.
 
-- [ ] Add native tests for all six rule families, conservative heavy-cage classification, cheap duplicate preview, complete/partial result parsing and invalid cells/boards/masks.
-- [ ] Expose a pure native live-computation cost class, with cages larger than four cells conservatively classified as enumeration-heavy. The WASM adapter maps it to immediate/Worker execution; no browser dependency enters core.
-- [ ] Expose explicit fallible conflict/edit work-result parsing for the transport boundary. Preserve complete versus exhausted outcomes, sound partial violations, owned arrays and numeric limits.
-- [ ] Main prepared resources expose cheap preview and prevent synchronous heavy conflicts/generated notes. Entry/erase/toggle, completion/review, metadata and storage validators stay synchronous.
-- [ ] Run native/WASM/type-focused tests; commit `feat(core): classify expensive live computations`.
+- [x] Add native tests for all six rule families, conservative heavy-cage classification, cheap duplicate preview, complete/partial result parsing and invalid cells/boards/masks.
+- [x] Expose a pure native live-computation cost class, with cages larger than four cells conservatively classified as enumeration-heavy. The WASM adapter maps it to immediate/Worker execution; no browser dependency enters core.
+- [x] Expose explicit fallible conflict/edit work-result parsing for the transport boundary. Preserve complete versus exhausted outcomes, sound partial violations, owned arrays and numeric limits.
+- [x] Main prepared resources expose cheap preview and prevent synchronous heavy conflicts/generated notes. Entry/erase/toggle, completion/review, metadata and storage validators stay synchronous.
+- [x] Run native/WASM/type-focused tests; commit `feat(core): classify expensive live computations`.
 
 ## Task 2: Execute focused live jobs through the existing Worker client
 

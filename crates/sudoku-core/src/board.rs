@@ -36,3 +36,15 @@ pub fn base_candidates(board: &Board, prepared: &PreparedRules) -> [CandidateMas
         mask
     })
 }
+
+/// Return nonempty entries that differ from an already validated solution; blanks are not errors.
+pub fn incorrect_entries(board: &Board, solution: &Board) -> Vec<usize> {
+    board
+        .values()
+        .iter()
+        .enumerate()
+        .filter_map(|(cell, &value)| {
+            (value != 0 && value != solution.values()[cell]).then_some(cell)
+        })
+        .collect()
+}

@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 
 /// Numeric budget consumption is explicit and never shared as mutable JS state across an operation.
-#[derive(Serialize, Tsify)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[tsify(hashmap_as_object, missing_as_null)]
 pub struct WorkResultDto<T> {
     pub result: T,
@@ -56,8 +56,8 @@ pub enum CandidateResultDto {
     BudgetExhausted,
 }
 
-#[derive(Serialize, Tsify)]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ViolationCodeDto {
     Duplicate,
     CageTotal { index: u32, sum: u16 },
@@ -65,16 +65,16 @@ pub enum ViolationCodeDto {
     ArrowTotal { index: u32 },
 }
 
-#[derive(Serialize, Tsify)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ViolationDto {
     pub constraint_id: String,
     pub cells: Vec<u32>,
     pub code: ViolationCodeDto,
 }
 
-#[derive(Serialize, Tsify)]
-#[serde(tag = "status", rename_all = "kebab-case")]
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ConflictResultDto {
     Complete { violations: Vec<ViolationDto> },
     BudgetExhausted { violations: Vec<ViolationDto> },
@@ -100,8 +100,8 @@ pub struct EditInputDto {
     pub work: Option<WorkOptionsDto>,
 }
 
-#[derive(Serialize, Tsify)]
-#[serde(tag = "status", rename_all = "kebab-case")]
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum EditResultDto {
     Complete {
         entries: BoardDto,
@@ -131,9 +131,33 @@ macro_rules! work_response {
     };
 }
 work_response!(CandidateWorkDto, CandidateResultDto);
-work_response!(ConflictWorkDto, ConflictResultDto);
+
 work_response!(SearchWorkDto, SearchResultDto);
-work_response!(EditWorkDto, EditResultDto);
+
 work_response!(LogicWorkDto, super::logic::LogicResultDto);
 work_response!(HintWorkDto, super::logic::HintResultDto);
 work_response!(AssessmentWorkDto, super::rating::AssessmentResultDto);
+
+#[derive(Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewInputDto {
+    pub board: BoardDto,
+    pub solution: BoardDto,
+}
+
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(transparent)]
+#[tsify(hashmap_as_object, missing_as_null)]
+pub struct ConflictWorkDto(pub WorkResultDto<ConflictResultDto>);
+
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(transparent)]
+#[tsify(hashmap_as_object, missing_as_null)]
+pub struct EditWorkDto(pub WorkResultDto<EditResultDto>);
+
+#[derive(Serialize, Tsify)]
+#[serde(rename_all = "kebab-case")]
+pub enum LiveExecutionDto {
+    Immediate,
+    Worker,
+}
