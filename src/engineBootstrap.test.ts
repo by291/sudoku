@@ -1,5 +1,6 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import App from '@/App.vue'
 
 const mocks = vi.hoisted(() => ({ load: vi.fn(), createEngine: vi.fn(), createRuntime: vi.fn() }))
@@ -9,6 +10,13 @@ vi.mock('@/runtime', () => ({
   gameRuntimeKey: Symbol('runtime'),
   createGameRuntime: mocks.createRuntime,
 }))
+
+function createBootstrapRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component: { render: () => null } }],
+  })
+}
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -23,7 +31,7 @@ it('failed_or_mismatched_module_blocks_semantic_actions', async () => {
   mocks.load.mockRejectedValue(new Error('Missing WASM asset'))
   const wrapper = mount(App, {
     props: { installRuntime: vi.fn() },
-    global: { stubs: { ReadyApplication: true } },
+    global: { plugins: [createBootstrapRouter()], stubs: { ReadyApplication: true } },
   })
 
   await flushPromises()
@@ -42,7 +50,7 @@ it('retries_after_failure_and_installs_only_a_ready_runtime', async () => {
   mocks.createRuntime.mockReturnValue({ dispose: disposeRuntime })
   const wrapper = mount(App, {
     props: { installRuntime: vi.fn() },
-    global: { stubs: { ReadyApplication: true } },
+    global: { plugins: [createBootstrapRouter()], stubs: { ReadyApplication: true } },
   })
   await flushPromises()
 
@@ -66,7 +74,10 @@ it('retry_cannot_publish_a_disposed_generation', async () => {
         finish = resolve
       }),
   )
-  const wrapper = mount(App, { props: { installRuntime: vi.fn() } })
+  const wrapper = mount(App, {
+    props: { installRuntime: vi.fn() },
+    global: { plugins: [createBootstrapRouter()] },
+  })
   await flushPromises()
   const dispose = vi.fn()
 

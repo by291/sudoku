@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import RootApp from '@/App.vue'
 import * as moduleLoader from '@/sudoku/wasmModule'
 import * as runtimeComposition from '@/runtime'
@@ -106,13 +107,33 @@ it('keeps_semantic_validation_alive_until_the_final_save_settles', async () => {
   expect(() => test.runtime.engine.deriveSeed(new Uint8Array())).toThrow(/disposed/i)
 })
 
-it('publishes_the_ready_runtime_to_the_pinia_application_context', async () => {
+it('waits_for_the_initial_route_before_publishing_the_runtime_to_pinia', async () => {
   vi.spyOn(moduleLoader, 'loadSudokuModule').mockResolvedValue(getTestModule())
-  vi.spyOn(runtimeComposition, 'createGameRuntime').mockImplementation((engine) => ({
-    ...test.runtime,
-    engine,
-    dispose: () => engine.dispose(),
-  }))
+  const compose = vi
+    .spyOn(runtimeComposition, 'createGameRuntime')
+    .mockImplementation((engine) => ({
+      ...test.runtime,
+      engine,
+      dispose: () => engine.dispose(),
+    }))
+  let finishNavigation: () => void = () => {
+    throw new Error('Missing navigation resolver')
+  }
+  const navigation = new Promise<void>((resolve) => {
+    finishNavigation = resolve
+  })
+  const initialRouter = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/',
+        component: async () => {
+          await navigation
+          return { render: () => null }
+        },
+      },
+    ],
+  })
   const host = document.createElement('div')
   document.body.append(host)
   const application = createApp(RootApp, {
@@ -120,14 +141,20 @@ it('publishes_the_ready_runtime_to_the_pinia_application_context', async () => {
       application.provide(gameRuntimeKey, runtime)
     },
   })
-  application.use(test.pinia).use(router)
+  application.use(test.pinia).use(initialRouter)
 
   try {
     application.mount(host)
+    await flushPromises()
+
+    expect(compose).not.toHaveBeenCalled()
+    expect(host.querySelector('main[aria-label="数独游戏"]')).toBeNull()
+    finishNavigation()
     await vi.waitFor(() => {
       expect(host.querySelector('main[aria-label="数独游戏"]')).not.toBeNull()
     })
   } finally {
+    finishNavigation()
     application.unmount()
     await flushPromises()
     host.remove()

@@ -1,11 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import type { RouteLocationNormalizedLoaded, RouteLocationRaw } from 'vue-router'
-import HomeView from '@/features/home/views/HomeView.vue'
-import GameView from '@/features/game/views/GameView.vue'
-import LearningView from '@/features/learning/views/LearningView.vue'
-import LessonView from '@/features/learning/views/LessonView.vue'
-import DailyView from '@/features/game/views/DailyView.vue'
-import RecordsView from '@/features/records/views/RecordsView.vue'
 import { lessonVariant } from '@/features/learning/model/lessonIds'
 
 declare module 'vue-router' {
@@ -36,12 +30,12 @@ export const router = createRouter({
       : false
   },
   routes: [
-    { path: '/', component: HomeView },
-    { path: '/play/free', component: GameView },
-    { path: '/learn', component: LearningView },
+    { path: '/', component: () => import('@/features/home/views/HomeView.vue') },
+    { path: '/play/free', component: () => import('@/features/game/views/GameView.vue') },
+    { path: '/learn', component: () => import('@/features/learning/views/LearningView.vue') },
     {
       path: '/learn/:lessonId',
-      component: LessonView,
+      component: () => import('@/features/learning/views/LessonView.vue'),
       meta: {
         parentNavigation: (route) => {
           if (route.query.practice === '1') {
@@ -60,8 +54,8 @@ export const router = createRouter({
         },
       },
     },
-    { path: '/play/daily', component: DailyView },
-    { path: '/records', component: RecordsView },
+    { path: '/play/daily', component: () => import('@/features/game/views/DailyView.vue') },
+    { path: '/records', component: () => import('@/features/records/views/RecordsView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

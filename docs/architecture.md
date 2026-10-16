@@ -79,6 +79,8 @@ BLAKE3 contexts and the 43-byte phase frame are version-owned. Frame fields are 
 
 App loads, compiles and validates the module before constructing runtime/repository/stores or decoding IndexedDB. Retry fetches fresh code. Stale bootstrap completion disposes its engine. Pinia 4.0.3 resolves store injections through the Vue application context, so `main.ts` publishes the ready runtime with an application-level provider before mounting `ReadyApplication.vue`.
 
+Initial route resolution and WASM download run concurrently; runtime publication and application rendering wait for both. Retry restarts initial navigation before waiting again. Game leave guards identify the target navigation, and a scope-owned resolve guard pauses/saves only after that target's page is loaded. Cancelled targets cannot pause the current game while their page downloads finish.
+
 Main-engine prepared layouts return independent metadata/results and reject calls after disposal. The game store owns one layout per puzzle identity, reuses it through moves and releases it once on replacement/drop/disposal. The main facade exposes no exact search, generation, assessment or hint search. Heavy jobs use separate Worker instances/memory and share only compiled code.
 
 The client sends initialization before a job and validates readiness/version identity. Original deadlines include remaining Worker initialization: 3,000 ms for generation and 15,000 ms for hints, assessment and live analysis. Cancellation/timeout terminates the owner; late replies cannot revive it. One next idle Worker may initialize, but never precomputes a puzzle. Requests copy seed/board/rule data before awaits; incomplete, cancelled, failed and completed outcomes remain distinct.
