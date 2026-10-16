@@ -1,0 +1,258 @@
+use super::rules::UnitDto;
+use super::values::{BoardDto, DigitDto};
+use serde::{Deserialize, Serialize};
+use tsify::Tsify;
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "kebab-case")]
+pub enum TechniqueDto {
+    NakedSingle,
+    HiddenSingle,
+    LockedCandidate,
+    NakedPair,
+    HiddenPair,
+    NakedTriple,
+    HiddenTriple,
+    XWing,
+    Swordfish,
+    #[serde(rename = "xy-wing")]
+    XYWing,
+    SimpleColoring,
+    CageDistinct,
+    CageRemainder,
+    CageCombination,
+    ThermoBound,
+    ArrowEquation,
+    ArrowCombination,
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct DomainDto {
+    pub cell: u32,
+    pub mask: u16,
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct BoundDto {
+    pub cell: u32,
+    pub min: DigitDto,
+    pub max: DigitDto,
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
+pub enum RuleEvidenceDto {
+    Cage {
+        #[serde(rename = "constraintId")]
+        constraint_id: String,
+        cells: Vec<u32>,
+        digits: Vec<DigitDto>,
+        sum: u16,
+        domains: Vec<DomainDto>,
+    },
+    Thermo {
+        #[serde(rename = "constraintId")]
+        constraint_id: String,
+        cells: Vec<u32>,
+        digits: Vec<DigitDto>,
+        path: Vec<u32>,
+        bounds: Vec<BoundDto>,
+    },
+    Arrow {
+        #[serde(rename = "constraintId")]
+        constraint_id: String,
+        cells: Vec<u32>,
+        digits: Vec<DigitDto>,
+        circle: u32,
+        shaft: Vec<u32>,
+        domains: Vec<DomainDto>,
+    },
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct ColoringLinkDto {
+    pub unit: UnitDto,
+    pub cells: [u32; 2],
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "lowercase")]
+pub enum ColoringModeDto {
+    Trap,
+    Wrap,
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
+pub enum AdvancedEvidenceDto {
+    Subset {
+        cells: Vec<u32>,
+        digits: Vec<DigitDto>,
+        domains: Vec<DomainDto>,
+        unit: UnitDto,
+        hidden: bool,
+    },
+    Fish {
+        cells: Vec<u32>,
+        digits: Vec<DigitDto>,
+        domains: Vec<DomainDto>,
+        bases: Vec<UnitDto>,
+        covers: Vec<UnitDto>,
+    },
+    Wing {
+        cells: Vec<u32>,
+        digits: Vec<DigitDto>,
+        domains: Vec<DomainDto>,
+        pivot: u32,
+        wings: [u32; 2],
+    },
+    Coloring {
+        cells: Vec<u32>,
+        digits: Vec<DigitDto>,
+        domains: Vec<DomainDto>,
+        mode: ColoringModeDto,
+        colors: [Vec<u32>; 2],
+        links: Vec<ColoringLinkDto>,
+    },
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct UnitEvidenceDto {
+    pub kind: UnitEvidenceKindDto,
+    pub unit: UnitDto,
+    pub cells: Vec<u32>,
+    pub digits: Vec<DigitDto>,
+    pub premises: Vec<RuleEvidenceDto>,
+    #[serde(default)]
+    pub units: Vec<UnitDto>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "lowercase")]
+pub enum UnitEvidenceKindDto {
+    Unit,
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(untagged)]
+pub enum EvidenceDto {
+    Rule(RuleEvidenceDto),
+    Advanced(AdvancedEvidenceDto),
+    Unit(UnitEvidenceDto),
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct RemovalDto {
+    pub cell: u32,
+    pub digit: DigitDto,
+}
+
+#[derive(Clone, Serialize, Deserialize, Tsify)]
+#[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
+pub enum LogicalStepDto {
+    Placement {
+        technique: TechniqueDto,
+        evidence: EvidenceDto,
+        cell: u32,
+        digit: DigitDto,
+    },
+    Elimination {
+        technique: TechniqueDto,
+        evidence: EvidenceDto,
+        removals: Vec<RemovalDto>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct PlacementDto {
+    pub cell: u32,
+    pub digit: DigitDto,
+}
+
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "kebab-case")]
+pub enum HintUnavailableDto {
+    Complete,
+    Unsupported,
+    BudgetExhausted,
+}
+
+#[derive(Serialize, Deserialize, Tsify)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+#[tsify(hashmap_as_object, missing_as_null)]
+pub enum HintResultDto {
+    ReviewEntry {
+        cell: u32,
+    },
+    Deduction {
+        steps: Vec<LogicalStepDto>,
+        placement: PlacementDto,
+    },
+    Unavailable {
+        reason: HintUnavailableDto,
+    },
+}
+
+#[derive(Deserialize, Tsify)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct HintInputDto {
+    pub board: BoardDto,
+    pub solution: BoardDto,
+    pub rules: super::rules::RulesDto,
+    #[serde(default)]
+    pub max_steps: Option<u32>,
+    #[serde(default)]
+    pub max_work: Option<u32>,
+}
+
+#[derive(Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct HintValidationInputDto {
+    pub hint: HintResultDto,
+    pub rules: super::rules::RulesDto,
+    #[serde(default)]
+    pub board: Option<BoardDto>,
+}
+
+#[derive(Deserialize, Tsify)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LogicInputDto {
+    pub board: BoardDto,
+    pub rules: super::rules::RulesDto,
+    pub allowed: Vec<TechniqueDto>,
+    pub max_steps: u32,
+    pub max_work: u32,
+}
+
+#[derive(Serialize, Tsify)]
+#[serde(tag = "status", rename_all = "kebab-case")]
+#[tsify(hashmap_as_object, missing_as_null)]
+pub enum LogicResultDto {
+    Solved {
+        board: BoardDto,
+        steps: Vec<LogicalStepDto>,
+    },
+    Stalled {
+        board: BoardDto,
+        steps: Vec<LogicalStepDto>,
+    },
+    BudgetExhausted {
+        board: BoardDto,
+        steps: Vec<LogicalStepDto>,
+        cause: super::rating::ExhaustionCauseDto,
+    },
+}
+
+#[derive(Serialize, Tsify)]
+#[serde(tag = "status", rename_all = "lowercase")]
+#[tsify(hashmap_as_object, missing_as_null)]
+pub enum HintValidationDto {
+    Valid { hint: HintResultDto },
+    Invalid { issues: Vec<String> },
+}

@@ -14,7 +14,8 @@ use crate::rules::types::{Arrow, PuzzleRules, RuleConstraint, Unit, UnitKind};
 use crate::types::{BOARD_SIZE, Board, Bounded, CoreResult, EngineError};
 
 const HINT_STEP_LIMIT: usize = 500;
-const VALIDATION_WORK_LIMIT: u64 = 4000000;
+/// Maximum proof replay work, matching the existing transport validator.
+pub const HINT_VALIDATION_WORK_LIMIT: u64 = 1000000;
 const ADVANCED_PROOF_WORK: u64 = (BOARD_SIZE * BOARD_SIZE) as u64;
 
 fn invalid() -> EngineError {
@@ -245,7 +246,7 @@ pub fn validate_hint_evidence(
 
     let context = compile_rules(rules)?;
     let mut state = board.map(|board| create_workspace(board, &context));
-    let mut budget = WorkBudget::new(VALIDATION_WORK_LIMIT);
+    let mut budget = WorkBudget::new(HINT_VALIDATION_WORK_LIMIT);
     for step in steps {
         match &mut step.evidence {
             Evidence::Advanced(_) => {

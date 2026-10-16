@@ -157,3 +157,11 @@ fn validates_owned_chains_and_rejects_changed_clues_and_conclusions() {
     assert!(chains > 0);
     assert!(rule_chains > 0);
 }
+
+#[test]
+fn proof_validation_retains_the_original_transport_work_bound() {
+    use sudoku_core::logic::hint_validation::HINT_VALIDATION_WORK_LIMIT;
+
+    // The frozen transport validator uses DEFAULT_WORK_LIMIT, independently fixed at one million.
+    assert_eq!(HINT_VALIDATION_WORK_LIMIT, 1000000);
+}

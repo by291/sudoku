@@ -1,3 +1,4 @@
+import { createWasmAdapter } from './wasm-adapter.mjs'
 import { computeScreening } from './reference-assessment.mjs'
 import assert from 'node:assert/strict'
 import { nativeResults } from './native-adapter.mjs'
@@ -208,7 +209,12 @@ export async function runMigration(args) {
   }
   const suite = option('--suite', 'all')
   const selectedEngine = option('--engine', 'typescript')
-  assert.ok(['typescript', 'native'].includes(selectedEngine), 'Engine adapter not implemented yet')
+  assert.ok(
+    ['typescript', 'native', 'wasm-chromium', 'wasm-webkit', 'wasm-firefox'].includes(
+      selectedEngine,
+    ),
+    'Unknown engine adapter',
+  )
   const manifest = JSON.parse(readFileSync(resolve(fixtureRoot, 'manifest.json'), 'utf8'))
   for (const patch of manifest.patch) {
     assert.equal(
@@ -228,19 +234,19 @@ export async function runMigration(args) {
       ? [
           'rules',
           'constraints',
-          'support',
+          ...(selectedEngine.startsWith('wasm-') ? [] : ['support']),
           'exact',
           'exact-prepared',
-          'advanced',
+          ...(selectedEngine.startsWith('wasm-') ? [] : ['advanced']),
           'logic',
           'hints',
           'hint-chains',
           'assessment',
-          'assessment-screening',
+          ...(selectedEngine.startsWith('wasm-') ? [] : ['assessment-screening']),
           'assessment-metadata',
           'editing',
           'validation',
-          'generation-layouts',
+          ...(selectedEngine.startsWith('wasm-') ? [] : ['generation-layouts']),
           'generation-boundaries',
           'generation',
         ]
@@ -254,123 +260,135 @@ export async function runMigration(args) {
     )
     referenceCounter = module.referenceCountSolutions
   }
-  const diversity = new Map()
-  let checked = 0
-  for (const name of suites) {
-    let files
-    if (name === 'generation' || name === 'assessment-generated') {
-      files = ['full', 'targeted', 'feedback', 'hard058'].map(
-        (family) => `generation-v11-${family}.jsonl.gz`,
-      )
-    } else if (name === 'assessment-screening') {
-      files = ['assessment-screening.jsonl.gz']
-    } else {
-      files = [(name === 'logic-basic' ? 'logic' : name) + '.json']
-    }
-    let rows = files.flatMap((file) => {
-      const stored = readFileSync(resolve(fixtureRoot, file))
-      if (file.endsWith('.gz'))
-        return gunzipSync(stored)
-          .toString('utf8')
-          .trim()
-          .split('\n')
-          .map((line) => JSON.parse(line))
-      return JSON.parse(stored.toString('utf8'))
-    })
-    if (name === 'assessment-generated') {
-      const counts = new Map(
-        JSON.parse(
-          readFileSync(resolve(fixtureRoot, 'generated-assessment-work.json'), 'utf8'),
-        ).map((row) => [row.id, row.workUsed]),
-      )
-      rows = rows.map((row) => {
-        assert.equal(row.expected.result.status, 'ready')
-        const puzzle = row.expected.result.puzzle
-        return {
-          id: row.id,
-          input: {
-            board: puzzle.givens,
-            solution: puzzle.solution,
-            rules: puzzle.rules,
-            difficulty: puzzle.difficulty,
-            limit: 4000000,
-          },
-          expected: { ...row.expected.assessment, workUsed: counts.get(row.id) },
-        }
-      })
-    }
-    if (name === 'logic-basic') {
-      rows = rows.filter((row) =>
-        row.expected.steps.every(
-          (step) =>
-            ![
-              'naked-triple',
-              'hidden-triple',
-              'x-wing',
-              'swordfish',
-              'xy-wing',
-              'simple-coloring',
-            ].includes(step.technique),
-        ),
-      )
-    }
-    const batchSize = 128
-    for (let start = 0; start < rows.length; start += batchSize) {
-      const batch = rows.slice(start, start + batchSize)
-      const native = selectedEngine === 'native' ? nativeResults(name, batch) : null
-      for (const [index, row] of batch.entries()) {
-        assert.deepStrictEqual(
-          native ? native[index] : await computeCase(engine, name, row.input),
-          row.expected,
-          `Migration result mismatch: ${name}/${row.id}`,
+  const wasm = selectedEngine.startsWith('wasm-')
+    ? await createWasmAdapter(selectedEngine.slice(5))
+    : null
+  try {
+    const diversity = new Map()
+    let checked = 0
+    for (const name of suites) {
+      let files
+      if (name === 'generation' || name === 'assessment-generated') {
+        files = ['full', 'targeted', 'feedback', 'hard058'].map(
+          (family) => `generation-v11-${family}.jsonl.gz`,
         )
-        if (referenceCounter) {
-          const actual = native ? native[index] : row.expected
-          assert.equal(actual.result.status, 'ready')
-          const puzzle = actual.result.puzzle
-          assert.ok(
-            puzzle.givens.every((digit, cell) => digit === 0 || digit === puzzle.solution[cell]),
-            row.id,
-          )
-          const counted = referenceCounter(puzzle.givens, puzzle.rules)
-          assert.equal(counted.count, 1, `Independent uniqueness: ${row.id}`)
-          assert.deepStrictEqual(
-            counted.solution,
-            puzzle.solution,
-            `Independent first solution: ${row.id}`,
-          )
-          if (puzzle.rules.kind !== 'classic') {
-            const classicTerminal = referenceCounter(puzzle.solution, { kind: 'classic' })
-            if (puzzle.rules.kind !== 'jigsaw' || classicTerminal.count === 1) {
-              assert.notEqual(
-                referenceCounter(puzzle.givens, { kind: 'classic' }).count,
-                1,
-                `Independent rule necessity: ${row.id}`,
-              )
-            }
-          }
-          const identity = `${puzzle.rules.kind}:${puzzle.difficulty}`
-          if (!diversity.has(identity)) diversity.set(identity, new Set())
-          diversity
-            .get(identity)
-            .add(JSON.stringify([puzzle.givens, puzzle.solution, puzzle.rules]))
-        }
-        checked++
+      } else if (name === 'assessment-screening') {
+        files = ['assessment-screening.jsonl.gz']
+      } else {
+        files = [(name === 'logic-basic' ? 'logic' : name) + '.json']
       }
-      if (rows.length > batchSize)
-        console.log(
-          `${selectedEngine} ${name}: ${Math.min(start + batchSize, rows.length)}/${rows.length}`,
+      let rows = files.flatMap((file) => {
+        const stored = readFileSync(resolve(fixtureRoot, file))
+        if (file.endsWith('.gz'))
+          return gunzipSync(stored)
+            .toString('utf8')
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line))
+        return JSON.parse(stored.toString('utf8'))
+      })
+      if (name === 'assessment-generated') {
+        const counts = new Map(
+          JSON.parse(
+            readFileSync(resolve(fixtureRoot, 'generated-assessment-work.json'), 'utf8'),
+          ).map((row) => [row.id, row.workUsed]),
         )
+        rows = rows.map((row) => {
+          assert.equal(row.expected.result.status, 'ready')
+          const puzzle = row.expected.result.puzzle
+          return {
+            id: row.id,
+            input: {
+              board: puzzle.givens,
+              solution: puzzle.solution,
+              rules: puzzle.rules,
+              difficulty: puzzle.difficulty,
+              limit: 4000000,
+            },
+            expected: { ...row.expected.assessment, workUsed: counts.get(row.id) },
+          }
+        })
+      }
+      if (name === 'logic-basic') {
+        rows = rows.filter((row) =>
+          row.expected.steps.every(
+            (step) =>
+              ![
+                'naked-triple',
+                'hidden-triple',
+                'x-wing',
+                'swordfish',
+                'xy-wing',
+                'simple-coloring',
+              ].includes(step.technique),
+          ),
+        )
+      }
+      const batchSize = 128
+      for (let start = 0; start < rows.length; start += batchSize) {
+        const batch = rows.slice(start, start + batchSize)
+        const native =
+          selectedEngine === 'native'
+            ? nativeResults(name, batch)
+            : wasm
+              ? await wasm.results(name, batch)
+              : null
+        for (const [index, row] of batch.entries()) {
+          assert.deepStrictEqual(
+            native ? native[index] : await computeCase(engine, name, row.input),
+            row.expected,
+            `Migration result mismatch: ${name}/${row.id}`,
+          )
+          if (referenceCounter) {
+            const actual = native ? native[index] : row.expected
+            assert.equal(actual.result.status, 'ready')
+            const puzzle = actual.result.puzzle
+            assert.ok(
+              puzzle.givens.every((digit, cell) => digit === 0 || digit === puzzle.solution[cell]),
+              row.id,
+            )
+            const counted = referenceCounter(puzzle.givens, puzzle.rules)
+            assert.equal(counted.count, 1, `Independent uniqueness: ${row.id}`)
+            assert.deepStrictEqual(
+              counted.solution,
+              puzzle.solution,
+              `Independent first solution: ${row.id}`,
+            )
+            if (puzzle.rules.kind !== 'classic') {
+              const classicTerminal = referenceCounter(puzzle.solution, { kind: 'classic' })
+              if (puzzle.rules.kind !== 'jigsaw' || classicTerminal.count === 1) {
+                assert.notEqual(
+                  referenceCounter(puzzle.givens, { kind: 'classic' }).count,
+                  1,
+                  `Independent rule necessity: ${row.id}`,
+                )
+              }
+            }
+            const identity = `${puzzle.rules.kind}:${puzzle.difficulty}`
+            if (!diversity.has(identity)) diversity.set(identity, new Set())
+            diversity
+              .get(identity)
+              .add(JSON.stringify([puzzle.givens, puzzle.solution, puzzle.rules]))
+          }
+          checked++
+        }
+        if (rows.length > batchSize)
+          console.log(
+            `${selectedEngine} ${name}: ${Math.min(start + batchSize, rows.length)}/${rows.length}`,
+          )
+      }
+      console.log(`${selectedEngine} ${name}: ${rows.length} PASS`)
     }
-    console.log(`${selectedEngine} ${name}: ${rows.length} PASS`)
+    if (referenceCounter) {
+      assert.equal(diversity.size, 19)
+      for (const [identity, outputs] of diversity)
+        assert.ok(outputs.size > 1, `Independent output diversity: ${identity}`)
+      console.log(
+        'Independent structure, uniqueness, rule necessity and 19-combination diversity: PASS',
+      )
+    }
+    console.log(`Migration contracts: ${checked} PASS`)
+  } finally {
+    await wasm?.close()
   }
-  if (referenceCounter) {
-    assert.equal(diversity.size, 19)
-    for (const [identity, outputs] of diversity)
-      assert.ok(outputs.size > 1, `Independent output diversity: ${identity}`)
-    console.log(
-      'Independent structure, uniqueness, rule necessity and 19-combination diversity: PASS',
-    )
-  }
-  console.log(`Migration contracts: ${checked} PASS`)
 }

@@ -21,3 +21,17 @@ Exact prepared probes are rebuilt with `node tests/migration/build-exact.mjs`. A
 Rebuild the generated-board work sidecar with `node tests/migration/build-generated-assessments.mjs`, followed by sealing. The generation snapshot originally stored complete standalone assessment payloads but omitted their aggregate work counters; the sidecar is captured from the frozen TypeScript engine and verifies every pre-existing sealed assessment before recording its count.
 
 Terminal/layout work and random continuations are captured by `node tests/migration/build-layouts.mjs`. Full-generation lower-limit outcomes are captured by `node tests/migration/build-generation-boundaries.mjs`; seal after either explicit rebuild. Run `pnpm test:migration -- --suite generation --engine native --independent` to additionally verify each returned puzzle with the separate reference counter, rule necessity and diversity across all 19 supported variant/tier combinations.
+
+### Real WASM contracts
+
+Build the pinned `wasm-bindgen` package with `pnpm wasm:build`, then run:
+
+```sh
+node tests/migration/run.mjs --engine wasm-chromium --suite all
+node tests/migration/run.mjs --engine wasm-webkit --suite all
+node tests/migration/run.mjs --engine wasm-firefox --suite all
+```
+
+Set `PLAYWRIGHT_BROWSERS_PATH` only when using an existing external browser installation. Browser launch failures fail the command; they never count as passing contracts. Each browser runs 4,262 complete comparisons, including all 2,241 v11 generated puzzles, all 152 full-generation boundaries, complete assessments/traces and actual work counts. Lower-level support, detector, screening and layout-continuation probes remain native tests; the browser adapter uses only named production WASM operations. The isolated Vite server disables hot reload so source edits cannot navigate a long-running fixture page.
+
+`browser-compute.mjs` is a test-only projection of the existing contracts. It preserves session-owned assistance/no-op facts and opaque historical seed/version metadata without implementing mathematical validation. Fixture hashes are verified before either browser or native execution. `wasm-contract.spec.ts` additionally checks byte-only inputs, BLAKE3 derivation against the independent implementation, returned ownership, malformed conversions, number/null/absence semantics and allocator reuse.
