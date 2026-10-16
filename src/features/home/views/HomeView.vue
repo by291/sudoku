@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, onMounted, onScopeDispose, ref, useTemplateRef } from 'vue'
 import { RouterLink, useRouter, type UseLinkReturn } from 'vue-router'
 import { NAlert, NButton, NCard, NModal } from 'naive-ui'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
@@ -38,20 +38,40 @@ const selectedSave = computed(
 )
 const resumeOpen = ref(false)
 const resumeButton = useTemplateRef<InstanceType<typeof NButton>>('resumeButton')
+let openingSetup = false
+let disposed = false
 
-function openSetup(mode: 'free' | 'daily', event: MouseEvent) {
+async function openSetup(mode: 'free' | 'daily', event: MouseEvent) {
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
     return
   }
 
   event.preventDefault()
+  if (openingSetup) {
+    return
+  }
+
   if (event.currentTarget instanceof HTMLElement) {
     event.currentTarget.focus()
   }
 
-  setupMode.value = mode
-  void records.load()
+  openingSetup = true
+  try {
+    await records.load()
+    // Leaving Home or a newer refresh must not publish a dialog from an outdated read.
+    if (disposed || records.busy) {
+      return
+    }
+
+    setupMode.value = mode
+  } finally {
+    openingSetup = false
+  }
 }
+
+onScopeDispose(() => {
+  disposed = true
+})
 
 function startSelected() {
   const mode = setupMode.value
