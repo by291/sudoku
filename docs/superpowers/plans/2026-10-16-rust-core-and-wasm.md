@@ -108,12 +108,12 @@ The plan dependency chain is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 �
 
 **Interfaces:** Produces `PuzzleRules`, `PreparedRules`, `RuleMetadata`, `compile_rules`, `prepare_rules`, `Puzzle`, `validate_puzzle`, `board::is_complete(&Board, &PreparedRules) -> bool`, and `board::base_candidates(&Board, &PreparedRules) -> [CandidateMask; 81]`.
 
-- [ ] Write tests `matches_all_ordered_topology_contracts`, `arrow_relation_is_not_a_duplicate_peer`, `jigsaw_replaces_boxes`, and `puzzle_content_validation_does_not_require_generation_metadata`. Assert whole units/peers/memberships/related-cell arrays against frozen fixtures, reject malformed path/partition/sum/index geometry, and validate stored mathematical content without a seed/version while rejecting contradictory terminal/givens.
-- [ ] Run `cargo test -p sudoku-core --test rules --test puzzles`; observe failures for the unimplemented Rust compiler and validators.
-- [ ] Port the current six focused definitions and topology construction, preserving group ordering, immutable preparation ownership, charged variant compilation and free static Classic preparation. Keep full nine-digit units, duplicate exclusion and related highlights distinct. Return owned metadata snapshots.
-- [ ] Implement content-only `Puzzle` validation with current supported-difficulty and stored-solution semantics; generation identity remains in `GeneratedPuzzle`. Do not add a uniqueness search, seed decoding or current-version requirement to content validation. Task 13 retains historical metadata validation at the storage owner.
-- [ ] Run rule/puzzle tests and `pnpm test:migration -- --suite rules --engine native`; compare runtime acceptance, complete ordered topology, candidate masks and completion results, including malformed and historical snapshots.
-- [ ] Commit as `feat(core): compile variant rules and validate puzzles`.
+- [x] Write tests `matches_all_ordered_topology_contracts`, `arrow_relation_is_not_a_duplicate_peer`, `jigsaw_replaces_boxes`, and `puzzle_content_validation_does_not_require_generation_metadata`. Assert whole units/peers/memberships/related-cell arrays against frozen fixtures, reject malformed path/partition/sum/index geometry, and validate stored mathematical content without a seed/version while rejecting contradictory terminal/givens.
+- [x] Run `cargo test -p sudoku-core --test rules --test puzzles`; observe failures for the unimplemented Rust compiler and validators.
+- [x] Port the current six focused definitions and topology construction, preserving group ordering, immutable preparation ownership, charged variant compilation and free static Classic preparation. Keep full nine-digit units, duplicate exclusion and related highlights distinct. Return owned metadata snapshots.
+- [x] Implement content-only `Puzzle` validation with current supported-difficulty and stored-solution semantics; generation identity remains in `GeneratedPuzzle`. Do not add a uniqueness search, seed decoding or current-version requirement to content validation. Task 13 retains historical metadata validation at the storage owner.
+- [x] Run rule/puzzle tests and `pnpm test:migration -- --suite rules --engine native`; compare runtime acceptance, complete ordered topology, candidate masks and completion results, including malformed and historical snapshots.
+- [x] Commit as `feat(core): compile variant rules and validate puzzles`.
 
 ## Task 4: Port bounded constraint support, catalogues, candidate refinement and conflicts
 

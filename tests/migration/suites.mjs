@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { nativeResults } from './native-adapter.mjs'
 import { gunzipSync } from 'node:zlib'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -118,7 +119,7 @@ export async function runMigration(args) {
   }
   const suite = option('--suite', 'all')
   const selectedEngine = option('--engine', 'typescript')
-  assert.equal(selectedEngine, 'typescript', 'Engine adapter not implemented yet')
+  assert.ok(['typescript', 'native'].includes(selectedEngine), 'Engine adapter not implemented yet')
   const manifest = JSON.parse(readFileSync(resolve(fixtureRoot, 'manifest.json'), 'utf8'))
   for (const patch of manifest.patch) {
     assert.equal(
@@ -132,7 +133,7 @@ export async function runMigration(args) {
     const bytes = fixture.file.endsWith('.gz') ? gunzipSync(stored) : stored
     assert.equal(sha256(bytes), fixture.sha256, `Changed fixture: ${fixture.file}`)
   }
-  const engine = await loadEngine({ v11: true })
+  const engine = selectedEngine === 'typescript' ? await loadEngine({ v11: true }) : null
   const suites =
     suite === 'all'
       ? [
@@ -159,9 +160,10 @@ export async function runMigration(args) {
               .map((line) => JSON.parse(line)),
           )
         : JSON.parse(readFileSync(resolve(fixtureRoot, name + '.json'), 'utf8'))
-    for (const row of rows) {
+    const native = selectedEngine === 'native' ? nativeResults(name, rows) : null
+    for (const [index, row] of rows.entries()) {
       assert.deepStrictEqual(
-        await computeCase(engine, name, row.input),
+        native ? native[index] : await computeCase(engine, name, row.input),
         row.expected,
         `Migration result mismatch: ${name}/${row.id}`,
       )

@@ -122,6 +122,16 @@ impl TryFrom<usize> for CellIndex {
 pub struct CandidateMask(u16);
 
 impl CandidateMask {
+    pub const EMPTY: Self = Self(0);
+    pub const ALL: Self = Self(ALL_DIGITS_MASK);
+
+    // Only validated Board values reach this internal operation; zero removes no digit.
+    pub(crate) fn exclude_board_value(&mut self, value: u8) {
+        if value != 0 {
+            self.0 &= !(1 << (value - 1));
+        }
+    }
+
     pub fn bits(self) -> u16 {
         self.0
     }
