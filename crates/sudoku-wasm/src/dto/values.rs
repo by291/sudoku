@@ -65,3 +65,11 @@ pub struct SearchOptionsDto {
     #[serde(default)]
     pub initial_work: Option<u32>,
 }
+
+/// Semantic validators accept untrusted JS values, then decode their explicit DTO before computation.
+#[derive(Deserialize, Tsify)]
+#[serde(transparent)]
+#[tsify(type = "unknown")]
+pub struct UntrustedValueDto(
+    #[serde(with = "serde_wasm_bindgen::preserve")] pub wasm_bindgen::JsValue,
+);

@@ -5,7 +5,7 @@ import type { Difficulty } from '@/core/sudoku/types'
 import { isDifficulty } from '@/core/sudoku/types'
 import { supportsDifficulty } from '@/core/sudoku/difficulties'
 import type { SudokuVariant } from '@/core/sudoku/rules/types'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { createGenerationInput } from '@/sudoku/generationInput'
 import { parseVariantQuery } from '@/features/game/model/variants'
 import type { SessionMetadata } from '@/features/game/model/session'
 import type { SessionRecord } from '@/storage/records'
@@ -217,7 +217,7 @@ export function useGameEntry(options: GameEntryOptions) {
     }
 
     const transition = await game.startGame(
-      createGenerationInput(nextVariant.value, difficulty.value, runtime.createId()),
+      createGenerationInput(nextVariant.value, difficulty.value, runtime.createSeed()),
       metadata.value,
     )
     if (transition.status === 'ready') {

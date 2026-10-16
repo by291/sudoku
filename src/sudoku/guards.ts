@@ -1,9 +1,12 @@
 import type { EngineInfo } from '@sudoku/wasm'
+import type { Board, Difficulty, PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
 
-const BRIDGE_VERSION = 1
-const PUZZLE_VERSION = 'sudoku-v11'
-const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v11'
-const RATING_VERSION = 'sudoku-rating-v2'
+export const BRIDGE_VERSION = 1
+export const PUZZLE_VERSION = 'sudoku-v11'
+export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v11'
+export const RATING_VERSION = 'sudoku-rating-v2'
+const BOARD_SIZE = 81
+const MAX_DIGIT = 9
 const REQUIRED_EXPORTS = [
   'engine_info',
   'derive_seed',
@@ -12,6 +15,8 @@ const REQUIRED_EXPORTS = [
   'hint',
   'count_solutions',
   'validate_puzzle',
+  'validate_rules',
+  'parse_hint',
   'validate_assessment',
   'validate_hint_evidence',
   'transform_rules',
@@ -39,4 +44,78 @@ export function validateEngineInfo(info: EngineInfo): void {
   ) {
     throw new Error('Sudoku engine bridge or algorithm version mismatch')
   }
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function isDifficulty(value: unknown): value is Difficulty {
+  return value === 'easy' || value === 'medium' || value === 'hard' || value === 'expert'
+}
+
+const VARIANT_TAGS = {
+  classic: true,
+  diagonal: true,
+  jigsaw: true,
+  killer: true,
+  thermo: true,
+  arrow: true,
+} satisfies Record<SudokuVariant, true>
+
+export function isVariant(value: unknown): value is SudokuVariant {
+  return typeof value === 'string' && Object.hasOwn(VARIANT_TAGS, value)
+}
+
+export function isBoard(value: unknown): value is Board {
+  return (
+    Array.isArray(value) &&
+    value.length === BOARD_SIZE &&
+    value.every(
+      (digit) =>
+        typeof digit === 'number' && Number.isInteger(digit) && digit >= 0 && digit <= MAX_DIGIT,
+    )
+  )
+}
+
+function cellList(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (cell) =>
+        typeof cell === 'number' && Number.isInteger(cell) && cell >= 0 && cell < BOARD_SIZE,
+    )
+  )
+}
+
+const RULE_SHAPES = {
+  classic: () => true,
+  diagonal: () => true,
+  jigsaw: (value) => Array.isArray(value.regions) && value.regions.every(cellList),
+  killer: (value) =>
+    Array.isArray(value.cages) &&
+    value.cages.every(
+      (cage: unknown) =>
+        isRecord(cage) &&
+        cellList(cage.cells) &&
+        typeof cage.sum === 'number' &&
+        Number.isSafeInteger(cage.sum),
+    ),
+  thermo: (value) => Array.isArray(value.paths) && value.paths.every(cellList),
+  arrow: (value) =>
+    Array.isArray(value.arrows) &&
+    value.arrows.every(
+      (arrow: unknown) =>
+        isRecord(arrow) &&
+        typeof arrow.circle === 'number' &&
+        Number.isInteger(arrow.circle) &&
+        arrow.circle >= 0 &&
+        arrow.circle < BOARD_SIZE &&
+        cellList(arrow.shaft),
+    ),
+} satisfies Record<SudokuVariant, (value: Record<string, unknown>) => boolean>
+
+/** Structural transport guard only; Rust validates connected geometry, partitions and equations. */
+export function isRulesShape(value: unknown): value is PuzzleRules {
+  return isRecord(value) && isVariant(value.kind) && RULE_SHAPES[value.kind](value)
 }

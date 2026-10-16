@@ -207,7 +207,8 @@ export default [
         patterns: [
           ...compositionImportPatterns,
           {
-            regex: '^@/(?!core/|features/(?:game|learning|settings)/model/)',
+            regex:
+              '^@/(?!core/|sudoku/(?:contracts|generationInput|seed)(?:[./]|$)|features/(?:game|learning|settings)/model/)',
             message: 'Pure models may only depend on the engine and other pure models.',
           },
         ],

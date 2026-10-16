@@ -1,11 +1,18 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { createTestEngine, getTestModule } from '../../tests/support/wasm'
+import { seedForTest } from '../../tests/support/generation'
+import { encodeSeed } from '@/sudoku/seed'
+import type { WorkerInbound } from '@/worker/protocol'
+import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createSudokuWorkerClient } from '@/worker/client'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
-import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
+import { generationInput } from '../../tests/support/generation'
+import { PUZZLE_VERSION } from '@/sudoku/guards'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 import { solvedBoard, uniqueBoard } from '../../tests/fixtures/sudoku'
 import type { WorkerRequest } from '@/worker/protocol'
 import { createAssessmentInput } from '@/core/sudoku/rating/input'
+
+const engine = await createTestEngine()
+afterAll(() => engine.dispose())
 
 class FakeWorker extends EventTarget {
   static instances: FakeWorker[] = []
@@ -15,8 +22,12 @@ class FakeWorker extends EventTarget {
     super()
     FakeWorker.instances.push(this)
   }
-  postMessage(request: WorkerRequest) {
-    this.requests.push(request)
+  postMessage(request: WorkerInbound) {
+    if (request.kind === 'initialize') {
+      this.reply({ kind: 'ready', bridgeVersion: request.bridgeVersion })
+    } else {
+      this.requests.push(request)
+    }
   }
   terminate() {
     this.terminated = true
@@ -27,7 +38,7 @@ class FakeWorker extends EventTarget {
 }
 const input = {
   difficulty: 'easy',
-  seed: 'worker',
+  seed: seedForTest('worker'),
   variant: 'classic' as const,
   puzzleVersion: PUZZLE_VERSION,
 } satisfies Parameters<ReturnType<typeof createSudokuWorkerClient>['generate']>[0]
@@ -52,7 +63,7 @@ afterEach(() => {
 })
 
 it('prepares one idle worker without starting the request timeout or computing a puzzle', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
 
   expect(FakeWorker.instances).toHaveLength(1)
   const prepared = latestWorker()
@@ -76,7 +87,7 @@ it('prepares one idle worker without starting the request timeout or computing a
 })
 
 it('reports an idle worker startup failure and prepares a fresh worker for retry', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
   const prepared = latestWorker()
   prepared.dispatchEvent(new ErrorEvent('error', { message: 'Worker script unavailable' }))
 
@@ -95,7 +106,7 @@ it('reports an idle worker startup failure and prepares a fresh worker for retry
 })
 
 it('assesses with the same timeout, stale reply fence, cancellation, and disposal', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
   const assessmentInput = createAssessmentInput(uniqueBoard, { kind: 'classic' })
   const pending = client.assess(assessmentInput)
   const worker = latestWorker()
@@ -138,7 +149,7 @@ it('assesses with the same timeout, stale reply fence, cancellation, and disposa
 })
 
 it('rejects assessment identities that differ from the submitted rules', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
   const pending = client.assess(createAssessmentInput(uniqueBoard, { kind: 'classic' }))
   const worker = latestWorker()
   worker.reply({
@@ -155,7 +166,7 @@ it('rejects assessment identities that differ from the submitted rules', async (
   client.dispose()
 })
 it('terminates generation after three seconds without changing retry input', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
   const pending = client.generate(input)
 
   expect(FakeWorker.instances).toHaveLength(1)
@@ -175,7 +186,7 @@ it('terminates generation after three seconds without changing retry input', asy
   expect(await retry).toEqual({ status: 'cancelled' })
 })
 it('ignores unknown IDs and validates success before settling once', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
   const pending = client.generate(input)
 
   expect(FakeWorker.instances).toHaveLength(1)
@@ -184,7 +195,7 @@ it('ignores unknown IDs and validates success before settling once', async () =>
   const outcome = {
     status: 'completed',
     value: {
-      seed: input.seed,
+      seed: encodeSeed(input.seed),
       difficulty: input.difficulty,
       puzzleVersion: input.puzzleVersion,
       rules: { kind: 'classic' },
@@ -201,7 +212,7 @@ it('ignores unknown IDs and validates success before settling once', async () =>
   expect(worker.terminated).toBe(true)
 })
 it('rejects malformed replies rather than accepting success-shaped data', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
   const pending = client.generate(input)
 
   expect(FakeWorker.instances).toHaveLength(1)
@@ -215,7 +226,7 @@ it('rejects malformed replies rather than accepting success-shaped data', async 
   expect(await pending).toMatchObject({ status: 'failed' })
 })
 it('cancels jobs and cannot deliver an old reply to a new job', async () => {
-  const client = createSudokuWorkerClient()
+  const client = createSudokuWorkerClient(getTestModule(), engine)
   const controller = new AbortController()
   const pending = client.hint(uniqueBoard, solvedBoard, { kind: 'classic' }, controller.signal)
 
@@ -239,8 +250,8 @@ it('cancels jobs and cannot deliver an old reply to a new job', async () => {
 })
 
 it('retains cancellation and timeout outcomes for variants', async () => {
-  const client = createSudokuWorkerClient()
-  const variantInput = createGenerationInput('arrow', 'medium', 'variant-worker')
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const variantInput = generationInput('arrow', 'medium', 'variant-worker')
   const pending = client.generate(variantInput)
   await vi.advanceTimersByTimeAsync(15000)
 
@@ -259,8 +270,8 @@ it('retains cancellation and timeout outcomes for variants', async () => {
 })
 
 it('ignores stale variant replies and preserves budget exhaustion', async () => {
-  const client = createSudokuWorkerClient()
-  const pending = client.generate(createGenerationInput('thermo', 'hard', 'variant-worker'))
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const pending = client.generate(generationInput('thermo', 'hard', 'variant-worker'))
   const worker = latestWorker()
   const outcome = { status: 'budget-exhausted', message: 'Bounded work exhausted' }
   worker.reply({ kind: 'generate', requestId: 'stale-variant', outcome })
@@ -273,8 +284,8 @@ it('ignores stale variant replies and preserves budget exhaustion', async () => 
 })
 
 it('rejects a valid puzzle whose type does not match the variant request', async () => {
-  const client = createSudokuWorkerClient()
-  const variantInput = createGenerationInput('arrow', 'easy', 'variant-worker')
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const variantInput = generationInput('arrow', 'easy', 'variant-worker')
   const pending = client.generate(variantInput)
   const worker = latestWorker()
   worker.reply({
@@ -284,6 +295,7 @@ it('rejects a valid puzzle whose type does not match the variant request', async
       status: 'completed',
       value: {
         ...variantInput,
+        seed: encodeSeed(variantInput.seed),
         givens: uniqueBoard,
         solution: solvedBoard,
         rules: { kind: 'classic' },

@@ -1,3 +1,4 @@
+import { encodeSeed } from '@/sudoku/seed'
 import { expect, it, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { router } from '@/router/index'
@@ -10,7 +11,7 @@ import { completeSession } from '@/features/game/model/session'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { useGameStore } from '@/features/game/stores/useGameStore'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { generationInput } from '../../../../tests/support/generation'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
 import type { Puzzle } from '@/core/sudoku/puzzle'
@@ -58,7 +59,7 @@ it.each(['free', 'learning', 'daily'] as const)(
       return pending.promise
     }
     const generating = game.startGame(
-      createGenerationInput('classic', 'easy', 'pre-restore'),
+      generationInput('classic', 'easy', 'pre-restore'),
       metadata,
       undefined,
       mode === 'daily' ? restored.id : undefined,
@@ -117,7 +118,7 @@ it.each(['acquire', 'write'] as const)(
         return write(...args)
       }
     }
-    const generating = game.startGame(createGenerationInput('classic', 'easy', 'racing-restore'), {
+    const generating = game.startGame(generationInput('classic', 'easy', 'racing-restore'), {
       kind: 'free',
     })
     await entered.promise
@@ -162,7 +163,7 @@ it.each(['rated', 'unavailable'] as const)(
     }))
 
     expect(
-      await test.game.startGame(createGenerationInput('classic', 'easy', 'snapshot'), {
+      await test.game.startGame(generationInput('classic', 'easy', 'snapshot'), {
         kind: 'free',
       }),
     ).toEqual({ status: 'ready' })
@@ -195,7 +196,7 @@ it.each(['cancel', 'switch', 'reset'] as const)(
       entered.resolve()
       return pending.promise
     }
-    const starting = test.game.startGame(createGenerationInput('classic', 'easy', 'late'), {
+    const starting = test.game.startGame(generationInput('classic', 'easy', 'late'), {
       kind: 'free',
     })
     await entered.promise
@@ -253,7 +254,7 @@ it('releases the current editing lease once when replacing its own game', async 
   const release = vi.spyOn(test.runtime.ownership, 'releaseOwnership')
   test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
 
-  await test.game.startGame(createGenerationInput('classic', 'easy', 'replacement'), {
+  await test.game.startGame(generationInput('classic', 'easy', 'replacement'), {
     kind: 'free',
   })
 
@@ -304,12 +305,9 @@ it.each(['acquisition-failed', 'acquisition-denied', 'replacement-failed'] as co
       })
     }
 
-    const starting = test.game.startGame(
-      createGenerationInput('classic', 'easy', 'cleanup-reset'),
-      {
-        kind: 'free',
-      },
-    )
+    const starting = test.game.startGame(generationInput('classic', 'easy', 'cleanup-reset'), {
+      kind: 'free',
+    })
     await cleanupEntered.promise
     await test.runtime.repository.clearAll()
     test.game.dropSession()
@@ -335,12 +333,17 @@ it('retains an unsaved session after a failed type switch and retries before ins
   })
   test.runtime.worker.generate = vi.fn(async (input) => ({
     status: 'completed' as const,
-    value: { ...makeSession().puzzle, ...VARIANT_FIXTURES.arrow, ...input },
+    value: {
+      ...makeSession().puzzle,
+      ...VARIANT_FIXTURES.arrow,
+      ...input,
+      seed: encodeSeed(input.seed),
+    },
   }))
   await test.game.resume()
   test.game.dispatch({ kind: 'enter', cell: 2, digit: 4 })
   time = 3000
-  const input = createGenerationInput('arrow', 'easy', 'switch')
+  const input = generationInput('arrow', 'easy', 'switch')
 
   expect(await test.game.startGame(input, { kind: 'free' })).toEqual({
     status: 'blocked',
@@ -380,16 +383,21 @@ it('ignores a late previous-type generation', async () => {
 
     return {
       status: 'completed',
-      value: { ...makeSession().puzzle, ...VARIANT_FIXTURES.thermo, ...input },
+      value: {
+        ...makeSession().puzzle,
+        ...VARIANT_FIXTURES.thermo,
+        ...input,
+        seed: encodeSeed(input.seed),
+      },
     }
   }
-  const pending = test.game.startGame(createGenerationInput('arrow', 'easy', 'first'), {
+  const pending = test.game.startGame(generationInput('arrow', 'easy', 'first'), {
     kind: 'free',
   })
   await entered.promise
 
   expect(
-    await test.game.startGame(createGenerationInput('thermo', 'easy', 'second'), { kind: 'free' }),
+    await test.game.startGame(generationInput('thermo', 'easy', 'second'), { kind: 'free' }),
   ).toEqual({ status: 'ready' })
   first.resolve({
     status: 'completed',
@@ -697,7 +705,7 @@ it('does not create or install a cancelled game while its catalog read is pendin
   }
   test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
-  const job = game.startGame(createGenerationInput('classic', 'easy', 'cancel-before-commit'), {
+  const job = game.startGame(generationInput('classic', 'easy', 'cancel-before-commit'), {
     kind: 'free',
   })
   await reading
@@ -710,5 +718,26 @@ it('does not create or install a cancelled game while its catalog read is pendin
   expect(await test.database.count('sessions')).toBe(0)
   await game.leaveGame()
   game.dispose()
+  test.dispose()
+})
+
+it('captures_seed_bytes_before_save_preparation_and_retains_them_for_retry', async () => {
+  const test = await setup()
+  const input = generationInput('classic', 'easy', 'owned-before-save')
+  const expected = input.seed.slice()
+  const generate = vi
+    .fn<typeof test.runtime.worker.generate>()
+    .mockResolvedValue({ status: 'timed-out' })
+  test.runtime.worker.generate = generate
+
+  const pending = test.game.startGame(input, { kind: 'free' })
+  input.seed.fill(255)
+  await pending
+  await test.game.retryGeneration()
+
+  expect(generate).toHaveBeenCalledTimes(2)
+  expect(generate.mock.calls.map(([request]) => request.seed)).toEqual([expected, expected])
+  await test.game.leaveGame()
+  test.game.dispose()
   test.dispose()
 })

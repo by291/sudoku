@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest'
 import {
   getChallengeDate,
-  getDailySeed,
+  getDailySeedMaterial,
+  getDailyFormalId,
   getDailyIdentity,
   getDailyStatuses,
   restartDailySession,
@@ -9,11 +10,13 @@ import {
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 
-it('changes the challenge at Beijing midnight with a versioned stable seed', () => {
+it('changes the challenge at Beijing midnight with exact ASCII seed material', () => {
   expect(getChallengeDate(new Date('2026-10-11T15:59:59.999Z'))).toBe('2026-10-11')
   expect(getChallengeDate(new Date('2026-10-11T16:00:00.000Z'))).toBe('2026-10-12')
-  expect(getDailySeed('2026-10-11', 'sudoku-v3')).toBe('daily:sudoku-v3:2026-10-11')
-  expect(() => getDailySeed('2026-02-30', 'v1')).toThrow()
+  expect(Array.from(getDailySeedMaterial('2026-10-11'))).toEqual([
+    100, 97, 105, 108, 121, 58, 50, 48, 50, 54, 45, 49, 48, 45, 49, 49,
+  ])
+  expect(() => getDailySeedMaterial('2026-02-30')).toThrow()
 })
 it('restarts daily entries while retaining identity, accumulated time and assistance', () => {
   const session = makeSession({
@@ -35,13 +38,14 @@ it('restarts daily entries while retaining identity, accumulated time and assist
   expect(restarted.notes.every((value) => value === 0)).toBe(true)
 })
 it('uses current seeds and stable type-specific formal daily identities', () => {
-  expect(getDailyIdentity('2026-10-11', 'classic')).toMatchObject({
-    seed: 'daily:sudoku-v10:2026-10-11',
+  expect(getDailyFormalId('2026-10-11', 'classic')).toBe('daily:2026-10-11:formal')
+  expect(getDailyIdentity('2026-10-11', 'classic', new Uint8Array(32))).toMatchObject({
+    seed: new Uint8Array(32),
     formalId: 'daily:2026-10-11:formal',
     input: { variant: 'classic', difficulty: 'medium' },
   })
-  expect(getDailyIdentity('2026-10-11', 'arrow')).toMatchObject({
-    seed: 'daily:sudoku-variants-v10:arrow:2026-10-11',
+  expect(getDailyIdentity('2026-10-11', 'arrow', new Uint8Array(32))).toMatchObject({
+    seed: new Uint8Array(32),
     formalId: 'daily:arrow:2026-10-11:formal',
     input: { variant: 'arrow', difficulty: 'medium' },
   })

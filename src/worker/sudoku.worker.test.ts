@@ -1,18 +1,23 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
-import { generatePuzzle } from '@/core/sudoku/generation/generate'
-import type { GenerationExhaustionCause } from '@/core/sudoku/generation/types'
-import type { WorkerResponse } from '@/worker/protocol'
+import { generationInput } from '../../tests/support/generation'
+import { getTestModule } from '../../tests/support/wasm'
+import { createWorkerEngine } from '@/sudoku/workerEngine'
+import type { GenerationExhaustionDto } from '@sudoku/wasm'
+import type { WorkerResponse, WorkerReady } from '@/worker/protocol'
 
-vi.mock('@/core/sudoku/generation/generate', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/core/sudoku/generation/generate')>()),
-  generatePuzzle: vi.fn(),
-}))
+vi.mock('@/sudoku/workerEngine', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/sudoku/workerEngine')>()
+  return { ...original, createWorkerEngine: vi.fn(original.createWorkerEngine) }
+})
 
 let handler: ((event: MessageEvent<unknown>) => void) | undefined
-const post = vi.fn<(response: WorkerResponse) => void>()
+let engine: Awaited<ReturnType<typeof createWorkerEngine>>
+const post = vi.fn<(response: WorkerResponse | WorkerReady) => void>()
 
 beforeAll(async () => {
+  const actual = await createWorkerEngine(getTestModule())
+  engine = { ...actual, generate: vi.fn(actual.generate) }
+  vi.mocked(createWorkerEngine).mockResolvedValue(engine)
   vi.stubGlobal(
     'addEventListener',
     (_kind: string, listener: (event: MessageEvent<unknown>) => void) => {
@@ -21,17 +26,26 @@ beforeAll(async () => {
   )
   vi.stubGlobal('postMessage', post)
   await import('@/worker/sudoku.worker')
+  if (!handler) {
+    throw new Error('Worker message handler was not installed')
+  }
+  handler(
+    new MessageEvent('message', {
+      data: { kind: 'initialize', bridgeVersion: 1, module: getTestModule() },
+    }),
+  )
+  await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ kind: 'ready', bridgeVersion: 1 }))
+  post.mockClear()
 })
-
 afterAll(() => vi.unstubAllGlobals())
 
-it.each<GenerationExhaustionCause>([
+it.each<GenerationExhaustionDto>([
   'work-limit',
   'logical-step-limit',
   'layout-limit',
   'exhausted-frontier',
 ])('maps %s to the existing public exhaustion envelope without diagnostics', (cause) => {
-  vi.mocked(generatePuzzle).mockReturnValue({
+  vi.mocked(engine.generate).mockReturnValue({
     status: 'budget-exhausted',
     stage: 'construction',
     cause,
@@ -52,7 +66,7 @@ it.each<GenerationExhaustionCause>([
       data: {
         kind: 'generate',
         requestId: cause,
-        input: createGenerationInput('classic', 'hard', 'adapter-cause'),
+        input: generationInput('classic', 'hard', 'adapter-cause'),
       },
     }),
   )

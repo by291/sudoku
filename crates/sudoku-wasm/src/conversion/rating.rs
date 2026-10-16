@@ -7,7 +7,6 @@ use sudoku_core::constraints::types::{RuleViolation, ViolationCode};
 use sudoku_core::logic::techniques::ALL_TECHNIQUES;
 use sudoku_core::rating::types::{
     AssessmentFailure, AssessmentIssue, AssessmentResult, AssessmentStage, DifficultyAssessment,
-    RATING_VERSION,
 };
 use sudoku_core::types::CoreResult;
 
@@ -52,7 +51,7 @@ pub fn summary_to_dto(summary: &DifficultyAssessment) -> CoreResult<AssessmentSu
         })
         .collect::<CoreResult<_>>()?;
     Ok(AssessmentSummaryDto {
-        rating_version: RATING_VERSION.to_string(),
+        rating_version: crate::dto::rating::RatingVersionDto::V2,
         variant: summary.variant.into(),
         difficulty: summary.difficulty.into(),
         workload: WorkloadDto {
@@ -80,7 +79,7 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
         },
         AssessmentResult::Unrated(AssessmentFailure::Ungraded { variant }) => {
             AssessmentResultDto::Ungraded {
-                rating_version: RATING_VERSION.to_string(),
+                rating_version: crate::dto::rating::RatingVersionDto::V2,
                 variant: (*variant).into(),
             }
         }
@@ -89,7 +88,7 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
             stage,
             difficulty,
         }) => AssessmentResultDto::BudgetExhausted {
-            rating_version: RATING_VERSION.to_string(),
+            rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: (*variant).into(),
             stage: match stage {
                 AssessmentStage::Validation => AssessmentStageDto::Validation,

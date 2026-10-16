@@ -1,3 +1,4 @@
+import { copyRules } from '@/sudoku/ruleInput'
 import { createBindings } from '@sudoku/wasm/factory'
 import { validateEngineInfo, validateModuleExports } from '@/sudoku/guards'
 import type {
@@ -11,13 +12,12 @@ import type {
   SearchWorkDto,
   EditInputDto,
   EditWorkDto,
-  PuzzleContent,
   PuzzleValidation,
   AssessmentValidationInputDto,
   AssessmentValidationDto,
-  HintValidationInputDto,
   HintValidationDto,
   TransformInputDto,
+  ParsedOutcomeDto,
 } from '@/sudoku/contracts'
 
 type Bindings = ReturnType<typeof createBindings>
@@ -38,9 +38,12 @@ export interface PreparedPuzzle {
 export interface MainSudokuEngine {
   prepare(rules: PuzzleRules): PreparedPuzzle
   deriveSeed(material: Uint8Array): Uint8Array
-  validatePuzzle(content: PuzzleContent): PuzzleValidation
+  validatePuzzle(content: unknown): PuzzleValidation
+  validateRules(rules: unknown): PuzzleValidation
+  parseHint(value: unknown): HintValidationDto
   validateAssessment(input: AssessmentValidationInputDto): AssessmentValidationDto
-  validateHint(input: HintValidationInputDto): HintValidationDto
+  validateAssessmentOutcome(value: unknown): ParsedOutcomeDto
+  validateHint(input: unknown): HintValidationDto
   transformRules(input: TransformInputDto): PuzzleRules
   dispose(): void
 }
@@ -62,7 +65,7 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
   return {
     prepare(rules) {
       let raw: InstanceType<Bindings['PreparedPuzzle']> | null = new (active().PreparedPuzzle)({
-        rules,
+        rules: copyRules(rules),
       })
       function prepared() {
         if (!raw) {
@@ -79,7 +82,7 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
         conflicts: (input) => prepared().conflicts(input),
         countSolutions: (input) => prepared().count_solutions(input),
         edit: (input) => prepared().edit(input),
-        isComplete: (board) => prepared().is_complete(board),
+        isComplete: (board) => prepared().is_complete([...board]),
         dispose() {
           if (raw) {
             raw.free()
@@ -93,7 +96,10 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
     },
     deriveSeed: (material) => active().derive_seed(material),
     validatePuzzle: (content) => active().validate_puzzle(content),
+    validateRules: (rules) => active().validate_rules(rules),
+    parseHint: (value) => active().parse_hint(value),
     validateAssessment: (input) => active().validate_assessment(input),
+    validateAssessmentOutcome: (value) => active().parse_assessment_outcome(value),
     validateHint: (input) => active().validate_hint_evidence(input),
     transformRules: (input) => active().transform_rules(input),
     dispose() {

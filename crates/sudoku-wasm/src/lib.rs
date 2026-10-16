@@ -11,7 +11,9 @@ use conversion::rules::rules_to_dto;
 use conversion::values::{DEFAULT_QUERY_WORK, budget, counter};
 use dto::EngineInfo;
 use dto::generation::{GenerationOptionsDto, GenerationResultDto};
-use dto::logic::{HintInputDto, HintValidationDto, HintValidationInputDto, LogicInputDto};
+use dto::logic::{
+    HintInputDto, HintResultDto, HintValidationDto, HintValidationInputDto, LogicInputDto,
+};
 use dto::operations::{CountInputDto, WorkResultDto};
 use dto::rating::AssessmentInputDto;
 use dto::rules::{PuzzleContentDto, RulesDto, TransformInputDto, ValidationDto};
@@ -191,9 +193,10 @@ pub fn count_solutions(
 }
 
 #[wasm_bindgen]
-pub fn validate_puzzle(input: Ts<PuzzleContentDto>) -> Result<Ts<ValidationDto>, JsError> {
-    let content = input
-        .to_rust()
+pub fn validate_puzzle(
+    input: Ts<dto::values::UntrustedValueDto>,
+) -> Result<Ts<ValidationDto>, JsError> {
+    let content = serde_wasm_bindgen::from_value::<PuzzleContentDto>(input.to_rust()?.0)
         .map_err(|_| EngineError::invalid("Invalid puzzle board or rules"))
         .and_then(|value| value.try_into());
     let outcome = content.and_then(|content| {
@@ -214,10 +217,9 @@ pub fn validate_puzzle(input: Ts<PuzzleContentDto>) -> Result<Ts<ValidationDto>,
 
 #[wasm_bindgen]
 pub fn validate_hint_evidence(
-    input: Ts<HintValidationInputDto>,
+    input: Ts<dto::values::UntrustedValueDto>,
 ) -> Result<Ts<HintValidationDto>, JsError> {
-    let parsed = input
-        .to_rust()
+    let parsed = serde_wasm_bindgen::from_value::<HintValidationInputDto>(input.to_rust()?.0)
         .map_err(|_| EngineError::invalid("Hint evidence does not match the requested rules"));
     let outcome = parsed.and_then(|input| {
         let hint = hint_to_core(input.hint)?;
@@ -259,7 +261,7 @@ pub fn validate_assessment(
 
 #[wasm_bindgen]
 pub fn parse_assessment_summary(
-    value: Ts<dto::rating::RawAssessmentDto>,
+    value: Ts<dto::values::UntrustedValueDto>,
 ) -> Result<Ts<dto::rating::ParsedSummaryDto>, JsError> {
     let parsed = conversion::metadata::parse_summary(&value.to_rust()?.0)
         .and_then(|value| conversion::rating::summary_to_dto(&value));
@@ -275,7 +277,7 @@ pub fn parse_assessment_summary(
 
 #[wasm_bindgen]
 pub fn parse_assessment_outcome(
-    value: Ts<dto::rating::RawAssessmentDto>,
+    value: Ts<dto::values::UntrustedValueDto>,
 ) -> Result<Ts<dto::rating::ParsedOutcomeDto>, JsError> {
     let result = match conversion::metadata::parse_outcome(&value.to_rust()?.0) {
         Ok(value) => dto::rating::ParsedAssessmentDto::Valid { valid: true, value },
@@ -285,4 +287,39 @@ pub fn parse_assessment_outcome(
         },
     };
     Ok(dto::rating::ParsedOutcomeDto(result).into_ts()?)
+}
+
+#[wasm_bindgen]
+pub fn parse_hint(
+    input: Ts<dto::values::UntrustedValueDto>,
+) -> Result<Ts<HintValidationDto>, JsError> {
+    let parsed = serde_wasm_bindgen::from_value::<HintResultDto>(input.to_rust()?.0)
+        .map_err(|_| EngineError::invalid("Hint evidence does not match the requested rules"))
+        .and_then(hint_to_core)
+        .and_then(|hint| sudoku_core::logic::hint_validation::validate_hint_shape(&hint));
+    let result = match parsed {
+        Ok(hint) => HintValidationDto::Valid {
+            hint: hint_to_dto(&hint).map_err(js_error)?,
+        },
+        Err(error) => HintValidationDto::Invalid {
+            issues: issues(error),
+        },
+    };
+    Ok(result.into_ts()?)
+}
+
+#[wasm_bindgen]
+pub fn validate_rules(
+    input: Ts<dto::values::UntrustedValueDto>,
+) -> Result<Ts<ValidationDto>, JsError> {
+    let parsed = serde_wasm_bindgen::from_value::<RulesDto>(input.to_rust()?.0)
+        .map_err(|_| EngineError::invalid("Invalid puzzle rules"))
+        .and_then(sudoku_core::rules::types::PuzzleRules::try_from);
+    let result = match parsed {
+        Ok(_) => ValidationDto::Valid,
+        Err(error) => ValidationDto::Invalid {
+            issues: issues(error),
+        },
+    };
+    Ok(result.into_ts()?)
 }

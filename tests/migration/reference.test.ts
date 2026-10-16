@@ -73,3 +73,45 @@ describe('migration reference integrity', () => {
     })
   })
 })
+
+it('does_not_redirect_imports_owned_by_other_projects_or_test_harnesses', () => {
+  withDirectory((directory) => {
+    const frozen = join(directory, 'frozen')
+    const production = join(directory, 'production')
+    mkdirSync(join(frozen, 'src/core/sudoku'), { recursive: true })
+    mkdirSync(join(production, 'src/core/sudoku'), { recursive: true })
+    writeFileSync(join(frozen, 'src/core/sudoku/value.ts'), 'export const value = 42\n')
+    writeFileSync(join(production, 'src/core/sudoku/value.ts'), 'export const value = 99\n')
+    writeFileSync(
+      join(frozen, 'probe.ts'),
+      "import { value } from '@/core/sudoku/value'\nexport default value\n",
+    )
+    writeFileSync(join(production, 'relative.js'), 'export const extra = 1\n')
+    writeFileSync(
+      join(production, 'probe.ts'),
+      "import { value } from '@/core/sudoku/value'\nimport { extra } from './relative'\nexport default value + extra\n",
+    )
+    const script = `
+      import { registerHooks } from 'node:module'
+      import { resolve } from 'node:path'
+      import { pathToFileURL } from 'node:url'
+      import { registerReference } from ${JSON.stringify(new URL('./reference-loader.mjs', import.meta.url).href)}
+      registerHooks({ resolve(specifier, context, next) {
+        if (specifier.startsWith('@/')) return next(pathToFileURL(resolve(${JSON.stringify(production)}, 'src', specifier.slice(2) + '.ts')).href, context)
+        if (specifier === './relative') return next(specifier + '.js', context)
+        return next(specifier, context)
+      } })
+      registerReference({ directory: ${JSON.stringify(frozen)}, verify: false })
+      const frozen = await import(pathToFileURL(${JSON.stringify(join(frozen, 'probe.ts'))}).href)
+      const production = await import(pathToFileURL(${JSON.stringify(join(production, 'probe.ts'))}).href)
+      console.log(frozen.default + ':' + production.default)
+    `
+
+    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+      encoding: 'utf8',
+    })
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout.trim()).toBe('42:100')
+  })
+})

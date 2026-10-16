@@ -32,3 +32,15 @@ test('generated_exports_preserve_concrete_result_types', () => {
     ParsedAssessmentDto<AssessmentSummaryDto>
   >()
 })
+
+test('nested_records_and_nulls_match_the_actual_js_values', () => {
+  expectTypeOf<import('@sudoku/wasm').WorkloadDto['techniqueCounts']>().toEqualTypeOf<
+    Record<import('@sudoku/wasm').TechniqueDto, number>
+  >()
+  expectTypeOf<import('@sudoku/wasm').WorkloadDto['highestTier']>().toEqualTypeOf<
+    import('@sudoku/wasm').DifficultyDto | null
+  >()
+  expectTypeOf<import('@sudoku/wasm').GenerationMetricsDto['workByStage']>().toEqualTypeOf<
+    Record<'preparation' | 'arithmetic' | 'exact' | 'logic' | 'proposals', number>
+  >()
+})

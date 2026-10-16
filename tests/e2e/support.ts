@@ -1,3 +1,4 @@
+import { seedForTest } from '../support/generation'
 import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { GameSession } from '@/features/game/model/session'
@@ -11,15 +12,19 @@ import type { NewSudokuVariant } from '@/core/sudoku/rules/types'
 
 export { expect }
 
-export async function useNextGenerationSeed(page: Page, seed: string) {
+export async function useNextGenerationSeed(page: Page, label: string) {
+  const seed = Array.from(seedForTest(label))
   await page.evaluate((seed) => {
-    const original = crypto.randomUUID.bind(crypto)
-    Object.defineProperty(crypto, 'randomUUID', {
+    const original = crypto.getRandomValues.bind(crypto)
+    Object.defineProperty(crypto, 'getRandomValues', {
       configurable: true,
-      value() {
-        // Fix only the next UI seed; later request and session identities remain independent.
-        Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: original })
-        return seed
+      value(value: unknown) {
+        if (value instanceof Uint8Array && value.length === 32) {
+          value.set(seed)
+          Object.defineProperty(crypto, 'getRandomValues', { configurable: true, value: original })
+          return value
+        }
+        return Reflect.apply(original, crypto, [value])
       },
     })
   }, seed)

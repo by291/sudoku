@@ -1,3 +1,4 @@
+import { SEED_BYTE_LENGTH } from '@/sudoku/seed'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
 import { inject } from 'vue'
 import type { InjectionKey } from 'vue'
@@ -38,7 +39,10 @@ export function useGameRuntime(): GameRuntime {
   return runtime
 }
 
-export function createGameRuntime(engine: MainSudokuEngine): GameRuntime {
+export function createGameRuntime(
+  engine: MainSudokuEngine,
+  module: WebAssembly.Module,
+): GameRuntime {
   let disposed = false
   // Reuse one live connection; failed opens and version changes permit a fresh connection.
   let opening: ReturnType<typeof openSudokuDatabase> | null = null
@@ -62,12 +66,12 @@ export function createGameRuntime(engine: MainSudokuEngine): GameRuntime {
   }
   const ownership = createOwnershipCoordinator(provider)
   const repository = createGameRepository(provider, { onReset: () => ownership.notifyReset() })
-  const worker = createSudokuWorkerClient()
+  const worker = createSudokuWorkerClient(module, engine)
 
   return {
     ready: true,
     engine,
-    createSeed: () => crypto.getRandomValues(new Uint8Array(32)),
+    createSeed: () => crypto.getRandomValues(new Uint8Array(SEED_BYTE_LENGTH)),
     worker,
     repository,
     ownership,

@@ -1,10 +1,10 @@
+import type { BoardDto, RulesDto } from '@sudoku/wasm'
+
 // Pure generated contracts. Importing domain types never initializes WASM or browser services.
 export type {
-  BoardDto as Board,
   DigitDto as Digit,
   DifficultyDto as Difficulty,
   VariantDto as SudokuVariant,
-  RulesDto as PuzzleRules,
   MetadataDto as RuleMetadata,
   LogicalStepDto as LogicalStep,
   TechniqueDto as Technique,
@@ -30,3 +30,14 @@ export type {
   EditWorkDto,
   SearchWorkDto,
 } from '@sudoku/wasm'
+
+/** Borrowed requests are read-only; binding conversion produces owned Rust values. */
+export type ReadonlyContract<T> = T extends readonly (infer Item)[]
+  ? readonly ReadonlyContract<Item>[]
+  : T extends object
+    ? { readonly [Key in keyof T]: ReadonlyContract<T[Key]> }
+    : T
+
+export type Board = Readonly<BoardDto>
+export type PuzzleRules = ReadonlyContract<RulesDto>
+export type { ParsedOutcomeDto } from '@sudoku/wasm'

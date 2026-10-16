@@ -9,7 +9,7 @@ use super::types::{
 use super::workspace::{apply_step, create_workspace};
 use crate::budget::WorkBudget;
 use crate::hint::HintResult;
-use crate::rules::context::compile_rules;
+use crate::rules::context::{compile_rules, validate_rules};
 use crate::rules::types::{Arrow, PuzzleRules, RuleConstraint, Unit, UnitKind};
 use crate::types::{BOARD_SIZE, Board, Bounded, CoreResult, EngineError};
 
@@ -56,7 +56,7 @@ fn valid_rule_evidence(evidence: &RuleEvidence) -> bool {
     match &evidence.kind {
         RuleEvidenceKind::Thermo { path, bounds } => {
             if !cell_list(path, 10)
-                || compile_rules(&PuzzleRules::Thermo {
+                || validate_rules(&PuzzleRules::Thermo {
                     paths: vec![path.clone()],
                 })
                 .is_err()
@@ -83,7 +83,7 @@ fn valid_rule_evidence(evidence: &RuleEvidence) -> bool {
             domains,
         } => {
             cell_list(shaft, 10)
-                && compile_rules(&PuzzleRules::Arrow {
+                && validate_rules(&PuzzleRules::Arrow {
                     arrows: vec![Arrow {
                         circle: *circle,
                         shaft: shaft.clone(),
@@ -215,11 +215,8 @@ fn clue_matches(evidence: &RuleEvidence, constraints: &[RuleConstraint]) -> bool
 
 /// Validate owned typed evidence against exact ordered clues; optional board enables candidate replay.
 /// Basic/rule deductions retain replay validation; advanced patterns use their independent proof checker.
-pub fn validate_hint_evidence(
-    hint: &HintResult,
-    rules: &PuzzleRules,
-    board: Option<&Board>,
-) -> CoreResult<HintResult> {
+/// Validate transport shape independently of clue identity or board-level proof replay.
+pub fn validate_hint_shape(hint: &HintResult) -> CoreResult<HintResult> {
     let mut parsed = hint.clone();
     let HintResult::Deduction { steps, placement } = &mut parsed else {
         if matches!(parsed, HintResult::ReviewEntry { cell } if cell >= BOARD_SIZE) {
@@ -243,6 +240,24 @@ pub fn validate_hint_evidence(
     {
         return Err(invalid());
     }
+
+    for step in steps {
+        if let Evidence::Unit { units, .. } = &mut step.evidence {
+            units.get_or_insert_with(Vec::new);
+        }
+    }
+    Ok(parsed)
+}
+
+pub fn validate_hint_evidence(
+    hint: &HintResult,
+    rules: &PuzzleRules,
+    board: Option<&Board>,
+) -> CoreResult<HintResult> {
+    let mut parsed = validate_hint_shape(hint)?;
+    let HintResult::Deduction { steps, .. } = &mut parsed else {
+        return Ok(parsed);
+    };
 
     let context = compile_rules(rules)?;
     let mut state = board.map(|board| create_workspace(board, &context));

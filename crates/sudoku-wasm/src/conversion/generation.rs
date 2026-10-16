@@ -4,6 +4,7 @@ use super::values::counter;
 use crate::dto::generation::{
     GeneratedPuzzleDto, GeneratedSourceDto, GenerationExhaustionDto, GenerationMetricsDto,
     GenerationOptionsDto, GenerationResultDto, GenerationStageDto, GenerationVersionDto,
+    WorkStageDto,
 };
 use sudoku_core::budget::WorkStage;
 use sudoku_core::generation::types::{
@@ -50,6 +51,18 @@ pub fn input(
     Ok((input, limits))
 }
 
+impl From<WorkStage> for WorkStageDto {
+    fn from(stage: WorkStage) -> Self {
+        match stage {
+            WorkStage::Preparation => Self::Preparation,
+            WorkStage::Arithmetic => Self::Arithmetic,
+            WorkStage::Exact => Self::Exact,
+            WorkStage::Logic => Self::Logic,
+            WorkStage::Proposals => Self::Proposals,
+        }
+    }
+}
+
 pub fn result_to_dto(result: GenerationResult) -> CoreResult<GenerationResultDto> {
     let source = result.metrics;
     let metrics = GenerationMetricsDto {
@@ -59,12 +72,7 @@ pub fn result_to_dto(result: GenerationResult) -> CoreResult<GenerationResultDto
         candidate_visits: source.candidate_visits,
         work_by_stage: WorkStage::ALL
             .into_iter()
-            .map(|stage| {
-                Ok((
-                    stage.name().to_string(),
-                    counter(source.work_by_stage.used(stage))?,
-                ))
-            })
+            .map(|stage| Ok((stage.into(), counter(source.work_by_stage.used(stage))?)))
             .collect::<CoreResult<_>>()?,
     };
     Ok(match result.outcome {

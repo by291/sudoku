@@ -1,3 +1,5 @@
+import { seedForTest } from '../../../../tests/support/generation'
+import { encodeSeed } from '@/sudoku/seed'
 import { expect, it, vi } from 'vitest'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
@@ -8,8 +10,8 @@ import { createPinia, disposePinia } from 'pinia'
 import { gameRuntimeKey } from '@/runtime'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
-import type { GenerationInput } from '@/core/sudoku/generation/types'
-import { getDailyIdentity } from '@/features/game/model/daily'
+import type { GenerationInput } from '@/sudoku/generationInput'
+import { getDailyIdentity, getDailyFormalId } from '@/features/game/model/daily'
 
 it('restores yesterday and old puzzle versions without generating them again', async () => {
   const test = await createTestRuntime()
@@ -46,7 +48,7 @@ it('uses one stable formal ID and keeps replay results separate', async () => {
   const test = await createTestRuntime()
   test.runtime.worker.generate = async (input) => ({
     status: 'completed',
-    value: { ...makeSession().puzzle, ...input },
+    value: { ...makeSession().puzzle, ...input, seed: encodeSeed(input.seed) },
   })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   await game.startDaily('2026-10-11', 'classic')
@@ -81,7 +83,7 @@ it('converges concurrent starts on a single formal session with one editor', asy
   const test = await createTestRuntime()
   test.runtime.worker.generate = async (input) => ({
     status: 'completed',
-    value: { ...makeSession().puzzle, ...input },
+    value: { ...makeSession().puzzle, ...input, seed: encodeSeed(input.seed) },
   })
   const peerPinia = createPinia()
   const peerApp = createApp({})
@@ -115,13 +117,16 @@ it('uses six Medium daily inputs and preserves independent formal attempts after
     const fixture =
       input.variant === 'classic' ? makeSession().puzzle : VARIANT_FIXTURES[input.variant]
 
-    return { status: 'completed', value: { ...makeSession().puzzle, ...fixture, ...input } }
+    return {
+      status: 'completed',
+      value: { ...makeSession().puzzle, ...fixture, ...input, seed: encodeSeed(input.seed) },
+    }
   }
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   try {
     for (const variant of SUDOKU_VARIANTS) {
       expect(await game.startDaily('2026-10-11', variant)).toEqual({ status: 'ready' })
-      expect(game.session?.id).toBe(getDailyIdentity('2026-10-11', variant).formalId)
+      expect(game.session?.id).toBe(getDailyFormalId('2026-10-11', variant))
       expect(game.activeVariant).toBe(variant)
       expect(game.session?.metadata).toMatchObject({ formalAttempt: true })
       if (variant === 'classic') {
@@ -140,6 +145,9 @@ it('uses six Medium daily inputs and preserves independent formal attempts after
     }
 
     expect(calls.map((input) => input.difficulty)).toEqual(Array(6).fill('medium'))
+    expect(calls.map((input) => encodeSeed(input.seed))).toEqual(
+      Array(6).fill(encodeSeed(seedForTest('daily:2026-10-11'))),
+    )
     expect(await test.database.count('sessions')).toBe(6)
     expect(await game.startDaily('2026-10-11', 'arrow')).toEqual({ status: 'ready' })
     expect(calls).toHaveLength(6)
@@ -163,11 +171,12 @@ it('keeps a saved v9 formal attempt authoritative across the current generator i
     elapsedMs: 71000,
     metadata: { kind: 'daily', challengeDate: '2026-10-11', formalAttempt: true },
   })
+  const derive = vi.spyOn(test.runtime.engine, 'deriveSeed')
   saved.puzzle = { ...saved.puzzle, puzzleVersion: 'sudoku-v9', seed: 'daily:sudoku-v9:2026-10-11' }
   saved.assessment = makeAssessment(saved.puzzle)
-  expect(getDailyIdentity('2026-10-11', 'classic').input.puzzleVersion).not.toBe(
-    saved.puzzle.puzzleVersion,
-  )
+  expect(
+    getDailyIdentity('2026-10-11', 'classic', new Uint8Array(32)).input.puzzleVersion,
+  ).not.toBe(saved.puzzle.puzzleVersion)
   const lease = await test.runtime.ownership.acquireOwnership(saved.id, 'v9-fixture')
   if (!lease.ok || !lease.value) {
     throw new Error('Expected fixture lease')
@@ -186,6 +195,7 @@ it('keeps a saved v9 formal attempt authoritative across the current generator i
   expect(game.session?.metadata).toEqual(saved.metadata)
   expect(game.session?.elapsedMs).toBe(71000)
   expect(generate).not.toHaveBeenCalled()
+  expect(derive).not.toHaveBeenCalled()
   expect(assess).not.toHaveBeenCalled()
   await game.leaveGame()
   game.dispose()

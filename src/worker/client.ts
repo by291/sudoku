@@ -1,20 +1,31 @@
 import type { Board } from '@/core/sudoku/types'
-import type { GenerationInput } from '@/core/sudoku/generation/types'
 import type { HintResult } from '@/core/sudoku/hint'
-import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
-import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
-import type { WorkerRequest } from '@/worker/protocol'
-import { isRecord } from '@/core/sudoku/types'
 import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import type { AssessmentInput, AssessmentOutcome } from '@/core/sudoku/rating/types'
+import type { MainSudokuEngine } from '@/sudoku/mainEngine'
+import { BRIDGE_VERSION, isRecord } from '@/sudoku/guards'
+import { copyGenerationInput } from '@/sudoku/generationInput'
+import type { GenerationInput } from '@/sudoku/generationInput'
+import { copyRules } from '@/sudoku/ruleInput'
+import { decodeSeed, equalSeeds } from '@/sudoku/seed'
+import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
+import type {
+  GenerateOutcome,
+  WorkerOutcome,
+  WorkerRequest,
+  WorkerInitialize,
+} from '@/worker/protocol'
 
 const GENERATION_TIMEOUT_MILLISECONDS = 3000
 const COMPUTATION_TIMEOUT_MILLISECONDS = 15000
 
+type StartupResult = { status: 'ready' } | { status: 'failed'; message: string }
 interface PreparedWorker {
   worker: Worker
+  phase: 'initializing' | 'ready' | 'failed'
   failure: string | null
-  observeError: (event: ErrorEvent) => void
+  ready: Promise<StartupResult>
+  terminate(): void
 }
 
 export interface SudokuWorkerClient {
@@ -29,58 +40,110 @@ export interface SudokuWorkerClient {
   dispose(): void
 }
 
-/** Owns idle and active Workers; dispose the client when its application runtime ends. */
-export function createSudokuWorkerClient(): SudokuWorkerClient {
+/** Own idle and active instances. Only compiled code is shared; termination interrupts synchronous WASM. */
+export function createSudokuWorkerClient(
+  module: WebAssembly.Module,
+  engine: MainSudokuEngine,
+): SudokuWorkerClient {
   const cancellations = new Set<() => void>()
   let disposed = false
   let preparedWorker: PreparedWorker | null = null
   let preparationFailure: string | null = null
 
-  function createWorker(): Worker {
-    return new Worker(new URL('./sudoku.worker.ts', import.meta.url), { type: 'module' })
+  function createPreparedWorker(): PreparedWorker {
+    const worker = new Worker(new URL('./sudoku.worker.ts', import.meta.url), { type: 'module' })
+    let settleStartup: ((result: StartupResult) => void) | undefined
+    const ready = new Promise<StartupResult>((resolve) => {
+      settleStartup = resolve
+    })
+    let terminated = false
+    const prepared: PreparedWorker = {
+      worker,
+      ready,
+      phase: 'initializing',
+      failure: null,
+      terminate() {
+        if (terminated) {
+          return
+        }
+        terminated = true
+        worker.removeEventListener('message', control)
+        worker.removeEventListener('error', startupError)
+        finishStartup({ status: 'failed', message: prepared.failure ?? 'Worker was terminated' })
+        worker.terminate()
+      },
+    }
+
+    function finishStartup(result: StartupResult) {
+      if (settleStartup) {
+        const settle = settleStartup
+        settleStartup = undefined
+        settle(result)
+      }
+    }
+    function failStartup(message: string) {
+      prepared.phase = 'failed'
+      prepared.failure = message
+      finishStartup({ status: 'failed', message })
+      prepared.terminate()
+    }
+    function startupError(event: ErrorEvent) {
+      failStartup(event.message || 'Worker failed to start')
+    }
+    function control(event: MessageEvent<unknown>) {
+      if (!isRecord(event.data)) {
+        return
+      }
+      if (event.data.kind === 'initialization-failed' && typeof event.data.message === 'string') {
+        failStartup(event.data.message)
+      } else if (event.data.kind === 'ready') {
+        if (event.data.bridgeVersion !== BRIDGE_VERSION) {
+          failStartup('Worker engine bridge mismatch')
+          return
+        }
+        prepared.phase = 'ready'
+        worker.removeEventListener('message', control)
+        finishStartup({ status: 'ready' })
+      }
+    }
+
+    worker.addEventListener('message', control)
+    worker.addEventListener('error', startupError)
+    try {
+      worker.postMessage({
+        kind: 'initialize',
+        bridgeVersion: BRIDGE_VERSION,
+        module,
+      } satisfies WorkerInitialize)
+    } catch (error: unknown) {
+      failStartup(error instanceof Error ? error.message : 'Could not initialize worker')
+    }
+    return prepared
   }
 
   function prepareWorker() {
     if (disposed || preparedWorker || preparationFailure) {
       return
     }
-
     try {
-      const worker = createWorker()
-      const prepared: PreparedWorker = {
-        worker,
-        failure: null,
-        observeError(event) {
-          prepared.failure = event.message || 'Worker failed to start'
-          worker.terminate()
-        },
-      }
-      worker.addEventListener('error', prepared.observeError)
-      preparedWorker = prepared
-    } catch (error) {
+      preparedWorker = createPreparedWorker()
+    } catch (error: unknown) {
       preparationFailure = error instanceof Error ? error.message : 'Worker unavailable'
     }
   }
 
-  function takeWorker(): Worker {
-    const prepared = preparedWorker
-    preparedWorker = null
-    if (prepared) {
-      prepared.worker.removeEventListener('error', prepared.observeError)
-      if (prepared.failure) {
-        throw new Error(prepared.failure)
-      }
-
-      return prepared.worker
+  function takeWorker(): PreparedWorker {
+    if (preparedWorker) {
+      const prepared = preparedWorker
+      preparedWorker = null
+      return prepared
     }
-
     if (preparationFailure) {
       const message = preparationFailure
       preparationFailure = null
       throw new Error(message)
     }
-
-    return createWorker()
+    return createPreparedWorker()
   }
 
   function run<T>(
@@ -92,94 +155,122 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
     if (disposed || signal?.aborted) {
       return Promise.resolve({ status: 'cancelled' })
     }
-
     return new Promise((resolve) => {
-      let worker: Worker
+      let prepared: PreparedWorker
       try {
-        worker = takeWorker()
-      } catch (error) {
+        prepared = takeWorker()
+      } catch (error: unknown) {
         resolve({
           status: 'failed',
           message: error instanceof Error ? error.message : 'Worker unavailable',
         })
         prepareWorker()
-
         return
       }
+      const worker = prepared.worker
       let settled = false
+      // The original deadline includes initialization; readiness never resets this timer.
       const timeout = window.setTimeout(() => finish({ status: 'timed-out' }), timeoutMilliseconds)
       const cancel = () => finish({ status: 'cancelled' })
 
       function finish(outcome: WorkerOutcome<T>) {
-        // Abort, timeout and reply can race; settle once and dispose the per-job worker together.
         if (settled) {
           return
         }
-
         settled = true
         window.clearTimeout(timeout)
         signal?.removeEventListener('abort', cancel)
         worker.removeEventListener('message', receive)
         worker.removeEventListener('error', fail)
         cancellations.delete(cancel)
-        worker.terminate()
+        prepared.terminate()
         resolve(outcome)
         prepareWorker()
       }
-
       function receive(event: MessageEvent<unknown>) {
         if (!isRecord(event.data) || event.data.requestId !== request.requestId) {
           return
         }
-
-        const outcome = decode(event.data)
-        finish(outcome ?? { status: 'failed', message: 'Worker returned malformed data' })
+        try {
+          finish(
+            decode(event.data) ?? { status: 'failed', message: 'Worker returned malformed data' },
+          )
+        } catch (error: unknown) {
+          finish({
+            status: 'failed',
+            message: error instanceof Error ? error.message : 'Worker returned malformed data',
+          })
+        }
       }
-
       function fail(event: ErrorEvent) {
         finish({ status: 'failed', message: event.message || 'Worker failed' })
+      }
+      function send() {
+        if (settled) {
+          return
+        }
+        if (prepared.failure) {
+          finish({ status: 'failed', message: prepared.failure })
+          return
+        }
+        try {
+          worker.postMessage(request)
+        } catch (error: unknown) {
+          finish({
+            status: 'failed',
+            message: error instanceof Error ? error.message : 'Could not send worker request',
+          })
+        }
       }
 
       cancellations.add(cancel)
       signal?.addEventListener('abort', cancel, { once: true })
       worker.addEventListener('message', receive)
       worker.addEventListener('error', fail)
-      try {
-        worker.postMessage(request)
-      } catch (error) {
-        finish({
-          status: 'failed',
-          message: error instanceof Error ? error.message : 'Could not send worker request',
+      if (signal?.aborted) {
+        cancel()
+        return
+      }
+      if (prepared.phase === 'ready' || prepared.failure) {
+        send()
+      } else {
+        void prepared.ready.then((result) => {
+          if (settled) {
+            return
+          }
+          if (result.status === 'ready') {
+            send()
+          } else {
+            finish({ status: 'failed', message: result.message })
+          }
         })
       }
     })
   }
 
-  // Load one idle worker ahead of interaction to reduce cold startup within the job's deadline.
-  // It computes nothing before a validated request and remains owned by this client's disposal.
+  // Preload one isolated idle instance, without a puzzle job or a running request deadline.
   prepareWorker()
 
   return {
     generate(input, signal) {
+      const snapshot = copyGenerationInput(input)
       return run(
-        { kind: 'generate', requestId: crypto.randomUUID(), input },
+        { kind: 'generate', requestId: crypto.randomUUID(), input: snapshot },
         (value) => {
-          const parsed = parseWorkerResponse(value)
+          const parsed = parseWorkerResponse(value, engine)
           if (!parsed.valid || parsed.value.kind !== 'generate') {
             return null
           }
-
           const outcome = parsed.value.outcome
           if (
             outcome.status === 'completed' &&
-            (outcome.value.rules.kind !== input.variant ||
-              outcome.value.seed !== input.seed ||
-              outcome.value.difficulty !== input.difficulty ||
-              outcome.value.puzzleVersion !== input.puzzleVersion)
+            (outcome.value.rules.kind !== snapshot.variant ||
+              !equalSeeds(decodeSeed(outcome.value.seed), snapshot.seed) ||
+              outcome.value.difficulty !== snapshot.difficulty ||
+              outcome.value.puzzleVersion !== snapshot.puzzleVersion)
           ) {
             return null
           }
-
           return outcome
         },
         signal,
@@ -187,61 +278,62 @@ export function createSudokuWorkerClient(): SudokuWorkerClient {
       )
     },
     assess(input, signal) {
+      const snapshot = {
+        ...input,
+        board: [...input.board],
+        rules: copyRules(input.rules),
+        limits: { ...input.limits },
+      }
       return run(
-        { kind: 'assess', requestId: crypto.randomUUID(), input },
+        { kind: 'assess', requestId: crypto.randomUUID(), input: snapshot },
         (value) => {
-          const parsed = parseWorkerResponse(value)
+          const parsed = parseWorkerResponse(value, engine)
           if (!parsed.valid || parsed.value.kind !== 'assess') {
             return null
           }
-
           const outcome = parsed.value.outcome
           if (outcome.status === 'completed' && outcome.value.status !== 'invalid') {
             const identity =
               outcome.value.status === 'rated' ? outcome.value.summary : outcome.value
             if (
-              identity.variant !== input.rules.kind ||
-              identity.ratingVersion !== input.ratingVersion
+              identity.variant !== snapshot.rules.kind ||
+              identity.ratingVersion !== snapshot.ratingVersion
             ) {
               return null
             }
           }
-
           return outcome
         },
         signal,
       )
     },
     hint(board, solution, rules, signal) {
+      const snapshot = { board: [...board], solution: [...solution], rules: copyRules(rules) }
       return run(
-        { kind: 'hint', requestId: crypto.randomUUID(), board, solution, rules },
+        { kind: 'hint', requestId: crypto.randomUUID(), ...snapshot },
         (value) => {
-          const parsed = parseWorkerResponse(value)
+          const parsed = parseWorkerResponse(value, engine)
           if (!parsed.valid || parsed.value.kind !== 'hint') {
             return null
           }
-
           const outcome = parsed.value.outcome
           if (outcome.status !== 'completed') {
             return outcome
           }
-
-          const hint = validateHintEvidence(outcome.value, rules, board)
-
+          const hint = validateHintEvidence(outcome.value, snapshot.rules, snapshot.board, engine)
           return hint.valid ? { status: 'completed', value: hint.value } : null
         },
         signal,
       )
     },
     dispose() {
-      disposed = true
-      if (preparedWorker) {
-        preparedWorker.worker.removeEventListener('error', preparedWorker.observeError)
-        preparedWorker.worker.terminate()
-        preparedWorker = null
+      if (disposed) {
+        return
       }
+      disposed = true
+      preparedWorker?.terminate()
+      preparedWorker = null
       preparationFailure = null
-
       for (const cancel of [...cancellations]) {
         cancel()
       }

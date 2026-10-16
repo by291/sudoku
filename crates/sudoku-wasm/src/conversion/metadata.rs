@@ -160,7 +160,7 @@ pub fn parse_outcome(value: &JsValue) -> CoreResult<AssessmentOutcomeDto> {
     }
     if equals(&status, "ungraded") {
         return Ok(AssessmentOutcomeDto::Ungraded {
-            rating_version: RATING_VERSION.to_owned(),
+            rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: variant.into(),
         });
     }
@@ -175,7 +175,7 @@ pub fn parse_outcome(value: &JsValue) -> CoreResult<AssessmentOutcomeDto> {
     };
     if equals(&status, "budget-exhausted") && valid_stage {
         return Ok(AssessmentOutcomeDto::BudgetExhausted {
-            rating_version: RATING_VERSION.to_owned(),
+            rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: variant.into(),
             stage: if equals(&stage, "validation") {
                 crate::dto::rating::AssessmentStageDto::Validation

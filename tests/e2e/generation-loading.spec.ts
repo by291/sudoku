@@ -77,7 +77,17 @@ test('reports exhausted generation without replacing a save or offering an ident
     .click()
   // The former failing seed is now a recovery test; inject the valid transport outcome here.
   await page.evaluate(() => {
+    const original = Worker.prototype.postMessage
     Worker.prototype.postMessage = function (this: Worker, message: unknown) {
+      if (
+        typeof message === 'object' &&
+        message !== null &&
+        'kind' in message &&
+        message.kind === 'initialize'
+      ) {
+        Reflect.apply(original, this, [message])
+        return
+      }
       if (
         typeof message !== 'object' ||
         message === null ||

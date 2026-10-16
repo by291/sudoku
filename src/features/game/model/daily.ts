@@ -1,7 +1,6 @@
 import type { GameSession } from '@/features/game/model/session'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
-import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import type { GenerationInput } from '@/core/sudoku/generation/types'
+import { createGenerationInput } from '@/sudoku/generationInput'
+import type { GenerationInput } from '@/sudoku/generationInput'
 import type { SudokuVariant } from '@/core/sudoku/rules/types'
 import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
 
@@ -33,30 +32,29 @@ export function getChallengeDate(now: Date): string {
   return date
 }
 
-export function getDailySeed(date: string, puzzleVersion: string): string {
-  if (!isChallengeDate(date) || !puzzleVersion.trim()) {
-    throw new TypeError('Invalid daily seed')
+/** ASCII material only; the ready Rust engine derives the binary root seed. */
+export function getDailySeedMaterial(date: string): Uint8Array {
+  if (!isChallengeDate(date)) {
+    throw new TypeError('Invalid challenge date')
   }
+  return Uint8Array.from(`daily:${date}`, (character) => character.charCodeAt(0))
+}
 
-  return `daily:${puzzleVersion}:${date}`
+export function getDailyFormalId(date: string, variant: SudokuVariant): string {
+  if (!isChallengeDate(date)) {
+    throw new TypeError('Invalid challenge date')
+  }
+  return variant === 'classic' ? `daily:${date}:formal` : `daily:${variant}:${date}:formal`
 }
 
 export function getDailyIdentity(
   date: string,
   variant: SudokuVariant,
-): { seed: string; formalId: string; input: GenerationInput } {
-  if (!isChallengeDate(date)) {
-    throw new TypeError('Invalid challenge date')
-  }
-
-  const seed =
-    variant === 'classic'
-      ? getDailySeed(date, PUZZLE_VERSION)
-      : `daily:${VARIANT_PUZZLE_VERSION}:${variant}:${date}`
-  const formalId =
-    variant === 'classic' ? `daily:${date}:formal` : `daily:${variant}:${date}:formal`
-
-  return { seed, formalId, input: createGenerationInput(variant, 'medium', seed) }
+  seed: Uint8Array,
+): { seed: Uint8Array; formalId: string; input: GenerationInput } {
+  const formalId = getDailyFormalId(date, variant)
+  const input = createGenerationInput(variant, 'medium', seed)
+  return { formalId, input, seed: input.seed.slice() }
 }
 
 export function restartDailySession(session: GameSession): GameSession {
@@ -88,7 +86,7 @@ export function getDailyStatuses(
   date: string,
 ): readonly DailyVariantStatus[] {
   return SUDOKU_VARIANTS.map((variant) => {
-    const { formalId } = getDailyIdentity(date, variant)
+    const formalId = getDailyFormalId(date, variant)
     const saved = sessions.find((record) => record.session.id === formalId)?.session
     const completed =
       saved?.completion ||

@@ -225,12 +225,12 @@ The plan dependency chain is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 �
 
 **Interfaces:** Preserve the public `SudokuWorkerClient.generate/assess/hint/dispose` operations and job kinds/outcomes, with `generate` input deliberately changing to an owned 32-byte `Uint8Array` seed and v11 identity. Add a separate `WorkerControl` init/ready/error protocol carrying the compiled module and bridge version. `createSudokuWorkerClient` receives the loaded module through runtime composition. `requestId`, engine outcomes and cancellation/timeout remain distinct; response seed equality decodes canonical hex and compares byte contents, never array identity or bytes-to-string coercion.
 
-- [ ] Add `request_waits_for_ready_without_losing_deadline`, `abort_during_wasm_initialization_settles_once`, `late_reply_cannot_revive_a_terminated_job`, `idle_worker_computes_no_puzzle`, and `worker_seed_identity_uses_owned_byte_contents`. Assert one settlement/termination, original 3,000/15,000 ms timers, failed-load recovery, unchanged current save, correct structured-clone identity and rejection of a response with one changed seed byte.
-- [ ] Run focused client/Worker/protocol tests; verify readiness/init races fail before replacing dispatch.
-- [ ] Initialize wasm-bindgen with shared compiled code in each isolated Worker, route generate/assess/hint to the typed exports, and post existing outcomes. Preserve an idle ready Worker and per-job termination; do not use queued cancellation messages as interruption of a running synchronous WASM function.
-- [ ] Replace mathematical hint validation with core validation through the main adapter while retaining cheap structural envelope guards and existing advanced-proof semantics. Preserve request/input identity checks on returned puzzles and assessments.
-- [ ] Run real emitted Worker tests at `/` and `/sudoku/` across Chromium desktop/touch, WebKit and a working Firefox runtime. Verify complete payload/assessment/evidence against frozen contracts and record unavailable runtimes explicitly. Re-run unit/type checks for changed owners.
-- [ ] Commit as `feat(worker): execute sudoku requests through wasm`.
+- [x] Add `request_waits_for_ready_without_losing_deadline`, `abort_during_wasm_initialization_settles_once`, `late_reply_cannot_revive_a_terminated_job`, `idle_worker_computes_no_puzzle`, and `worker_seed_identity_uses_owned_byte_contents`. Assert one settlement/termination, original 3,000/15,000 ms timers, failed-load recovery, unchanged current save, correct structured-clone identity and rejection of a response with one changed seed byte.
+- [x] Run focused client/Worker/protocol tests; verify readiness/init races fail before replacing dispatch.
+- [x] Initialize wasm-bindgen with shared compiled code in each isolated Worker, route generate/assess/hint to the typed exports, and post existing outcomes. Preserve an idle ready Worker and per-job termination; do not use queued cancellation messages as interruption of a running synchronous WASM function.
+- [x] Replace mathematical hint validation with core validation through the main adapter while retaining cheap structural envelope guards and existing advanced-proof semantics. Preserve request/input identity checks on returned puzzles and assessments.
+- [x] Run real emitted Worker tests at `/` and `/sudoku/` across Chromium desktop/touch, WebKit and a working Firefox runtime. Verify complete payload/assessment/evidence against frozen contracts and record unavailable runtimes explicitly. Re-run unit/type checks for changed owners.
+- [x] Commit as `feat(worker): execute sudoku requests through wasm`.
 
 ## Task 13: Migrate live board, session and persistence semantic callers
 

@@ -1,13 +1,11 @@
-import { runWorker } from './workerHarness'
+import { runWorker, parseWorkerResponse, generateReference } from './workerHarness'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { test, expect, makeVariantHintSession } from './support'
-import { parseWorkerResponse } from '@/worker/protocol'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 import { countReferenceSolutions } from '../support/referenceSudoku'
 import { assessPuzzle } from '@/core/sudoku/rating/assessment'
 import { createAssessmentInput } from '@/core/sudoku/rating/input'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
-import { generatePuzzle } from '@/core/sudoku/generation/generate'
+import { generationInput } from '../support/generation'
 import { explainStep } from '@/features/game/model/techniquePresentation'
 import { referenceCountSolutions } from '../support/referenceVariants'
 import {
@@ -28,7 +26,7 @@ test('verifies current-identity puzzles for historical recovery seeds at both ro
           {
             kind: 'generate',
             requestId: `recovered-${variant}-${base}`,
-            input: createGenerationInput(variant, difficulty, seed),
+            input: generationInput(variant, difficulty, seed),
           },
           base,
         ),
@@ -64,7 +62,7 @@ test('verifies current-identity puzzles for historical recovery seeds at both ro
   }
 })
 
-test('delivers the slowest observed request from every type and tier within three seconds', async ({
+test('keeps historical type-and-tier latency inputs within the current Worker deadline', async ({
   page,
   browser,
 }, testInfo) => {
@@ -85,7 +83,7 @@ test('delivers the slowest observed request from every type and tier within thre
           {
             kind: 'generate',
             requestId: `latency-${variant}-${difficulty}-${base}`,
-            input: createGenerationInput(variant, difficulty, seed),
+            input: generationInput(variant, difficulty, seed),
           },
           base,
         ),
@@ -134,8 +132,8 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
   page,
 }) => {
   const { variant, difficulty, seed } = KILLER_HARD_RECOVERY_INPUT
-  const input = createGenerationInput(variant, difficulty, seed)
-  const result = generatePuzzle(input)
+  const input = generationInput(variant, difficulty, seed)
+  const result = await generateReference(input)
   if (result.status !== 'ready') {
     throw new Error('Missing fresh Killer Hard regression fixture')
   }
@@ -192,11 +190,7 @@ test('delivers fixed regional regression seeds within the production Worker time
           {
             kind: 'generate',
             requestId: `regional-${seed}-${base}`,
-            input: createGenerationInput(
-              'jigsaw',
-              difficulty,
-              `local-product-corpus-v1:seed:${seed}`,
-            ),
+            input: generationInput('jigsaw', difficulty, `local-product-corpus-v1:seed:${seed}`),
           },
           base,
         ),
@@ -224,8 +218,8 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
   await page.goto('/#/')
 
   for (const difficulty of ['easy', 'medium', 'hard', 'expert'] as const) {
-    const input = createGenerationInput('classic', difficulty, 'production-fixed-seed')
-    const expected = generatePuzzle(input)
+    const input = generationInput('classic', difficulty, 'production-fixed-seed')
+    const expected = await generateReference(input)
     if (expected.status !== 'ready') {
       throw new Error('Expected a complete Classic reference result')
     }
@@ -289,8 +283,8 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
     page,
   }) => {
     const fixture = makeVariantHintSession(variant)
-    const input = createGenerationInput(variant, 'medium', 'production-fixed-variant-seed')
-    const expected = generatePuzzle(input)
+    const input = generationInput(variant, 'medium', 'production-fixed-variant-seed')
+    const expected = await generateReference(input)
     if (expected.status !== 'ready') {
       throw new Error('Expected a complete variant reference result')
     }

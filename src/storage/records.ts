@@ -11,7 +11,7 @@ import { isRecord, ALL_DIGITS_MASK, BOARD_SIZE } from '@/core/sudoku/types'
 import { parsePuzzle } from '@/core/sudoku/puzzle'
 import type { Puzzle } from '@/core/sudoku/puzzle'
 import { CLASSIC_RULES, compileRules } from '@/core/sudoku/rules/context'
-import { getDailyIdentity } from '@/features/game/model/daily'
+import { getDailyFormalId } from '@/features/game/model/daily'
 import { parseBoard, isComplete } from '@/core/sudoku/board'
 import type { Settings } from '@/features/settings/model/preferences'
 import { isLessonId, lessonStageCount } from '@/features/learning/model/lessonIds'
@@ -194,7 +194,7 @@ export function parseSession(value: unknown): ParseResult<GameSession> {
   if (
     metadata.kind === 'daily' &&
     metadata.formalAttempt !==
-      (value.id === getDailyIdentity(metadata.challengeDate, puzzle.value.rules.kind).formalId)
+      (value.id === getDailyFormalId(metadata.challengeDate, puzzle.value.rules.kind))
   ) {
     return invalid('Daily formal identity does not match eligibility')
   }

@@ -11,11 +11,10 @@ import {
 import { makeSession } from '../support/gameFixtures'
 import { CLASSIC_PUZZLE_FIXTURES } from '../fixtures/classicPuzzles'
 import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { generationInput } from '../support/generation'
 import { analyzeLogic } from '@/core/sudoku/logic/solver'
 import { RATING_POLICIES } from '@/core/sudoku/rating/policies'
-import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
-import { runWorker } from './workerHarness'
+import { runWorker, parseWorkerResponse, validateHintEvidence } from './workerHarness'
 
 const authored = CLASSIC_PUZZLE_FIXTURES.find((template) => template.difficulty === 'expert')
 if (!authored) {
@@ -55,7 +54,7 @@ for (const base of ['/', '/sudoku/'] as const) {
         {
           kind: 'generate',
           requestId: 'expert-generation',
-          input: createGenerationInput('classic', 'expert', 'production-expert'),
+          input: generationInput('classic', 'expert', 'production-expert'),
         },
         base,
       ),

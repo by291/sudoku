@@ -1,6 +1,10 @@
-import { expect, it } from 'vitest'
-import { parseWorkerRequest, parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { afterAll, expect, it } from 'vitest'
+import {
+  parseWorkerRequest as decodeRequest,
+  parseWorkerResponse as decodeResponse,
+  validateHintEvidence as validateEvidence,
+} from '@/worker/protocol'
+import { generationInput } from '../../tests/support/generation'
 import { assessPuzzle, toAssessmentOutcome } from '@/core/sudoku/rating/assessment'
 import { createAssessmentInput } from '@/core/sudoku/rating/input'
 import { RATING_FIXTURES } from '../../tests/fixtures/rating'
@@ -10,12 +14,25 @@ import { findVariantStep } from '@/core/sudoku/logic/variantTechniques'
 import { compileRules } from '@/core/sudoku/rules/context'
 import { createWorkBudget } from '@/core/sudoku/budget'
 import type { HintResult } from '@/core/sudoku/hint'
-import { parseHint } from '@/worker/hintEvidence'
+import { createTestEngine } from '../../tests/support/wasm'
+import type { Board } from '@/core/sudoku/types'
+import type { PuzzleRules } from '@/core/sudoku/rules/types'
 import {
   ARROW_REPEAT_BOARD,
   ARROW_REPEAT_RULES,
   VARIANT_FIXTURES,
 } from '../../tests/fixtures/variants'
+
+const engine = await createTestEngine()
+afterAll(() => engine.dispose())
+const parseWorkerRequest = (value: unknown) => decodeRequest(value, engine)
+const parseWorkerResponse = (value: unknown) => decodeResponse(value, engine)
+const validateHintEvidence = (hint: HintResult, rules: PuzzleRules, board?: Board) =>
+  validateEvidence(hint, rules, board, engine)
+function parseHint(value: unknown) {
+  const result = engine.parseHint(value)
+  return result.status === 'valid' ? result.hint : null
+}
 
 it('rejects an elimination payload larger than the board candidate space', () => {
   expect(
@@ -153,7 +170,7 @@ it('rejects unknown types, generation versions, geometry, and contradictory solu
     parseWorkerRequest({
       kind: 'generate',
       requestId: 'a',
-      input: { ...createGenerationInput('arrow', 'easy', 'test'), puzzleVersion: 'future' },
+      input: { ...generationInput('arrow', 'easy', 'test'), puzzleVersion: 'future' },
     }).valid,
   ).toBe(false)
 

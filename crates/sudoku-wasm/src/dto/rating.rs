@@ -7,13 +7,22 @@ use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 use wasm_bindgen::JsValue;
 
+#[derive(Clone, Copy, Serialize, Deserialize, Tsify)]
+pub enum RatingVersionDto {
+    #[serde(rename = "sudoku-rating-v2")]
+    V2,
+}
+
 #[derive(Clone, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
+#[tsify(hashmap_as_object, missing_as_null)]
 pub struct WorkloadDto {
     pub steps: u32,
     pub placements: u32,
     pub eliminations: u32,
     pub candidate_removals: u32,
+    // Conversion emits every known technique, including zero counts.
+    #[tsify(type = "Record<TechniqueDto, number>")]
     pub technique_counts: BTreeMap<TechniqueDto, u32>,
     pub highest_tier: Option<DifficultyDto>,
     pub highest_technique: Option<TechniqueDto>,
@@ -23,7 +32,7 @@ pub struct WorkloadDto {
 #[derive(Clone, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentSummaryDto {
-    pub rating_version: String,
+    pub rating_version: RatingVersionDto,
     pub variant: VariantDto,
     pub difficulty: DifficultyDto,
     pub workload: WorkloadDto,
@@ -53,12 +62,12 @@ pub enum AssessmentResultDto {
     },
     Ungraded {
         #[serde(rename = "ratingVersion")]
-        rating_version: String,
+        rating_version: RatingVersionDto,
         variant: VariantDto,
     },
     BudgetExhausted {
         #[serde(rename = "ratingVersion")]
-        rating_version: String,
+        rating_version: RatingVersionDto,
         variant: VariantDto,
         stage: AssessmentStageDto,
         difficulty: Option<DifficultyDto>,
@@ -142,12 +151,12 @@ pub enum AssessmentOutcomeDto {
     },
     Ungraded {
         #[serde(rename = "ratingVersion")]
-        rating_version: String,
+        rating_version: RatingVersionDto,
         variant: VariantDto,
     },
     BudgetExhausted {
         #[serde(rename = "ratingVersion")]
-        rating_version: String,
+        rating_version: RatingVersionDto,
         variant: VariantDto,
         stage: AssessmentStageDto,
         difficulty: Option<DifficultyDto>,
@@ -182,8 +191,3 @@ pub struct ParsedSummaryDto(pub ParsedAssessmentDto<AssessmentSummaryDto>);
 #[serde(transparent)]
 #[tsify(hashmap_as_object, missing_as_null)]
 pub struct ParsedOutcomeDto(pub ParsedAssessmentDto<AssessmentOutcomeDto>);
-
-#[derive(Deserialize, Tsify)]
-#[serde(transparent)]
-#[tsify(type = "unknown")]
-pub struct RawAssessmentDto(#[serde(with = "serde_wasm_bindgen::preserve")] pub JsValue);

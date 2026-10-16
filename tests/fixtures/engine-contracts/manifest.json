@@ -268,7 +268,7 @@
   "patch": [
     {
       "file": "reference-loader.mjs",
-      "sha256": "397654f174b83bfa6162f43b671edc8e21ee280b39fa917da0a4268d8d254c78"
+      "sha256": "1d6d71a02a020d1b1fb755c819552854db4f4ea00f344a03e5908235809c9329"
     },
     {
       "file": "v11-random.ts",

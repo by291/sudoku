@@ -165,3 +165,15 @@ fn proof_validation_retains_the_original_transport_work_bound() {
     // The frozen transport validator uses DEFAULT_WORK_LIMIT, independently fixed at one million.
     assert_eq!(HINT_VALIDATION_WORK_LIMIT, 1000000);
 }
+
+#[test]
+fn shape_only_hint_validation_does_not_require_a_layout_or_board() {
+    use sudoku_core::hint::HintResult;
+    use sudoku_core::logic::hint_validation::validate_hint_shape;
+
+    assert_eq!(
+        validate_hint_shape(&HintResult::ReviewEntry { cell: 80 }).unwrap(),
+        HintResult::ReviewEntry { cell: 80 }
+    );
+    assert!(validate_hint_shape(&HintResult::ReviewEntry { cell: 81 }).is_err());
+}

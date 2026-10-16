@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { generationInput } from '../../../../tests/support/generation'
 import type { SessionMetadata } from '@/features/game/model/session'
 import GameView from '@/features/game/views/GameView.vue'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
@@ -26,7 +26,7 @@ async function setup(metadata: SessionMetadata) {
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   cleanups.push(game.dispose)
   test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
-  await game.startGame(createGenerationInput('classic', 'easy', 'fixture'), metadata)
+  await game.startGame(generationInput('classic', 'easy', 'fixture'), metadata)
   game.selectCell(2)
   game.dispatch({ kind: 'enter', cell: 2, digit: 4 })
   game.pause()
@@ -70,7 +70,7 @@ it.each(gameModes)(
       return response.promise
     }
 
-    const starting = game.startGame(createGenerationInput('classic', 'easy', 'pending'), metadata)
+    const starting = game.startGame(generationInput('classic', 'easy', 'pending'), metadata)
     await vi.waitFor(() => expect(game.phase).toBe('generating'))
     await flushPromises()
 

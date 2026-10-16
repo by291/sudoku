@@ -1,14 +1,52 @@
-import { generatePuzzle } from '@/core/sudoku/generation/generate'
-import { analyzeHint } from '@/core/sudoku/hint'
-import { isRecord } from '@/core/sudoku/types'
+import { createWorkerEngine } from '@/sudoku/workerEngine'
+import { BRIDGE_VERSION, isRecord } from '@/sudoku/guards'
 import { parseWorkerRequest } from '@/worker/protocol'
-import type { WorkerResponse } from '@/worker/protocol'
-import { compileRules } from '@/core/sudoku/rules/context'
-import { createWorkBudget, DEFAULT_WORK_LIMIT } from '@/core/sudoku/budget'
-import { assessPuzzle, toAssessmentOutcome } from '@/core/sudoku/rating/assessment'
+import type { WorkerResponse, WorkerReady, WorkerInitializationFailed } from '@/worker/protocol'
+
+let engine: Awaited<ReturnType<typeof createWorkerEngine>> | null = null
+let initializing = false
 
 addEventListener('message', (event: MessageEvent<unknown>) => {
-  const parsed = parseWorkerRequest(event.data)
+  if (isRecord(event.data) && event.data.kind === 'initialize') {
+    if (initializing || engine) {
+      return
+    }
+    initializing = true
+    if (
+      event.data.bridgeVersion !== BRIDGE_VERSION ||
+      !(event.data.module instanceof WebAssembly.Module)
+    ) {
+      postMessage({
+        kind: 'initialization-failed',
+        message: 'Invalid engine initialization',
+      } satisfies WorkerInitializationFailed)
+      return
+    }
+    void createWorkerEngine(event.data.module)
+      .then((initialized) => {
+        engine = initialized
+        postMessage({ kind: 'ready', bridgeVersion: BRIDGE_VERSION } satisfies WorkerReady)
+      })
+      .catch((error: unknown) => {
+        postMessage({
+          kind: 'initialization-failed',
+          message: error instanceof Error ? error.message : 'Engine initialization failed',
+        } satisfies WorkerInitializationFailed)
+      })
+    return
+  }
+  if (!engine) {
+    if (isRecord(event.data) && typeof event.data.requestId === 'string') {
+      postMessage({
+        kind: event.data.kind,
+        requestId: event.data.requestId,
+        outcome: { status: 'failed', message: 'Worker engine is not ready' },
+      })
+    }
+    return
+  }
+
+  const parsed = parseWorkerRequest(event.data, engine)
   if (!parsed.valid) {
     if (isRecord(event.data) && typeof event.data.requestId === 'string') {
       postMessage({
@@ -17,37 +55,44 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
         outcome: { status: 'failed', message: parsed.issues.join('; ') },
       })
     }
-
     return
   }
-
   const request = parsed.value
   try {
     let response: WorkerResponse
     if (request.kind === 'generate') {
-      const result = generatePuzzle(request.input)
-      response = {
-        kind: 'generate',
-        requestId: request.requestId,
-        outcome:
-          result.status === 'ready'
-            ? {
-                status: 'completed',
-                value: result.puzzle,
-                assessment: { status: 'rated', summary: result.assessment },
-              }
-            : result.status === 'budget-exhausted'
-              ? {
-                  status: 'budget-exhausted',
-                  message: 'No qualifying puzzle found within the generation limits',
-                }
-              : { status: 'failed', message: result.reason },
+      const result = engine.generate(request.input)
+      if (result.status === 'ready') {
+        response = {
+          kind: 'generate',
+          requestId: request.requestId,
+          outcome: {
+            status: 'completed',
+            value: result.puzzle,
+            assessment: { status: 'rated', summary: result.assessment },
+          },
+        }
+      } else if (result.status === 'budget-exhausted') {
+        response = {
+          kind: 'generate',
+          requestId: request.requestId,
+          outcome: {
+            status: 'budget-exhausted',
+            message: 'No qualifying puzzle found within the generation limits',
+          },
+        }
+      } else {
+        response = {
+          kind: 'generate',
+          requestId: request.requestId,
+          outcome: { status: 'failed', message: result.reason },
+        }
       }
     } else if (request.kind === 'assess') {
       response = {
         kind: 'assess',
         requestId: request.requestId,
-        outcome: { status: 'completed', value: toAssessmentOutcome(assessPuzzle(request.input)) },
+        outcome: { status: 'completed', value: engine.assess(request.input) },
       }
     } else {
       response = {
@@ -55,16 +100,12 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
         requestId: request.requestId,
         outcome: {
           status: 'completed',
-          value: analyzeHint(request.board, request.solution, 500, {
-            context: compileRules(request.rules),
-            workBudget: createWorkBudget(DEFAULT_WORK_LIMIT),
-          }),
+          value: engine.hint(request.board, request.solution, request.rules),
         },
       }
     }
-
     postMessage(response)
-  } catch (error) {
+  } catch (error: unknown) {
     postMessage({
       kind: request.kind,
       requestId: request.requestId,
@@ -75,3 +116,4 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
     })
   }
 })
+export {}

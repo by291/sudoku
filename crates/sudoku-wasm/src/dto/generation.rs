@@ -35,14 +35,27 @@ pub struct GeneratedPuzzleDto {
     pub puzzle_version: GenerationVersionDto,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Tsify)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkStageDto {
+    Preparation,
+    Arithmetic,
+    Exact,
+    Logic,
+    Proposals,
+}
+
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
+#[tsify(hashmap_as_object, missing_as_null)]
 pub struct GenerationMetricsDto {
     pub construction_work: u32,
     pub layouts: u32,
     pub completed_layouts: u32,
     pub candidate_visits: u32,
-    pub work_by_stage: BTreeMap<String, u32>,
+    // Metrics always include all exclusive work stages, even when unused.
+    #[tsify(type = "Record<WorkStageDto, number>")]
+    pub work_by_stage: BTreeMap<WorkStageDto, u32>,
 }
 
 #[derive(Serialize, Tsify)]

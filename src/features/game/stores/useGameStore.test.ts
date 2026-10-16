@@ -8,7 +8,7 @@ import { useGameStore } from '@/features/game/stores/useGameStore'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 import type { HintResult } from '@/core/sudoku/hint'
 import { createTestRuntime } from '../../../../tests/support/runtime'
-import { createGenerationInput } from '@/core/sudoku/generation/input'
+import { generationInput } from '../../../../tests/support/generation'
 
 const engine = await createTestEngine()
 afterAll(() => engine.dispose())
@@ -142,7 +142,7 @@ it('ignores stale hints and preserves an old session when generation fails', asy
 
   expect(test.store.hint).toBeNull()
   expect(test.store.session?.assistance.hintCount).toBe(0)
-  await test.store.startGame(createGenerationInput('classic', 'easy', 'new'), { kind: 'free' })
+  await test.store.startGame(generationInput('classic', 'easy', 'new'), { kind: 'free' })
 
   expect(test.store.session?.id).toBe('fixture-free-session')
   expect(test.store.board[2]).toBe(4)
@@ -207,7 +207,7 @@ it('retries a failed generation with the identical seed and metadata', async () 
     return { status: 'timed-out' }
   }
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
-  const input = createGenerationInput('classic', 'easy', 'same-request')
+  const input = generationInput('classic', 'easy', 'same-request')
   await game.startGame(input, { kind: 'free' })
 
   expect(game.canRetryGeneration).toBe(true)
@@ -229,7 +229,7 @@ it('reports deterministic generation exhaustion while keeping the old save and r
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
   await game.restoreSession(original.id)
 
-  const outcome = await game.startGame(createGenerationInput('classic', 'hard', 'exhausted'), {
+  const outcome = await game.startGame(generationInput('classic', 'hard', 'exhausted'), {
     kind: 'free',
   })
 

@@ -1,21 +1,28 @@
 import { registerHooks, stripTypeScriptTypes } from 'node:module'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { resolve, extname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { referenceRoot, verifyReference } from './freeze-reference.mjs'
 
 export function registerReference({ directory = referenceRoot, v11 = false, verify = true } = {}) {
   if (verify) verifyReference(directory)
-  const prefix = pathToFileURL(resolve(directory)).href + '/'
+  // Node canonicalizes symlinks before reporting parent URLs (including macOS temporary paths).
+  const root = realpathSync(directory)
+  const prefix = pathToFileURL(root).href + '/'
   const randomModule = new URL('./v11-random.ts', import.meta.url).href
 
   return registerHooks({
     resolve(specifier, context, next) {
-      if (specifier.startsWith('@/')) {
-        const target = resolve(directory, 'src', specifier.slice(2) + '.ts')
+      if (context.parentURL?.startsWith(prefix) && specifier.startsWith('@/')) {
+        const target = resolve(root, 'src', specifier.slice(2) + '.ts')
         return next(pathToFileURL(target).href, context)
       }
-      if (specifier.startsWith('.') && context.parentURL?.endsWith('.ts') && !extname(specifier)) {
+      if (
+        context.parentURL?.startsWith(prefix) &&
+        specifier.startsWith('.') &&
+        context.parentURL.endsWith('.ts') &&
+        !extname(specifier)
+      ) {
         return next(specifier + '.ts', context)
       }
       return next(specifier, context)

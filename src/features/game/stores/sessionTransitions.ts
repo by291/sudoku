@@ -1,11 +1,17 @@
+import { copyGenerationInput } from '@/sudoku/generationInput'
 import { shallowRef } from 'vue'
 import type { Ref } from 'vue'
 import type { GameRuntime } from '@/runtime'
 import type { OwnershipToken } from '@/storage/ownership'
-import type { GenerationInput } from '@/core/sudoku/generation/types'
+import type { GenerationInput } from '@/sudoku/generationInput'
 import type { Puzzle } from '@/core/sudoku/puzzle'
 import type { SudokuVariant } from '@/core/sudoku/rules/types'
-import { getDailyIdentity, getDailyStatuses } from '@/features/game/model/daily'
+import {
+  getDailyIdentity,
+  getDailyFormalId,
+  getDailySeedMaterial,
+  getDailyStatuses,
+} from '@/features/game/model/daily'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
 import { createSession } from '@/features/game/model/session'
 import type { GameSession, SessionMetadata, SessionPhase } from '@/features/game/model/session'
@@ -674,6 +680,7 @@ export function createSessionTransitions(
     _replaceId?: string,
     id?: string,
   ): Promise<GameTransition> {
+    const snapshot = copyGenerationInput(input)
     const prepared = await prepareTransition()
     if (prepared.status !== 'ready') {
       return prepared
@@ -684,7 +691,7 @@ export function createSessionTransitions(
     if (operation !== operationGeneration) {
       return { status: 'cancelled' }
     }
-    return generatePreparedGame(input, metadata, id, fence.ok ? fence.value : null)
+    return generatePreparedGame(snapshot, metadata, id, fence.ok ? fence.value : null)
   }
 
   async function generatePreparedGame(
@@ -886,7 +893,7 @@ export function createSessionTransitions(
       error.value = '读取每日挑战失败，请重试。'
       return { status: 'blocked', reason: 'load' }
     }
-    const { input, formalId } = getDailyIdentity(date, variant)
+    const formalId = getDailyFormalId(date, variant)
     const [catalog, results] = await Promise.all([
       runtime.repository.listSessions(),
       runtime.repository.listResults(),
@@ -914,6 +921,9 @@ export function createSessionTransitions(
     const formalAttempt =
       !existing && !results.value.some((record) => record.session.id === formalId)
 
+    // Existing formal attempts win before any current-version seed derivation or construction.
+    const seed = runtime.engine.deriveSeed(getDailySeedMaterial(date))
+    const { input } = getDailyIdentity(date, variant, seed)
     return generatePreparedGame(
       input,
       { kind: 'daily', challengeDate: date, formalAttempt },

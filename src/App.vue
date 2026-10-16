@@ -37,7 +37,7 @@ async function start() {
       return
     }
 
-    preparedRuntime = createGameRuntime(engine)
+    preparedRuntime = createGameRuntime(engine, module)
     engine = null
     // Pinia runs store setup in the application context, so publish there before mounting stores.
     props.installRuntime(preparedRuntime)
