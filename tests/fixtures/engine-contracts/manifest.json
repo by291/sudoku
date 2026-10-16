@@ -308,6 +308,12 @@
   ],
   "fixtures": [
     {
+      "file": "advanced.json",
+      "sha256": "91bfb15b5747741c4a435819aebe1cabd59a1f9b77c1feee3ff8e5af1de0c89c",
+      "bytes": 190624,
+      "cases": 72
+    },
+    {
       "file": "assessment.json",
       "sha256": "7de338bbb0eee2c1c7ebcf260d5b9a85b9af89f7185522cef19f6dffb7cba0e3",
       "bytes": 1733652,
@@ -371,6 +377,12 @@
       "file": "geometry.json",
       "sha256": "02910ff7a1f7f46784affbead850d2d66ed14c55ab18626ecbf9fbce94c47208",
       "bytes": 5750
+    },
+    {
+      "file": "hint-chains.json",
+      "sha256": "3271af0d095345618001d32e1b4d522056f518f429c6bf2f24b999ea5d596aeb",
+      "bytes": 236418,
+      "cases": 65
     },
     {
       "file": "hints.json",

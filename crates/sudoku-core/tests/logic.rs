@@ -2,6 +2,8 @@
 mod contracts;
 #[path = "support/rules.rs"]
 pub mod fixtures;
+#[path = "../examples/contracts/projection.rs"]
+mod logical_projection;
 
 use sudoku_core::budget::WorkBudget;
 use sudoku_core::logic::solver::{analyze_workspace, find_step};

@@ -22,3 +22,18 @@ pub(crate) fn candidate_positions(
         .filter(|&cell| state.board.values()[cell] == 0 && state.candidates[cell].bits() & bit != 0)
         .collect()
 }
+
+pub(crate) fn are_classic_peers(first: usize, second: usize) -> bool {
+    first != second
+        && (first / 9 == second / 9
+            || first % 9 == second % 9
+            || (first / 27 == second / 27 && first % 9 / 3 == second % 9 / 3))
+}
+
+pub(crate) fn has_peer_collision(cells: &[usize]) -> bool {
+    cells.iter().enumerate().any(|(index, &cell)| {
+        cells[index + 1..]
+            .iter()
+            .any(|&other| are_classic_peers(cell, other))
+    })
+}

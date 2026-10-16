@@ -1,12 +1,18 @@
 //! Test-only JSONL adapter; the reusable library performs no I/O or platform work.
+#[path = "contracts/advanced.rs"]
+mod advanced_contracts;
 #[path = "contracts/constraints.rs"]
 mod constraint_contracts;
 #[path = "contracts/editing.rs"]
 mod editing_contracts;
 #[path = "../tests/support/rules.rs"]
 pub mod fixtures;
+#[path = "contracts/hints.rs"]
+mod hint_contracts;
 #[path = "contracts/logic.rs"]
 mod logic_contracts;
+#[path = "contracts/projection.rs"]
+mod logical_projection;
 #[path = "contracts/search.rs"]
 mod search_contracts;
 
@@ -21,6 +27,10 @@ use sudoku_core::types::Board;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, tag = "suite", content = "input")]
 enum Request {
+    #[serde(rename = "advanced")]
+    Advanced(advanced_contracts::AdvancedInput),
+    #[serde(rename = "hints")]
+    Hints(hint_contracts::HintInput),
     #[serde(rename = "logic")]
     Logic(logic_contracts::LogicInput),
     #[serde(rename = "exact")]
@@ -41,6 +51,8 @@ enum Request {
 
 fn evaluate(request: Request) -> Result<Value, Box<dyn std::error::Error>> {
     match request {
+        Request::Advanced(input) => advanced_contracts::evaluate(input),
+        Request::Hints(input) => hint_contracts::evaluate(input),
         Request::Logic(input) => logic_contracts::evaluate(input),
         Request::Exact(input) => search_contracts::evaluate(input),
         Request::ExactPrepared(input) => search_contracts::evaluate_prepared(input),

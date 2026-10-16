@@ -1,3 +1,4 @@
+use super::advanced_techniques::find_advanced_step;
 use super::basic_techniques::find_basic_step;
 use super::techniques::{ALL_CLASSIC_TECHNIQUES, Technique};
 use super::types::{LogicResult, LogicStatus, LogicalStep, LogicalWorkspace, StepOutcome};
@@ -27,8 +28,12 @@ pub fn find_step(
             return Bounded::BudgetExhausted;
         }
         for technique in ordered {
-            if technique.is_classic() {
-                // Advanced detector dispatch is completed in the next migration task before cutover.
+            if technique.is_advanced() {
+                let result = find_advanced_step(state, technique, budget);
+                if !matches!(result, Bounded::Complete(None)) {
+                    return result;
+                }
+            } else if technique.is_classic() {
                 if let Some(step) = find_basic_step(state, technique) {
                     return Bounded::Complete(Some(Box::new(step)));
                 }

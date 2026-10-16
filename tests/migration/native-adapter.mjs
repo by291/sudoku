@@ -14,13 +14,20 @@ export function nativeResults(suite, rows) {
       'editing',
       'logic',
       'logic-basic',
+      'advanced',
+      'hints',
+      'hint-chains',
     ].includes(suite),
     'This native suite is not implemented yet',
   )
+  const requestSuite = { 'logic-basic': 'logic', 'hint-chains': 'hints' }[suite] ?? suite
   const requests =
     rows
       .map((row) =>
-        JSON.stringify({ suite: suite === 'logic-basic' ? 'logic' : suite, input: row.input }),
+        JSON.stringify({
+          suite: requestSuite,
+          input: row.input,
+        }),
       )
       .join('\n') + '\n'
   const result = spawnSync(

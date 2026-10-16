@@ -160,12 +160,12 @@ The plan dependency chain is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 �
 
 **Interfaces:** Produces `validate_advanced_step(&LogicalWorkspace, &LogicalStep) -> bool`, `HintResult`, `analyze_hint(&Board, &Board, &PreparedRules, max_steps: u32, &mut WorkBudget) -> HintResult`, and `validate_hint_evidence(&HintResult, &PuzzleRules, Option<&Board>) -> CoreResult<HintResult>`.
 
-- [ ] Add tests `rejects_forged_fish_wing_and_coloring_premises`, `matches_full_elimination_to_placement_hint_chain`, `reviews_first_incorrect_entry`, and `hint_exhaustion_is_not_an_unsupported_claim`. Assert existing advanced witnesses and malicious unit/domain/clue changes are rejected without using the stored solution as proof.
-- [ ] Run `cargo test -p sudoku-core --test advanced_logic --test hints`; observe rejection/trace failures with the missing logic.
-- [ ] Port all current advanced techniques and their separate proof validators. Preserve basic/variant replay-and-clue-matching validation; do not turn it into a new proof algorithm as an incidental port change.
-- [ ] Port hint selection, first wrong entry, logical-step application and complete/unsupported/exhausted distinctions. Maintain owned trace/evidence and one shared caller budget.
-- [ ] Run `pnpm test:migration -- --suite logic --engine native` and `--suite hints --engine native`, advanced/hint tests, and the full native suite. Compare all step arrays and evidence fields.
-- [ ] Commit as `feat(core): port advanced proofs and hint computation`.
+- [x] Add tests `rejects_forged_fish_wing_and_coloring_premises`, `matches_full_elimination_to_placement_hint_chain`, `reviews_first_incorrect_entry`, and `hint_exhaustion_is_not_an_unsupported_claim`. Assert existing advanced witnesses and malicious unit/domain/clue changes are rejected without using the stored solution as proof.
+- [x] Run `cargo test -p sudoku-core --test advanced_logic --test hints`; observe rejection/trace failures with the missing logic.
+- [x] Port all current advanced techniques and their separate proof validators. Preserve basic/variant replay-and-clue-matching validation; do not turn it into a new proof algorithm as an incidental port change.
+- [x] Port hint selection, first wrong entry, logical-step application and complete/unsupported/exhausted distinctions. Maintain owned trace/evidence and one shared caller budget.
+- [x] Run `pnpm test:migration -- --suite logic --engine native` and `--suite hints --engine native`, advanced/hint tests, and the full native suite. Compare all step arrays and evidence fields.
+- [x] Commit as `feat(core): port advanced proofs and hint computation`.
 
 ## Task 8: Port assessment, screening and persisted-summary semantics
 

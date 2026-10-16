@@ -87,8 +87,24 @@ export async function computeCase(engine, suite, input) {
         },
       )
       break
+    case 'advanced': {
+      const moduleUrl = (name) =>
+        pathToFileURL(resolve(referenceRoot, 'src/core/sudoku/logic', name + '.ts')).href
+      const { findAdvancedStep } = await import(moduleUrl('advancedTechniques'))
+      const { validateAdvancedStep } = await import(moduleUrl('advancedEvidence'))
+      const state = engine.createLogicalWorkspace(input.board, engine.compileRules(input.rules))
+      state.candidates = [...input.domains]
+      const step = findAdvancedStep(state, input.technique, budget)
+      result = {
+        result: step,
+        valid:
+          step.status === 'complete' && step.step ? validateAdvancedStep(state, step.step) : null,
+      }
+      break
+    }
+    case 'hint-chains':
     case 'hints':
-      result = engine.analyzeHint(input.board, input.solution, 500, {
+      result = engine.analyzeHint(input.board, input.solution, input.maxSteps ?? 500, {
         context: engine.compileRules(input.rules),
         workBudget: budget,
       })
@@ -178,8 +194,10 @@ export async function runMigration(args) {
           'support',
           'exact',
           'exact-prepared',
+          'advanced',
           'logic',
           'hints',
+          'hint-chains',
           'assessment',
           'editing',
           'validation',

@@ -1,5 +1,8 @@
+pub mod advanced_evidence;
+pub mod advanced_techniques;
 pub mod basic_techniques;
 pub mod evidence;
+pub mod hint_validation;
 pub mod pattern_facts;
 pub mod solver;
 pub mod techniques;
