@@ -52,6 +52,10 @@ export default [
       'target/**',
       'packages/sudoku-wasm/pkg/**',
       '.tools/**',
+      'android/**/build/**',
+      'android/**/.gradle/**',
+      'android/**/.kotlin/**',
+      'android/.native-tools/**',
       '.superpowers/**',
       'tests/reference/typescript-engine/**',
       '.agents/**',
@@ -62,7 +66,12 @@ export default [
   },
   // Reference snapshots remain byte exact; executable migration tools use Node globals.
   {
-    files: ['tests/migration/**/*.mjs', 'tests/reference/*.mjs', 'scripts/**/*.mjs'],
+    files: [
+      'tests/migration/**/*.mjs',
+      'tests/reference/*.mjs',
+      'scripts/**/*.mjs',
+      'android/interop/**/*.ts',
+    ],
     languageOptions: { globals: globals.node },
   },
   js.configs.recommended,

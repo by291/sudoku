@@ -10,3 +10,9 @@ test-results/
 target/
 packages/sudoku-wasm/pkg/
 .tools/
+
+android/**/.gradle/
+android/**/.kotlin/
+android/**/build/
+android/local.properties
+android/.native-tools/

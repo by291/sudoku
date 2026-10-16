@@ -13,3 +13,11 @@ tests/reference/typescript-engine/
 target/
 packages/sudoku-wasm/pkg/
 .tools/
+
+android/**/.gradle/
+android/**/.kotlin/
+android/**/build/
+android/.native-tools/
+
+# Room owns the checked-in schema formatting.
+android/core/data/schemas/
