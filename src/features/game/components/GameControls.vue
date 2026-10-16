@@ -15,11 +15,12 @@ const props = withDefaults(
     canUndo: boolean
     canRedo: boolean
     hintLoading: boolean
+    notesLoading?: boolean
     canRestart: boolean
     canStartNew: boolean
     newGameLabel: string
   }>(),
-  { announceSelection: true },
+  { announceSelection: true, notesLoading: false },
 )
 const emit = defineEmits<{
   digit: [digit: Digit]
@@ -105,7 +106,7 @@ const menuOptions = computed<NonNullable<DropdownProps['options']>>(() => [
   },
   // Top-level options retain native props in Naive UI 2.45; grouped children drop them.
   actionOption('check', '检查填写', !props.editable),
-  actionOption('candidates', '生成候选数', !props.editable),
+  actionOption('candidates', '生成候选数', !props.editable || props.notesLoading),
   { type: 'divider', key: 'divider' },
   actionOption('settings', '对局设置'),
   actionOption('new', props.newGameLabel, !props.canStartNew),

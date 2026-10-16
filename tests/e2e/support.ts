@@ -121,8 +121,13 @@ export function cellName(cell: number): RegExp {
   return new RegExp(`^第${Math.floor(cell / 9) + 1}行第${(cell % 9) + 1}列，`)
 }
 
-export async function seedSession(page: Page, session: GameSession, route = '/play/free') {
-  await page.goto('/#/')
+export async function seedSession(
+  page: Page,
+  session: GameSession,
+  route = '/play/free',
+  base = '/',
+) {
+  await page.goto(`${base}#/`)
   await expect(page.getByRole('button', { name: /开始一局数独/ })).toBeVisible()
   await page.evaluate(async (session) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -139,7 +144,7 @@ export async function seedSession(page: Page, session: GameSession, route = '/pl
     database.close()
   }, session)
   await page.goto(
-    `/#${route}${route.includes('?') ? '&' : '?'}session=${encodeURIComponent(session.id)}`,
+    `${base}#${route}${route.includes('?') ? '&' : '?'}session=${encodeURIComponent(session.id)}`,
   )
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
 }

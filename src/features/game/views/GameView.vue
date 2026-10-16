@@ -52,6 +52,8 @@ const {
   noteMode,
   hint,
   hintLoading,
+  notesLoading,
+  conflictAnalysisState,
   conflicts,
   checkedCells,
   checkIsCurrent,
@@ -306,8 +308,29 @@ function erase() {
       <NButton @click="game.cancelLoading">取消出题</NButton>
     </GenerationStatus>
     <template v-if="active && session">
+      <p
+        v-if="conflictAnalysisState === 'pending' && phase === 'playing'"
+        role="status"
+        class="feedback-message"
+      >
+        正在检查线索，仅显示已确认的冲突。
+      </p>
+      <p
+        v-if="conflictAnalysisState === 'failed' && phase === 'playing'"
+        role="status"
+        class="feedback-message"
+      >
+        线索检查暂时无法完成，仅显示已确认的冲突。
+      </p>
+      <p v-if="notesLoading" role="status" class="feedback-message">
+        正在生成候选数，修改局面会取消本次计算。
+      </p>
       <NAlert
-        v-if="conflictEvaluation.status === 'budget-exhausted'"
+        v-if="
+          conflictEvaluation.status === 'budget-exhausted' &&
+          conflictAnalysisState === 'ready' &&
+          phase === 'playing'
+        "
         class="feedback-message"
         type="warning"
         :show-icon="false"
@@ -391,6 +414,7 @@ function erase() {
             :can-undo="canUndo"
             :can-redo="canRedo"
             :hint-loading="hintLoading"
+            :notes-loading="notesLoading"
             :can-restart="
               !readOnly &&
               phase !== 'generating' &&

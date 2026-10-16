@@ -35,9 +35,9 @@ Approved behavior: the user selected the focused Worker option on 2026-10-16 and
 
 **Owners:** `GameView.vue`, controls, relevant component/unit tests and actual browser flows.
 
-- [ ] Add accessible Chinese checking/note-loading feedback without implying full validity from preview or stale results. Prevent duplicate note requests while permitting ordinary input.
-- [ ] Verify the valid nine-cell-cage regression using emitted Workers at both roots. Exercise cancellation/staleness through player actions and preserve ordinary keyboard/touch/save/completion behavior.
-- [ ] Run affected unit/type/lint and desktop/touch/WebKit tests; attempt Firefox and report runtime availability honestly. Commit `test(game): cover heavy-layout live analysis`.
+- [x] Add accessible Chinese checking/note-loading feedback without implying full validity from preview or stale results. Prevent duplicate note requests while permitting ordinary input.
+- [x] Verify the valid nine-cell-cage regression using emitted Workers at both roots. Exercise cancellation/staleness through player actions and preserve ordinary keyboard/touch/save/completion behavior.
+- [x] Run affected unit/type/lint and desktop/touch/WebKit tests; attempt Firefox and report runtime availability honestly. Commit `test(game): cover heavy-layout live analysis`.
 
 ## Task 5: Re-run the interactive gate and resume the release audit
 
