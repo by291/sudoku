@@ -27,6 +27,8 @@ export async function createTestRuntime() {
     wallNow: () => new Date('2026-10-11T01:00:00.000Z'),
     createSaveQueue: (token, revision) => createSaveQueue(repository, token, revision),
     worker: {
+      conflicts: async () => ({ status: 'failed', message: 'No live conflict fixture' }),
+      generateNotes: async () => ({ status: 'failed', message: 'No live notes fixture' }),
       generate: async () => ({ status: 'failed', message: 'No worker configured' }),
       assess: async () => ({ status: 'failed', message: 'No worker configured' }),
       hint: async () => ({ status: 'failed', message: 'No worker configured' }),

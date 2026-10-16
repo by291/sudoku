@@ -1,4 +1,4 @@
-import type { Board, ParseResult } from '@/sudoku/contracts'
+import type { ConflictWorkDto, EditWorkDto, Board, ParseResult } from '@/sudoku/contracts'
 import type { Puzzle } from '@/sudoku/contracts'
 import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
@@ -17,7 +17,18 @@ export type WorkerOutcome<T> =
   | { status: 'budget-exhausted'; message: string }
   | { status: 'failed'; message: string }
 
+export const LIVE_WORK_ALLOWANCE = 1000000
+export type GenerateNotesInput = {
+  givens: Board
+  entries: Board
+  notes: readonly number[]
+  rules: PuzzleRules
+}
+export type LiveComputation<T> = { preparationWork: number; computation: T }
+
 export type WorkerRequest =
+  | { kind: 'conflicts'; requestId: string; board: Board; rules: PuzzleRules }
+  | { kind: 'generate-notes'; requestId: string; input: GenerateNotesInput }
   | { kind: 'generate'; requestId: string; input: GenerationInput }
   | { kind: 'assess'; requestId: string; input: AssessmentInput }
   | { kind: 'hint'; requestId: string; board: Board; solution: Board; rules: PuzzleRules }
@@ -27,6 +38,16 @@ export type GenerateOutcome =
   | Exclude<WorkerOutcome<Puzzle>, { status: 'completed' }>
 
 export type WorkerResponse =
+  | {
+      kind: 'conflicts'
+      requestId: string
+      outcome: WorkerOutcome<LiveComputation<ConflictWorkDto>>
+    }
+  | {
+      kind: 'generate-notes'
+      requestId: string
+      outcome: WorkerOutcome<LiveComputation<EditWorkDto>>
+    }
   | { kind: 'generate'; requestId: string; outcome: GenerateOutcome }
   | { kind: 'assess'; requestId: string; outcome: WorkerOutcome<AssessmentOutcome> }
   | { kind: 'hint'; requestId: string; outcome: WorkerOutcome<HintResult> }
@@ -44,7 +65,12 @@ export type WorkerControl = WorkerInitialize | WorkerReady | WorkerInitializatio
 type RequestValidator = Pick<MainSudokuEngine, 'validateRules' | 'validatePuzzle'>
 type ResponseValidator = Pick<
   MainSudokuEngine,
-  'validatePuzzle' | 'validateAssessment' | 'validateAssessmentOutcome' | 'parseHint'
+  | 'validatePuzzle'
+  | 'validateAssessment'
+  | 'validateAssessmentOutcome'
+  | 'parseHint'
+  | 'parseConflicts'
+  | 'parseEdit'
 >
 
 function withinLimit(value: unknown, maximum: number): value is number {
@@ -58,6 +84,49 @@ export function parseWorkerRequest(
   const invalid: ParseResult<WorkerRequest> = { valid: false, issues: ['Invalid request payload'] }
   if (!isRecord(value) || typeof value.requestId !== 'string' || !value.requestId) {
     return { valid: false, issues: ['Invalid request envelope'] }
+  }
+  if (
+    value.kind === 'conflicts' &&
+    isBoard(value.board) &&
+    isRulesShape(value.rules) &&
+    validator.validateRules(value.rules).status === 'valid'
+  ) {
+    return {
+      valid: true,
+      value: {
+        kind: 'conflicts',
+        requestId: value.requestId,
+        board: value.board,
+        rules: value.rules,
+      },
+    }
+  }
+  if (value.kind === 'generate-notes' && isRecord(value.input)) {
+    const input = value.input
+    if (
+      isBoard(input.givens) &&
+      isBoard(input.entries) &&
+      Array.isArray(input.notes) &&
+      input.notes.length === 81 &&
+      input.notes.every((mask: unknown) => withinLimit(mask, 511)) &&
+      isRulesShape(input.rules) &&
+      validator.validateRules(input.rules).status === 'valid'
+    ) {
+      return {
+        valid: true,
+        value: {
+          kind: 'generate-notes',
+          requestId: value.requestId,
+          input: {
+            givens: input.givens,
+            entries: input.entries,
+            notes: input.notes,
+            rules: input.rules,
+          },
+        },
+      }
+    }
+    return invalid
   }
   if (value.kind === 'generate') {
     const parsed = parseGenerationInput(value.input)
@@ -131,7 +200,11 @@ export function parseWorkerResponse(
   if (
     !isRecord(value) ||
     typeof value.requestId !== 'string' ||
-    (value.kind !== 'generate' && value.kind !== 'hint' && value.kind !== 'assess') ||
+    (value.kind !== 'generate' &&
+      value.kind !== 'hint' &&
+      value.kind !== 'assess' &&
+      value.kind !== 'conflicts' &&
+      value.kind !== 'generate-notes') ||
     !isRecord(value.outcome)
   ) {
     return invalid
@@ -151,6 +224,39 @@ export function parseWorkerResponse(
   }
   if (outcome.status !== 'completed') {
     return invalid
+  }
+  if (kind === 'conflicts' || kind === 'generate-notes') {
+    if (
+      !isRecord(outcome.value) ||
+      !withinLimit(outcome.value.preparationWork, LIVE_WORK_ALLOWANCE)
+    ) {
+      return invalid
+    }
+    const preparationWork = outcome.value.preparationWork
+    try {
+      if (kind === 'conflicts') {
+        const computation = validator.parseConflicts(outcome.value.computation)
+        return {
+          valid: true,
+          value: {
+            kind,
+            requestId,
+            outcome: { status: 'completed', value: { preparationWork, computation } },
+          },
+        }
+      }
+      const computation = validator.parseEdit(outcome.value.computation)
+      return {
+        valid: true,
+        value: {
+          kind,
+          requestId,
+          outcome: { status: 'completed', value: { preparationWork, computation } },
+        },
+      }
+    } catch {
+      return invalid
+    }
   }
   if (kind === 'generate') {
     const parsed = validatePuzzleSnapshot(outcome.value, validator)

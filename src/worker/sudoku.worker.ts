@@ -94,6 +94,18 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
         requestId: request.requestId,
         outcome: { status: 'completed', value: engine.assess(request.input) },
       }
+    } else if (request.kind === 'conflicts') {
+      response = {
+        kind: 'conflicts',
+        requestId: request.requestId,
+        outcome: { status: 'completed', value: engine.conflicts(request.board, request.rules) },
+      }
+    } else if (request.kind === 'generate-notes') {
+      response = {
+        kind: 'generate-notes',
+        requestId: request.requestId,
+        outcome: { status: 'completed', value: engine.generateNotes(request.input) },
+      }
     } else {
       response = {
         kind: 'hint',

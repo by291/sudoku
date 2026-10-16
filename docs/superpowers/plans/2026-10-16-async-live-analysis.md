@@ -16,10 +16,10 @@ Approved behavior: the user selected the focused Worker option on 2026-10-16 and
 
 **Owners:** `src/sudoku/workerEngine.ts`, `src/worker/{protocol,client,sudoku.worker}.ts`, readiness/protocol/client tests and runtime fixtures.
 
-- [ ] Add typed `conflicts` and `generate-notes` requests using owned board/rule/layer snapshots. Copy before any readiness await; never transfer a persisted session.
-- [ ] Keep mathematical action work at 1,000,000 and report separately bounded layout preparation. Return exact Rust work/result DTOs; do not add fallback, refund, retry or generation allowances.
-- [ ] Reuse version readiness, per-job Worker ownership, 15-second live-job timeout, abort/termination and late-reply fencing. Parse unknown results through Rust and validate the small transport envelope.
-- [ ] Test delayed startup, mutable callers, partial/exhausted outcomes, malformed responses, cancellation, timeout and disposal. Commit `feat(worker): run expensive live analysis off thread`.
+- [x] Add typed `conflicts` and `generate-notes` requests using owned board/rule/layer snapshots. Copy before any readiness await; never transfer a persisted session.
+- [x] Keep mathematical action work at 1,000,000 and report separately bounded layout preparation. Return exact Rust work/result DTOs; do not add fallback, refund, retry or generation allowances.
+- [x] Reuse version readiness, per-job Worker ownership, 15-second live-job timeout, abort/termination and late-reply fencing. Parse unknown results through Rust and validate the small transport envelope.
+- [x] Test delayed startup, mutable callers, partial/exhausted outcomes, malformed responses, cancellation, timeout and disposal. Commit `feat(worker): run expensive live analysis off thread`.
 
 ## Task 3: Fence reactive conflicts and asynchronous note commits
 

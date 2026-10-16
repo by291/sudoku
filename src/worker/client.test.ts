@@ -16,6 +16,7 @@ afterAll(() => engine.dispose())
 
 class FakeWorker extends EventTarget {
   static instances: FakeWorker[] = []
+  static autoReady = true
   requests: WorkerRequest[] = []
   terminated = false
   constructor() {
@@ -24,7 +25,9 @@ class FakeWorker extends EventTarget {
   }
   postMessage(request: WorkerInbound) {
     if (request.kind === 'initialize') {
-      this.reply({ kind: 'ready', bridgeVersion: request.bridgeVersion })
+      if (FakeWorker.autoReady) {
+        this.reply({ kind: 'ready', bridgeVersion: request.bridgeVersion })
+      }
     } else {
       this.requests.push(request)
     }
@@ -54,6 +57,7 @@ function latestWorker(): FakeWorker {
 
 beforeEach(() => {
   FakeWorker.instances = []
+  FakeWorker.autoReady = true
   vi.useFakeTimers()
   vi.stubGlobal('Worker', FakeWorker)
 })
@@ -304,5 +308,97 @@ it('rejects a valid puzzle whose type does not match the variant request', async
   })
 
   expect(await pending).toMatchObject({ status: 'failed' })
+  client.dispose()
+})
+
+it('live_jobs_preserve_owned_snapshots_partial_results_and_original_deadlines', async () => {
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const board = [...uniqueBoard]
+  const pending = client.conflicts(board, { kind: 'classic' })
+  const worker = latestWorker()
+  const request = worker.requests[0]
+  board.fill(0)
+
+  expect(request).toMatchObject({ kind: 'conflicts', board: uniqueBoard })
+  const computation = { result: { status: 'budget-exhausted', violations: [] }, workUsed: 1000000 }
+  worker.reply({
+    kind: 'conflicts',
+    requestId: request.requestId,
+    outcome: { status: 'completed', value: { preparationWork: 100, computation } },
+  })
+
+  expect(await pending).toEqual({
+    status: 'completed',
+    value: { preparationWork: 100, computation },
+  })
+  const notes = Array<number>(81).fill(0)
+  const editing = client.generateNotes({
+    givens: uniqueBoard,
+    entries: Array(81).fill(0),
+    notes,
+    rules: { kind: 'classic' },
+  })
+  const editingWorker = latestWorker()
+  notes[0] = 511
+
+  expect(editingWorker.requests[0]).toMatchObject({
+    kind: 'generate-notes',
+    input: { notes: Array(81).fill(0) },
+  })
+  await vi.advanceTimersByTimeAsync(15000)
+  expect(await editing).toEqual({ status: 'timed-out' })
+  expect(editingWorker.terminated).toBe(true)
+  client.dispose()
+})
+
+it('live_jobs_reject_malformed_results_and_terminate_cancelled_or_disposed_owners', async () => {
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const pending = client.conflicts(uniqueBoard, { kind: 'classic' })
+  const worker = latestWorker()
+  worker.reply({
+    kind: 'conflicts',
+    requestId: worker.requests[0].requestId,
+    outcome: { status: 'completed', value: { preparationWork: 1000001, computation: {} } },
+  })
+  expect((await pending).status).toBe('failed')
+
+  const controller = new AbortController()
+  const cancelled = client.generateNotes(
+    {
+      givens: uniqueBoard,
+      entries: Array(81).fill(0),
+      notes: Array(81).fill(0),
+      rules: { kind: 'classic' },
+    },
+    controller.signal,
+  )
+  const owner = latestWorker()
+  controller.abort()
+  expect(await cancelled).toEqual({ status: 'cancelled' })
+  expect(owner.terminated).toBe(true)
+  const disposed = client.conflicts(uniqueBoard, { kind: 'classic' })
+  client.dispose()
+  expect(await disposed).toEqual({ status: 'cancelled' })
+})
+
+it('live_jobs_snapshot_before_delayed_readiness_and_keep_the_initial_deadline', async () => {
+  FakeWorker.autoReady = false
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const notes = Array<number>(81).fill(0)
+  const pending = client.generateNotes({
+    givens: uniqueBoard,
+    entries: Array(81).fill(0),
+    notes,
+    rules: { kind: 'classic' },
+  })
+  const worker = latestWorker()
+  notes.fill(511)
+  await vi.advanceTimersByTimeAsync(14000)
+  expect(worker.requests).toEqual([])
+  worker.reply({ kind: 'ready', bridgeVersion: 1 })
+  await Promise.resolve()
+  expect(worker.requests[0]).toMatchObject({ input: { notes: Array(81).fill(0) } })
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(await pending).toEqual({ status: 'timed-out' })
   client.dispose()
 })

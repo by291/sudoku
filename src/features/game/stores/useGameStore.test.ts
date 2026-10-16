@@ -29,6 +29,8 @@ function setup() {
     wallNow: () => new Date('2026-10-11T01:00:00.000Z'),
     createId: () => 'new-game',
     worker: {
+      conflicts: async () => ({ status: 'failed', message: 'No live conflict fixture' }),
+      generateNotes: async () => ({ status: 'failed', message: 'No live notes fixture' }),
       generate: async () => ({ status: 'failed', message: 'Test generation failure' }),
       assess: async () => ({ status: 'failed', message: 'Test assessment failure' }),
       hint: () =>

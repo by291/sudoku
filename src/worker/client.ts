@@ -1,4 +1,4 @@
-import type { Board } from '@/sudoku/contracts'
+import type { ConflictWorkDto, EditWorkDto, Board } from '@/sudoku/contracts'
 import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
 import type { AssessmentInput, AssessmentOutcome } from '@/sudoku/contracts'
@@ -10,6 +10,8 @@ import { copyRules } from '@/sudoku/ruleInput'
 import { decodeSeed, equalSeeds } from '@/sudoku/seed'
 import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
 import type {
+  GenerateNotesInput,
+  LiveComputation,
   GenerateOutcome,
   WorkerOutcome,
   WorkerRequest,
@@ -29,6 +31,16 @@ interface PreparedWorker {
 }
 
 export interface SudokuWorkerClient {
+  conflicts(
+    board: Board,
+    rules: PuzzleRules,
+    signal?: AbortSignal,
+  ): Promise<WorkerOutcome<LiveComputation<ConflictWorkDto>>>
+  generateNotes(
+    input: GenerateNotesInput,
+    signal?: AbortSignal,
+  ): Promise<WorkerOutcome<LiveComputation<EditWorkDto>>>
+
   generate(input: GenerationInput, signal?: AbortSignal): Promise<GenerateOutcome>
   assess(input: AssessmentInput, signal?: AbortSignal): Promise<WorkerOutcome<AssessmentOutcome>>
   hint(
@@ -252,6 +264,36 @@ export function createSudokuWorkerClient(
   prepareWorker()
 
   return {
+    conflicts(board, rules, signal) {
+      const snapshot = { board: [...board], rules: copyRules(rules) }
+      return run(
+        { kind: 'conflicts', requestId: crypto.randomUUID(), ...snapshot },
+        (value) => {
+          const parsed = parseWorkerResponse(value, engine)
+          return parsed.valid && parsed.value.kind === 'conflicts' ? parsed.value.outcome : null
+        },
+        signal,
+      )
+    },
+    generateNotes(input, signal) {
+      // Snapshot before run can await readiness; callers retain ownership of their mutable layers.
+      const snapshot = {
+        givens: [...input.givens],
+        entries: [...input.entries],
+        notes: [...input.notes],
+        rules: copyRules(input.rules),
+      }
+      return run(
+        { kind: 'generate-notes', requestId: crypto.randomUUID(), input: snapshot },
+        (value) => {
+          const parsed = parseWorkerResponse(value, engine)
+          return parsed.valid && parsed.value.kind === 'generate-notes'
+            ? parsed.value.outcome
+            : null
+        },
+        signal,
+      )
+    },
     generate(input, signal) {
       const snapshot = copyGenerationInput(input)
       return run(
