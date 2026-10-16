@@ -95,7 +95,7 @@ fn evaluate(
                 violations,
             };
         };
-        if local.supports.iter().any(|mask| mask.bits() == 0) {
+        if local.as_slice().contains(&0) {
             violations.push(constraint_violation(constraint));
         }
     }

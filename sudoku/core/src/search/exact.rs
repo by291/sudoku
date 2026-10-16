@@ -4,7 +4,7 @@ use crate::board::is_complete;
 use crate::budget::{WorkBudget, WorkStage};
 use crate::constraints::computation::prepare_computation;
 use crate::constraints::types::PreparedComputation;
-use crate::rules::context::compile_rules;
+use crate::rules::context::directly_contradictory_rules;
 use crate::rules::types::{PreparedRules, PuzzleRules};
 use crate::types::{Board, Bounded, CoreResult};
 
@@ -55,8 +55,7 @@ pub fn count_with_rules(
     budget: &mut WorkBudget,
     node_limit: u64,
 ) -> CoreResult<SearchResult> {
-    let inspected = compile_rules(rules)?;
-    if directly_contradictory(board, &inspected) {
+    if directly_contradictory_rules(board, rules)? {
         return Ok(contradictory_result());
     }
     let started = budget.used();

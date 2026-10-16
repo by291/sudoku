@@ -383,47 +383,63 @@ impl CandidateFrontier {
             self.sweep_entry = Some(retained);
         }
 
-        let mut solved: Vec<_> = self
-            .entries
-            .iter()
-            .filter(|entry| entry.borrow().checkpoint.status.solved())
-            .cloned()
-            .collect();
-        let mut stalled: Vec<_> = self
-            .entries
-            .iter()
-            .filter(|entry| !entry.borrow().checkpoint.status.solved())
-            .cloned()
-            .collect();
-        solved.sort_by(|left, right| {
-            compare(
-                &left.borrow().checkpoint,
-                &right.borrow().checkpoint,
-                self.target,
-            )
-        });
-        stalled.sort_by(|left, right| {
-            compare(
-                &left.borrow().checkpoint,
-                &right.borrow().checkpoint,
-                self.target,
-            )
-        });
+        // Insertion temporarily owns nine entries before the retained pool returns to eight.
+        let mut solved = [0; MAX_CHECKPOINTS + 1];
+        let mut stalled = [0; MAX_CHECKPOINTS + 1];
+        let solved_count = self.rank_indices(true, &mut solved);
+        let stalled_count = self.rank_indices(false, &mut stalled);
         let reserved = MAX_CHECKPOINTS / 2;
-        let solved_capacity = reserved.max(MAX_CHECKPOINTS.saturating_sub(stalled.len()));
-        let stalled_capacity = reserved.max(MAX_CHECKPOINTS.saturating_sub(solved.len()));
-        solved.truncate(solved_capacity);
+        let solved_capacity = reserved.max(MAX_CHECKPOINTS.saturating_sub(stalled_count));
+        let stalled_capacity = reserved.max(MAX_CHECKPOINTS.saturating_sub(solved_count));
+        let solved_count = solved_count.min(solved_capacity);
+        let stalled_count = stalled_count.min(stalled_capacity);
+        let mut retained: [Option<Entry>; MAX_CHECKPOINTS] = std::array::from_fn(|_| None);
+        for (slot, &index) in retained.iter_mut().zip(&solved[..solved_count]) {
+            *slot = Some(self.entries[index].clone());
+        }
         // A temporary tier drop must not cut a solved removal lineage's ordinary sweep short.
         if let Some(sweep) = &self.sweep_entry
-            && !solved.iter().any(|entry| Rc::ptr_eq(entry, sweep))
-            && let Some(last) = solved.last_mut()
+            && solved_count != 0
+            && !retained[..solved_count]
+                .iter()
+                .flatten()
+                .any(|entry| Rc::ptr_eq(entry, sweep))
         {
-            *last = sweep.clone();
+            retained[solved_count - 1] = Some(sweep.clone());
         }
-        stalled.truncate(stalled_capacity);
-        solved.extend(stalled);
-        self.entries = solved;
+        for (slot, &index) in retained[solved_count..]
+            .iter_mut()
+            .zip(&stalled[..stalled_count])
+        {
+            *slot = Some(self.entries[index].clone());
+        }
+        self.entries.clear();
+        self.entries.extend(retained.into_iter().flatten());
         Ok(improved || continuing_sweep)
+    }
+
+    fn rank_indices(&self, solved: bool, ranked: &mut [usize; MAX_CHECKPOINTS + 1]) -> usize {
+        let mut count = 0;
+        for (index, entry) in self.entries.iter().enumerate() {
+            if entry.borrow().checkpoint.status.solved() != solved {
+                continue;
+            }
+            let mut position = count;
+            // Strict replacement keeps equal checkpoints in their original stable insertion order.
+            while position != 0
+                && compare(
+                    &entry.borrow().checkpoint,
+                    &self.entries[ranked[position - 1]].borrow().checkpoint,
+                    self.target,
+                ) == Ordering::Less
+            {
+                ranked[position] = ranked[position - 1];
+                position -= 1;
+            }
+            ranked[position] = index;
+            count += 1;
+        }
+        count
     }
 
     pub fn next(
@@ -433,48 +449,39 @@ impl CandidateFrontier {
     ) -> Option<CandidateProposal> {
         budget.with_stage(WorkStage::Proposals, |budget| {
             while self.seen.len() < MAX_SEEN_MASKS {
-                let eligible: Vec<_> = self
+                let eligible = self
                     .entries
                     .iter()
-                    .filter(|entry| entry.borrow().cursor < MAX_PROPOSALS)
-                    .cloned()
-                    .collect();
-                if eligible.is_empty() || !budget.consume(1) {
+                    .filter(|entry| entry.borrow().cursor < MAX_PROPOSALS);
+                if eligible.clone().next().is_none() || !budget.consume(1) {
                     return None;
                 }
                 let desired_solved = self.selections.is_multiple_of(2);
                 self.selections += 1;
-                let mut ranked: Vec<_> = eligible
-                    .iter()
-                    .filter(|entry| entry.borrow().checkpoint.status.solved() == desired_solved)
-                    .cloned()
-                    .collect();
-                if ranked.is_empty() {
-                    ranked = eligible.clone();
-                }
-                ranked.sort_by(|left, right| {
+                let has_desired = eligible
+                    .clone()
+                    .any(|entry| entry.borrow().checkpoint.status.solved() == desired_solved);
+                let ranked = eligible.clone().filter(|entry| {
+                    !has_desired || entry.borrow().checkpoint.status.solved() == desired_solved
+                });
+                let Some(best) = ranked.clone().min_by(|left, right| {
                     compare(
                         &left.borrow().checkpoint,
                         &right.borrow().checkpoint,
                         self.target,
                     )
-                });
-                let Some(best) = ranked.first() else {
+                }) else {
                     panic!("Nonempty candidate pool has no best checkpoint");
                 };
-                let tied: Vec<_> = ranked
-                    .iter()
-                    .filter(|entry| {
-                        compare(
-                            &entry.borrow().checkpoint,
-                            &best.borrow().checkpoint,
-                            self.target,
-                        ) == Ordering::Equal
-                    })
-                    .cloned()
-                    .collect();
+                let tied = ranked.filter(|entry| {
+                    compare(
+                        &entry.borrow().checkpoint,
+                        &best.borrow().checkpoint,
+                        self.target,
+                    ) == Ordering::Equal
+                });
                 if self.sweep_entry.as_ref().is_some_and(|sweep| {
-                    !eligible.iter().any(|entry| Rc::ptr_eq(entry, sweep))
+                    !eligible.clone().any(|entry| Rc::ptr_eq(entry, sweep))
                         || sweep.borrow().sweep_cursor >= BOARD_SIZE
                 }) {
                     self.sweep_entry = None;
@@ -483,7 +490,11 @@ impl CandidateFrontier {
                 let selected = if let Some(sweep) = &self.sweep_entry {
                     sweep.clone()
                 } else {
-                    tied[(random.next_f64() * tied.len() as f64) as usize].clone()
+                    let index = (random.next_f64() * tied.clone().count() as f64) as usize;
+                    let Some(selected) = tied.clone().nth(index) else {
+                        panic!("Nonempty tied checkpoint selection must be in range");
+                    };
+                    selected.clone()
                 };
                 let proposal = {
                     let mut entry = selected.borrow_mut();

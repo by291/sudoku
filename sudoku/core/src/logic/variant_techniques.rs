@@ -1,4 +1,4 @@
-use super::pattern_facts::{digits_in, mask_of};
+use super::pattern_facts::mask_of;
 use super::techniques::Technique;
 use super::types::{
     CageMemo, CandidateDomain, CellBound, Evidence, LogicalAction, LogicalStep, LogicalWorkspace,
@@ -6,10 +6,10 @@ use super::types::{
 };
 use super::workspace::{all_digits, local_domains};
 use crate::budget::WorkBudget;
-use crate::constraints::support::get_constraint_support;
-use crate::constraints::types::{SupportResult, SupportSnapshot};
+use crate::constraints::support::raw_for_constraint;
+use crate::constraints::types::{MAX_CONSTRAINT_CELLS, SupportMasksResult};
 use crate::rules::types::RuleConstraint;
-use crate::types::Bounded;
+use crate::types::{Bounded, CandidateMask};
 
 pub(crate) fn matches_rule_technique(technique: Technique, constraint: &RuleConstraint) -> bool {
     match constraint {
@@ -29,39 +29,44 @@ fn combination_support(
     state: &mut LogicalWorkspace,
     index: usize,
     budget: &mut WorkBudget,
-) -> SupportResult {
+) -> SupportMasksResult {
     let constraint = &state.rules.context().constraints[index];
     let cage = matches!(constraint, RuleConstraint::Cage { .. });
-    let domains = if cage {
-        local_domains(state, constraint.cells())
-    } else {
-        vec![]
-    };
+    let domains = std::array::from_fn(|position| {
+        if !cage || position >= constraint.cells().len() {
+            return CandidateMask::EMPTY;
+        }
+        let cell = constraint.cells()[position];
+        if state.board.values()[cell] == 0 {
+            state.candidates[cell]
+        } else {
+            CandidateMask::from_computed_bits(mask_of(state.board.values()[cell]))
+        }
+    });
     if cage
         && let Some(previous) = &state.cage_memo[index]
         && previous.domains == domains
     {
         // Geometry is immutable and private to this workspace. The caller still charges each visit.
-        return Bounded::Complete(SupportSnapshot {
-            cells: constraint.cells().to_vec(),
-            supports: previous.supports.clone(),
-        });
+        return Bounded::Complete(previous.supports);
     }
 
     let result = if let Some(support) = &state.support {
         support.query_at(&state.board, &state.candidates, index, budget)
     } else {
-        // The index belongs to this workspace's validated immutable layout.
-        match get_constraint_support(&state.board, &state.candidates, &state.rules, index, budget) {
-            Ok(result) => result,
-            Err(error) => panic!("Internal constraint index invariant: {error}"),
-        }
+        raw_for_constraint(
+            &state.board,
+            &state.candidates,
+            &state.rules,
+            constraint,
+            budget,
+        )
     };
     if cage && let Bounded::Complete(support) = &result {
         // Keep one owned complete snapshot per cage; an interrupted enumeration proves nothing.
         state.cage_memo[index] = Some(CageMemo {
             domains,
-            supports: support.supports.clone(),
+            supports: *support,
         });
     }
     result
@@ -100,13 +105,11 @@ pub(crate) fn clue_evidence(state: &LogicalWorkspace, constraint: &RuleConstrain
     }
 }
 
-fn deduction(
+fn deduction_action(
     state: &LogicalWorkspace,
-    technique: Technique,
     cells: &[usize],
     supported: &[u16],
-    evidence: RuleEvidence,
-) -> Option<LogicalStep> {
+) -> Option<LogicalAction> {
     let mut removals = vec![];
     for (index, &cell) in cells.iter().enumerate() {
         if state.board.values()[cell] != 0 {
@@ -114,29 +117,26 @@ fn deduction(
         }
 
         let before = state.candidates[cell].bits();
-        let remaining = digits_in(before & supported[index]);
-        if remaining.len() == 1 && before != (before & supported[index]) {
-            return Some(LogicalStep {
-                technique,
-                evidence: Evidence::Rule(evidence),
-                action: LogicalAction::Placement {
-                    cell,
-                    digit: remaining[0],
-                },
+        let remaining = CandidateMask::from_computed_bits(before & supported[index]);
+        if before != remaining.bits()
+            && let Some(digit) = remaining.single()
+        {
+            return Some(LogicalAction::Placement {
+                cell,
+                digit: digit.value(),
             });
         }
-        for digit in digits_in(before & !supported[index]) {
-            removals.push(Removal { cell, digit });
+        for digit in CandidateMask::from_computed_bits(before & !supported[index]).digits() {
+            removals.push(Removal {
+                cell,
+                digit: digit.value(),
+            });
         }
     }
     if removals.is_empty() {
         None
     } else {
-        Some(LogicalStep {
-            technique,
-            evidence: Evidence::Rule(evidence),
-            action: LogicalAction::Elimination { removals },
-        })
+        Some(LogicalAction::Elimination { removals })
     }
 }
 
@@ -146,73 +146,79 @@ fn simple_step(
     technique: Technique,
 ) -> Option<LogicalStep> {
     let cells = constraint.cells();
-    let mut evidence = clue_evidence(state, constraint);
     if technique == Technique::ThermoBound
         && let RuleConstraint::Thermo { .. } = constraint
     {
-        let supported: Vec<u16> = cells
-            .iter()
-            .enumerate()
-            .map(|(position, _)| {
-                let mut minimum = position as i32 + 1;
-                let mut maximum = 9 - (cells.len() - position - 1) as i32;
-                for (index, &other) in cells.iter().enumerate() {
-                    if state.board.values()[other] == 0 || index == position {
-                        continue;
-                    }
-                    if index < position {
-                        minimum = minimum.max(
-                            i32::from(state.board.values()[other]) + (position - index) as i32,
-                        );
-                    } else {
-                        maximum = maximum.min(
-                            i32::from(state.board.values()[other]) - (index - position) as i32,
-                        );
-                    }
+        let mut supported = [0; MAX_CONSTRAINT_CELLS];
+        for (position, mask) in supported.iter_mut().take(cells.len()).enumerate() {
+            let mut minimum = position as i32 + 1;
+            let mut maximum = 9 - (cells.len() - position - 1) as i32;
+            for (index, &other) in cells.iter().enumerate() {
+                if state.board.values()[other] == 0 || index == position {
+                    continue;
                 }
-                (1..=9)
-                    .filter(|&digit| i32::from(digit) >= minimum && i32::from(digit) <= maximum)
-                    .fold(0, |bits, digit| bits | mask_of(digit))
-            })
-            .collect();
+                if index < position {
+                    minimum = minimum
+                        .max(i32::from(state.board.values()[other]) + (position - index) as i32);
+                } else {
+                    maximum = maximum
+                        .min(i32::from(state.board.values()[other]) - (index - position) as i32);
+                }
+            }
+            *mask = (1..=9)
+                .filter(|&digit| i32::from(digit) >= minimum && i32::from(digit) <= maximum)
+                .fold(0, |bits, digit| bits | mask_of(digit));
+        }
+        let action = deduction_action(state, cells, &supported)?;
+        let mut evidence = clue_evidence(state, constraint);
         if let RuleEvidenceKind::Thermo { bounds, .. } = &mut evidence.kind {
             *bounds = cells
                 .iter()
                 .copied()
                 .zip(&supported)
                 .filter_map(|(cell, &bits)| {
-                    let values = digits_in(bits);
+                    if bits == 0 {
+                        return None;
+                    }
                     Some(CellBound {
                         cell,
-                        min: *values.first()?,
-                        max: *values.last()?,
+                        min: (bits.trailing_zeros() + 1) as u8,
+                        max: (u16::BITS - bits.leading_zeros()) as u8,
                     })
                 })
                 .collect();
         }
-        return deduction(state, technique, cells, &supported, evidence);
+        return Some(LogicalStep {
+            technique,
+            evidence: Evidence::Rule(evidence),
+            action,
+        });
     }
     if technique == Technique::CageDistinct && matches!(constraint, RuleConstraint::Cage { .. }) {
         let used = cells
             .iter()
             .filter(|&&cell| state.board.values()[cell] != 0)
             .fold(0, |bits, &cell| bits | mask_of(state.board.values()[cell]));
-        return deduction(state, technique, cells, &vec![!used; cells.len()], evidence);
+        let action = deduction_action(state, cells, &[!used; MAX_CONSTRAINT_CELLS])?;
+        return Some(LogicalStep {
+            technique,
+            evidence: Evidence::Rule(clue_evidence(state, constraint)),
+            action,
+        });
     }
     if (technique == Technique::CageRemainder && matches!(constraint, RuleConstraint::Cage { .. }))
         || (technique == Technique::ArrowEquation
             && matches!(constraint, RuleConstraint::Arrow { .. }))
     {
-        let unknown: Vec<usize> = cells
+        let mut unknown = cells
             .iter()
             .copied()
-            .filter(|&cell| state.board.values()[cell] == 0)
-            .collect();
-        if unknown.len() != 1 {
+            .filter(|&cell| state.board.values()[cell] == 0);
+        let cell = unknown.next()?;
+        if unknown.next().is_some() {
             return None;
         }
 
-        let cell = unknown[0];
         let total: i32 = cells
             .iter()
             .map(|&cell| i32::from(state.board.values()[cell]))
@@ -236,7 +242,7 @@ fn simple_step(
         }
         return Some(LogicalStep {
             technique,
-            evidence: Evidence::Rule(evidence),
+            evidence: Evidence::Rule(clue_evidence(state, constraint)),
             action: LogicalAction::Placement {
                 cell,
                 digit: answer as u8,
@@ -279,10 +285,13 @@ pub fn find_variant_step(
             let Bounded::Complete(support) = combination_support(state, index, budget) else {
                 return Bounded::BudgetExhausted;
             };
-            let evidence = clue_evidence(state, &state.rules.context().constraints[index]);
-            let supported: Vec<u16> = support.supports.iter().map(|mask| mask.bits()).collect();
-            if let Some(step) = deduction(state, technique, &support.cells, &supported, evidence) {
-                return Bounded::Complete(Some(Box::new(step)));
+            let constraint = &state.rules.context().constraints[index];
+            if let Some(action) = deduction_action(state, constraint.cells(), support.as_slice()) {
+                return Bounded::Complete(Some(Box::new(LogicalStep {
+                    technique,
+                    action,
+                    evidence: Evidence::Rule(clue_evidence(state, constraint)),
+                })));
             }
         }
     }

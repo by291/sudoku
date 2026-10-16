@@ -137,6 +137,10 @@ work_response!(SearchWorkDto, SearchResultDto);
 work_response!(LogicWorkDto, super::logic::LogicResultDto);
 work_response!(HintWorkDto, super::logic::HintResultDto);
 work_response!(AssessmentWorkDto, super::rating::AssessmentResultDto);
+work_response!(
+    AssessmentSummaryWorkDto,
+    super::rating::AssessmentOutcomeDto
+);
 
 #[derive(Deserialize, Tsify)]
 #[serde(deny_unknown_fields)]

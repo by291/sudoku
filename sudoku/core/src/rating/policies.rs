@@ -1,6 +1,4 @@
-use crate::logic::techniques::{
-    ADVANCED_TECHNIQUES, ALL_CLASSIC_TECHNIQUES, BASIC_TECHNIQUES, Technique,
-};
+use crate::logic::techniques::{ALL_CLASSIC_TECHNIQUES, BASIC_TECHNIQUES, Technique};
 use crate::rules::types::SudokuVariant;
 use crate::types::Difficulty;
 
@@ -16,52 +14,65 @@ pub fn supports_difficulty(variant: SudokuVariant, difficulty: Difficulty) -> bo
     supported_difficulties(variant).contains(&difficulty)
 }
 
-fn applicable(variant: SudokuVariant, technique: Technique) -> bool {
-    if BASIC_TECHNIQUES.contains(&technique)
-        || (variant == SudokuVariant::Classic && technique.is_advanced())
-    {
-        return true;
-    }
-    match variant {
-        SudokuVariant::Killer => matches!(
-            technique,
-            Technique::CageDistinct | Technique::CageRemainder | Technique::CageCombination
-        ),
-        SudokuVariant::Thermo => technique == Technique::ThermoBound,
-        SudokuVariant::Arrow => matches!(
-            technique,
-            Technique::ArrowEquation | Technique::ArrowCombination
-        ),
-        SudokuVariant::Classic | SudokuVariant::Diagonal | SudokuVariant::Jigsaw => false,
-    }
+/// Fixed catalogues are borrowed internally; the public wrapper retains native source compatibility.
+pub(crate) fn policy_slice(variant: SudokuVariant, difficulty: Difficulty) -> &'static [Technique] {
+    use Technique::*;
+    const KILLER: &[Technique] = &[
+        NakedSingle,
+        HiddenSingle,
+        CageDistinct,
+        CageRemainder,
+        LockedCandidate,
+        CageCombination,
+        NakedPair,
+        HiddenPair,
+    ];
+    const THERMO: &[Technique] = &[
+        NakedSingle,
+        HiddenSingle,
+        ThermoBound,
+        LockedCandidate,
+        NakedPair,
+        HiddenPair,
+    ];
+    const ARROW: &[Technique] = &[
+        NakedSingle,
+        HiddenSingle,
+        ArrowEquation,
+        LockedCandidate,
+        ArrowCombination,
+        NakedPair,
+        HiddenPair,
+    ];
+
+    let (catalogue, easy, medium): (&[Technique], usize, usize) = match variant {
+        SudokuVariant::Classic | SudokuVariant::Diagonal | SudokuVariant::Jigsaw => {
+            (&ALL_CLASSIC_TECHNIQUES, 2, 3)
+        }
+        SudokuVariant::Killer => (KILLER, 4, 6),
+        SudokuVariant::Thermo => (THERMO, 3, 4),
+        SudokuVariant::Arrow => (ARROW, 3, 5),
+    };
+    let length = match difficulty {
+        Difficulty::Easy => easy,
+        Difficulty::Medium => medium,
+        Difficulty::Expert if variant == SudokuVariant::Classic => catalogue.len(),
+        Difficulty::Hard | Difficulty::Expert => {
+            if matches!(
+                variant,
+                SudokuVariant::Classic | SudokuVariant::Diagonal | SudokuVariant::Jigsaw
+            ) {
+                BASIC_TECHNIQUES.len()
+            } else {
+                catalogue.len()
+            }
+        }
+    };
+    &catalogue[..length]
 }
 
 pub fn policy(variant: SudokuVariant, difficulty: Difficulty) -> Vec<Technique> {
-    let mut ordered = vec![
-        Technique::NakedSingle,
-        Technique::HiddenSingle,
-        Technique::CageDistinct,
-        Technique::CageRemainder,
-        Technique::ThermoBound,
-        Technique::ArrowEquation,
-    ];
-    if difficulty != Difficulty::Easy {
-        ordered.extend([
-            Technique::LockedCandidate,
-            Technique::CageCombination,
-            Technique::ArrowCombination,
-        ]);
-    }
-    if matches!(difficulty, Difficulty::Hard | Difficulty::Expert) {
-        ordered.extend([Technique::NakedPair, Technique::HiddenPair]);
-    }
-    if difficulty == Difficulty::Expert {
-        ordered.extend(ADVANCED_TECHNIQUES);
-    }
-    ordered
-        .into_iter()
-        .filter(|&technique| applicable(variant, technique))
-        .collect()
+    policy_slice(variant, difficulty).to_vec()
 }
 
 pub fn technique_tier(technique: Technique) -> Difficulty {
@@ -86,22 +97,31 @@ pub fn technique_tier(technique: Technique) -> Difficulty {
 }
 
 /// Classic always follows catalogue order even if a caller's allowed list has another order.
-pub(crate) fn execution_order(variant: SudokuVariant, allowed: &[Technique]) -> Vec<Technique> {
-    if variant == SudokuVariant::Classic {
-        ALL_CLASSIC_TECHNIQUES
-            .into_iter()
-            .filter(|technique| allowed.contains(technique))
-            .collect()
+pub(crate) fn execution_order(
+    variant: SudokuVariant,
+    allowed: &[Technique],
+) -> impl Iterator<Item = Technique> + Clone + '_ {
+    let classic = variant == SudokuVariant::Classic;
+    let order = if classic {
+        &ALL_CLASSIC_TECHNIQUES[..]
     } else {
-        allowed.to_vec()
+        allowed
+    };
+    order
+        .iter()
+        .copied()
+        .filter(move |technique| !classic || allowed.contains(technique))
+}
+
+pub(crate) fn hint_techniques_slice(variant: SudokuVariant) -> &'static [Technique] {
+    if variant == SudokuVariant::Classic {
+        &ALL_CLASSIC_TECHNIQUES
+    } else {
+        policy_slice(variant, Difficulty::Hard)
     }
 }
 
 /// Hint orchestration uses the supported hard policy; Classic additionally permits expert patterns.
 pub fn hint_techniques(variant: SudokuVariant) -> Vec<Technique> {
-    if variant == SudokuVariant::Classic {
-        ALL_CLASSIC_TECHNIQUES.to_vec()
-    } else {
-        policy(variant, Difficulty::Hard)
-    }
+    hint_techniques_slice(variant).to_vec()
 }

@@ -1,6 +1,7 @@
 import { expectTypeOf, test } from 'vitest'
 import type {
   assess,
+  assess_summary,
   generate,
   derive_seed,
   count_solutions,
@@ -9,6 +10,7 @@ import type {
   PreparedPuzzle,
   WorkResultDto,
   AssessmentResultDto,
+  AssessmentOutcomeDto,
   SearchResultDto,
   CandidateResultDto,
   HintResultDto,
@@ -23,6 +25,12 @@ test('generated_exports_preserve_concrete_result_types', () => {
   expectTypeOf<Parameters<typeof derive_seed>[0]>().toEqualTypeOf<Uint8Array>()
   expectTypeOf<Parameters<typeof parse_assessment_summary>[0]>().toBeUnknown()
   expectTypeOf<ReturnType<typeof assess>>().toEqualTypeOf<WorkResultDto<AssessmentResultDto>>()
+  expectTypeOf<ReturnType<typeof assess_summary>>().toEqualTypeOf<
+    WorkResultDto<AssessmentOutcomeDto>
+  >()
+  expectTypeOf<
+    Extract<ReturnType<typeof assess_summary>['result'], { status: 'rated' }>
+  >().not.toHaveProperty('trace')
   expectTypeOf<ReturnType<typeof hint>>().toEqualTypeOf<WorkResultDto<HintResultDto>>()
   expectTypeOf<ReturnType<typeof count_solutions>>().toEqualTypeOf<WorkResultDto<SearchResultDto>>()
   expectTypeOf<ReturnType<PreparedPuzzle['candidates']>>().toEqualTypeOf<

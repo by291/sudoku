@@ -113,3 +113,127 @@ fn catalogue_limits_cannot_exceed_fixed_memory_bounds() {
         assert_eq!(budget.used(), 0);
     }
 }
+
+#[test]
+fn ten_cell_arrow_keeps_its_full_arity_and_charged_repeat_rejection() {
+    use sudoku_core::constraints::support::get_constraint_support;
+    use sudoku_core::rules::types::{Arrow, PuzzleRules};
+
+    let rules = PuzzleRules::Arrow {
+        arrows: vec![Arrow {
+            circle: 0,
+            shaft: vec![1, 2, 3, 4, 5, 6, 7, 8, 17],
+        }],
+    };
+    let context = compile_rules(&rules).unwrap();
+    let mut domains = [CandidateMask::EMPTY; 81];
+    domains[0] = CandidateMask::try_from(1 << 8).unwrap();
+    for cell in [1, 2, 3, 4, 5, 6, 7, 8, 17] {
+        domains[cell] = CandidateMask::try_from(1).unwrap();
+    }
+    let mut budget = WorkBudget::new(3);
+
+    let Bounded::Complete(result) =
+        get_constraint_support(&Board::EMPTY, &domains, &context, 0, &mut budget).unwrap()
+    else {
+        panic!("The impossible repeat is established in exactly three candidate visits");
+    };
+
+    // Nine shaft digits must all be one to total at most nine; the first two share a row.
+    assert_eq!(result.cells, [0, 1, 2, 3, 4, 5, 6, 7, 8, 17]);
+    assert_eq!(result.supports, [CandidateMask::EMPTY; 10]);
+    assert_eq!(budget.used(), 3);
+    assert!(matches!(
+        get_constraint_support(
+            &Board::EMPTY,
+            &domains,
+            &context,
+            0,
+            &mut WorkBudget::new(2)
+        )
+        .unwrap(),
+        Bounded::BudgetExhausted
+    ));
+}
+
+#[test]
+fn empty_support_domains_preserve_raw_and_fallback_candidate_charges() {
+    use sudoku_core::constraints::support::get_constraint_support;
+    use sudoku_core::constraints::types::SupportSnapshot;
+    use sudoku_core::rules::types::{Arrow, Cage, PuzzleRules};
+
+    let mut cages = vec![Cage {
+        cells: vec![0, 1],
+        sum: 3,
+    }];
+    cages.extend((2..81).map(|cell| Cage {
+        cells: vec![cell],
+        sum: 1,
+    }));
+    let variants = [
+        PuzzleRules::Killer { cages },
+        PuzzleRules::Arrow {
+            arrows: vec![Arrow {
+                circle: 0,
+                shaft: vec![1],
+            }],
+        },
+    ];
+
+    for rules in variants {
+        let context = compile_rules(&rules).unwrap();
+        let mut preparation = WorkBudget::new(4_000_000);
+        let Bounded::Complete(prepared) = prepare_constraint_support(
+            &context,
+            &mut preparation,
+            CatalogueLimits {
+                max_tuples_per_constraint: 0,
+                max_tuples_per_layout: 0,
+            },
+        )
+        .unwrap() else {
+            panic!("Expected forced enumeration preparation");
+        };
+
+        for first_domain_empty in [false, true] {
+            let mut domains = [CandidateMask::EMPTY; 81];
+            domains[if first_domain_empty { 1 } else { 0 }] = CandidateMask::try_from(1).unwrap();
+
+            for owner in [None, Some(&prepared)] {
+                for allowance in [0, 1] {
+                    let mut budget = WorkBudget::new(allowance);
+
+                    let result = match owner {
+                        Some(owner) => owner.get(&Board::EMPTY, &domains, 0, &mut budget).unwrap(),
+                        None => get_constraint_support(
+                            &Board::EMPTY,
+                            &domains,
+                            &context,
+                            0,
+                            &mut budget,
+                        )
+                        .unwrap(),
+                    };
+
+                    // A future empty domain rejects after trying digit one; an empty first domain tries nothing.
+                    let expected = if first_domain_empty || allowance == 1 {
+                        Bounded::Complete(SupportSnapshot {
+                            cells: vec![0, 1],
+                            supports: vec![CandidateMask::EMPTY; 2],
+                        })
+                    } else {
+                        Bounded::BudgetExhausted
+                    };
+                    assert_eq!(
+                        result, expected,
+                        "{rules:?}, first empty: {first_domain_empty}"
+                    );
+                    assert_eq!(
+                        budget.used(),
+                        if first_domain_empty { 0 } else { allowance }
+                    );
+                }
+            }
+        }
+    }
+}

@@ -31,10 +31,10 @@ beforeAll(async () => {
   }
   handler(
     new MessageEvent('message', {
-      data: { kind: 'initialize', bridgeVersion: 1, module: getTestModule() },
+      data: { kind: 'initialize', bridgeVersion: 2, module: getTestModule() },
     }),
   )
-  await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ kind: 'ready', bridgeVersion: 1 }))
+  await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ kind: 'ready', bridgeVersion: 2 }))
   post.mockClear()
 })
 afterAll(() => vi.unstubAllGlobals())

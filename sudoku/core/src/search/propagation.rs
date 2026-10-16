@@ -20,6 +20,11 @@ impl OrderedQueue {
         }
     }
 
+    fn clear(&mut self) {
+        self.pending.clear();
+        self.present.fill(false);
+    }
+
     fn insert(&mut self, index: usize) {
         if !self.present[index] {
             self.present[index] = true;
@@ -42,6 +47,22 @@ struct Queues {
     cells: Vec<usize>,
     units: OrderedQueue,
     constraints: OrderedQueue,
+}
+
+impl Queues {
+    fn new(computation: &PreparedComputation) -> Self {
+        Self {
+            cells: Vec::with_capacity(BOARD_SIZE),
+            units: OrderedQueue::new(computation.rules.context().units.len()),
+            constraints: OrderedQueue::new(computation.rules.context().constraints.len()),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.cells.clear();
+        self.units.clear();
+        self.constraints.clear();
+    }
 }
 
 struct DomainChange {
@@ -112,14 +133,11 @@ impl SearchState<'_> {
         true
     }
 
-    fn propagate(&mut self, changed_cell: Option<usize>) -> bool {
+    fn propagate(&mut self, changed_cell: Option<usize>, queues: &mut Queues) -> bool {
         let computation = self.computation;
         let context = computation.rules.context();
-        let mut queues = Queues {
-            cells: vec![],
-            units: OrderedQueue::new(context.units.len()),
-            constraints: OrderedQueue::new(context.constraints.len()),
-        };
+        // A contradiction can leave all three queues pending; siblings always start with empty membership.
+        queues.clear();
         if let Some(cell) = changed_cell {
             queues.cells.push(cell);
             for &index in &context.cell_units[cell] {
@@ -152,7 +170,7 @@ impl SearchState<'_> {
                     continue;
                 }
                 for &peer in &context.duplicate_peers[cell] {
-                    if !self.reduce(peer, self.domains[peer].bits() & !mask, &mut queues) {
+                    if !self.reduce(peer, self.domains[peer].bits() & !mask, queues) {
                         return false;
                     }
                 }
@@ -182,7 +200,7 @@ impl SearchState<'_> {
                     match positions {
                         DigitPositions::Missing => return false,
                         DigitPositions::One(cell) => {
-                            if !self.reduce(cell, bit, &mut queues) {
+                            if !self.reduce(cell, bit, queues) {
                                 return false;
                             }
                         }
@@ -206,8 +224,12 @@ impl SearchState<'_> {
                 self.exhausted = true;
                 return false;
             };
-            for (&cell, mask) in support.cells.iter().zip(&support.supports) {
-                if !self.reduce(cell, self.domains[cell].bits() & mask.bits(), &mut queues) {
+            for (&cell, mask) in context.constraints[index]
+                .cells()
+                .iter()
+                .zip(support.as_slice())
+            {
+                if !self.reduce(cell, self.domains[cell].bits() & mask, queues) {
                     return false;
                 }
             }
@@ -215,13 +237,13 @@ impl SearchState<'_> {
         true
     }
 
-    fn visit(&mut self, changed_cell: Option<usize>) {
+    fn visit(&mut self, changed_cell: Option<usize>, queues: &mut Queues) {
         if self.nodes_visited >= self.node_limit || !self.charge() {
             self.exhausted = true;
             return;
         }
         self.nodes_visited += 1;
-        if !self.propagate(changed_cell) {
+        if !self.propagate(changed_cell, queues) {
             return;
         }
 
@@ -257,7 +279,7 @@ impl SearchState<'_> {
             self.assign(target, CandidateMask::from_computed_bits(bit));
             {
                 let guard = TrailGuard { state: self, mark };
-                guard.state.visit(Some(target));
+                guard.state.visit(Some(target), queues);
             }
             if self.exhausted || self.count == 2 {
                 return;
@@ -266,7 +288,7 @@ impl SearchState<'_> {
     }
 }
 
-// Branches restore domains on every exit, including exhaustion and unwinding; queues remain local.
+// Branches restore domains on every exit; probe-owned queues are cleared before each propagation.
 struct TrailGuard<'state, 'layout> {
     state: &'state mut SearchState<'layout>,
     mark: usize,
@@ -306,12 +328,13 @@ pub(super) fn count_propagation_solutions(
         count: 0,
         solution: None,
     };
+    let mut queues = Queues::new(computation);
     {
         let guard = TrailGuard {
             state: &mut state,
             mark: 0,
         };
-        guard.state.visit(None);
+        guard.state.visit(None, &mut queues);
     }
     let work_used = state.budget.used() - started;
     if state.exhausted {

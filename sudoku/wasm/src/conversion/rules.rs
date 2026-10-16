@@ -63,29 +63,21 @@ pub fn rules_to_dto(value: &PuzzleRules) -> CoreResult<RulesDto> {
         PuzzleRules::Classic => RulesDto::Classic,
         PuzzleRules::Diagonal => RulesDto::Diagonal,
         PuzzleRules::Jigsaw { regions } => RulesDto::Jigsaw {
-            regions: regions
-                .iter()
-                .cloned()
-                .map(indices)
-                .collect::<CoreResult<_>>()?,
+            regions: regions.iter().map(indices).collect::<CoreResult<_>>()?,
         },
         PuzzleRules::Killer { cages } => RulesDto::Killer {
             cages: cages
                 .iter()
                 .map(|cage| {
                     Ok(CageDto {
-                        cells: indices(cage.cells.clone())?,
+                        cells: indices(&cage.cells)?,
                         sum: cage.sum,
                     })
                 })
                 .collect::<CoreResult<_>>()?,
         },
         PuzzleRules::Thermo { paths } => RulesDto::Thermo {
-            paths: paths
-                .iter()
-                .cloned()
-                .map(indices)
-                .collect::<CoreResult<_>>()?,
+            paths: paths.iter().map(indices).collect::<CoreResult<_>>()?,
         },
         PuzzleRules::Arrow { arrows } => RulesDto::Arrow {
             arrows: arrows
@@ -93,7 +85,7 @@ pub fn rules_to_dto(value: &PuzzleRules) -> CoreResult<RulesDto> {
                 .map(|arrow| {
                     Ok(ArrowDto {
                         circle: index(arrow.circle)?,
-                        shaft: indices(arrow.shaft.clone())?,
+                        shaft: indices(&arrow.shaft)?,
                     })
                 })
                 .collect::<CoreResult<_>>()?,
@@ -146,21 +138,21 @@ pub fn unit_to_core(unit: UnitDto) -> CoreResult<Unit> {
 }
 
 pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
-    let metadata = prepared.metadata();
+    let metadata = prepared.metadata_ref();
     let units = metadata
         .units
-        .into_iter()
+        .iter()
         .map(|unit| {
             Ok(SudokuUnitDto {
                 kind: unit.kind.into(),
                 index: index(unit.index)?,
-                cells: indices(unit.cells)?,
+                cells: indices(&unit.cells)?,
             })
         })
         .collect::<CoreResult<_>>()?;
     let constraints = metadata
         .constraints
-        .into_iter()
+        .iter()
         .map(|constraint| {
             Ok(match constraint {
                 RuleConstraint::Cage {
@@ -169,18 +161,18 @@ pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
                     cells,
                     sum,
                 } => ConstraintDto::Cage {
-                    id,
-                    index: index(clue_index)?,
+                    id: id.clone(),
+                    index: index(*clue_index)?,
                     cells: indices(cells)?,
-                    sum,
+                    sum: *sum,
                 },
                 RuleConstraint::Thermo {
                     id,
                     index: clue_index,
                     cells,
                 } => ConstraintDto::Thermo {
-                    id,
-                    index: index(clue_index)?,
+                    id: id.clone(),
+                    index: index(*clue_index)?,
                     cells: indices(cells)?,
                 },
                 RuleConstraint::Arrow {
@@ -192,10 +184,10 @@ pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
                         return Err(EngineError::invalid("Compiled arrow has no circle"));
                     };
                     ConstraintDto::Arrow {
-                        id,
-                        index: index(clue_index)?,
+                        id: id.clone(),
+                        index: index(*clue_index)?,
                         circle: index(circle)?,
-                        shaft: indices(shaft.to_vec())?,
+                        shaft: indices(shaft)?,
                     }
                 }
             })
@@ -207,22 +199,22 @@ pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
         constraints,
         cell_units: metadata
             .cell_units
-            .into_iter()
+            .iter()
             .map(indices)
             .collect::<CoreResult<_>>()?,
         cell_constraints: metadata
             .cell_constraints
-            .into_iter()
+            .iter()
             .map(indices)
             .collect::<CoreResult<_>>()?,
         duplicate_peers: metadata
             .duplicate_peers
-            .into_iter()
+            .iter()
             .map(indices)
             .collect::<CoreResult<_>>()?,
         related_cells: metadata
             .related_cells
-            .into_iter()
+            .iter()
             .map(indices)
             .collect::<CoreResult<_>>()?,
     })

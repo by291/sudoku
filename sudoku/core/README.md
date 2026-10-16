@@ -31,6 +31,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 Use checked `Board`, `Digit`, `CellIndex` and `CandidateMask` values. `Puzzle` contains mathematical content only; generated identity is separate. Rules/topology and prepared support are immutable owned layout data. A caller may reuse that preparation across boards, but every search/logical workspace owns fresh domains, queues, trails, premises and domain-dependent caches. Returned boards/evidence are owned snapshots.
 
+`CandidateMask` supports checked digit membership, counting, single-digit lookup and ascending iteration without allocating a digit vector. `PreparedRules::metadata_ref()` borrows immutable layout data; `metadata()` still returns an independent owned snapshot. Exact propagation reuses queue capacity within one probe and clears pending entries and membership before exploring another branch.
+
 `WorkBudget` charges before work, retains abandoned work and reports stage consumption. Expected incompleteness uses explicit bounded outcomes; exhaustion never means zero solutions, contradiction, uniqueness or success. Default generation limits are 40 layouts, 4,000,000 shared work units and 500 logical steps. Live arithmetic can consume its full allowance even on an 81-cell board: a UI must honor its measured execution policy rather than assuming every synchronous operation fits one frame.
 
 The public owners are `rules/`, `constraints/`, `search/`, `editing`, `logic/`, `rating/`, `generation/`, `hint` and `puzzle`. See the workspace [architecture](../../docs/architecture.md), [extension checklist](../../docs/variant-extension.md) and [migration contracts](../../tests/migration/README.md).

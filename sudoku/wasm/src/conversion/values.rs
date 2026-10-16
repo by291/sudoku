@@ -77,8 +77,8 @@ pub fn index(value: usize) -> CoreResult<u32> {
         .map_err(|_| EngineError::invalid("Core index exceeds the browser's numeric bounds"))
 }
 
-pub fn indices(values: Vec<usize>) -> CoreResult<Vec<u32>> {
-    values.into_iter().map(index).collect()
+pub fn indices(values: impl AsRef<[usize]>) -> CoreResult<Vec<u32>> {
+    values.as_ref().iter().copied().map(index).collect()
 }
 
 pub fn core_indices(values: Vec<u32>) -> CoreResult<Vec<usize>> {

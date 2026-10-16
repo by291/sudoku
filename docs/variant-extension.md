@@ -37,6 +37,8 @@ Declare and measure the primitive’s live computation cost in `LiveComputationC
 
 Preserve the four-cell/512-tuple/8,192-layout catalogue limits and fallback behavior unless a separately reviewed versioned behavior change requires otherwise. A detector's search answer is not evidence. Advanced proofs must establish their unit, candidate, peer/fish/wing/strong-link premises directly. Authored teaching-state validation assumes independently proven earlier candidate eliminations and may choose a sound pattern other than the detector's first one.
 
+Local support scratch currently holds ten cells, including an Arrow circle plus nine shaft cells. A new primitive with a larger arity must update this bound and its boundary checks together. Keep full units, cage distinctness and peer exclusion separate; Arrow positions may repeat a digit when their ordinary peer relation permits it. Reused propagation scratch must reset both pending work and deduplication membership after every completed or contradictory branch; budget exhaustion ends that count request.
+
 ## Generation and determinism
 
 Current defaults remain 40 layouts, 4,000,000 shared work units and 500 logical steps, with a separate 6,561-visit regional terminal attempt cap. A terminal/geometry attempt consumes a layout slot before work, including partial failure. Preserve bounded checkpoint/novelty/proposal pools, target stopping, full-result completion, policy-prefix continuation and failed-charge accounting. A changed clue mask cannot reuse mutable candidate state. A known terminal proves existence, not uniqueness.

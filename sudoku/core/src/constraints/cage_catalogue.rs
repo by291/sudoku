@@ -1,6 +1,8 @@
-use super::types::{CageCatalogue, MAX_CATALOGUE_CELLS, SupportResult, SupportSnapshot};
+use super::types::{
+    CageCatalogue, MAX_CATALOGUE_CELLS, MAX_CONSTRAINT_CELLS, SupportMasks, SupportMasksResult,
+};
 use crate::budget::WorkBudget;
-use crate::types::{Bounded, CandidateMask, UNIT_SIZE};
+use crate::types::{Bounded, UNIT_SIZE};
 
 pub(super) enum CatalogueResult {
     Complete(CageCatalogue),
@@ -12,8 +14,10 @@ struct CatalogueBuilder<'a> {
     arity: usize,
     target: i32,
     capacity: usize,
-    combination: Vec<u8>,
-    assigned: Vec<u8>,
+    combination: [u8; MAX_CATALOGUE_CELLS],
+    combination_len: usize,
+    assigned: [u8; MAX_CATALOGUE_CELLS],
+    assigned_len: usize,
     tuples: Vec<[u16; MAX_CATALOGUE_CELLS]>,
     exhausted: bool,
     overflow: bool,
@@ -22,20 +26,20 @@ struct CatalogueBuilder<'a> {
 
 impl CatalogueBuilder<'_> {
     fn permute(&mut self, used: u16) {
-        if self.assigned.len() == self.combination.len() {
+        if self.assigned_len == self.combination_len {
             if self.tuples.len() >= self.capacity {
                 self.overflow = true;
                 return;
             }
             let mut tuple = [0; MAX_CATALOGUE_CELLS];
-            for (index, &digit) in self.assigned.iter().enumerate() {
+            for (index, &digit) in self.assigned[..self.assigned_len].iter().enumerate() {
                 tuple[index] = 1 << (digit - 1);
             }
             self.tuples.push(tuple);
             return;
         }
 
-        for index in 0..self.combination.len() {
+        for index in 0..self.combination_len {
             let digit = self.combination[index];
             let bit = 1 << (digit - 1);
             if used & bit != 0 {
@@ -46,9 +50,10 @@ impl CatalogueBuilder<'_> {
                 return;
             }
 
-            self.assigned.push(digit);
+            self.assigned[self.assigned_len] = digit;
+            self.assigned_len += 1;
             self.permute(used | bit);
-            self.assigned.pop();
+            self.assigned_len -= 1;
             if self.exhausted || self.overflow {
                 return;
             }
@@ -56,13 +61,13 @@ impl CatalogueBuilder<'_> {
     }
 
     fn combine(&mut self, start: u8, sum: i32) {
-        if self.combination.len() == self.arity {
+        if self.combination_len == self.arity {
             if sum == self.target {
                 self.permute(0);
             }
             return;
         }
-        let remaining = (self.arity - self.combination.len()) as i32;
+        let remaining = (self.arity - self.combination_len) as i32;
 
         for digit in 1..=UNIT_SIZE as u8 {
             let value = i32::from(digit);
@@ -82,9 +87,10 @@ impl CatalogueBuilder<'_> {
                 continue;
             }
 
-            self.combination.push(digit);
+            self.combination[self.combination_len] = digit;
+            self.combination_len += 1;
             self.combine(digit + 1, sum + value);
-            self.combination.pop();
+            self.combination_len -= 1;
             if self.exhausted || self.overflow {
                 return;
             }
@@ -102,8 +108,10 @@ pub(super) fn compile(
         arity,
         target: i32::from(target),
         capacity,
-        combination: vec![],
-        assigned: vec![],
+        combination: [0; MAX_CATALOGUE_CELLS],
+        combination_len: 0,
+        assigned: [0; MAX_CATALOGUE_CELLS],
+        assigned_len: 0,
         tuples: vec![],
         exhausted: false,
         overflow: false,
@@ -124,12 +132,15 @@ pub(super) fn compile(
 }
 
 pub(super) fn filter(
-    cells: &[usize],
+    arity: usize,
     domains: &[u16],
     catalogue: &CageCatalogue,
     budget: &mut WorkBudget,
-) -> SupportResult {
-    let mut supports = vec![0_u16; cells.len()];
+) -> SupportMasksResult {
+    let mut supports = SupportMasks {
+        bits: [0; MAX_CONSTRAINT_CELLS],
+        len: arity,
+    };
     for tuple in &catalogue.tuples {
         let mut compatible = true;
         for index in 0..catalogue.arity {
@@ -142,17 +153,11 @@ pub(super) fn filter(
             }
         }
         if compatible {
-            for index in 0..catalogue.arity {
-                supports[index] |= tuple[index];
+            for (support, &bits) in supports.bits.iter_mut().zip(&tuple[..catalogue.arity]) {
+                *support |= bits;
             }
         }
     }
 
-    Bounded::Complete(SupportSnapshot {
-        cells: cells.to_vec(),
-        supports: supports
-            .into_iter()
-            .map(CandidateMask::from_computed_bits)
-            .collect(),
-    })
+    Bounded::Complete(supports)
 }

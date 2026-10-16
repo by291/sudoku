@@ -100,7 +100,7 @@ fn checked_digit(digit: DigitDto) -> CoreResult<u8> {
 
 pub fn rule_to_dto(evidence: &RuleEvidence) -> CoreResult<RuleEvidenceDto> {
     let constraint_id = evidence.constraint_id.clone();
-    let cells = indices(evidence.cells.clone())?;
+    let cells = indices(&evidence.cells)?;
     let digits = evidence.digits.iter().copied().map(DigitDto).collect();
     Ok(match &evidence.kind {
         RuleEvidenceKind::Cage { sum, domains } => RuleEvidenceDto::Cage {
@@ -114,7 +114,7 @@ pub fn rule_to_dto(evidence: &RuleEvidence) -> CoreResult<RuleEvidenceDto> {
             constraint_id,
             cells,
             digits,
-            path: indices(path.clone())?,
+            path: indices(path)?,
             bounds: bounds
                 .iter()
                 .map(|bound| {
@@ -135,7 +135,7 @@ pub fn rule_to_dto(evidence: &RuleEvidence) -> CoreResult<RuleEvidenceDto> {
             cells,
             digits,
             circle: index(*circle)?,
-            shaft: indices(shaft.clone())?,
+            shaft: indices(shaft)?,
             domains: domains_to_dto(domains)?,
         },
     })
@@ -212,7 +212,7 @@ fn rule_to_core(evidence: RuleEvidenceDto) -> CoreResult<RuleEvidence> {
 }
 
 fn advanced_to_dto(evidence: &AdvancedEvidence) -> CoreResult<AdvancedEvidenceDto> {
-    let cells = indices(evidence.cells.clone())?;
+    let cells = indices(&evidence.cells)?;
     let digits = evidence.digits.iter().copied().map(DigitDto).collect();
     let domains = domains_to_dto(&evidence.domains)?;
     Ok(match &evidence.kind {
@@ -257,7 +257,7 @@ fn advanced_to_dto(evidence: &AdvancedEvidence) -> CoreResult<AdvancedEvidenceDt
                 ColoringMode::Trap => ColoringModeDto::Trap,
                 ColoringMode::Wrap => ColoringModeDto::Wrap,
             },
-            colors: [indices(colors[0].clone())?, indices(colors[1].clone())?],
+            colors: [indices(&colors[0])?, indices(&colors[1])?],
             links: links
                 .iter()
                 .map(|link| {
@@ -390,7 +390,7 @@ fn evidence_to_dto(evidence: &Evidence) -> CoreResult<EvidenceDto> {
         } => EvidenceDto::Unit(UnitEvidenceDto {
             kind: UnitEvidenceKindDto::Unit,
             unit: unit_to_dto(*unit)?,
-            cells: indices(cells.clone())?,
+            cells: indices(cells)?,
             digits: digits.iter().copied().map(DigitDto).collect(),
             premises: premises
                 .iter()

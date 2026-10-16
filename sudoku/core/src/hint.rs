@@ -3,7 +3,7 @@ use crate::budget::WorkBudget;
 use crate::logic::solver::find_step;
 use crate::logic::types::{LogicalAction, LogicalStep};
 use crate::logic::workspace::{apply_step, create_workspace};
-use crate::rating::policies::hint_techniques;
+use crate::rating::policies::hint_techniques_slice;
 use crate::rules::types::PreparedRules;
 use crate::types::{Board, Bounded};
 
@@ -53,10 +53,10 @@ pub fn analyze_hint(
     }
 
     let mut state = create_workspace(board, rules);
-    let techniques = hint_techniques(rules.rules().variant());
+    let techniques = hint_techniques_slice(rules.rules().variant());
     let mut steps = vec![];
     for _ in 0..max_steps {
-        let step = match find_step(&mut state, &techniques, budget) {
+        let step = match find_step(&mut state, techniques, budget) {
             Bounded::BudgetExhausted => {
                 return HintResult::Unavailable(HintUnavailable::BudgetExhausted);
             }

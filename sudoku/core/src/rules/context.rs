@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::sync::OnceLock;
 
 use super::definitions;
@@ -13,13 +12,13 @@ fn charge(budget: &mut Option<&mut WorkBudget>) -> bool {
     }
 }
 
-fn memberships(
-    groups: &[Vec<usize>],
+fn memberships<'a>(
+    groups: impl IntoIterator<Item = &'a [usize]>,
     budget: &mut Option<&mut WorkBudget>,
 ) -> Option<Vec<Vec<usize>>> {
     let mut result = vec![vec![]; BOARD_SIZE];
 
-    for (index, cells) in groups.iter().enumerate() {
+    for (index, cells) in groups.into_iter().enumerate() {
         for &cell in cells {
             if !charge(budget) {
                 return None;
@@ -31,11 +30,12 @@ fn memberships(
     Some(result)
 }
 
-fn relationships(
-    groups: &[Vec<usize>],
+fn relationships<'a>(
+    groups: impl IntoIterator<Item = &'a [usize]>,
     budget: &mut Option<&mut WorkBudget>,
 ) -> Option<Vec<Vec<usize>>> {
-    let mut result = vec![BTreeSet::new(); BOARD_SIZE];
+    // Two machine words cover the finite board without tree nodes or target-dependent u128 shifts.
+    let mut result = [[0_u64; 2]; BOARD_SIZE];
 
     for cells in groups {
         for &cell in cells {
@@ -45,7 +45,7 @@ fn relationships(
                     return None;
                 }
                 if cell != peer {
-                    result[cell].insert(peer);
+                    result[cell][peer / 64] |= 1_u64 << (peer % 64);
                 }
             }
         }
@@ -54,7 +54,11 @@ fn relationships(
     Some(
         result
             .into_iter()
-            .map(|peers| peers.into_iter().collect())
+            .map(|peers| {
+                (0..BOARD_SIZE)
+                    .filter(|&cell| peers[cell / 64] & (1_u64 << (cell % 64)) != 0)
+                    .collect()
+            })
             .collect(),
     )
 }
@@ -65,24 +69,31 @@ fn build(rules: &PuzzleRules, mut budget: Option<&mut WorkBudget>) -> Option<Pre
     }
 
     let compiled = definitions::compile(rules);
-    let units_as_cells: Vec<Vec<usize>> = compiled
-        .units
-        .iter()
-        .map(|unit| unit.cells.clone())
-        .collect();
-    let constraints_as_cells: Vec<Vec<usize>> = compiled
-        .constraints
-        .iter()
-        .map(|constraint| constraint.cells().to_vec())
-        .collect();
+    let cell_units = memberships(
+        compiled.units.iter().map(|unit| unit.cells.as_slice()),
+        &mut budget,
+    )?;
+    let cell_constraints = memberships(
+        compiled
+            .constraints
+            .iter()
+            .map(|constraint| constraint.cells()),
+        &mut budget,
+    )?;
 
-    let cell_units = memberships(&units_as_cells, &mut budget)?;
-    let cell_constraints = memberships(&constraints_as_cells, &mut budget)?;
-
-    let duplicate_peers = relationships(&compiled.duplicate_groups, &mut budget)?;
-    let mut related_groups = compiled.duplicate_groups;
-    related_groups.extend(constraints_as_cells);
-    let related_cells = relationships(&related_groups, &mut budget)?;
+    let duplicate_peers = relationships(
+        compiled.duplicate_groups.iter().map(Vec::as_slice),
+        &mut budget,
+    )?;
+    let related_cells = relationships(
+        compiled.duplicate_groups.iter().map(Vec::as_slice).chain(
+            compiled
+                .constraints
+                .iter()
+                .map(|constraint| constraint.cells()),
+        ),
+        &mut budget,
+    )?;
 
     Some(PreparedRules::new(RuleMetadata {
         rules: rules.clone(),
@@ -100,6 +111,59 @@ pub fn validate_rules(rules: &PuzzleRules) -> CoreResult<()> {
     definitions::validate(rules)
 }
 
+/// Scan validated rule groups without constructing memberships or pairwise topology.
+/// Invalid geometry is rejected before givens, and only a completed board checks arithmetic totals.
+pub(crate) fn directly_contradictory_rules(
+    board: &crate::types::Board,
+    rules: &PuzzleRules,
+) -> CoreResult<bool> {
+    validate_rules(rules)?;
+    if matches!(rules, PuzzleRules::Classic) {
+        let prepared = classic_prepared_rules()?;
+        return Ok(prepared
+            .context()
+            .units
+            .iter()
+            .any(|unit| has_duplicate(board, &unit.cells)));
+    }
+    let compiled = definitions::compile(rules);
+    if compiled
+        .duplicate_groups
+        .iter()
+        .any(|cells| has_duplicate(board, cells))
+    {
+        return Ok(true);
+    }
+    Ok(!board.values().contains(&0)
+        && compiled
+            .constraints
+            .iter()
+            .any(|constraint| !satisfies_constraint(board, constraint)))
+}
+
+fn has_duplicate(board: &crate::types::Board, cells: &[usize]) -> bool {
+    let mut seen = 0_u16;
+    for &cell in cells {
+        let digit = board.values()[cell];
+        if digit == 0 {
+            continue;
+        }
+        let bit = 1 << (digit - 1);
+        if seen & bit != 0 {
+            return true;
+        }
+        seen |= bit;
+    }
+    false
+}
+
+fn classic_prepared_rules() -> CoreResult<PreparedRules> {
+    static CLASSIC: OnceLock<CoreResult<PreparedRules>> = OnceLock::new();
+    CLASSIC
+        .get_or_init(|| compile_rules(&PuzzleRules::Classic))
+        .clone()
+}
+
 /// Validate and own an immutable layout. Native callers may choose this unbounded convenience API.
 pub fn compile_rules(rules: &PuzzleRules) -> CoreResult<PreparedRules> {
     definitions::validate(rules)?;
@@ -115,11 +179,7 @@ pub fn prepare_rules(
 ) -> CoreResult<Bounded<PreparedRules>> {
     definitions::validate(rules)?;
     if matches!(rules, PuzzleRules::Classic) {
-        static CLASSIC: OnceLock<CoreResult<PreparedRules>> = OnceLock::new();
-        return CLASSIC
-            .get_or_init(|| compile_rules(&PuzzleRules::Classic))
-            .clone()
-            .map(Bounded::Complete);
+        return classic_prepared_rules().map(Bounded::Complete);
     }
 
     Ok(budget.with_stage(WorkStage::Preparation, |budget| {

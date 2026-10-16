@@ -42,6 +42,37 @@ pub struct SupportSnapshot {
     pub supports: Vec<CandidateMask>,
 }
 
+// Arrow permits a circle plus nine shaft cells; other local constraints use at most nine cells.
+pub(crate) const MAX_CONSTRAINT_CELLS: usize = 10;
+
+/// Query-local masks borrow their geometry from the immutable constraint owner.
+#[derive(Clone, Copy)]
+pub(crate) struct SupportMasks {
+    pub bits: [u16; MAX_CONSTRAINT_CELLS],
+    pub len: usize,
+}
+
+impl SupportMasks {
+    pub fn as_slice(&self) -> &[u16] {
+        &self.bits[..self.len]
+    }
+
+    pub fn into_snapshot(self, cells: &[usize]) -> SupportSnapshot {
+        debug_assert_eq!(cells.len(), self.len);
+        SupportSnapshot {
+            cells: cells.to_vec(),
+            supports: self
+                .as_slice()
+                .iter()
+                .copied()
+                .map(CandidateMask::from_computed_bits)
+                .collect(),
+        }
+    }
+}
+
+pub(crate) type SupportMasksResult = Bounded<SupportMasks>;
+
 pub type SupportResult = Bounded<SupportSnapshot>;
 pub type CandidateResult = Bounded<[CandidateMask; BOARD_SIZE]>;
 

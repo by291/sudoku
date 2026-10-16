@@ -16,18 +16,19 @@ pub fn find_step(
     budget: &mut WorkBudget,
 ) -> StepOutcome {
     budget.with_stage(WorkStage::Logic, |budget| {
-        let ordered: Vec<Technique> = if matches!(state.rules.rules(), PuzzleRules::Classic) {
-            ALL_CLASSIC_TECHNIQUES
-                .into_iter()
-                .filter(|technique| allowed.contains(technique))
-                .collect()
+        let classic = matches!(state.rules.rules(), PuzzleRules::Classic);
+        let order = if classic {
+            &ALL_CLASSIC_TECHNIQUES[..]
         } else {
-            allowed.to_vec()
+            allowed
         };
         if !budget.consume(1) {
             return Bounded::BudgetExhausted;
         }
-        for technique in ordered {
+        for &technique in order {
+            if classic && !allowed.contains(&technique) {
+                continue;
+            }
             if technique.is_advanced() {
                 let result = find_advanced_step(state, technique, budget);
                 if !matches!(result, Bounded::Complete(None)) {
@@ -68,7 +69,17 @@ pub fn analyze_workspace(
     budget: &mut WorkBudget,
     previous_steps: &[LogicalStep],
 ) -> LogicResult {
-    let mut steps = previous_steps.to_vec();
+    analyze_workspace_owned(state, allowed, max_steps, budget, previous_steps.to_vec())
+}
+
+/// Continues a private workspace by moving its existing trace instead of copying evidence.
+pub(crate) fn analyze_workspace_owned(
+    state: &mut LogicalWorkspace,
+    allowed: &[Technique],
+    max_steps: u32,
+    budget: &mut WorkBudget,
+    mut steps: Vec<LogicalStep>,
+) -> LogicResult {
     let status = loop {
         if is_complete(&state.board, &state.rules) {
             break LogicStatus::Solved;

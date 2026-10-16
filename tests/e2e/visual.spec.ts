@@ -103,16 +103,46 @@ test('keeps boards square and focus visible at 360, 390 and desktop widths', asy
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBe(true)
-    const board = await page.getByRole('group', { name: '数独棋盘' }).boundingBox()
-    const firstCell = await page.getByRole('button', { name: cellName(0) }).boundingBox()
-    const lastCell = await page.getByRole('button', { name: cellName(80) }).boundingBox()
-    if (!board || !firstCell || !lastCell) {
-      throw new Error('The board and corner cells must be visible')
-    }
+    await expect(async () => {
+      // Read one layout snapshot while the resize observer settles the board size.
+      const geometry = await page.getByRole('group', { name: '数独棋盘' }).evaluate((element) => {
+        const cells = element.querySelectorAll('button')
+        const board = element.getBoundingClientRect()
+        const firstCell = cells[0]?.getBoundingClientRect()
+        const lastCell = cells[80]?.getBoundingClientRect()
+        if (!firstCell || !lastCell) {
+          throw new Error('The board and corner cells must be visible')
+        }
 
-    expect(Math.abs(board.width - board.height)).toBeLessThan(2)
-    expect(Math.abs(firstCell.height - lastCell.height)).toBeLessThan(1)
-    expect(lastCell.y + lastCell.height).toBeLessThanOrEqual(board.y + board.height)
+        return {
+          visible: [element, cells[0], cells[80]].every(
+            (target) =>
+              target instanceof HTMLElement &&
+              getComputedStyle(target).visibility === 'visible' &&
+              target.getClientRects().length > 0,
+          ),
+          boardWidth: board.width,
+          boardHeight: board.height,
+          boardBottom: board.bottom,
+          firstCellWidth: firstCell.width,
+          firstCellHeight: firstCell.height,
+          lastCellWidth: lastCell.width,
+          lastCellHeight: lastCell.height,
+          lastCellBottom: lastCell.bottom,
+        }
+      })
+
+      expect(geometry.visible).toBe(true)
+      expect(geometry.boardWidth).toBeGreaterThan(0)
+      expect(geometry.boardHeight).toBeGreaterThan(0)
+      expect(geometry.firstCellWidth).toBeGreaterThan(0)
+      expect(geometry.firstCellHeight).toBeGreaterThan(0)
+      expect(geometry.lastCellWidth).toBeGreaterThan(0)
+      expect(geometry.lastCellHeight).toBeGreaterThan(0)
+      expect(Math.abs(geometry.boardWidth - geometry.boardHeight)).toBeLessThan(2)
+      expect(Math.abs(geometry.firstCellHeight - geometry.lastCellHeight)).toBeLessThan(1)
+      expect(geometry.lastCellBottom).toBeLessThanOrEqual(geometry.boardBottom)
+    }).toPass({ timeout: 10_000 })
     if (testInfo.project.name === 'desktop') {
       await page.screenshot({
         path: `.superpowers/sdd/2026-10-11-sudoku-variants/game-${width}.png`,

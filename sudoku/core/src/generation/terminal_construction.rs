@@ -86,10 +86,14 @@ impl Construction<'_> {
         let Some(target) = target else {
             return is_complete(&Board::from_computed_values(self.board), self.rules);
         };
-        let mut assignments: Vec<(usize, u8)> = (1..=9)
-            .filter(|&digit| candidates[target] & (1 << (digit - 1)) != 0)
-            .map(|digit| (target, digit))
-            .collect();
+        let mut assignments = [(0, 0); UNIT_SIZE];
+        let mut assignment_count = 0;
+        for digit in 1..=9 {
+            if candidates[target] & (1 << (digit - 1)) != 0 {
+                assignments[assignment_count] = (target, digit);
+                assignment_count += 1;
+            }
+        }
         if self.regional {
             // Regional units can offer fewer positions for a missing digit than the cell MRV choice.
             for (index, unit) in self.rules.context().units.iter().enumerate() {
@@ -98,29 +102,36 @@ impl Construction<'_> {
                     if self.unit_masks[index] & bit != 0 {
                         continue;
                     }
-                    let mut positions = vec![];
+                    let mut positions = [0; UNIT_SIZE];
+                    let mut position_count = 0;
                     for &cell in &unit.cells {
                         if candidates[cell] & bit != 0 {
-                            positions.push(cell);
+                            positions[position_count] = cell;
+                            position_count += 1;
                             // Equal/larger branches cannot win; skipping their tail preserves tie/draw order.
-                            if positions.len() >= assignments.len() {
+                            if position_count >= assignment_count {
                                 break;
                             }
                         }
                     }
-                    if positions.is_empty() {
+                    if position_count == 0 {
                         return false;
                     }
-                    if positions.len() < assignments.len() {
-                        assignments = positions.into_iter().map(|cell| (cell, digit)).collect();
+                    if position_count < assignment_count {
+                        assignment_count = position_count;
+                        for (assignment, &cell) in
+                            assignments.iter_mut().zip(&positions[..position_count])
+                        {
+                            *assignment = (cell, digit);
+                        }
                     }
                 }
             }
         }
 
         // Ascending MRV ties and one descending Fisher-Yates shuffle per branch are seed identity.
-        self.random.shuffle(&mut assignments);
-        for (cell, digit) in assignments {
+        self.random.shuffle(&mut assignments[..assignment_count]);
+        for &(cell, digit) in &assignments[..assignment_count] {
             self.assign(cell, digit);
             if self.visit() {
                 return true;

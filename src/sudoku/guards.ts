@@ -2,7 +2,7 @@ import { BOARD_SIZE } from '@/sudoku/values'
 import type { EngineInfo } from '@sudoku/wasm'
 import type { Difficulty, PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
 
-export const BRIDGE_VERSION = 1
+export const BRIDGE_VERSION = 2
 export const PUZZLE_VERSION = 'sudoku-v11'
 export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v11'
 export const RATING_VERSION = 'sudoku-rating-v2'
@@ -11,6 +11,7 @@ const REQUIRED_EXPORTS = [
   'derive_seed',
   'generate',
   'assess',
+  'assess_summary',
   'hint',
   'count_solutions',
   'validate_puzzle',

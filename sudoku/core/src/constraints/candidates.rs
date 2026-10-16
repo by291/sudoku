@@ -26,14 +26,14 @@ fn evaluate(
             let Bounded::Complete(local) = result else {
                 return Bounded::BudgetExhausted;
             };
-            if local.supports.iter().any(|mask| mask.bits() == 0) {
+            if local.as_slice().contains(&0) {
                 return Bounded::Complete([CandidateMask::EMPTY; BOARD_SIZE]);
             }
-            for (&cell, mask) in local.cells.iter().zip(&local.supports) {
+            for (&cell, mask) in constraint.cells().iter().zip(local.as_slice()) {
                 if board.values()[cell] != 0 {
                     continue;
                 }
-                let reduced = candidates[cell].bits() & mask.bits();
+                let reduced = candidates[cell].bits() & mask;
                 if reduced != candidates[cell].bits() {
                     candidates[cell] = CandidateMask::from_computed_bits(reduced);
                     changed = true;

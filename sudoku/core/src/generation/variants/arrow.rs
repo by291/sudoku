@@ -6,7 +6,7 @@ use crate::types::{BOARD_SIZE, Board};
 
 fn shaft(
     circle: usize,
-    path: &[usize],
+    path: &mut Vec<usize>,
     total: u16,
     solution: &Board,
     random: &mut SeededRandom,
@@ -38,17 +38,18 @@ fn shaft(
         .collect();
     random.shuffle(&mut choices);
     for cell in choices {
-        let mut extended = path.to_vec();
-        extended.push(cell);
-        if let Some(result) = shaft(
+        path.push(cell);
+        let result = shaft(
             circle,
-            &extended,
+            path,
             total + u16::from(solution.values()[cell]),
             solution,
             random,
             budget,
-        ) {
-            return Some(result);
+        );
+        path.pop();
+        if result.is_some() {
+            return result;
         }
         if budget.remaining() == 0 {
             return None;
@@ -74,7 +75,14 @@ pub fn create_geometry(
             continue;
         }
 
-        let path = shaft(circle, &[], 0, solution, random, budget);
+        let path = shaft(
+            circle,
+            &mut Vec::with_capacity(5),
+            0,
+            solution,
+            random,
+            budget,
+        );
         // Preserve the conservative boundary: a last-unit success still leaves no geometry allowance.
         if budget.remaining() == 0 {
             return None;

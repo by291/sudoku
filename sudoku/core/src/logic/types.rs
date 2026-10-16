@@ -118,8 +118,8 @@ pub struct LogicalStep {
 pub type StepOutcome = Bounded<Option<Box<LogicalStep>>>;
 
 pub(crate) struct CageMemo {
-    pub domains: Vec<CandidateMask>,
-    pub supports: Vec<CandidateMask>,
+    pub domains: [CandidateMask; crate::constraints::types::MAX_CONSTRAINT_CELLS],
+    pub supports: crate::constraints::types::SupportMasks,
 }
 
 /// Fresh mutable board state; only immutable preparation may be shared between trial boards.

@@ -67,6 +67,8 @@ test('keeps a second editor read-only, permits takeover, and resets every tab', 
   await expect(peer.getByText(/本局正在其他标签页编辑/)).toBeVisible()
   await expect(peer.getByRole('button', { name: '擦除', exact: true })).toBeDisabled()
   await page.getByRole('link', { name: '返回首页', exact: true }).click()
+  // Navigation resolves only after the game guard saves and releases editing ownership.
+  await expect(page).toHaveURL(/\/#\/$/)
   await peer.getByRole('button', { name: '尝试接管', exact: true }).first().click()
   await expect(peer.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
   await peer.getByRole('button', { name: cellName(2) }).click()

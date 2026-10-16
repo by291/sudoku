@@ -62,7 +62,7 @@ it('idle_worker_computes_no_puzzle', async () => {
   await vi.advanceTimersByTimeAsync(10000)
 
   expect(worker.messages).toHaveLength(1)
-  expect(worker.messages[0]).toMatchObject({ kind: 'initialize', bridgeVersion: 1 })
+  expect(worker.messages[0]).toMatchObject({ kind: 'initialize', bridgeVersion: 2 })
   expect(worker.terminations).toBe(0)
   client.dispose()
 })
@@ -79,7 +79,7 @@ it('request_waits_for_ready_without_losing_deadline', async () => {
 
   expect(await pending).toEqual({ status: 'timed-out' })
   expect(worker.terminations).toBe(1)
-  worker.reply({ kind: 'ready', bridgeVersion: 1 })
+  worker.reply({ kind: 'ready', bridgeVersion: 2 })
   await vi.advanceTimersByTimeAsync(0)
   expect(worker.messages).toHaveLength(1)
   client.dispose()
@@ -107,7 +107,7 @@ it('worker_seed_identity_uses_owned_byte_contents', async () => {
   const request = input()
   const pending = client.generate(request)
   request.seed.fill(255)
-  worker.reply({ kind: 'ready', bridgeVersion: 1 })
+  worker.reply({ kind: 'ready', bridgeVersion: 2 })
   await vi.advanceTimersByTimeAsync(0)
   const posted = worker.messages[1]
   if (!isRecord(posted) || !isRecord(posted.input)) {
@@ -142,7 +142,7 @@ it('late_reply_cannot_revive_a_terminated_job', async () => {
   const pending = client.generate(input())
 
   await vi.advanceTimersByTimeAsync(3000)
-  worker.reply({ kind: 'ready', bridgeVersion: 1 })
+  worker.reply({ kind: 'ready', bridgeVersion: 2 })
   await vi.advanceTimersByTimeAsync(0)
 
   expect(await pending).toEqual({ status: 'timed-out' })
@@ -155,7 +155,7 @@ it('rejects_a_response_with_one_changed_seed_byte', async () => {
   const client = createSudokuWorkerClient(getTestModule(), engine)
   const worker = currentWorker()
   const pending = client.generate(input())
-  worker.reply({ kind: 'ready', bridgeVersion: 1 })
+  worker.reply({ kind: 'ready', bridgeVersion: 2 })
   await vi.advanceTimersByTimeAsync(0)
   const posted = worker.messages[1]
   if (!isRecord(posted)) {

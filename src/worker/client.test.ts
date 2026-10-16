@@ -395,7 +395,7 @@ it('live_jobs_snapshot_before_delayed_readiness_and_keep_the_initial_deadline', 
   notes.fill(511)
   await vi.advanceTimersByTimeAsync(14000)
   expect(worker.requests).toEqual([])
-  worker.reply({ kind: 'ready', bridgeVersion: 1 })
+  worker.reply({ kind: 'ready', bridgeVersion: 2 })
   await Promise.resolve()
   expect(worker.requests[0]).toMatchObject({ input: { notes: Array(81).fill(0) } })
   await vi.advanceTimersByTimeAsync(1000)

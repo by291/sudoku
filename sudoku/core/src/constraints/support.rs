@@ -2,89 +2,92 @@ use std::sync::Arc;
 
 use super::cage_catalogue::{self, CatalogueResult};
 use super::types::{
-    CatalogueLimits, MAX_CATALOGUE_CELLS, PreparedConstraintSupport, SupportLayout, SupportResult,
-    SupportSnapshot,
+    CatalogueLimits, MAX_CATALOGUE_CELLS, MAX_CONSTRAINT_CELLS, PreparedConstraintSupport,
+    SupportLayout, SupportMasks, SupportMasksResult, SupportResult,
 };
 use crate::budget::{WorkBudget, WorkStage};
 use crate::rules::types::{PreparedRules, RuleConstraint};
 use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask, CoreResult, EngineError, UNIT_SIZE};
 
 struct Enumerator<'a> {
-    rules: &'a PreparedRules,
     constraint: &'a RuleConstraint,
-    domains: Vec<Vec<u8>>,
-    assigned: Vec<u8>,
-    supports: Vec<u16>,
+    domains: [u16; MAX_CONSTRAINT_CELLS],
+    assigned: [u8; MAX_CONSTRAINT_CELLS],
+    supports: SupportMasks,
+    prefix_peers: [u16; MAX_CONSTRAINT_CELLS],
+    suffix_minimum: [u16; MAX_CONSTRAINT_CELLS + 1],
+    suffix_maximum: [u16; MAX_CONSTRAINT_CELLS + 1],
+    suffix_empty: [bool; MAX_CONSTRAINT_CELLS + 1],
     exhausted: bool,
     budget: &'a mut WorkBudget,
 }
 
 impl Enumerator<'_> {
-    fn plausible(&self) -> bool {
-        let cells = self.constraint.cells();
-        for first in 0..self.assigned.len() {
-            for second in 0..first {
-                if self.assigned[first] == self.assigned[second]
-                    && self.rules.context().duplicate_peers[cells[first]].contains(&cells[second])
-                {
-                    return false;
-                }
-            }
-        }
-        let (start, target) = match self.constraint {
-            RuleConstraint::Thermo { .. } => {
-                let position = self.assigned.len() - 1;
-                let digit = self.assigned[position];
-                return (position == 0 || digit > self.assigned[position - 1])
-                    && usize::from(digit) <= UNIT_SIZE - (cells.len() - self.assigned.len());
-            }
-            RuleConstraint::Arrow { .. } => (1, u16::from(self.assigned[0])),
-            RuleConstraint::Cage { sum, .. } => (0, *sum),
-        };
-        let mut minimum: u16 = self
-            .assigned
-            .iter()
-            .skip(start)
-            .map(|&digit| u16::from(digit))
-            .sum();
-        let mut maximum = minimum;
-        for index in start.max(self.assigned.len())..self.domains.len() {
-            let domain = &self.domains[index];
-            let (Some(&first), Some(&last)) = (domain.first(), domain.last()) else {
+    fn plausible(&self, position: usize, sum: u16) -> bool {
+        let digit = self.assigned[position];
+        // Accepted prefix pairs already passed this relation. Arrow repeats remain legal for non-peers.
+        for previous in 0..position {
+            if self.prefix_peers[position] & (1 << previous) != 0
+                && self.assigned[previous] == digit
+            {
                 return false;
-            };
-            minimum += u16::from(first);
-            maximum += u16::from(last);
+            }
         }
-        minimum <= target && maximum >= target
+        let target = match self.constraint {
+            RuleConstraint::Thermo { .. } => {
+                return (position == 0 || digit > self.assigned[position - 1])
+                    && usize::from(digit) <= UNIT_SIZE - (self.supports.len - position - 1);
+            }
+            RuleConstraint::Arrow { .. } => u16::from(self.assigned[0]),
+            RuleConstraint::Cage { sum, .. } => *sum,
+        };
+        let next = position + 1;
+        !self.suffix_empty[next]
+            && sum + self.suffix_minimum[next] <= target
+            && sum + self.suffix_maximum[next] >= target
     }
 
-    fn visit(&mut self, position: usize) {
+    fn visit(&mut self, position: usize, sum: u16) {
         if self.exhausted {
             return;
         }
-        if position == self.domains.len() {
-            for (index, &digit) in self.assigned.iter().enumerate() {
-                self.supports[index] |= 1 << (digit - 1);
+        if position == self.supports.len {
+            for (index, &digit) in self.assigned[..position].iter().enumerate() {
+                self.supports.bits[index] |= 1 << (digit - 1);
             }
             return;
         }
 
-        for index in 0..self.domains[position].len() {
-            let candidate = self.domains[position][index];
+        let mut remaining = self.domains[position];
+        while remaining != 0 {
+            let candidate = (remaining.trailing_zeros() + 1) as u8;
+            remaining &= remaining - 1;
             if !self.budget.consume(1) {
                 self.exhausted = true;
                 return;
             }
-            self.assigned.push(candidate);
-            if self.plausible() {
-                self.visit(position + 1);
+            self.assigned[position] = candidate;
+            let next_sum =
+                if position == 0 && matches!(self.constraint, RuleConstraint::Arrow { .. }) {
+                    sum
+                } else {
+                    sum + u16::from(candidate)
+                };
+            if self.plausible(position, next_sum) {
+                self.visit(position + 1, next_sum);
             }
-            self.assigned.pop();
             if self.exhausted {
                 return;
             }
         }
+    }
+}
+
+fn effective_domain(board: &Board, candidates: &[CandidateMask; BOARD_SIZE], cell: usize) -> u16 {
+    if board.values()[cell] == 0 {
+        candidates[cell].bits()
+    } else {
+        1 << (board.values()[cell] - 1)
     }
 }
 
@@ -94,44 +97,55 @@ fn enumerate(
     rules: &PreparedRules,
     constraint: &RuleConstraint,
     budget: &mut WorkBudget,
-) -> SupportResult {
+) -> SupportMasksResult {
     let cells = constraint.cells();
-    let domains = cells
-        .iter()
-        .map(|&cell| {
-            let value = board.values()[cell];
-            if value == 0 {
-                (1..=UNIT_SIZE as u8)
-                    .filter(|digit| candidates[cell].bits() & (1 << (digit - 1)) != 0)
-                    .collect()
-            } else {
-                vec![value]
-            }
-        })
-        .collect();
     let mut state = Enumerator {
-        rules,
         constraint,
-        domains,
-        assigned: vec![],
-        supports: vec![0; cells.len()],
+        domains: [0; MAX_CONSTRAINT_CELLS],
+        assigned: [0; MAX_CONSTRAINT_CELLS],
+        supports: SupportMasks {
+            bits: [0; MAX_CONSTRAINT_CELLS],
+            len: cells.len(),
+        },
+        prefix_peers: [0; MAX_CONSTRAINT_CELLS],
+        suffix_minimum: [0; MAX_CONSTRAINT_CELLS + 1],
+        suffix_maximum: [0; MAX_CONSTRAINT_CELLS + 1],
+        suffix_empty: [false; MAX_CONSTRAINT_CELLS + 1],
         exhausted: false,
         budget,
     };
-    state.visit(0);
+    for (position, &cell) in cells.iter().enumerate() {
+        state.domains[position] = effective_domain(board, candidates, cell);
+        for (previous, &peer) in cells[..position].iter().enumerate() {
+            if rules.context().duplicate_peers[cell].contains(&peer) {
+                state.prefix_peers[position] |= 1 << previous;
+            }
+        }
+    }
+    for position in (0..cells.len()).rev() {
+        let domain = state.domains[position];
+        state.suffix_empty[position] = domain == 0 || state.suffix_empty[position + 1];
+        let minimum = if domain == 0 {
+            0
+        } else {
+            domain.trailing_zeros() as u16 + 1
+        };
+        let maximum = if domain == 0 {
+            0
+        } else {
+            u16::BITS as u16 - domain.leading_zeros() as u16
+        };
+        state.suffix_minimum[position] = minimum + state.suffix_minimum[position + 1];
+        state.suffix_maximum[position] = maximum + state.suffix_maximum[position + 1];
+    }
+    // Empty future domains still reject only after the first charged candidate, as in the original DFS.
+    state.visit(0, 0);
 
     if state.exhausted {
-        return Bounded::BudgetExhausted;
+        Bounded::BudgetExhausted
+    } else {
+        Bounded::Complete(state.supports)
     }
-
-    Bounded::Complete(SupportSnapshot {
-        cells: cells.to_vec(),
-        supports: state
-            .supports
-            .into_iter()
-            .map(CandidateMask::from_computed_bits)
-            .collect(),
-    })
 }
 
 pub(crate) fn raw_for_constraint(
@@ -140,7 +154,7 @@ pub(crate) fn raw_for_constraint(
     rules: &PreparedRules,
     constraint: &RuleConstraint,
     budget: &mut WorkBudget,
-) -> SupportResult {
+) -> SupportMasksResult {
     budget.with_stage(WorkStage::Arithmetic, |budget| {
         enumerate(board, candidates, rules, constraint, budget)
     })
@@ -157,9 +171,12 @@ pub fn get_constraint_support(
     let constraint = rules.context().constraints.get(index).ok_or_else(|| {
         EngineError::invalid("Constraint belongs to a different prepared context")
     })?;
-    Ok(raw_for_constraint(
-        board, candidates, rules, constraint, budget,
-    ))
+    Ok(
+        match raw_for_constraint(board, candidates, rules, constraint, budget) {
+            Bounded::Complete(masks) => Bounded::Complete(masks.into_snapshot(constraint.cells())),
+            Bounded::BudgetExhausted => Bounded::BudgetExhausted,
+        },
+    )
 }
 
 /// Build only complete static support; overflow selects exact enumeration without refund.
@@ -214,7 +231,12 @@ impl PreparedConstraintSupport {
                 "Constraint belongs to a different prepared context",
             ));
         }
-        Ok(self.query_at(board, candidates, index, budget))
+        Ok(match self.query_at(board, candidates, index, budget) {
+            Bounded::Complete(masks) => Bounded::Complete(
+                masks.into_snapshot(self.layout.rules.context().constraints[index].cells()),
+            ),
+            Bounded::BudgetExhausted => Bounded::BudgetExhausted,
+        })
     }
 
     // Only an index from this layout's own iteration reaches this internal operation.
@@ -224,7 +246,7 @@ impl PreparedConstraintSupport {
         candidates: &[CandidateMask; BOARD_SIZE],
         index: usize,
         budget: &mut WorkBudget,
-    ) -> SupportResult {
+    ) -> SupportMasksResult {
         budget.with_stage(WorkStage::Arithmetic, |budget| {
             let rules = &self.layout.rules;
             let constraint = &rules.context().constraints[index];
@@ -232,16 +254,11 @@ impl PreparedConstraintSupport {
                 return enumerate(board, candidates, rules, constraint, budget);
             };
             let cells = constraint.cells();
-            let domains: Vec<u16> = cells
-                .iter()
-                .map(|&cell| {
-                    if board.values()[cell] == 0 {
-                        candidates[cell].bits()
-                    } else {
-                        1 << (board.values()[cell] - 1)
-                    }
-                })
-                .collect();
+            let mut local_domains = [0; MAX_CONSTRAINT_CELLS];
+            for (position, &cell) in cells.iter().enumerate() {
+                local_domains[position] = effective_domain(board, candidates, cell);
+            }
+            let domains = &local_domains[..cells.len()];
             if !budget.consume(1) {
                 return Bounded::BudgetExhausted;
             }
@@ -254,7 +271,7 @@ impl PreparedConstraintSupport {
             if combinations <= catalogue.tuples.len() {
                 return enumerate(board, candidates, rules, constraint, budget);
             }
-            cage_catalogue::filter(cells, &domains, catalogue, budget)
+            cage_catalogue::filter(cells.len(), domains, catalogue, budget)
         })
     }
 }

@@ -15,12 +15,18 @@ pub(crate) fn candidate_positions(
     cells: &[usize],
     digit: u8,
 ) -> Vec<usize> {
+    candidate_position_iter(state, cells, digit).collect()
+}
+
+pub(crate) fn candidate_position_iter<'a>(
+    state: &'a LogicalWorkspace,
+    cells: &'a [usize],
+    digit: u8,
+) -> impl Iterator<Item = usize> + Clone + 'a {
     let bit = mask_of(digit);
-    cells
-        .iter()
-        .copied()
-        .filter(|&cell| state.board.values()[cell] == 0 && state.candidates[cell].bits() & bit != 0)
-        .collect()
+    cells.iter().copied().filter(move |&cell| {
+        state.board.values()[cell] == 0 && state.candidates[cell].bits() & bit != 0
+    })
 }
 
 pub(crate) fn are_classic_peers(first: usize, second: usize) -> bool {

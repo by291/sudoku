@@ -40,3 +40,23 @@ fn review_entries_ignores_blanks_and_reports_every_incorrect_value() {
         vec![2, 80]
     );
 }
+
+#[test]
+fn mask_queries_handle_empty_single_and_ascending_digits() {
+    let empty = CandidateMask::EMPTY;
+    let single = CandidateMask::try_from(1_u16 << 8).unwrap();
+    let mixed = CandidateMask::try_from(0b101000101).unwrap();
+
+    assert_eq!(empty.count(), 0);
+    assert_eq!(empty.single(), None);
+    assert_eq!(single.single().map(Digit::value), Some(9));
+    assert!(single.contains(Digit::try_from(9).unwrap()));
+    assert!(!single.contains(Digit::try_from(1).unwrap()));
+    assert_eq!(mixed.single(), None);
+    assert_eq!(mixed.count(), 4);
+    assert_eq!(
+        mixed.digits().map(Digit::value).collect::<Vec<_>>(),
+        [1, 3, 7, 9]
+    );
+    assert_eq!(empty.digits().next(), None);
+}

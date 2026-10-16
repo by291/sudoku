@@ -69,3 +69,43 @@ fn trial_completion_does_not_repeat_policy_search() {
         AssessmentResult::Unrated(_)
     ));
 }
+
+#[test]
+fn borrowed_continuation_returns_an_independent_trace_snapshot() {
+    use sudoku_core::logic::solver::analyze_workspace;
+    use sudoku_core::logic::techniques::BASIC_TECHNIQUES;
+    use sudoku_core::logic::types::{LogicStatus, LogicalAction};
+    use sudoku_core::logic::workspace::create_workspace;
+    use sudoku_core::rules::context::compile_rules;
+    use sudoku_core::rules::types::PuzzleRules;
+
+    let mut values: [u8; 81] =
+        std::array::from_fn(|cell| ((cell / 9 * 3 + cell / 27 + cell % 9) % 9 + 1) as u8);
+    values[0] = 0;
+    values[40] = 0;
+    let board = Board::try_from(values.as_slice()).unwrap();
+    let rules = compile_rules(&PuzzleRules::Classic).unwrap();
+    let mut state = create_workspace(&board, &rules);
+    let mut budget = WorkBudget::new(10);
+    let mut previous = analyze_workspace(&mut state, &BASIC_TECHNIQUES, 1, &mut budget, &[]);
+    assert_eq!(previous.status, LogicStatus::StepLimit);
+
+    let resumed = analyze_workspace(
+        &mut state,
+        &BASIC_TECHNIQUES,
+        2,
+        &mut budget,
+        &previous.steps,
+    );
+    previous.steps[0].action = LogicalAction::Placement { cell: 0, digit: 9 };
+    previous.steps.clear();
+
+    assert_eq!(resumed.status, LogicStatus::Solved);
+    assert_eq!(resumed.steps.len(), 2);
+    assert_eq!(
+        resumed.steps[0].action,
+        LogicalAction::Placement { cell: 0, digit: 1 }
+    );
+    assert_eq!(state.board, resumed.board);
+    assert_eq!(budget.used(), 2);
+}

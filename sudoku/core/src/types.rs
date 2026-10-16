@@ -149,6 +149,32 @@ impl CandidateMask {
         }
     }
 
+    pub fn contains(self, digit: Digit) -> bool {
+        self.0 & (1 << (digit.0 - 1)) != 0
+    }
+
+    pub fn count(self) -> u32 {
+        self.0.count_ones()
+    }
+
+    /// Returns the only digit, or None for both empty and multi-digit masks.
+    pub fn single(self) -> Option<Digit> {
+        (self.count() == 1).then(|| Digit((self.0.trailing_zeros() + 1) as u8))
+    }
+
+    /// Iterates validated digits in ascending order without allocating.
+    pub fn digits(self) -> impl Iterator<Item = Digit> + Clone {
+        let mut remaining = self.0;
+        std::iter::from_fn(move || {
+            if remaining == 0 {
+                return None;
+            }
+            let digit = Digit((remaining.trailing_zeros() + 1) as u8);
+            remaining &= remaining - 1;
+            Some(digit)
+        })
+    }
+
     pub fn bits(self) -> u16 {
         self.0
     }

@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
 import type { ViteDevServer } from 'vite'
 import type { EngineInfo } from '@sudoku/wasm'
+import { uniqueBoard } from '../fixtures/sudoku'
 
 let server: ViteDevServer
 let origin: string
@@ -51,12 +52,70 @@ test('loads the generated WASM library and reports typed algorithm identities', 
   })
 
   const expected: EngineInfo = {
-    bridgeVersion: 1,
+    bridgeVersion: 2,
     puzzleVersion: 'sudoku-v11',
     variantPuzzleVersion: 'sudoku-variants-v11',
     ratingVersion: 'sudoku-rating-v2',
   }
   expect(info).toEqual(expected)
+})
+
+test('summary assessment preserves full outcomes and work in the browser', async ({ page }) => {
+  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+
+  const comparisons = await page.evaluate(async (board) => {
+    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const bindings: unknown = await import(url)
+    function record(value: unknown): value is Record<string, unknown> {
+      return value !== null && typeof value === 'object'
+    }
+    if (
+      !record(bindings) ||
+      typeof bindings.default !== 'function' ||
+      typeof bindings.assess !== 'function' ||
+      typeof bindings.assess_summary !== 'function'
+    ) {
+      throw new Error('Missing assessment bindings')
+    }
+    await bindings.default()
+    const assess = bindings.assess
+    const assessSummary = bindings.assess_summary
+    const empty = Array(81).fill(0)
+    const duplicate = [...empty]
+    duplicate[0] = 1
+    duplicate[1] = 1
+    const requests = [
+      { board, rules: { kind: 'classic' } },
+      { board: empty, rules: { kind: 'classic' } },
+      { board: duplicate, rules: { kind: 'classic' } },
+      { board, rules: { kind: 'classic' }, maxWork: 0 },
+      { board, rules: { kind: 'diagonal' }, maxWork: 0 },
+    ]
+    return requests.map((input) => {
+      const full: unknown = assess(input)
+      const summary: unknown = assessSummary(input)
+      if (!record(full) || !record(full.result) || !record(summary) || !record(summary.result)) {
+        throw new Error('Malformed assessment output')
+      }
+      const expected =
+        full.result.status === 'rated'
+          ? { result: { status: 'rated', summary: full.result.summary }, workUsed: full.workUsed }
+          : full
+      return { expected, summary, status: summary.result.status }
+    })
+  }, uniqueBoard)
+
+  expect(comparisons.map((row) => row.status)).toEqual([
+    'rated',
+    'ungraded',
+    'invalid',
+    'budget-exhausted',
+    'budget-exhausted',
+  ])
+  for (const row of comparisons) {
+    expect(row.summary).toEqual(row.expected)
+    expect(row.summary).not.toHaveProperty('result.trace')
+  }
 })
 
 test('rejects_text_wrong_seed_lengths_and_v10_requests', async ({ page }) => {

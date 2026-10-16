@@ -231,15 +231,18 @@ impl PreparedPuzzle {
         let input = input.to_rust()?;
         let givens: Board = input.givens.try_into().map_err(js_error)?;
         let entries: Board = input.entries.try_into().map_err(js_error)?;
-        let notes: Vec<_> = input
-            .notes
-            .into_iter()
-            .map(CandidateMask::try_from)
-            .collect::<CoreResult<_>>()
-            .map_err(js_error)?;
-        let notes: [CandidateMask; BOARD_SIZE] = notes
-            .try_into()
-            .map_err(|_| JsError::new("Notes require exactly 81 masks"))?;
+        let note_count = input.notes.len();
+        let mut notes = [CandidateMask::EMPTY; BOARD_SIZE];
+        // Retain mask-validation precedence even when the input has the wrong length.
+        for (index, bits) in input.notes.into_iter().enumerate() {
+            let mask = CandidateMask::try_from(bits).map_err(js_error)?;
+            if let Some(destination) = notes.get_mut(index) {
+                *destination = mask;
+            }
+        }
+        if note_count != BOARD_SIZE {
+            return Err(JsError::new("Notes require exactly 81 masks"));
+        }
         let before = BoardLayers { entries, notes };
         let cell = |value: u32| {
             CellIndex::try_from(

@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 
 use super::input::validate_input;
-use super::policies::{execution_order, policy, supported_difficulties, supports_difficulty};
+use super::policies::{execution_order, policy_slice, supported_difficulties, supports_difficulty};
 use super::types::{
     AssessmentFailure, AssessmentIssue, AssessmentResult, AssessmentStage, DifficultyAssessment,
     ExhaustionCause, PreparedAssessment, RatedAssessment, RatedTrial, TargetFeedback,
@@ -13,7 +13,7 @@ use crate::budget::{WorkBudget, WorkStage};
 use crate::constraints::computation::prepare_computation;
 use crate::constraints::conflicts::evaluate_prepared_conflicts;
 use crate::constraints::types::{ConflictStatus, PreparedComputation};
-use crate::logic::solver::analyze_workspace;
+use crate::logic::solver::analyze_workspace_owned;
 use crate::logic::techniques::Technique;
 use crate::logic::types::{LogicStatus, LogicalStep};
 use crate::logic::workspace::create_prepared_workspace;
@@ -127,11 +127,10 @@ impl PreparedAssessment {
             Err(error) => return PolicyScreen::Invalid(message(error.to_string())),
         };
         budget.with_stage(WorkStage::Logic, |budget| {
-            let policies: Vec<_> = supported_difficulties(self.rules.variant())
+            let policies = supported_difficulties(self.rules.variant())
                 .iter()
-                .map(|&difficulty| (difficulty, policy(self.rules.variant(), difficulty)))
-                .collect();
-            screen_policies(board, self.limits, computation, budget, target, &policies)
+                .map(|&difficulty| (difficulty, policy_slice(self.rules.variant(), difficulty)));
+            screen_policies(board, self.limits, computation, budget, target, policies)
         })
     }
 
@@ -204,17 +203,20 @@ impl RatedTrial {
     }
 }
 
-fn extends_prefix(previous: &[Technique], order: &[Technique]) -> bool {
-    order.starts_with(previous)
+fn extends_prefix(
+    mut previous: impl Iterator<Item = Technique>,
+    mut order: impl Iterator<Item = Technique>,
+) -> bool {
+    previous.all(|technique| order.next() == Some(technique))
 }
 
-fn screen_policies(
+fn screen_policies<'policy>(
     board: &Board,
     limits: AssessmentLimits,
     computation: &PreparedComputation,
     budget: &mut WorkBudget,
     target: Option<Difficulty>,
-    policies: &[(Difficulty, Vec<Technique>)],
+    policies: impl IntoIterator<Item = (Difficulty, &'policy [Technique])>,
 ) -> PolicyScreen {
     let conflicts = evaluate_prepared_conflicts(board, computation, budget);
     if !conflicts.violations.is_empty() {
@@ -235,26 +237,29 @@ fn screen_policies(
     }
 
     let mut workspace = create_prepared_workspace(board, computation);
-    let mut previous_order = vec![];
+    let mut previous_allowed: &[Technique] = &[];
     let mut previous_steps: Vec<LogicalStep> = vec![];
     let mut feedback = TargetFeedback {
         remaining_cells: board.values().iter().filter(|&&digit| digit == 0).count(),
         deductions: 0,
     };
     for (difficulty, allowed) in policies {
-        let order = execution_order(computation.rules().rules().variant(), allowed);
+        let variant = computation.rules().rules().variant();
         // Only an unchanged priority prefix can resume domains; changed priorities need a fresh board.
-        if !extends_prefix(&previous_order, &order) {
+        if !extends_prefix(
+            execution_order(variant, previous_allowed),
+            execution_order(variant, allowed),
+        ) {
             workspace = create_prepared_workspace(board, computation);
             previous_steps.clear();
         }
 
-        let result = analyze_workspace(
+        let result = analyze_workspace_owned(
             &mut workspace,
             allowed,
             limits.max_steps,
             budget,
-            &previous_steps,
+            previous_steps,
         );
         match result.status {
             LogicStatus::WorkLimit | LogicStatus::StepLimit => {
@@ -265,7 +270,7 @@ fn screen_policies(
                         ExhaustionCause::LogicalStepLimit
                     },
                     stage: AssessmentStage::Logic,
-                    difficulty: Some(*difficulty),
+                    difficulty: Some(difficulty),
                 };
             }
             LogicStatus::Solved | LogicStatus::Stalled => {}
@@ -284,16 +289,16 @@ fn screen_policies(
                 trial: RatedTrial {
                     board: board.clone(),
                     rules: computation.rules().clone(),
-                    difficulty: *difficulty,
+                    difficulty,
                     trace: result.steps,
                 },
                 feedback,
             };
         }
-        if Some(*difficulty) == target {
+        if Some(difficulty) == target {
             break;
         }
-        previous_order = order;
+        previous_allowed = allowed;
         previous_steps = result.steps;
     }
     PolicyScreen::Stalled(feedback)
@@ -303,6 +308,7 @@ fn screen_policies(
 mod tests {
     use super::*;
     use crate::logic::solver::analyze_logic;
+    use crate::rating::policies::policy;
     use crate::rules::types::Cage;
 
     #[test]
@@ -337,7 +343,10 @@ mod tests {
         let mut changed = policy(rules.variant(), Difficulty::Medium);
         changed.retain(|&technique| technique != Technique::CageCombination);
         changed.insert(0, Technique::CageCombination);
-        assert!(!extends_prefix(&easy, &changed));
+        assert!(!extends_prefix(
+            easy.iter().copied(),
+            changed.iter().copied()
+        ));
         let policies = [
             (Difficulty::Easy, easy),
             (Difficulty::Medium, changed.clone()),
@@ -349,7 +358,9 @@ mod tests {
             &computation,
             &mut WorkBudget::new(4000000),
             None,
-            &policies,
+            policies
+                .iter()
+                .map(|(difficulty, allowed)| (*difficulty, allowed.as_slice())),
         ) else {
             panic!("Expected changed-priority rating");
         };

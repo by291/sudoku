@@ -57,13 +57,13 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
       })
     },
     assess(input: AssessmentInput): AssessmentOutcome {
-      const result = bindings.assess({
+      const result = bindings.assess_summary({
         board: [...input.board],
         rules: copyRules(input.rules),
         ratingVersion: input.ratingVersion,
         limits: { ...input.limits },
       }).result
-      return result.status === 'rated' ? { status: 'rated', summary: result.summary } : result
+      return result
     },
     hint(board: Board, solution: Board, rules: PuzzleRules) {
       return bindings.hint({

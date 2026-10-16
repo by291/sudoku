@@ -166,6 +166,11 @@ impl PreparedRules {
         &self.data
     }
 
+    /// Borrow immutable layout metadata without allocating an intermediate snapshot.
+    pub fn metadata_ref(&self) -> &RuleMetadata {
+        &self.data
+    }
+
     /// Return an owned display snapshot; caller mutations cannot alter later computation.
     pub fn metadata(&self) -> RuleMetadata {
         (*self.data).clone()

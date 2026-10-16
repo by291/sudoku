@@ -1,7 +1,8 @@
 use super::logic::step_to_dto;
 use super::values::counter;
 use crate::dto::rating::{
-    AssessmentResultDto, AssessmentStageDto, AssessmentSummaryDto, WorkloadDto,
+    AssessmentOutcomeDto, AssessmentResultDto, AssessmentStageDto, AssessmentSummaryDto,
+    WorkloadDto,
 };
 use sudoku_core::constraints::types::{RuleViolation, ViolationCode};
 use sudoku_core::logic::techniques::ALL_TECHNIQUES;
@@ -68,17 +69,46 @@ pub fn summary_to_dto(summary: &DifficultyAssessment) -> CoreResult<AssessmentSu
 }
 
 pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResultDto> {
+    let outcome = assessment_summary_to_dto(result)?;
+    let trace = match result {
+        AssessmentResult::Rated(rated) => rated
+            .trace
+            .iter()
+            .map(step_to_dto)
+            .collect::<CoreResult<_>>()?,
+        AssessmentResult::Unrated(_) => Vec::new(),
+    };
+    Ok(match outcome {
+        AssessmentOutcomeDto::Rated { summary } => AssessmentResultDto::Rated { summary, trace },
+        AssessmentOutcomeDto::Ungraded {
+            rating_version,
+            variant,
+        } => AssessmentResultDto::Ungraded {
+            rating_version,
+            variant,
+        },
+        AssessmentOutcomeDto::BudgetExhausted {
+            rating_version,
+            variant,
+            stage,
+            difficulty,
+        } => AssessmentResultDto::BudgetExhausted {
+            rating_version,
+            variant,
+            stage,
+            difficulty,
+        },
+        AssessmentOutcomeDto::Invalid { issues } => AssessmentResultDto::Invalid { issues },
+    })
+}
+
+pub fn assessment_summary_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentOutcomeDto> {
     Ok(match result {
-        AssessmentResult::Rated(rated) => AssessmentResultDto::Rated {
+        AssessmentResult::Rated(rated) => AssessmentOutcomeDto::Rated {
             summary: summary_to_dto(&rated.summary)?,
-            trace: rated
-                .trace
-                .iter()
-                .map(step_to_dto)
-                .collect::<CoreResult<_>>()?,
         },
         AssessmentResult::Unrated(AssessmentFailure::Ungraded { variant }) => {
-            AssessmentResultDto::Ungraded {
+            AssessmentOutcomeDto::Ungraded {
                 rating_version: crate::dto::rating::RatingVersionDto::V2,
                 variant: (*variant).into(),
             }
@@ -87,7 +117,7 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
             variant,
             stage,
             difficulty,
-        }) => AssessmentResultDto::BudgetExhausted {
+        }) => AssessmentOutcomeDto::BudgetExhausted {
             rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: (*variant).into(),
             stage: match stage {
@@ -97,7 +127,7 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
             difficulty: difficulty.map(Into::into),
         },
         AssessmentResult::Unrated(AssessmentFailure::Invalid { issues }) => {
-            AssessmentResultDto::Invalid {
+            AssessmentOutcomeDto::Invalid {
                 issues: issue_messages(issues),
             }
         }

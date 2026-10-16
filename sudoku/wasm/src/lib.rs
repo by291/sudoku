@@ -6,7 +6,7 @@ mod prepared;
 
 use conversion::generation::{input as generation_input, result_to_dto};
 use conversion::logic::{hint_to_core, hint_to_dto, logic_to_dto};
-use conversion::rating::assessment_to_dto;
+use conversion::rating::{assessment_summary_to_dto, assessment_to_dto};
 use conversion::rules::rules_to_dto;
 use conversion::values::{DEFAULT_QUERY_WORK, budget, counter};
 use dto::EngineInfo;
@@ -59,7 +59,7 @@ fn owned_bytes(value: &Uint8Array) -> Result<Vec<u8>, JsError> {
 #[wasm_bindgen]
 pub fn engine_info() -> Result<Ts<EngineInfo>, JsError> {
     Ok(EngineInfo {
-        bridge_version: 1,
+        bridge_version: 2,
         puzzle_version: PUZZLE_VERSION,
         variant_puzzle_version: VARIANT_PUZZLE_VERSION,
         rating_version: RATING_VERSION,
@@ -130,11 +130,7 @@ pub fn hint(input: Ts<HintInputDto>) -> Result<Ts<crate::dto::operations::HintWo
     .into_ts()?)
 }
 
-#[wasm_bindgen]
-pub fn assess(
-    input: Ts<AssessmentInputDto>,
-) -> Result<Ts<crate::dto::operations::AssessmentWorkDto>, JsError> {
-    let input = input.to_rust()?;
+fn run_assessment(input: AssessmentInputDto) -> Result<(AssessmentResult, u32), JsError> {
     let board: Board = input.board.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
     let limits = input
@@ -162,11 +158,34 @@ pub fn assess(
             )],
         })
     };
+    Ok((result, counter(work.used()).map_err(js_error)?))
+}
+
+#[wasm_bindgen]
+pub fn assess(
+    input: Ts<AssessmentInputDto>,
+) -> Result<Ts<crate::dto::operations::AssessmentWorkDto>, JsError> {
+    let (result, work_used) = run_assessment(input.to_rust()?)?;
     Ok(crate::dto::operations::AssessmentWorkDto(WorkResultDto {
         result: assessment_to_dto(&result).map_err(js_error)?,
-        work_used: counter(work.used()).map_err(js_error)?,
+        work_used,
     })
     .into_ts()?)
+}
+
+/// Compute the same assessment while keeping its transient proof trace inside Rust.
+#[wasm_bindgen]
+pub fn assess_summary(
+    input: Ts<AssessmentInputDto>,
+) -> Result<Ts<crate::dto::operations::AssessmentSummaryWorkDto>, JsError> {
+    let (result, work_used) = run_assessment(input.to_rust()?)?;
+    Ok(
+        crate::dto::operations::AssessmentSummaryWorkDto(WorkResultDto {
+            result: assessment_summary_to_dto(&result).map_err(js_error)?,
+            work_used,
+        })
+        .into_ts()?,
+    )
 }
 
 #[wasm_bindgen]
