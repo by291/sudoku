@@ -22,13 +22,19 @@ export function nativeResults(suite, rows) {
       'assessment-generated',
       'assessment-metadata',
       'validation',
+      'generation-layouts',
+      'generation-boundaries',
+      'generation',
     ].includes(suite),
     'This native suite is not implemented yet',
   )
   const requestSuite =
-    { 'logic-basic': 'logic', 'hint-chains': 'hints', 'assessment-generated': 'assessment' }[
-      suite
-    ] ?? suite
+    {
+      'logic-basic': 'logic',
+      'hint-chains': 'hints',
+      'assessment-generated': 'assessment',
+      'generation-boundaries': 'generation',
+    }[suite] ?? suite
   const requests =
     rows
       .map((row) =>

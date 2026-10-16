@@ -175,6 +175,15 @@ pub enum Difficulty {
 }
 
 impl Difficulty {
+    pub fn rank(self) -> u8 {
+        match self {
+            Self::Easy => 0,
+            Self::Medium => 1,
+            Self::Hard => 2,
+            Self::Expert => 3,
+        }
+    }
+
     pub const ALL: [Self; 4] = [Self::Easy, Self::Medium, Self::Hard, Self::Expert];
 
     pub fn as_str(self) -> &'static str {

@@ -15,7 +15,7 @@ pub(super) fn valid_cells(cells: &[usize], minimum: usize, maximum: usize) -> bo
     true
 }
 
-fn cells_touch(first: usize, second: usize, diagonal: bool) -> bool {
+pub(crate) fn cells_touch(first: usize, second: usize, diagonal: bool) -> bool {
     let row_distance = (first / UNIT_SIZE).abs_diff(second / UNIT_SIZE);
     let column_distance = (first % UNIT_SIZE).abs_diff(second % UNIT_SIZE);
     if diagonal {

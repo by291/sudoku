@@ -1,4 +1,4 @@
 pub mod context;
 mod definitions;
-mod topology;
+pub(crate) mod topology;
 pub mod types;

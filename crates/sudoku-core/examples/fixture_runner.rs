@@ -9,6 +9,8 @@ mod constraint_contracts;
 mod editing_contracts;
 #[path = "../tests/support/rules.rs"]
 pub mod fixtures;
+#[path = "contracts/generation.rs"]
+mod generation_contracts;
 #[path = "contracts/hints.rs"]
 mod hint_contracts;
 #[path = "contracts/logic.rs"]
@@ -33,6 +35,10 @@ use sudoku_core::types::Board;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, tag = "suite", content = "input")]
 enum Request {
+    #[serde(rename = "generation")]
+    Generation(generation_contracts::GenerationInputDto),
+    #[serde(rename = "generation-layouts")]
+    GenerationLayouts(generation_contracts::LayoutInput),
     #[serde(rename = "assessment-metadata")]
     AssessmentMetadata(metadata_contracts::MetadataInput),
     #[serde(rename = "validation")]
@@ -65,6 +71,8 @@ enum Request {
 
 fn evaluate(request: Request) -> Result<Value, Box<dyn std::error::Error>> {
     match request {
+        Request::Generation(input) => generation_contracts::evaluate(input),
+        Request::GenerationLayouts(input) => generation_contracts::evaluate_layout(input),
         Request::AssessmentMetadata(input) => metadata_contracts::evaluate(input),
         Request::Validation(input) => metadata_contracts::evaluate_validation(input),
         Request::Assessment(input) => assessment_contracts::evaluate(input),

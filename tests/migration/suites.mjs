@@ -5,7 +5,7 @@ import { gunzipSync } from 'node:zlib'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { loadEngine } from './reference-loader.mjs'
+import { loadEngine, registerReference } from './reference-loader.mjs'
 import { referenceRoot, sha256 } from './freeze-reference.mjs'
 
 export const fixtureRoot = fileURLToPath(new URL('../fixtures/engine-contracts/', import.meta.url))
@@ -153,11 +153,33 @@ export async function computeCase(engine, suite, input) {
       }
       break
     }
+    case 'generation-layouts': {
+      const url = (name) =>
+        pathToFileURL(resolve(referenceRoot, 'src/core/sudoku/generation', name + '.ts')).href
+      const { constructGenerationLayout } = await import(url('layouts'))
+      const { createGenerationRandom } = await import(url('random'))
+      const request = engine.createGenerationInput(
+        input.variant,
+        input.difficulty,
+        Buffer.from(input.seed).toString('hex'),
+      )
+      const random = {
+        terminal: createGenerationRandom(request, 'terminal', input.layout),
+        geometry: createGenerationRandom(request, 'geometry', input.layout),
+      }
+      result = {
+        result: constructGenerationLayout(request, random, budget),
+        nextTerminal: random.terminal(),
+        nextGeometry: random.geometry(),
+      }
+      break
+    }
+    case 'generation-boundaries':
     case 'generation': {
       const seedHex = Buffer.from(input.seed).toString('hex')
       const request = engine.createGenerationInput(input.variant, input.difficulty, seedHex)
       assert.equal(request.puzzleVersion, input.puzzleVersion)
-      result = { result: engine.generatePuzzle(request) }
+      result = { result: engine.generatePuzzle(request, input.limits) }
       if (result.result.status === 'ready') {
         const puzzle = result.result.puzzle
         const request = engine.createAssessmentInput(puzzle.givens, puzzle.rules)
@@ -173,7 +195,9 @@ export async function computeCase(engine, suite, input) {
   }
   return plain({
     ...result,
-    ...(['generation', 'support'].includes(suite) ? {} : { workUsed: budget.used }),
+    ...(['generation', 'generation-boundaries', 'support'].includes(suite)
+      ? {}
+      : { workUsed: budget.used }),
   })
 }
 
@@ -216,9 +240,21 @@ export async function runMigration(args) {
           'assessment-metadata',
           'editing',
           'validation',
+          'generation-layouts',
+          'generation-boundaries',
           'generation',
         ]
       : [suite]
+  let referenceCounter
+  if (args.includes('--independent')) {
+    assert.equal(suite, 'generation', 'Independent generation checks require the generation suite')
+    registerReference({ v11: true })
+    const module = await import(
+      pathToFileURL(resolve(referenceRoot, 'tests/support/referenceVariants.ts')).href
+    )
+    referenceCounter = module.referenceCountSolutions
+  }
+  const diversity = new Map()
   let checked = 0
   for (const name of suites) {
     let files
@@ -288,6 +324,37 @@ export async function runMigration(args) {
           row.expected,
           `Migration result mismatch: ${name}/${row.id}`,
         )
+        if (referenceCounter) {
+          const actual = native ? native[index] : row.expected
+          assert.equal(actual.result.status, 'ready')
+          const puzzle = actual.result.puzzle
+          assert.ok(
+            puzzle.givens.every((digit, cell) => digit === 0 || digit === puzzle.solution[cell]),
+            row.id,
+          )
+          const counted = referenceCounter(puzzle.givens, puzzle.rules)
+          assert.equal(counted.count, 1, `Independent uniqueness: ${row.id}`)
+          assert.deepStrictEqual(
+            counted.solution,
+            puzzle.solution,
+            `Independent first solution: ${row.id}`,
+          )
+          if (puzzle.rules.kind !== 'classic') {
+            const classicTerminal = referenceCounter(puzzle.solution, { kind: 'classic' })
+            if (puzzle.rules.kind !== 'jigsaw' || classicTerminal.count === 1) {
+              assert.notEqual(
+                referenceCounter(puzzle.givens, { kind: 'classic' }).count,
+                1,
+                `Independent rule necessity: ${row.id}`,
+              )
+            }
+          }
+          const identity = `${puzzle.rules.kind}:${puzzle.difficulty}`
+          if (!diversity.has(identity)) diversity.set(identity, new Set())
+          diversity
+            .get(identity)
+            .add(JSON.stringify([puzzle.givens, puzzle.solution, puzzle.rules]))
+        }
         checked++
       }
       if (rows.length > batchSize)
@@ -296,6 +363,14 @@ export async function runMigration(args) {
         )
     }
     console.log(`${selectedEngine} ${name}: ${rows.length} PASS`)
+  }
+  if (referenceCounter) {
+    assert.equal(diversity.size, 19)
+    for (const [identity, outputs] of diversity)
+      assert.ok(outputs.size > 1, `Independent output diversity: ${identity}`)
+    console.log(
+      'Independent structure, uniqueness, rule necessity and 19-combination diversity: PASS',
+    )
   }
   console.log(`Migration contracts: ${checked} PASS`)
 }
