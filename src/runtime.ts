@@ -1,3 +1,4 @@
+import type { MainSudokuEngine } from '@/sudoku/mainEngine'
 import { inject } from 'vue'
 import type { InjectionKey } from 'vue'
 import type { SudokuWorkerClient } from '@/worker/client'
@@ -12,6 +13,9 @@ import { createSaveQueue } from '@/storage/saveQueue'
 
 // Compose application-scoped browser services here; App owns their final disposal.
 export interface GameRuntime {
+  readonly ready: true
+  engine: MainSudokuEngine
+  createSeed(): Uint8Array
   worker: SudokuWorkerClient
   repository: GameRepository
   ownership: OwnershipCoordinator
@@ -34,7 +38,8 @@ export function useGameRuntime(): GameRuntime {
   return runtime
 }
 
-export function createGameRuntime(): GameRuntime {
+export function createGameRuntime(engine: MainSudokuEngine): GameRuntime {
+  let disposed = false
   // Reuse one live connection; failed opens and version changes permit a fresh connection.
   let opening: ReturnType<typeof openSudokuDatabase> | null = null
   const provider = () => {
@@ -60,6 +65,9 @@ export function createGameRuntime(): GameRuntime {
   const worker = createSudokuWorkerClient()
 
   return {
+    ready: true,
+    engine,
+    createSeed: () => crypto.getRandomValues(new Uint8Array(32)),
     worker,
     repository,
     ownership,
@@ -69,8 +77,13 @@ export function createGameRuntime(): GameRuntime {
     createId: () => crypto.randomUUID(),
     ownerId: crypto.randomUUID(),
     dispose() {
+      if (disposed) {
+        return
+      }
+      disposed = true
       worker.dispose()
       ownership.dispose()
+      engine.dispose()
       if (opening) {
         void opening.then((database) => database.close())
       }

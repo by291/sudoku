@@ -8,7 +8,8 @@ const sourceImportPatterns = [{ regex: '^\\.', message: 'Use @/ for source impor
 const compositionImportPatterns = [
   ...sourceImportPatterns,
   {
-    regex: '^@/(?:App(?:\\.|$)|main(?:\\.|$)|layouts/|router(?:/|$)|theme/)',
+    regex:
+      '^@/(?:(?:App|ReadyApplication|EngineBootstrapState)(?:\\.|$)|main(?:\\.|$)|layouts/|router(?:/|$)|theme/)',
     message: 'Business and browser-service modules must not depend on application presentation.',
   },
 ]
@@ -156,7 +157,8 @@ export default [
         patterns: [
           ...compositionImportPatterns,
           {
-            regex: '^@/(?:runtime(?:[./]|$)|(?:features|storage|worker)/)',
+            regex:
+              '^@/(?:runtime(?:[./]|$)|(?:features|storage|worker)/|sudoku/(?!contracts(?:[./]|$)))|^@sudoku/wasm(?:/|$)',
             message: 'Shared presentation must not depend on feature state or browser services.',
           },
         ],

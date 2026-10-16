@@ -7,7 +7,12 @@
     ".": {
       "types": "./pkg/sudoku_wasm.d.ts",
       "import": "./pkg/sudoku_wasm.js"
-    }
+    },
+    "./factory": {
+      "types": "./pkg/factory.d.ts",
+      "import": "./pkg/factory.js"
+    },
+    "./binary": "./pkg/sudoku_wasm_bg.wasm"
   },
   "files": [
     "pkg"

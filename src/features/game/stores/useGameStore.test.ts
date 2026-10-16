@@ -1,6 +1,7 @@
+import { createTestEngine } from '../../../../tests/support/wasm'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { expect, it } from 'vitest'
+import { afterAll, expect, it } from 'vitest'
 import { gameRuntimeKey } from '@/runtime'
 import type { GameRuntime } from '@/runtime'
 import { useGameStore } from '@/features/game/stores/useGameStore'
@@ -8,6 +9,9 @@ import { makeSession } from '../../../../tests/support/gameFixtures'
 import type { HintResult } from '@/core/sudoku/hint'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { createGenerationInput } from '@/core/sudoku/generation/input'
+
+const engine = await createTestEngine()
+afterAll(() => engine.dispose())
 
 function setup() {
   let time = 0
@@ -17,6 +21,9 @@ function setup() {
   }
   const token = { sessionId: saved.id, ownerId: 'test', fence: 1, epoch: 1 }
   const runtime: GameRuntime = {
+    ready: true,
+    engine,
+    createSeed: () => crypto.getRandomValues(new Uint8Array(32)),
     ownerId: 'test',
     monotonicNow: () => time,
     wallNow: () => new Date('2026-10-11T01:00:00.000Z'),

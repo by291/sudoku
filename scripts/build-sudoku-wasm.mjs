@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import ts from 'typescript'
 import { spawnSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -61,3 +62,46 @@ run(bindgen, [
   '--out-dir',
   output,
 ])
+
+// wasm-bindgen web glue has module-scoped mutable state. A compiler-generated closure
+// gives each owner a collectable instance without eval, cache-busting imports or a custom ABI.
+const gluePath = resolve(output, 'sudoku_wasm.js')
+const glue = readFileSync(gluePath, 'utf8')
+const parsed = ts.createSourceFile(gluePath, glue, ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS)
+if (
+  parsed.statements.some(
+    (statement) =>
+      ts.isImportDeclaration(statement) ||
+      (ts.isExportDeclaration(statement) && statement.moduleSpecifier),
+  )
+) {
+  throw new Error('The generated binding factory requires self-contained wasm-bindgen web glue')
+}
+const transformed = ts.transpileModule(glue, {
+  fileName: 'sudoku_wasm.js',
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2022,
+    allowJs: true,
+  },
+  reportDiagnostics: true,
+})
+if (
+  transformed.diagnostics?.some((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error)
+) {
+  throw new Error(
+    ts.formatDiagnosticsWithColorAndContext(transformed.diagnostics, {
+      getCanonicalFileName: (name) => name,
+      getCurrentDirectory: () => root,
+      getNewLine: () => '\n',
+    }),
+  )
+}
+writeFileSync(
+  resolve(output, 'factory.js'),
+  `// Generated from pinned wasm-bindgen glue by TypeScript. Do not edit.\nexport function createBindings() {\nconst exports = {};\n${transformed.outputText}\nreturn exports;\n}\n`,
+)
+writeFileSync(
+  resolve(output, 'factory.d.ts'),
+  `export declare function createBindings(): typeof import('./sudoku_wasm.js');\n`,
+)

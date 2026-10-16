@@ -1,5 +1,8 @@
 // Test-only transport projection. Every mathematical operation runs in the emitted WASM.
-import init, * as wasm from '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+import { createBindings } from '/packages/sudoku-wasm/pkg/factory.js'
+
+const wasm = createBindings()
+const init = wasm.default
 await init()
 
 export function computeCase(suite, input, policies) {

@@ -1,10 +1,16 @@
+import { createApp } from 'vue'
+import RootApp from '@/App.vue'
+import * as moduleLoader from '@/sudoku/wasmModule'
+import * as runtimeComposition from '@/runtime'
+import { getTestModule } from '../tests/support/wasm'
+import { useGameStore } from '@/features/game/stores/useGameStore'
 import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { createTestRuntime } from '../tests/support/runtime'
 import { NConfigProvider } from 'naive-ui'
 import themeCss from '@/styles/theme.css?raw'
 import { gameRuntimeKey } from '@/runtime'
-import App from '@/App.vue'
+import App from '@/ReadyApplication.vue'
 import { router } from '@/router/index'
 
 const listeners = new Set<() => void>()
@@ -72,4 +78,58 @@ it('follows system theme changes only while its scope is alive', async () => {
   wrapper.unmount()
 
   expect(listeners.size).toBe(0)
+})
+
+it('keeps_semantic_validation_alive_until_the_final_save_settles', async () => {
+  const game = test.app.runWithContext(() => useGameStore(test.pinia))
+  let finish: () => void = () => {
+    throw new Error('Missing save resolver')
+  }
+  const leaving = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  const leave = vi.spyOn(game, 'leaveGame').mockReturnValue(leaving)
+  const dispose = vi.fn(() => test.runtime.engine.dispose())
+  test.runtime.dispose = dispose
+  const wrapper = mount(App, {
+    global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
+  })
+
+  wrapper.unmount()
+  expect(dispose).not.toHaveBeenCalled()
+  expect(test.runtime.engine.deriveSeed(new Uint8Array())).toHaveLength(32)
+  finish()
+  await flushPromises()
+
+  expect(leave).toHaveBeenCalledOnce()
+  expect(dispose).toHaveBeenCalledOnce()
+  expect(() => test.runtime.engine.deriveSeed(new Uint8Array())).toThrow(/disposed/i)
+})
+
+it('publishes_the_ready_runtime_to_the_pinia_application_context', async () => {
+  vi.spyOn(moduleLoader, 'loadSudokuModule').mockResolvedValue(getTestModule())
+  vi.spyOn(runtimeComposition, 'createGameRuntime').mockImplementation((engine) => ({
+    ...test.runtime,
+    engine,
+    dispose: () => engine.dispose(),
+  }))
+  const host = document.createElement('div')
+  document.body.append(host)
+  const application = createApp(RootApp, {
+    installRuntime(runtime: runtimeComposition.GameRuntime) {
+      application.provide(gameRuntimeKey, runtime)
+    },
+  })
+  application.use(test.pinia).use(router)
+
+  try {
+    application.mount(host)
+    await vi.waitFor(() => {
+      expect(host.querySelector('main[aria-label="数独游戏"]')).not.toBeNull()
+    })
+  } finally {
+    application.unmount()
+    await flushPromises()
+    host.remove()
+  }
 })

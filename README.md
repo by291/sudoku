@@ -10,6 +10,10 @@ The approved [Local Product Roadmap](docs/superpowers/plans/2026-10-14-sudoku-lo
 
 Use Node.js 26 or later and the repository-pinned pnpm 12.11.2. Development was verified on Windows with Node.js 26.10.0. TypeScript is pinned to 6.0.3 for compatibility with the installed lint tooling.
 
+Install Rust through rustup as well. `rust-toolchain.toml` pins Rust 1.98.0, Clippy, rustfmt and the `wasm32-unknown-unknown` target. Development, type checking, unit tests and production builds run `pnpm wasm:build` first. It compiles the separate Rust core and binding crates and installs the pinned wasm-bindgen CLI automatically on the first run. Generated JS/WASM/declarations stay under the ignored workspace package; no manually copied binary is required.
+
+After changing Rust source, restart `pnpm dev` to rebuild WASM. Vite owns the emitted binary URL at both `/` and `/sudoku/`; loading failures offer a retry before business services or storage decoding start.
+
 Repository text uses LF line endings on every platform. Git attributes, EditorConfig, and Prettier enforce the same convention, including Windows checkouts with `core.autocrlf` enabled.
 
 ```sh
@@ -25,6 +29,7 @@ Open the Local URL printed by Vite. No server account, API keys, or backend serv
 
 | Command                             | Purpose                                                           |
 | ----------------------------------- | ----------------------------------------------------------------- |
+| `pnpm wasm:build`                   | Build pinned Rust/WASM and generated TypeScript contracts         |
 | `pnpm dev`                          | Start the development server on loopback                          |
 | `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types   |
 | `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries         |

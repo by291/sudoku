@@ -1,3 +1,4 @@
+import { createTestEngine } from './wasm'
 import 'fake-indexeddb/auto'
 import { createApp } from 'vue'
 import { createPinia, disposePinia } from 'pinia'
@@ -13,7 +14,11 @@ export async function createTestRuntime() {
   const provider = () => Promise.resolve(database)
   const ownership = createOwnershipCoordinator(provider, { channel: null })
   const repository = createGameRepository(provider)
+  const engine = await createTestEngine()
   const runtime: GameRuntime = {
+    ready: true,
+    engine,
+    createSeed: () => crypto.getRandomValues(new Uint8Array(32)),
     ownership,
     repository,
     ownerId: 'test-owner',
@@ -40,6 +45,7 @@ export async function createTestRuntime() {
     dispose() {
       ownership.dispose()
       runtime.worker.dispose()
+      engine.dispose()
       disposePinia(pinia)
       database.close()
     },

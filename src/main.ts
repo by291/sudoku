@@ -4,10 +4,13 @@ import App from '@/App.vue'
 import { router } from '@/router/index'
 import '@/styles/theme.css'
 import '@/styles/global.css'
-import { createGameRuntime, gameRuntimeKey } from '@/runtime'
+import { gameRuntimeKey } from '@/runtime'
+import type { GameRuntime } from '@/runtime'
 
-createApp(App)
-  .use(createPinia())
-  .use(router)
-  .provide(gameRuntimeKey, createGameRuntime())
-  .mount('#app')
+const app = createApp(App, {
+  installRuntime(runtime: GameRuntime) {
+    app.provide(gameRuntimeKey, runtime)
+  },
+})
+
+app.use(createPinia()).use(router).mount('#app')
