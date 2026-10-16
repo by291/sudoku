@@ -44,3 +44,12 @@ test('nested_records_and_nulls_match_the_actual_js_values', () => {
     Record<'preparation' | 'arithmetic' | 'exact' | 'logic' | 'proposals', number>
   >()
 })
+
+test('preserves fixed-size proof tuples in read-only application contracts', () => {
+  expectTypeOf<
+    Extract<import('@/sudoku/contracts').AdvancedEvidence, { kind: 'wing' }>['wings']
+  >().toEqualTypeOf<readonly [number, number]>()
+  expectTypeOf<
+    Extract<import('@/sudoku/contracts').AdvancedEvidence, { kind: 'coloring' }>['colors']
+  >().toEqualTypeOf<readonly [readonly number[], readonly number[]]>()
+})

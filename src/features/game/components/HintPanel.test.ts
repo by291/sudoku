@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { expect, it } from 'vitest'
 import HintPanel from '@/features/game/components/HintPanel.vue'
-import type { HintResult } from '@/core/sudoku/hint'
+import type { HintResult } from '@reference/core/sudoku/hint'
 
 const hint: HintResult = {
   kind: 'deduction',

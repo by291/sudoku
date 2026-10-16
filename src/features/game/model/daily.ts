@@ -1,8 +1,8 @@
 import type { GameSession } from '@/features/game/model/session'
 import { createGenerationInput } from '@/sudoku/generationInput'
 import type { GenerationInput } from '@/sudoku/generationInput'
-import type { SudokuVariant } from '@/core/sudoku/rules/types'
-import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
+import type { SudokuVariant } from '@/sudoku/contracts'
+import { SUDOKU_VARIANTS } from '@/sudoku/catalogue'
 
 export function isChallengeDate(value: unknown): value is string {
   return (

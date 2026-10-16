@@ -1,5 +1,5 @@
-import type { Unit, SudokuVariant } from '@/core/sudoku/rules/types'
-import type { Difficulty, Digit } from '@/core/sudoku/types'
+import type { Unit, SudokuVariant } from '@reference/core/sudoku/rules/types'
+import type { Difficulty, Digit } from '@reference/core/sudoku/types'
 
 type Domains = readonly (readonly [number, readonly Digit[]])[]
 type UnitWitness = {

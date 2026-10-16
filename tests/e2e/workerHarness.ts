@@ -1,8 +1,8 @@
 import { readdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
-import type { Board } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
-import type { HintResult } from '@/core/sudoku/hint'
+import type { Board } from '@reference/core/sudoku/types'
+import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
+import type { HintResult } from '@reference/core/sudoku/hint'
 import {
   parseWorkerResponse as decodeResponse,
   validateHintEvidence as validateEvidence,

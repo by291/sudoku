@@ -2,7 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "vitest/globals", "node"]
+    "types": ["vite/client", "vitest/globals", "node"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@reference/*": ["./tests/reference/typescript-engine/src/*"],
+      "@/core/sudoku/*": ["./tests/reference/typescript-engine/src/core/sudoku/*"]
+    }
   },
   "include": ["src/**/*.test.ts", "tests/**/*.test.ts", "tests/support/**/*.ts"],
   "exclude": ["tests/e2e/**", "tests/reference/**"]

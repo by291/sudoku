@@ -6,7 +6,7 @@ import LearningView from '@/features/learning/views/LearningView.vue'
 import LessonView from '@/features/learning/views/LessonView.vue'
 import DailyView from '@/features/game/views/DailyView.vue'
 import RecordsView from '@/features/records/views/RecordsView.vue'
-import { LESSONS } from '@/features/learning/model/lessons'
+import { lessonVariant } from '@/features/learning/model/lessonIds'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -51,10 +51,10 @@ export const router = createRouter({
             }
           }
 
-          const lesson = LESSONS.find((item) => item.id === route.params.lessonId)
+          const variant = lessonVariant(route.params.lessonId)
 
           return {
-            to: lesson ? { path: '/learn', query: { variant: lesson.practiceVariant } } : '/learn',
+            to: variant ? { path: '/learn', query: { variant } } : '/learn',
             label: '返回课程列表',
           }
         },

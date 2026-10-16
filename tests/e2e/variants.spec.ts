@@ -1,3 +1,4 @@
+import { LESSONS } from '../support/lessons'
 import {
   test,
   expect,
@@ -12,10 +13,10 @@ import {
 import { makeSession } from '../support/gameFixtures'
 import type { Page } from '@playwright/test'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
-import { LESSONS } from '@/features/learning/model/lessons'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
-import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import type { Digit } from '@/core/sudoku/types'
+
+import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
+import { VARIANT_PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
+import type { Digit } from '@reference/core/sudoku/types'
 
 async function chooseVariant(page: Page, field: string, name: string) {
   if (field !== '成绩玩法') {

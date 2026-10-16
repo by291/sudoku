@@ -5,8 +5,8 @@ import type { Ref } from 'vue'
 import type { GameRuntime } from '@/runtime'
 import type { OwnershipToken } from '@/storage/ownership'
 import type { GenerationInput } from '@/sudoku/generationInput'
-import type { Puzzle } from '@/core/sudoku/puzzle'
-import type { SudokuVariant } from '@/core/sudoku/rules/types'
+import type { Puzzle } from '@/sudoku/contracts'
+import type { SudokuVariant } from '@/sudoku/contracts'
 import {
   getDailyIdentity,
   getDailyFormalId,
@@ -19,7 +19,7 @@ import type { GameSession, SessionMetadata, SessionPhase } from '@/features/game
 import type { GameTransition } from '@/features/game/model/variants'
 import type { StorageOutcome, SessionRecord } from '@/storage/records'
 import type { SessionPersistence } from '@/features/game/stores/sessionPersistence'
-import type { PuzzleAssessment } from '@/core/sudoku/rating/types'
+import type { PuzzleAssessment } from '@/sudoku/contracts'
 
 export type SessionTransitionHost = {
   session: Ref<GameSession | null>

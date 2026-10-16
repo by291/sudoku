@@ -7,8 +7,8 @@ import {
   getVariantPresentation,
   VARIANT_OPTIONS,
 } from '@/features/game/model/variants'
-import { isSudokuVariant } from '@/core/sudoku/rules/context'
-import { supportedDifficulties } from '@/core/sudoku/difficulties'
+import { isSudokuVariant } from '@/sudoku/catalogue'
+import { supportedDifficulties } from '@/sudoku/catalogue'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { modeName } from '@/features/records/model/records'

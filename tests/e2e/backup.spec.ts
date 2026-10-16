@@ -1,3 +1,4 @@
+import { LESSONS } from '../support/lessons'
 import { applySessionAction } from '../support/semantics'
 import { readFile } from 'node:fs/promises'
 import {
@@ -12,7 +13,7 @@ import {
 import { makeSession } from '../support/gameFixtures'
 
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
-import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
+import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 
 test('rejects a pre-restore Worker result when reset broadcasting is unavailable', async ({

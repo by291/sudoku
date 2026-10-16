@@ -1,4 +1,4 @@
-import type { Board } from '@/core/sudoku/types'
+import type { Board } from '@reference/core/sudoku/types'
 
 /** Unordered a,b / b,a rectangles are invariant under row/column/digit permutations and transpose. */
 export function countIntercalates(board: Board): number {

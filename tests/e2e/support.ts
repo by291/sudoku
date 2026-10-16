@@ -1,3 +1,4 @@
+import { VARIANT_EXAMPLES } from '../support/lessons'
 import { parseSessionRecord } from '../support/semantics'
 import { seedForTest } from '../support/generation'
 import { test as base, expect } from '@playwright/test'
@@ -6,10 +7,10 @@ import type { GameSession } from '@/features/game/model/session'
 
 import { makeSession } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
-import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
-import { VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import type { NewSudokuVariant } from '@/core/sudoku/rules/types'
+
+import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
+import { VARIANT_PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
+import type { NewSudokuVariant } from '@reference/core/sudoku/rules/types'
 
 export { expect }
 

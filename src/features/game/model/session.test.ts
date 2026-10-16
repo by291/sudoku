@@ -8,7 +8,7 @@ import { expect, it } from 'vitest'
 import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { emptyBoard, solvedBoard } from '../../../../tests/fixtures/sudoku'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
-import { createWorkBudget } from '@/core/sudoku/budget'
+import { createWorkBudget } from '@reference/core/sudoku/budget'
 
 it('installs an independent assessment snapshot and preserves it through player actions', () => {
   const fixture = makeSession()

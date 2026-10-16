@@ -2,7 +2,6 @@
 import { NAlert, NButton, NProgress } from 'naive-ui'
 import { computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { LESSONS } from '@/features/learning/model/lessons'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import {
@@ -13,6 +12,7 @@ import {
 
 const route = useRoute()
 const learning = useLearningStore()
+const LESSONS = learning.lessons
 const preferences = usePreferencesStore()
 const variantQuery = computed(() => parseVariantQuery(route.query.variant))
 const selectedVariant = computed(() =>

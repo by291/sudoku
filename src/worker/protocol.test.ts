@@ -5,18 +5,18 @@ import {
   validateHintEvidence as validateEvidence,
 } from '@/worker/protocol'
 import { generationInput } from '../../tests/support/generation'
-import { assessPuzzle, toAssessmentOutcome } from '@/core/sudoku/rating/assessment'
-import { createAssessmentInput } from '@/core/sudoku/rating/input'
+import { assessPuzzle, toAssessmentOutcome } from '@reference/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
 import { RATING_FIXTURES } from '../../tests/fixtures/rating'
-import { analyzeHint } from '@/core/sudoku/hint'
-import { createLogicalWorkspace } from '@/core/sudoku/logic/workspace'
-import { findVariantStep } from '@/core/sudoku/logic/variantTechniques'
-import { compileRules } from '@/core/sudoku/rules/context'
-import { createWorkBudget } from '@/core/sudoku/budget'
-import type { HintResult } from '@/core/sudoku/hint'
+import { analyzeHint } from '@reference/core/sudoku/hint'
+import { createLogicalWorkspace } from '@reference/core/sudoku/logic/workspace'
+import { findVariantStep } from '@reference/core/sudoku/logic/variantTechniques'
+import { compileRules } from '@reference/core/sudoku/rules/context'
+import { createWorkBudget } from '@reference/core/sudoku/budget'
+import type { HintResult } from '@reference/core/sudoku/hint'
 import { createTestEngine } from '../../tests/support/wasm'
-import type { Board } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
+import type { Board } from '@reference/core/sudoku/types'
+import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
 import {
   ARROW_REPEAT_BOARD,
   ARROW_REPEAT_RULES,

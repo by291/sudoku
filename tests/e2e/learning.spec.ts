@@ -1,5 +1,6 @@
+import { LESSONS } from '../support/lessons'
 import { test, expect, cellName, readSessions, enterExerciseDigit } from './support'
-import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
+import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { VARIANT_OPTIONS } from '@/features/game/model/variants'
 

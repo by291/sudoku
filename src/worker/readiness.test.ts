@@ -3,7 +3,7 @@ import { createSudokuWorkerClient } from '@/worker/client'
 import { encodeSeed } from '@/sudoku/seed'
 import { createTestEngine, getTestModule } from '../../tests/support/wasm'
 import { solvedBoard, uniqueBoard } from '../../tests/fixtures/sudoku'
-import { isRecord } from '@/core/sudoku/types'
+import { isRecord } from '@reference/core/sudoku/types'
 
 const engine = await createTestEngine()
 afterAll(() => engine.dispose())

@@ -1,14 +1,11 @@
-import type { Board, ParseResult } from '@/core/sudoku/types'
-import type { Puzzle } from '@/core/sudoku/puzzle'
-import type { HintResult } from '@/core/sudoku/hint'
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
-import type {
-  AssessmentInput,
-  AssessmentOutcome,
-  PuzzleAssessment,
-} from '@/core/sudoku/rating/types'
+import type { Board, ParseResult } from '@/sudoku/contracts'
+import type { Puzzle } from '@/sudoku/contracts'
+import type { HintResult } from '@/sudoku/contracts'
+import type { PuzzleRules } from '@/sudoku/contracts'
+import type { AssessmentInput, AssessmentOutcome, PuzzleAssessment } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
-import { isBoard, isRecord, isRulesShape, RATING_VERSION } from '@/sudoku/guards'
+import { isBoard } from '@/sudoku/values'
+import { isRecord, isRulesShape, RATING_VERSION } from '@/sudoku/guards'
 import { parseGenerationInput } from '@/sudoku/generationInput'
 import type { GenerationInput } from '@/sudoku/generationInput'
 import { validatePuzzleSnapshot } from '@/sudoku/puzzleSnapshot'

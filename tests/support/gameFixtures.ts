@@ -1,9 +1,9 @@
 import type { GameSession } from '@/features/game/model/session'
-import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import type { Puzzle } from '@/core/sudoku/puzzle'
-import { assessPuzzle, toAssessmentOutcome } from '@/core/sudoku/rating/assessment'
-import { createAssessmentInput } from '@/core/sudoku/rating/input'
-import { toPuzzleAssessment } from '@/core/sudoku/rating/decoding'
+import { PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
+import type { Puzzle } from '@reference/core/sudoku/puzzle'
+import { assessPuzzle, toAssessmentOutcome } from '@reference/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
+import { toPuzzleAssessment } from '@reference/core/sudoku/rating/decoding'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 
 export function makeSession(overrides: Partial<GameSession> = {}): GameSession {

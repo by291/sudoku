@@ -6,13 +6,13 @@ import { useRoute, RouterLink } from 'vue-router'
 import NumberPad from '@/shared/components/NumberPad.vue'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 import GameView from '@/features/game/views/GameView.vue'
-import { LESSONS } from '@/features/learning/model/lessons'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { useLessonExercise } from '@/features/learning/composables/useLessonExercise'
 import { explainStepEvidence } from '@/features/game/model/techniquePresentation'
 
 const route = useRoute()
 const learning = useLearningStore()
+const LESSONS = learning.lessons
 const lesson = computed(() => LESSONS.find((lesson) => lesson.id === route.params.lessonId))
 const practice = computed(() => route.query.practice === '1')
 const explanationId = useId()

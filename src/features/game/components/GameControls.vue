@@ -2,7 +2,7 @@
 import { computed, ref, useTemplateRef, useId, watch, nextTick, h } from 'vue'
 import { NButton, NDropdown } from 'naive-ui'
 import type { DropdownProps, DropdownMenuProps, DropdownOption } from 'naive-ui'
-import type { Digit } from '@/core/sudoku/types'
+import type { Digit } from '@/sudoku/contracts'
 import NumberPad from '@/shared/components/NumberPad.vue'
 
 const props = withDefaults(

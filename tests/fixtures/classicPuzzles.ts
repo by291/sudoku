@@ -1,14 +1,14 @@
-import { parseBoard } from '@/core/sudoku/board'
-import type { Board, Difficulty } from '@/core/sudoku/types'
+import { isBoard } from '@/sudoku/values'
+import type { Board, Difficulty } from '@reference/core/sudoku/types'
 
 export type ClassicPuzzleFixture = { difficulty: Difficulty; givens: Board; solution: Board }
 function literalBoard(text: string): Board {
-  const parsed = parseBoard(Array.from(text, Number))
-  if (!parsed.valid) {
-    throw new Error(`Invalid fixture: ${parsed.issues.join('; ')}`)
+  const board = Array.from(text, Number)
+  if (!isBoard(board)) {
+    throw new Error('Invalid authored fixture board')
   }
 
-  return parsed.value
+  return board
 }
 
 const solution = literalBoard(

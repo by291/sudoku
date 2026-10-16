@@ -252,12 +252,12 @@ The plan dependency chain is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 �
 
 **Interfaces:** Core validates lesson steps and transforms variant rules. Teaching data, stable exercise/lesson IDs, Chinese explanations, drawing and display-only mask formatting stay in TS. Shared components accept DTOs/owned metadata and never load WASM. Independent reference solvers remain test-only.
 
-- [ ] Add `all_32_lesson_identities_and_expected_deductions_are_preserved`, `lesson_rule_transforms_obey_variant_capabilities`, and `production_graph_contains_no_typescript_solver`. Assert old lesson completions/cursors restore, correct/incorrect answers retain behavior, and all static/dynamic production imports exclude test reference sources and old solver algorithms.
-- [ ] Run focused learning/presentation and module-boundary tests; observe failures from remaining direct calculation imports or missing Rust transformation/validation.
-- [ ] Construct/validate teaching examples through explicit engine results at their workflow owner. Preserve datasets and exercise readiness fences. Keep cell geometry formatting and technique explanations pure; move only display-only digit/mask helpers into `sudokuPresentation.ts`.
-- [ ] Remove every production TS rule compiler, candidate evaluator, proof validator, solver, rater and generator after replacing its consumers. Port meaningful current engine tests to core/WASM contract coverage before deleting their obsolete TS locations. Retain test-only baseline/reference data without adding a shipped fallback or hidden double engine.
-- [ ] Run all Rust tests, migration suites, four TS type projects, lint/format, module-boundary tests, root/subpath builds and learning/expert/player browser flows. Inspect emitted assets/import graphs to verify no reference engine ships.
-- [ ] Commit as `refactor(web): complete portable engine cutover`.
+- [x] Add `all_32_lesson_identities_and_expected_deductions_are_preserved`, `lesson_rule_transforms_obey_variant_capabilities`, and `production_graph_contains_no_typescript_solver`. Assert old lesson completions/cursors restore, correct/incorrect answers retain behavior, and all static/dynamic production imports exclude test reference sources and old solver algorithms.
+- [x] Run focused learning/presentation and module-boundary tests; observe failures from remaining direct calculation imports or missing Rust transformation/validation.
+- [x] Construct/validate teaching examples through explicit engine results at their workflow owner. Preserve datasets and exercise readiness fences. Keep cell geometry formatting and technique explanations pure; move only display-only digit/mask helpers into `sudokuPresentation.ts`.
+- [x] Remove every production TS rule compiler, candidate evaluator, proof validator, solver, rater and generator after replacing its consumers. Port meaningful current engine tests to core/WASM contract coverage before deleting their obsolete TS locations. Retain test-only baseline/reference data without adding a shipped fallback or hidden double engine.
+- [x] Run all Rust tests, migration suites, four TS type projects, lint/format, module-boundary tests, root/subpath builds and learning/expert/player browser flows. Inspect emitted assets/import graphs to verify no reference engine ships.
+- [x] Commit as `refactor(web): complete portable engine cutover`.
 
 ## Task 15: Validate release performance, portability and maintainability
 

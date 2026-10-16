@@ -1,12 +1,11 @@
+import { BOARD_SIZE } from '@/sudoku/values'
 import type { EngineInfo } from '@sudoku/wasm'
-import type { Board, Difficulty, PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
+import type { Difficulty, PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
 
 export const BRIDGE_VERSION = 1
 export const PUZZLE_VERSION = 'sudoku-v11'
 export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v11'
 export const RATING_VERSION = 'sudoku-rating-v2'
-const BOARD_SIZE = 81
-const MAX_DIGIT = 9
 const REQUIRED_EXPORTS = [
   'engine_info',
   'derive_seed',
@@ -17,6 +16,7 @@ const REQUIRED_EXPORTS = [
   'validate_puzzle',
   'validate_rules',
   'parse_hint',
+  'validate_teaching_step',
   'validate_assessment',
   'validate_hint_evidence',
   'transform_rules',
@@ -65,17 +65,6 @@ const VARIANT_TAGS = {
 
 export function isVariant(value: unknown): value is SudokuVariant {
   return typeof value === 'string' && Object.hasOwn(VARIANT_TAGS, value)
-}
-
-export function isBoard(value: unknown): value is Board {
-  return (
-    Array.isArray(value) &&
-    value.length === BOARD_SIZE &&
-    value.every(
-      (digit) =>
-        typeof digit === 'number' && Number.isInteger(digit) && digit >= 0 && digit <= MAX_DIGIT,
-    )
-  )
 }
 
 function cellList(value: unknown): value is number[] {

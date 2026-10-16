@@ -1,4 +1,4 @@
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
+import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
 
 /** Canonical geometry ignores clue numbering, given masks and arithmetic totals, but preserves directed paths. */
 export function geometrySignature(rules: PuzzleRules): string {

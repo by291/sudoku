@@ -4,7 +4,13 @@ import ts from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 
-const sourceImportPatterns = [{ regex: '^\\.', message: 'Use @/ for source imports.' }]
+const sourceImportPatterns = [
+  { regex: '^\\.', message: 'Use @/ for source imports.' },
+  {
+    regex: '^@reference/|^@/core/|(?:^|/)tests/reference/',
+    message: 'Production must not import the retired TypeScript engine or test oracles.',
+  },
+]
 const compositionImportPatterns = [
   ...sourceImportPatterns,
   {
@@ -12,25 +18,6 @@ const compositionImportPatterns = [
       '^@/(?:(?:App|ReadyApplication|EngineBootstrapState)(?:\\.|$)|main(?:\\.|$)|layouts/|router(?:/|$)|theme/)',
     message: 'Business and browser-service modules must not depend on application presentation.',
   },
-]
-
-const coreImportPatterns = [
-  ...sourceImportPatterns,
-  { regex: '^@/(?!core/)', message: 'The Sudoku engine must remain independent.' },
-]
-const coreExternalPackages = ['vue', 'pinia', 'vue-router', 'naive-ui', 'idb']
-
-// Each entry includes the base engine policy because flat-config rule options replace it.
-const coreDependencyPolicies = [
-  { files: ['src/core/sudoku/{types,budget,random}.ts'], forbidden: 'logic|rating|generation' },
-  {
-    files: ['src/core/sudoku/rules/**/*.ts'],
-    forbidden: 'constraints|search|logic|rating|generation',
-  },
-  { files: ['src/core/sudoku/constraints/**/*.ts'], forbidden: 'search|logic|rating|generation' },
-  { files: ['src/core/sudoku/search/**/*.ts'], forbidden: 'logic|rating|generation' },
-  { files: ['src/core/sudoku/logic/**/*.ts'], forbidden: 'rating|generation' },
-  { files: ['src/core/sudoku/rating/**/*.ts'], forbidden: 'generation' },
 ]
 
 function restrictImports({ paths = [], patterns }) {
@@ -75,7 +62,7 @@ export default [
   },
   // Reference snapshots remain byte exact; executable migration tools use Node globals.
   {
-    files: ['tests/migration/**/*.mjs', 'scripts/**/*.mjs'],
+    files: ['tests/migration/**/*.mjs', 'tests/reference/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
   js.configs.recommended,
@@ -91,12 +78,18 @@ export default [
     rules: { ...restrictImports({ patterns: sourceImportPatterns }) },
   },
   {
-    files: ['src/core/**/*.ts'],
-    ignores: ['src/**/*.test.ts'],
+    files: ['src/sudoku/{contracts,values,catalogue,ruleInput,seed,generationInput}.ts'],
     rules: {
       ...restrictImports({
-        paths: coreExternalPackages,
-        patterns: coreImportPatterns,
+        paths: ['vue', 'pinia', 'vue-router', 'naive-ui', 'idb'],
+        patterns: [
+          ...sourceImportPatterns,
+          {
+            regex: '^@/(?!sudoku/(?:contracts|values|catalogue|ruleInput|seed|guards)(?:[./]|$))',
+            message:
+              'Pure contracts and input assembly must not load a runtime or application services.',
+          },
+        ],
       }),
       '@typescript-eslint/consistent-type-imports': [
         'error',
@@ -114,36 +107,6 @@ export default [
       ],
     },
   },
-  ...coreDependencyPolicies.map(({ files, forbidden }) => ({
-    files,
-    ignores: ['src/**/*.test.ts'],
-    rules: restrictImports({
-      paths: coreExternalPackages,
-      patterns: [
-        ...coreImportPatterns,
-        {
-          regex: `^@/core/sudoku/(?:${forbidden})(?:/|$)`,
-          message: 'Import a lower-level owner; Sudoku dependencies must not point upward.',
-        },
-      ],
-    }),
-  })),
-  {
-    files: ['src/core/sudoku/rules/definitions/**/*.ts'],
-    ignores: ['src/**/*.test.ts'],
-    rules: restrictImports({
-      paths: coreExternalPackages,
-      patterns: [
-        ...coreImportPatterns,
-        {
-          regex:
-            '^@/core/sudoku/(?:constraints|search|logic|rating|generation)(?:/|$)|^@/core/sudoku/rules/(?:registry|context)(?:[./]|$)',
-          message:
-            'Rule definitions must remain independent of registries and higher-level operations.',
-        },
-      ],
-    }),
-  },
   {
     files: ['src/runtime.ts', 'src/{features,storage,worker,shared}/**/*.{ts,vue}'],
     ignores: ['src/**/*.test.ts'],
@@ -158,7 +121,7 @@ export default [
           ...compositionImportPatterns,
           {
             regex:
-              '^@/(?:runtime(?:[./]|$)|(?:features|storage|worker)/|sudoku/(?!contracts(?:[./]|$)))|^@sudoku/wasm(?:/|$)',
+              '^@/(?:runtime(?:[./]|$)|(?:features|storage|worker)/|sudoku/(?!(?:contracts|values)(?:[./]|$)))|^@sudoku/wasm(?:/|$)',
             message: 'Shared presentation must not depend on feature state or browser services.',
           },
         ],
@@ -208,7 +171,7 @@ export default [
           ...compositionImportPatterns,
           {
             regex:
-              '^@/(?!core/|sudoku/(?:contracts|generationInput|seed|ruleInput)(?:[./]|$)|features/(?:game|learning|settings)/model/)',
+              '^@/(?!shared/model/sudokuPresentation(?:[./]|$)|sudoku/(?:contracts|generationInput|seed|ruleInput|values|catalogue)(?:[./]|$)|features/(?:game|learning|settings)/model/)',
             message: 'Pure models may only depend on the engine and other pure models.',
           },
         ],

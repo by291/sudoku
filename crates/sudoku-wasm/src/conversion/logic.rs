@@ -456,7 +456,7 @@ pub fn step_to_dto(step: &LogicalStep) -> CoreResult<LogicalStepDto> {
     })
 }
 
-fn step_to_core(step: LogicalStepDto) -> CoreResult<LogicalStep> {
+pub fn step_to_core(step: LogicalStepDto) -> CoreResult<LogicalStep> {
     let (technique, evidence, action) = match step {
         LogicalStepDto::Placement {
             technique,

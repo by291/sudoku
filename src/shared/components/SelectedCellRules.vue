@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
+import type { PuzzleRules } from '@/sudoku/contracts'
 import { getSelectedRuleDescriptions } from '@/shared/model/boardGeometry'
 
 const props = defineProps<{

@@ -1,7 +1,7 @@
-import type { Puzzle } from '@/core/sudoku/puzzle'
+import type { Puzzle } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
+import { isBoard } from '@/sudoku/values'
 import {
-  isBoard,
   isDifficulty,
   isRecord,
   isRulesShape,

@@ -1,7 +1,8 @@
-import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
-import type { LogicalStep, RuleEvidence, AdvancedEvidence } from '@/core/sudoku/logic/types'
-import type { PuzzleRules, Unit } from '@/core/sudoku/rules/types'
-import { transformVariantRules } from '@/core/sudoku/generation/variantStrategies'
+import type { Board, Digit, NoteMask } from '@/sudoku/contracts'
+import type { LogicalStep, RuleEvidence, AdvancedEvidence } from '@/sudoku/contracts'
+import type { PuzzleRules, Unit } from '@/sudoku/contracts'
+import { copyRules } from '@/sudoku/ruleInput'
+import type { LessonCalculation } from '@/sudoku/contracts'
 
 export type ExerciseAnswer =
   | { kind: 'placement'; expected: { cell: number; digit: Digit } }
@@ -25,6 +26,7 @@ export function stageAnswer(stage: ExerciseStage): ExerciseAnswer {
 /** Each spatial transform is an involution; only Classic permits the within-band row swap. */
 export function transformStage(
   stage: ExerciseStage,
+  calculation: Pick<LessonCalculation, 'transformRules'>,
   transform: 'transpose' | 'rotate' | 'swap-rows' = 'transpose',
 ): ExerciseStage {
   if (transform === 'swap-rows' && stage.rules.kind !== 'classic') {
@@ -90,7 +92,7 @@ export function transformStage(
         unit: unitMap(evidence.unit),
         cells: cells(evidence.cells),
         premises: evidence.premises.map(clueMap),
-        units: evidence.units?.map(unitMap),
+        ...(evidence.units === undefined ? {} : { units: evidence.units.map(unitMap) }),
       }
     }
     if (evidence.kind === 'cage' || evidence.kind === 'arrow' || evidence.kind === 'thermo') {
@@ -142,7 +144,10 @@ export function transformStage(
   const rules =
     stage.rules.kind === 'classic'
       ? stage.rules
-      : transformVariantRules(stage.rules, cellMap, false)
+      : calculation.transformRules({
+          rules: copyRules(stage.rules),
+          symmetry: transform === 'rotate' ? 2 : 7,
+        })
   const step =
     stage.step.kind === 'placement'
       ? { ...stage.step, cell: cellMap(stage.step.cell), evidence: proofMap(stage.step.evidence) }

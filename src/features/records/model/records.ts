@@ -1,7 +1,7 @@
-import type { Difficulty } from '@/core/sudoku/types'
+import type { Difficulty } from '@/sudoku/contracts'
 import type { ResultRecord } from '@/storage/records'
 import type { GameSession } from '@/features/game/model/session'
-import type { SudokuVariant } from '@/core/sudoku/rules/types'
+import type { SudokuVariant } from '@/sudoku/contracts'
 import { getChallengeDate, isChallengeDate } from '@/features/game/model/daily'
 
 export type RecordSummary = {

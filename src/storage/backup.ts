@@ -2,10 +2,10 @@ import type { IDBPDatabase } from 'idb'
 import type { SudokuDatabase } from '@/storage/database'
 import { commitTransaction } from '@/storage/database'
 import { StorageConflict } from '@/storage/ownership'
-import { isRecord } from '@/core/sudoku/types'
-import type { ParseResult } from '@/core/sudoku/types'
-import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
-import type { SudokuVariant } from '@/core/sudoku/rules/types'
+import { isRecord } from '@/sudoku/values'
+import type { ParseResult } from '@/sudoku/contracts'
+import { SUDOKU_VARIANTS } from '@/sudoku/catalogue'
+import type { SudokuVariant } from '@/sudoku/contracts'
 import {
   SnapshotValidationUnavailable,
   isIsoInstant,

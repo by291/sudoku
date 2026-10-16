@@ -1,17 +1,19 @@
 use std::collections::BTreeSet;
 
 use super::advanced_evidence::validate_advanced_step;
+use super::pattern_facts::{candidate_positions, mask_of};
 use super::solver::find_step;
 use super::techniques::Technique;
 use super::types::{
-    AdvancedEvidenceKind, Evidence, LogicalAction, LogicalStep, RuleEvidence, RuleEvidenceKind,
+    AdvancedEvidenceKind, Evidence, LogicalAction, LogicalStep, LogicalWorkspace, RuleEvidence,
+    RuleEvidenceKind,
 };
 use super::workspace::{apply_step, create_workspace};
 use crate::budget::WorkBudget;
 use crate::hint::HintResult;
 use crate::rules::context::{compile_rules, validate_rules};
-use crate::rules::types::{Arrow, PuzzleRules, RuleConstraint, Unit, UnitKind};
-use crate::types::{BOARD_SIZE, Board, Bounded, CoreResult, EngineError};
+use crate::rules::types::{Arrow, PreparedRules, PuzzleRules, RuleConstraint, Unit, UnitKind};
+use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask, CoreResult, EngineError};
 
 const HINT_STEP_LIMIT: usize = 500;
 /// Maximum proof replay work, matching the existing transport validator.
@@ -263,86 +265,242 @@ pub fn validate_hint_evidence(
     let mut state = board.map(|board| create_workspace(board, &context));
     let mut budget = WorkBudget::new(HINT_VALIDATION_WORK_LIMIT);
     for step in steps {
-        match &mut step.evidence {
-            Evidence::Advanced(_) => {
-                let Some(state) = &state else {
-                    return Err(invalid());
-                };
-                if !budget.consume(ADVANCED_PROOF_WORK) || !validate_advanced_step(state, step) {
-                    return Err(invalid());
-                }
+        validate_step_and_apply(
+            step,
+            &context,
+            &mut state,
+            &mut budget,
+            ValidationMode::Hint,
+        )?;
+    }
+    Ok(parsed)
+}
+
+#[derive(Clone, Copy)]
+enum ValidationMode {
+    Hint,
+    Teaching,
+}
+
+fn validate_step_and_apply(
+    step: &mut LogicalStep,
+    context: &PreparedRules,
+    state: &mut Option<LogicalWorkspace>,
+    budget: &mut WorkBudget,
+    mode: ValidationMode,
+) -> CoreResult<()> {
+    match &mut step.evidence {
+        Evidence::Advanced(_) => {
+            let Some(state) = state.as_ref() else {
+                return Err(invalid());
+            };
+            if !budget.consume(ADVANCED_PROOF_WORK) || !validate_advanced_step(state, step) {
+                return Err(invalid());
             }
-            Evidence::Unit {
-                unit,
-                cells,
-                premises,
-                units,
-                ..
-            } => {
-                let Some(actual_unit) =
-                    context.context().units.iter().find(|candidate| {
+        }
+        Evidence::Unit {
+            unit,
+            cells,
+            premises,
+            units,
+            ..
+        } => {
+            let Some(actual_unit) = context
+                .context()
+                .units
+                .iter()
+                .find(|candidate| candidate.kind == unit.kind && candidate.index == unit.index)
+            else {
+                return Err(invalid());
+            };
+            // The existing parser normalizes an omitted related-unit list to an empty list.
+            let units = units.get_or_insert_with(Vec::new);
+            if !cells.iter().all(|cell| actual_unit.cells.contains(cell))
+                || !premises
+                    .iter()
+                    .all(|evidence| clue_matches(evidence, &context.context().constraints))
+                || !units.iter().all(|unit| {
+                    context.context().units.iter().any(|candidate| {
                         candidate.kind == unit.kind && candidate.index == unit.index
                     })
-                else {
+                })
+            {
+                return Err(invalid());
+            }
+            match &step.action {
+                LogicalAction::Placement { cell, .. } if !actual_unit.cells.contains(cell) => {
                     return Err(invalid());
-                };
-                // The existing parser normalizes an omitted related-unit list to an empty list.
-                let units = units.get_or_insert_with(Vec::new);
-                if !cells.iter().all(|cell| actual_unit.cells.contains(cell))
-                    || !premises
-                        .iter()
-                        .all(|evidence| clue_matches(evidence, &context.context().constraints))
-                    || !units.iter().all(|unit| {
-                        context.context().units.iter().any(|candidate| {
-                            candidate.kind == unit.kind && candidate.index == unit.index
-                        })
-                    })
+                }
+                LogicalAction::Elimination { removals }
+                    if step.technique != Technique::LockedCandidate
+                        && !removals
+                            .iter()
+                            .all(|removal| actual_unit.cells.contains(&removal.cell)) =>
                 {
                     return Err(invalid());
                 }
-                match &step.action {
-                    LogicalAction::Placement { cell, .. } if !actual_unit.cells.contains(cell) => {
-                        return Err(invalid());
-                    }
-                    LogicalAction::Elimination { removals }
-                        if step.technique != Technique::LockedCandidate
-                            && !removals
-                                .iter()
-                                .all(|removal| actual_unit.cells.contains(&removal.cell)) =>
-                    {
-                        return Err(invalid());
-                    }
-                    _ => {}
-                }
-            }
-            Evidence::Rule(evidence) => {
-                if !clue_matches(evidence, &context.context().constraints) {
-                    return Err(invalid());
-                }
-                let affected = match &step.action {
-                    LogicalAction::Placement { cell, .. } => vec![*cell],
-                    LogicalAction::Elimination { removals } => {
-                        removals.iter().map(|removal| removal.cell).collect()
-                    }
-                };
-                if !affected.iter().all(|cell| evidence.cells.contains(cell)) {
-                    return Err(invalid());
-                }
+                _ => {}
             }
         }
-        if let Some(state) = &mut state {
-            if !matches!(step.evidence, Evidence::Advanced(_)) {
-                let Bounded::Complete(Some(expected)) =
-                    find_step(state, &[step.technique], &mut budget)
+        Evidence::Rule(evidence) => {
+            if !clue_matches(evidence, &context.context().constraints) {
+                return Err(invalid());
+            }
+            let affected = match &step.action {
+                LogicalAction::Placement { cell, .. } => vec![*cell],
+                LogicalAction::Elimination { removals } => {
+                    removals.iter().map(|removal| removal.cell).collect()
+                }
+            };
+            if !affected.iter().all(|cell| evidence.cells.contains(cell)) {
+                return Err(invalid());
+            }
+        }
+    }
+    if let Some(state) = state.as_mut() {
+        if !matches!(step.evidence, Evidence::Advanced(_)) {
+            if matches!(mode, ValidationMode::Teaching)
+                && matches!(step.evidence, Evidence::Unit { .. })
+            {
+                if !valid_teaching_unit_action(state, step) {
+                    return Err(invalid());
+                }
+            } else {
+                let Bounded::Complete(Some(expected)) = find_step(state, &[step.technique], budget)
                 else {
                     return Err(invalid());
                 };
-                if expected.action != step.action {
+                let matches = match (&expected.action, &step.action, mode) {
+                    (
+                        LogicalAction::Elimination { removals: expected },
+                        LogicalAction::Elimination { removals: actual },
+                        ValidationMode::Teaching,
+                    ) => {
+                        expected.len() == actual.len()
+                            && actual.iter().all(|removal| expected.contains(removal))
+                    }
+                    _ => expected.action == step.action,
+                };
+                if !matches {
                     return Err(invalid());
                 }
             }
-            apply_step(state, step);
         }
+        apply_step(state, step);
     }
-    Ok(parsed)
+    Ok(())
+}
+
+/// Validates one authored deduction against its explicit candidate state, without exact search.
+/// The caller must establish that earlier candidate eliminations are sound.
+/// Candidates may reflect earlier explained deductions; no state or cache survives this call.
+pub fn validate_teaching_step(
+    board: &Board,
+    candidates: [CandidateMask; BOARD_SIZE],
+    rules: &PuzzleRules,
+    step: &LogicalStep,
+) -> CoreResult<()> {
+    if !valid_step_shape(step)
+        || board
+            .values()
+            .iter()
+            .zip(candidates)
+            .any(|(&value, mask)| value != 0 && mask != CandidateMask::EMPTY)
+    {
+        return Err(invalid());
+    }
+    let context = compile_rules(rules)?;
+    let mut workspace = create_workspace(board, &context);
+    workspace.candidates = candidates;
+    let mut state = Some(workspace);
+    let mut step = step.clone();
+    let mut budget = WorkBudget::new(HINT_VALIDATION_WORK_LIMIT);
+    validate_step_and_apply(
+        &mut step,
+        &context,
+        &mut state,
+        &mut budget,
+        ValidationMode::Teaching,
+    )
+}
+
+/// Authored exercises may choose any sound unit pattern, independently of detector traversal order.
+fn valid_teaching_unit_action(state: &LogicalWorkspace, step: &LogicalStep) -> bool {
+    let Evidence::Unit {
+        unit,
+        cells,
+        digits,
+        ..
+    } = &step.evidence
+    else {
+        return false;
+    };
+    let Some(unit) = state
+        .rules
+        .context()
+        .units
+        .iter()
+        .find(|candidate| candidate.kind == unit.kind && candidate.index == unit.index)
+    else {
+        return false;
+    };
+    let equal_cells = |first: &[usize], second: &[usize]| {
+        first.len() == second.len() && first.iter().all(|cell| second.contains(cell))
+    };
+    match (&step.action, step.technique) {
+        (LogicalAction::Placement { cell, digit }, Technique::NakedSingle) => {
+            cells == &[*cell]
+                && digits == &[*digit]
+                && state.board.values()[*cell] == 0
+                && state.candidates[*cell].bits() == mask_of(*digit)
+        }
+        (LogicalAction::Placement { cell, digit }, Technique::HiddenSingle) => {
+            cells == &[*cell]
+                && digits == &[*digit]
+                && candidate_positions(state, &unit.cells, *digit) == [*cell]
+        }
+        (LogicalAction::Elimination { removals }, Technique::LockedCandidate) => {
+            digits.len() == 1
+                && cells.len() >= 2
+                && equal_cells(&candidate_positions(state, &unit.cells, digits[0]), cells)
+                && removals.iter().all(|removal| {
+                    removal.digit == digits[0]
+                        && state.board.values()[removal.cell] == 0
+                        && state.candidates[removal.cell].bits() & mask_of(removal.digit) != 0
+                        && cells.iter().all(|cell| {
+                            state.rules.context().duplicate_peers[removal.cell].contains(cell)
+                        })
+                })
+        }
+        (LogicalAction::Elimination { removals }, Technique::NakedPair | Technique::HiddenPair) => {
+            if cells.len() != 2
+                || digits.len() != 2
+                || cells.iter().any(|&cell| state.board.values()[cell] != 0)
+            {
+                return false;
+            }
+            let pair = mask_of(digits[0]) | mask_of(digits[1]);
+            let pattern_valid = if step.technique == Technique::NakedPair {
+                cells
+                    .iter()
+                    .all(|&cell| state.candidates[cell].bits() == pair)
+            } else {
+                digits.iter().all(|&digit| {
+                    equal_cells(&candidate_positions(state, &unit.cells, digit), cells)
+                })
+            };
+            pattern_valid
+                && removals.iter().all(|removal| {
+                    unit.cells.contains(&removal.cell)
+                        && state.board.values()[removal.cell] == 0
+                        && state.candidates[removal.cell].bits() & mask_of(removal.digit) != 0
+                        && if step.technique == Technique::NakedPair {
+                            !cells.contains(&removal.cell) && pair & mask_of(removal.digit) != 0
+                        } else {
+                            cells.contains(&removal.cell) && pair & mask_of(removal.digit) == 0
+                        }
+                })
+        }
+        _ => false,
+    }
 }

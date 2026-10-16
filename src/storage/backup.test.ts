@@ -13,7 +13,7 @@ import { createOwnershipCoordinator } from '@/storage/ownership'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { makeSession, makeAssessment } from '../../tests/support/gameFixtures'
 import { CORPUS_COMBINATIONS } from '../../tests/fixtures/generationCorpus'
-import { VARIANT_TEMPLATES } from '@/core/sudoku/examples/variants'
+import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../tests/fixtures/classicPuzzles'
 
 import { createSaveQueue } from '@/storage/saveQueue'

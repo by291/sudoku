@@ -1,6 +1,6 @@
 import { createBindings } from '@sudoku/wasm/factory'
 import type { Board, PuzzleRules } from '@/sudoku/contracts'
-import type { AssessmentInput, AssessmentOutcome } from '@/core/sudoku/rating/types'
+import type { AssessmentInput, AssessmentOutcome } from '@/sudoku/contracts'
 import type { GenerationInput } from '@/sudoku/generationInput'
 import { validateEngineInfo, validateModuleExports } from '@/sudoku/guards'
 import { copyRules } from '@/sudoku/ruleInput'

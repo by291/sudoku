@@ -1,3 +1,6 @@
+import type { SudokuVariant } from '@/sudoku/contracts'
+import { SUDOKU_VARIANTS } from '@/sudoku/catalogue'
+
 export const LESSON_IDS = [
   'rules',
   'naked-single',
@@ -39,4 +42,12 @@ export function isLessonId(value: unknown): value is (typeof LESSON_IDS)[number]
 
 export function lessonStageCount(id: string): number {
   return id.endsWith('-combined') ? 6 : 2
+}
+
+/** Stable course IDs own navigation metadata independently of exercise construction. */
+export function lessonVariant(id: unknown): SudokuVariant | null {
+  if (!isLessonId(id)) {
+    return null
+  }
+  return SUDOKU_VARIANTS.find((variant) => id.startsWith(`${variant}-`)) ?? 'classic'
 }

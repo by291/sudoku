@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
-import { DIGITS } from '@/core/sudoku/types'
-import type { Digit } from '@/core/sudoku/types'
+import { DIGITS } from '@/sudoku/values'
+import type { Digit } from '@/sudoku/contracts'
 
 const {
   disabled = false,

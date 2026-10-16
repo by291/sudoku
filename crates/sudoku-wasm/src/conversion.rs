@@ -4,3 +4,5 @@ pub mod metadata;
 pub mod rating;
 pub mod rules;
 pub mod values;
+
+pub mod js_input;

@@ -6,7 +6,7 @@ import { gameRuntimeKey } from '@/runtime'
 import type { GameRuntime } from '@/runtime'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { makeSession } from '../../../../tests/support/gameFixtures'
-import type { HintResult } from '@/core/sudoku/hint'
+import type { HintResult } from '@reference/core/sudoku/hint'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { generationInput } from '../../../../tests/support/generation'
 

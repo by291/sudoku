@@ -55,9 +55,36 @@ test('bounded live operations stay within the main-thread frame budget', async (
   if (!Array.isArray(profiles)) {
     throw new Error('Invalid profiling response')
   }
-  expect(profiles).toHaveLength(36)
+  expect(profiles).toHaveLength(37)
   for (const profile of profiles) {
     expect(profile.p95Ms, `${profile.variant}/${profile.operation} p95`).toBeLessThan(16.67)
     expect(profile.maxMs, `${profile.variant}/${profile.operation} maximum`).toBeLessThan(50)
   }
+})
+
+test('preserves optional unit fields without mutating caller proofs', async ({ page }) => {
+  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  const result: unknown = await page.evaluate(async () => {
+    const url = '/tests/migration/live-profile.ts'
+    const module: unknown = await import(url)
+    if (
+      !module ||
+      typeof module !== 'object' ||
+      !('probeOptionalUnitFields' in module) ||
+      typeof module.probeOptionalUnitFields !== 'function'
+    ) {
+      throw new Error('Missing optional-field probe')
+    }
+    return module.probeOptionalUnitFields()
+  })
+
+  expect(result).toEqual({
+    teaching: 'valid',
+    shape: 'valid',
+    proof: 'valid',
+    nullTeaching: 'invalid',
+    nullShape: 'invalid',
+    nullProof: 'invalid',
+    originalUnchanged: true,
+  })
 })

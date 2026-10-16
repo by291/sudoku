@@ -2,12 +2,15 @@
 import { afterAll, expect, it } from 'vitest'
 import { writeFileSync } from 'node:fs'
 import { cpus, platform, release } from 'node:os'
-import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
-import { generatePuzzle } from '@/core/sudoku/generation/generate'
-import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/core/sudoku/generation/types'
-import { RATING_VERSION } from '@/core/sudoku/rating/policies'
-import { assessPuzzle } from '@/core/sudoku/rating/assessment'
-import { createAssessmentInput } from '@/core/sudoku/rating/input'
+import {
+  createGenerationInput,
+  DEFAULT_GENERATION_LIMITS,
+} from '@reference/core/sudoku/generation/input'
+import { generatePuzzle } from '@reference/core/sudoku/generation/generate'
+import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
+import { RATING_VERSION } from '@reference/core/sudoku/rating/policies'
+import { assessPuzzle } from '@reference/core/sudoku/rating/assessment'
+import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
 import {
   CORPUS_COMBINATIONS,
   CORPUS_SEEDS,

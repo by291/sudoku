@@ -8,8 +8,6 @@ import type {
   BoardQueryDto,
   CandidateWorkDto,
   ConflictWorkDto,
-  PreparedCountInputDto,
-  SearchWorkDto,
   EditInputDto,
   EditWorkDto,
   PuzzleValidation,
@@ -25,10 +23,10 @@ type Bindings = ReturnType<typeof createBindings>
 /** Owns a prepared layout. Returned DTOs are independent copies; disposal is idempotent. */
 export interface PreparedPuzzle {
   readonly preparationWork: number
+  baseCandidates(board: Board): readonly number[]
   metadata(): RuleMetadata
   candidates(input: BoardQueryDto): CandidateWorkDto
   conflicts(input: BoardQueryDto): ConflictWorkDto
-  countSolutions(input: PreparedCountInputDto): SearchWorkDto
   edit(input: EditInputDto): EditWorkDto
   isComplete(board: Board): boolean
   dispose(): void
@@ -40,6 +38,7 @@ export interface MainSudokuEngine {
   deriveSeed(material: Uint8Array): Uint8Array
   validatePuzzle(content: unknown): PuzzleValidation
   validateRules(rules: unknown): PuzzleValidation
+  validateTeachingStep(value: unknown): PuzzleValidation
   parseHint(value: unknown): HintValidationDto
   validateAssessment(input: AssessmentValidationInputDto): AssessmentValidationDto
   validateAssessmentOutcome(value: unknown): ParsedOutcomeDto
@@ -77,10 +76,10 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
         get preparationWork() {
           return prepared().preparationWork
         },
+        baseCandidates: (board) => Array.from(prepared().base_candidates([...board])),
         metadata: () => prepared().metadata(),
         candidates: (input) => prepared().candidates(input),
         conflicts: (input) => prepared().conflicts(input),
-        countSolutions: (input) => prepared().count_solutions(input),
         edit: (input) => prepared().edit(input),
         isComplete: (board) => prepared().is_complete([...board]),
         dispose() {
@@ -97,6 +96,7 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
     deriveSeed: (material) => active().derive_seed(material),
     validatePuzzle: (content) => active().validate_puzzle(content),
     validateRules: (rules) => active().validate_rules(rules),
+    validateTeachingStep: (value) => active().validate_teaching_step(value),
     parseHint: (value) => active().parse_hint(value),
     validateAssessment: (input) => active().validate_assessment(input),
     validateAssessmentOutcome: (value) => active().parse_assessment_outcome(value),

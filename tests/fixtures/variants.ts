@@ -1,7 +1,7 @@
-import type { Board } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
-import type { NewSudokuVariant } from '@/core/sudoku/rules/types'
-import { parseBoard } from '@/core/sudoku/board'
+import type { Board } from '@reference/core/sudoku/types'
+import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
+import type { NewSudokuVariant } from '@reference/core/sudoku/rules/types'
+import { isBoard } from '@/sudoku/values'
 
 export const ARROW_REPEAT_RULES: PuzzleRules = {
   kind: 'arrow',
@@ -19,9 +19,9 @@ export const FULL_LENGTH_THERMO_RULES: PuzzleRules = {
   paths: [[0, 1, 2, 3, 4, 5, 6, 7, 8]],
 }
 function literalBoard(text: string): Board {
-  const result = parseBoard(Array.from(text, Number))
-  if (!result.valid) throw new Error('Invalid literal variant fixture')
-  return result.value
+  const board = Array.from(text, Number)
+  if (!isBoard(board)) throw new Error('Invalid literal variant fixture')
+  return board
 }
 const latinSolution = literalBoard(
   '123456789456789123789123456234567891567891234891234567345678912678912345912345678',

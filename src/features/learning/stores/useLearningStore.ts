@@ -3,13 +3,14 @@ import { ref, shallowRef, watch } from 'vue'
 import { useGameRuntime } from '@/runtime'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import type { LessonProgress } from '@/storage/records'
-import { LESSONS, checkExercise, lessonStages } from '@/features/learning/model/lessons'
+import { createLessons, checkExercise, lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { explainStep } from '@/features/game/model/techniquePresentation'
 import type { Exercise } from '@/features/learning/model/lessons'
 
 export const useLearningStore = defineStore('learning', () => {
   const runtime = useGameRuntime()
+  const lessons = createLessons(runtime.engine)
   const preferences = usePreferencesStore()
   const progress = shallowRef<readonly LessonProgress[]>([])
   const error = ref<string | null>(null)
@@ -85,7 +86,7 @@ export const useLearningStore = defineStore('learning', () => {
   }
 
   async function selectLesson(id: string) {
-    if (LESSONS.some((lesson) => lesson.id === id)) {
+    if (lessons.some((lesson) => lesson.id === id)) {
       return preferences.update({ currentLessonId: id })
     }
     return false
@@ -101,7 +102,7 @@ export const useLearningStore = defineStore('learning', () => {
     stageIndex = exerciseStage(id),
   ) {
     const current = operation
-    const lesson = LESSONS.find((lesson) => lesson.id === id)
+    const lesson = lessons.find((lesson) => lesson.id === id)
     if (!lesson) {
       return {
         correct: false,
@@ -204,6 +205,7 @@ export const useLearningStore = defineStore('learning', () => {
   }
 
   return {
+    lessons,
     progress,
     error,
     datasetGeneration,

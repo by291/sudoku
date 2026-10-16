@@ -1,5 +1,5 @@
-import { SUDOKU_VARIANTS } from '@/core/sudoku/rules/types'
-import { supportedDifficulties } from '@/core/sudoku/difficulties'
+import { SUDOKU_VARIANTS } from '@reference/core/sudoku/rules/types'
+import { supportedDifficulties } from '@reference/core/sudoku/difficulties'
 
 export const CORPUS_VERSION = 'local-product-corpus-v1'
 export const CORPUS_SEEDS = Array.from(

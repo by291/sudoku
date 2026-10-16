@@ -10,10 +10,10 @@ import {
 } from './support'
 import { makeSession } from '../support/gameFixtures'
 import { CLASSIC_PUZZLE_FIXTURES } from '../fixtures/classicPuzzles'
-import { PUZZLE_VERSION } from '@/core/sudoku/generation/types'
+import { PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
 import { generationInput } from '../support/generation'
-import { analyzeLogic } from '@/core/sudoku/logic/solver'
-import { RATING_POLICIES } from '@/core/sudoku/rating/policies'
+import { analyzeLogic } from '@reference/core/sudoku/logic/solver'
+import { RATING_POLICIES } from '@reference/core/sudoku/rating/policies'
 import { runWorker, parseWorkerResponse, validateHintEvidence } from './workerHarness'
 
 const authored = CLASSIC_PUZZLE_FIXTURES.find((template) => template.difficulty === 'expert')

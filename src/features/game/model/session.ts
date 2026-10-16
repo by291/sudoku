@@ -1,6 +1,6 @@
-import type { Board, Digit, NoteMask } from '@/core/sudoku/types'
-import type { Puzzle } from '@/core/sudoku/puzzle'
-import type { PuzzleAssessment } from '@/core/sudoku/rating/types'
+import type { Board, Digit, NoteMask } from '@/sudoku/contracts'
+import type { Puzzle } from '@/sudoku/contracts'
+import type { PuzzleAssessment } from '@/sudoku/contracts'
 import type { EditWorkDto } from '@/sudoku/contracts'
 import { copyRules } from '@/sudoku/ruleInput'
 

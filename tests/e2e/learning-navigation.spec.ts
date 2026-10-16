@@ -1,5 +1,6 @@
+import { LESSONS } from '../support/lessons'
 import { test, expect, cellName, enterExerciseDigit } from './support'
-import { LESSONS, lessonStages } from '@/features/learning/model/lessons'
+import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 
 test('shows one course path and retains the selected type through refresh and parent navigation', async ({

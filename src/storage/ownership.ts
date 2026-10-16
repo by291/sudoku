@@ -1,5 +1,5 @@
 import type { IDBPTransaction } from 'idb'
-import { isRecord } from '@/core/sudoku/types'
+import { isRecord } from '@/sudoku/values'
 import { commitTransaction } from '@/storage/database'
 import type { DatabaseProvider, SudokuDatabase } from '@/storage/database'
 import { isIdentifier, isNonnegativeInteger } from '@/storage/records'

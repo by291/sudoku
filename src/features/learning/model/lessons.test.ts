@@ -1,10 +1,10 @@
+import { LESSONS, VARIANT_EXAMPLES } from '../../../../tests/support/lessons'
 import { expect, it } from 'vitest'
-import { LESSONS, checkExercise } from '@/features/learning/model/lessons'
+import { checkExercise } from '@/features/learning/model/lessons'
 import { EXAMPLES } from '@/features/learning/model/examples'
 import { solvedBoard } from '../../../../tests/fixtures/sudoku'
-import { UNITS, maskOf, digitsIn } from '@/core/sudoku/board'
+import { UNITS, maskOf, digitsIn } from '@reference/core/sudoku/board'
 import { LESSON_IDS } from '@/features/learning/model/lessonIds'
-import { VARIANT_EXAMPLES } from '@/features/learning/model/variantExamples'
 
 it('provides six lessons with explicit exercises and mode-appropriate practice', () => {
   expect(LESSONS.slice(0, 6).map((lesson) => lesson.id)).toEqual([

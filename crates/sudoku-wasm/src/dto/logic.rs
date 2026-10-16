@@ -256,3 +256,12 @@ pub enum HintValidationDto {
     Valid { hint: HintResultDto },
     Invalid { issues: Vec<String> },
 }
+
+#[derive(Deserialize, Tsify)]
+#[serde(deny_unknown_fields)]
+pub struct TeachingStepInputDto {
+    pub board: super::values::BoardDto,
+    pub candidates: Vec<u16>,
+    pub rules: super::rules::RulesDto,
+    pub step: LogicalStepDto,
+}

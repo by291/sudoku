@@ -1,4 +1,4 @@
-import type { Difficulty } from '@/core/sudoku/types'
+import type { Difficulty } from '@/sudoku/contracts'
 
 export const DIFFICULTY_NAMES: Record<Difficulty, string> = {
   easy: '简单',

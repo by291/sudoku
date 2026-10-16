@@ -5,15 +5,15 @@ import type {
   HistoryMove,
   SessionMetadata,
 } from '@/features/game/model/session'
-import type { ParseResult } from '@/core/sudoku/types'
-import type { Board } from '@/core/sudoku/types'
-import { isRecord, ALL_DIGITS_MASK, BOARD_SIZE } from '@/core/sudoku/types'
+import type { ParseResult } from '@/sudoku/contracts'
+import type { Board } from '@/sudoku/contracts'
+import { isRecord, ALL_DIGITS_MASK, BOARD_SIZE } from '@/sudoku/values'
 import { validatePuzzleSnapshot } from '@/sudoku/puzzleSnapshot'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
-import type { Puzzle } from '@/core/sudoku/puzzle'
-import { CLASSIC_RULES } from '@/core/sudoku/rules/context'
+import type { Puzzle } from '@/sudoku/contracts'
+import { CLASSIC_RULES } from '@/sudoku/catalogue'
 import { getDailyFormalId } from '@/features/game/model/daily'
-import { isBoard } from '@/sudoku/guards'
+import { isBoard } from '@/sudoku/values'
 import type { Settings } from '@/features/settings/model/preferences'
 import { isLessonId, lessonStageCount } from '@/features/learning/model/lessonIds'
 

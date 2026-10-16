@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { NButton } from 'naive-ui'
 import { computed, ref, watch } from 'vue'
-import type { HintResult } from '@/core/sudoku/hint'
+import type { HintResult } from '@/sudoku/contracts'
 import {
   explainStep,
   explainStepEvidence,
   TECHNIQUE_NAMES,
 } from '@/features/game/model/techniquePresentation'
-import type { LogicalStep } from '@/core/sudoku/logic/types'
+import type { LogicalStep } from '@/sudoku/contracts'
 
 const props = defineProps<{ hint: HintResult }>()
 const emit = defineEmits<{ apply: []; dismiss: []; highlight: [step: LogicalStep | null] }>()

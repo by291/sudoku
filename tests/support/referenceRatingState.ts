@@ -1,6 +1,6 @@
-import type { Board, Digit } from '@/core/sudoku/types'
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
-import type { LogicalStep } from '@/core/sudoku/logic/types'
+import type { Board, Digit } from '@reference/core/sudoku/types'
+import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
+import type { LogicalStep } from '@reference/core/sudoku/logic/types'
 
 /** Replays explicit actions using separate unit construction and digit lists, without engine helpers. */
 export function referenceRatingState(

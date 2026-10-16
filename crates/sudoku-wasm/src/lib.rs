@@ -219,8 +219,13 @@ pub fn validate_puzzle(
 pub fn validate_hint_evidence(
     input: Ts<dto::values::UntrustedValueDto>,
 ) -> Result<Ts<HintValidationDto>, JsError> {
-    let parsed = serde_wasm_bindgen::from_value::<HintValidationInputDto>(input.to_rust()?.0)
-        .map_err(|_| EngineError::invalid("Hint evidence does not match the requested rules"));
+    let parsed =
+        conversion::js_input::map_field(input.to_rust()?.0, "hint", conversion::js_input::hint)
+            .and_then(|value| {
+                serde_wasm_bindgen::from_value::<HintValidationInputDto>(value).map_err(|_| {
+                    EngineError::invalid("Hint evidence does not match the requested rules")
+                })
+            });
     let outcome = parsed.and_then(|input| {
         let hint = hint_to_core(input.hint)?;
         let rules = input.rules.try_into()?;
@@ -293,8 +298,12 @@ pub fn parse_assessment_outcome(
 pub fn parse_hint(
     input: Ts<dto::values::UntrustedValueDto>,
 ) -> Result<Ts<HintValidationDto>, JsError> {
-    let parsed = serde_wasm_bindgen::from_value::<HintResultDto>(input.to_rust()?.0)
-        .map_err(|_| EngineError::invalid("Hint evidence does not match the requested rules"))
+    let parsed = conversion::js_input::hint(input.to_rust()?.0)
+        .and_then(|value| {
+            serde_wasm_bindgen::from_value::<HintResultDto>(value).map_err(|_| {
+                EngineError::invalid("Hint evidence does not match the requested rules")
+            })
+        })
         .and_then(hint_to_core)
         .and_then(|hint| sudoku_core::logic::hint_validation::validate_hint_shape(&hint));
     let result = match parsed {
@@ -322,4 +331,39 @@ pub fn validate_rules(
         },
     };
     Ok(result.into_ts()?)
+}
+
+#[wasm_bindgen]
+pub fn validate_teaching_step(
+    input: Ts<dto::values::UntrustedValueDto>,
+) -> Result<Ts<ValidationDto>, JsError> {
+    let parsed =
+        conversion::js_input::map_field(input.to_rust()?.0, "step", conversion::js_input::step)
+            .and_then(|value| {
+                serde_wasm_bindgen::from_value::<dto::logic::TeachingStepInputDto>(value)
+                    .map_err(|_| EngineError::invalid("Invalid teaching step envelope"))
+            });
+    let outcome = parsed.and_then(|input| {
+        let board = input.board.try_into()?;
+        let rules = input.rules.try_into()?;
+        let candidates = input
+            .candidates
+            .into_iter()
+            .map(sudoku_core::types::CandidateMask::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        let candidates = candidates
+            .try_into()
+            .map_err(|_| EngineError::invalid("Teaching candidate state must contain 81 masks"))?;
+        let step = conversion::logic::step_to_core(input.step)?;
+        sudoku_core::logic::hint_validation::validate_teaching_step(
+            &board, candidates, &rules, &step,
+        )
+    });
+    Ok(match outcome {
+        Ok(()) => ValidationDto::Valid,
+        Err(error) => ValidationDto::Invalid {
+            issues: issues(error),
+        },
+    }
+    .into_ts()?)
 }

@@ -1,18 +1,18 @@
-import type { Unit } from '@/core/sudoku/rules/types'
-import { digitsIn } from '@/core/sudoku/board'
-import { UNIT_SIZE } from '@/core/sudoku/types'
+import type { Unit } from '@/sudoku/contracts'
+import { digitsIn } from '@/shared/model/sudokuPresentation'
+import { UNIT_SIZE } from '@/sudoku/values'
 import type {
   BasicClassicTechnique,
   AdvancedEvidence,
   Technique,
   LogicalStep,
-} from '@/core/sudoku/logic/types'
+} from '@/sudoku/contracts'
 import {
   TECHNIQUES,
   isClassicTechnique,
   isAdvancedTechnique,
   isAdvancedEvidence,
-} from '@/core/sudoku/logic/techniques'
+} from '@/sudoku/catalogue'
 
 export const TECHNIQUE_NAMES: Record<Technique, string> = {
   'naked-single': '唯一候选数',

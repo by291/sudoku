@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, useTemplateRef, watch, nextTick } from 'vue'
-import type { Board, NoteMask } from '@/core/sudoku/types'
-import { DIGITS } from '@/core/sudoku/types'
-import { digitsIn, maskOf } from '@/core/sudoku/board'
-import type { PuzzleRules } from '@/core/sudoku/rules/types'
+import type { Board, NoteMask } from '@/sudoku/contracts'
+import { DIGITS } from '@/sudoku/values'
+import { digitsIn, maskOf } from '@/shared/model/sudokuPresentation'
+import type { PuzzleRules } from '@/sudoku/contracts'
 import { getBoardGeometry, getCellRuleContext } from '@/shared/model/boardGeometry'
 import SudokuClues from '@/shared/components/SudokuClues.vue'
 import SelectedCellRules from '@/shared/components/SelectedCellRules.vue'

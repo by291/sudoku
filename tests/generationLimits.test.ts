@@ -1,7 +1,10 @@
 import { expect, it } from 'vitest'
 import { CORPUS_COMBINATIONS } from './fixtures/generationCorpus'
-import { createGenerationInput, DEFAULT_GENERATION_LIMITS } from '@/core/sudoku/generation/input'
-import { generatePuzzle } from '@/core/sudoku/generation/generate'
+import {
+  createGenerationInput,
+  DEFAULT_GENERATION_LIMITS,
+} from '@reference/core/sudoku/generation/input'
+import { generatePuzzle } from '@reference/core/sudoku/generation/generate'
 
 const exhaustedLimits = [
   { name: 'layout', limits: { ...DEFAULT_GENERATION_LIMITS, maxLayouts: 0 } },

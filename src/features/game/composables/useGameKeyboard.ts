@@ -1,5 +1,5 @@
 import { onMounted, onScopeDispose } from 'vue'
-import { isDigit, UNIT_SIZE } from '@/core/sudoku/types'
+import { isDigit, UNIT_SIZE } from '@/sudoku/values'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import type { GameAction } from '@/features/game/model/session'
 import { isKeyboardOwnedByControl } from '@/shared/utils/keyboardOwnership'

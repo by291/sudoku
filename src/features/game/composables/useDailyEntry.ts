@@ -4,9 +4,9 @@ import { useGameStore } from '@/features/game/stores/useGameStore'
 import { useGameRuntime } from '@/runtime'
 import { getChallengeDate } from '@/features/game/model/daily'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
-import type { SudokuVariant } from '@/core/sudoku/rules/types'
+import type { SudokuVariant } from '@/sudoku/contracts'
 import { parseVariantQuery } from '@/features/game/model/variants'
-import type { Difficulty } from '@/core/sudoku/types'
+import type { Difficulty } from '@/sudoku/contracts'
 
 export function useDailyEntry() {
   const runtime = useGameRuntime()

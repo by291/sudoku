@@ -1,5 +1,5 @@
-import type { PuzzleRules, RulesFor, SudokuVariant } from '@/core/sudoku/rules/types'
-import { isCellIndex } from '@/core/sudoku/types'
+import type { PuzzleRules, RulesFor, SudokuVariant } from '@/sudoku/contracts'
+import { isCellIndex } from '@/sudoku/values'
 
 export type BoardEdge = { cell: number; edge: 'top' | 'right' | 'bottom' | 'left' }
 

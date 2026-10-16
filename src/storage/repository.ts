@@ -5,7 +5,7 @@ import { assertOwnership, StorageConflict } from '@/storage/ownership'
 import type { OwnershipToken } from '@/storage/ownership'
 import type { GameSession } from '@/features/game/model/session'
 import type { LessonProgress, ResultRecord, SessionRecord, StorageOutcome } from '@/storage/records'
-import type { ParseResult } from '@/core/sudoku/types'
+import type { ParseResult } from '@/sudoku/contracts'
 import {
   parseLessonProgress,
   parseResultRecord,

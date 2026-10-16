@@ -24,38 +24,10 @@ async function boundaryMessages(filePath: string, target: string, kind: 'static'
 
 describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)', (kind) => {
   it.each([
-    ['src/core/sudoku/types.ts', '@/core/sudoku/logic/solver'],
-    ['src/core/sudoku/types.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/types.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/budget.ts', '@/core/sudoku/logic/solver'],
-    ['src/core/sudoku/budget.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/budget.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/random.ts', '@/core/sudoku/logic/solver'],
-    ['src/core/sudoku/random.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/random.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/constraints/support'],
-    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/search/exact'],
-    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/logic/solver'],
-    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/rules/fixture.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/search/exact'],
-    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/logic/solver'],
-    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/constraints/fixture.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/search/fixture.ts', '@/core/sudoku/logic/solver'],
-    ['src/core/sudoku/search/fixture.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/search/fixture.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/logic/fixture.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/logic/fixture.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/rating/fixture.ts', '@/core/sudoku/generation/generate'],
-    ['src/core/sudoku/rules/definitions/fixture.ts', '@/core/sudoku/rules/registry'],
-    ['src/core/sudoku/rules/definitions/fixture.ts', '@/core/sudoku/rules/context'],
-    ['src/core/sudoku/fixture.ts', 'vue'],
-    ['src/core/sudoku/fixture.ts', 'naive-ui'],
-    ['src/core/sudoku/fixture.ts', '@/shared/components/SudokuBoard.vue'],
-    ['src/core/sudoku/fixture.ts', '@/runtime'],
-    ['src/core/sudoku/fixture.ts', '@/storage/records'],
-    ['src/core/sudoku/fixture.ts', '@/worker/protocol'],
+    ['src/sudoku/values.ts', '@/sudoku/mainEngine'],
+    ['src/sudoku/catalogue.ts', '@/storage/repository'],
+    ['src/features/game/model/fixture.ts', '@reference/core/sudoku/board'],
+    ['src/features/game/model/fixture.ts', '@/core/sudoku/board'],
     ['src/shared/components/Fixture.vue', '@/features/game/stores/useGameStore'],
     ['src/shared/components/Fixture.vue', '@/router'],
     ['src/features/game/stores/fixture.ts', '@/App.vue'],
@@ -88,21 +60,12 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
   })
 
   it.each([
-    ['src/core/sudoku/generation/fixture.ts', '@/core/sudoku/rating/assessment'],
-    ['src/core/sudoku/generation/fixture.ts', '@/core/sudoku/search/exact'],
-    ['src/core/sudoku/rating/fixture.ts', '@/core/sudoku/logic/solver'],
-    ['src/core/sudoku/hint.ts', '@/core/sudoku/rating/policies'],
-    ['src/core/sudoku/board.ts', '@/core/sudoku/rules/context'],
-    ['src/core/sudoku/rules/definitions/fixture.test.ts', '@/core/sudoku/rules/context'],
-    ['src/core/sudoku/rules/definitions/fixture.test.ts', '@/core/sudoku/rules/registry'],
-    ['src/core/sudoku/rules/definitions/fixture.test.ts', '../../../../../tests/fixtures/variants'],
     ['src/features/learning/model/fixture.ts', '@/features/game/model/techniquePresentation'],
-    ['src/core/sudoku/fixture.ts', '@/core/sudoku/types'],
-    ['src/shared/components/Fixture.vue', '@/core/sudoku/types'],
     ['src/shared/components/Fixture.vue', 'naive-ui'],
+    ['src/shared/components/Fixture.vue', '@/sudoku/values'],
+    ['src/shared/components/Fixture.vue', '@/sudoku/contracts'],
     ['src/features/game/stores/fixture.ts', '@/runtime'],
     ['src/features/game/views/Fixture.vue', '@/shared/components/SudokuBoard.vue'],
-    ['src/features/game/model/fixture.ts', '@/core/sudoku/board'],
     ['src/features/game/model/fixture.ts', '@/sudoku/generationInput'],
     ['src/features/game/model/fixture.ts', '@/sudoku/seed'],
     ['src/features/game/model/fixture.ts', '@/sudoku/ruleInput'],
@@ -112,7 +75,7 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
     ['src/runtime.ts', '@/worker/client'],
     ['src/storage/fixture.ts', '@/features/game/model/session'],
     ['src/storage/fixture.ts', '@/storage/ownership'],
-    ['src/worker/fixture.ts', '@/core/sudoku/generation/generate'],
+    ['src/worker/fixture.ts', '@/sudoku/workerEngine'],
     ['src/theme/fixture.ts', '@/features/settings/model/preferences'],
     ['src/features/game/stores/fixture.test.ts', '@/router'],
   ])('allows %s importing %s', async (filePath, target) => {
@@ -120,9 +83,9 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
   })
 })
 
-it('keeps browser globals out of the Sudoku engine', async () => {
+it('keeps browser globals out of pure Sudoku contracts', async () => {
   const [result] = await lint.lintText('window.setTimeout(() => {}, 100)', {
-    filePath: 'src/core/sudoku/fixture.ts',
+    filePath: 'src/sudoku/values.ts',
   })
 
   expect(result.messages.some((message) => message.ruleId === 'no-restricted-globals')).toBe(true)
@@ -131,7 +94,7 @@ it('keeps browser globals out of the Sudoku engine', async () => {
 it.each(['void import(target)', 'void import(`@/features/game/stores/useGameStore`)'])(
   'requires an inspectable string-literal module path: %s',
   async (source) => {
-    const [result] = await lint.lintText(source, { filePath: 'src/core/sudoku/fixture.ts' })
+    const [result] = await lint.lintText(source, { filePath: 'src/sudoku/values.ts' })
 
     expect(result.messages.some((message) => message.ruleId === 'no-restricted-syntax')).toBe(true)
   },
@@ -260,15 +223,15 @@ it('finds an actual runtime cycle without rejecting a shared dependency', () => 
 })
 
 it('keeps the production Sudoku runtime import graph acyclic', () => {
-  const root = resolve('src/core/sudoku')
+  const root = resolve('src/sudoku')
   const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(
     (file) => file.endsWith('.ts') && !file.endsWith('.test.ts'),
   )
   const graph = new Map(
     files.map((file) => {
-      const path = `@/core/sudoku/${file.slice(0, -3)}`
+      const path = `@/sudoku/${file.slice(0, -3)}`
       const dependencies = runtimeModules(readFileSync(resolve(root, file), 'utf8')).filter(
-        (target) => target.startsWith('@/core/sudoku/'),
+        (target) => target.startsWith('@/sudoku/'),
       )
 
       return [path, dependencies] as const

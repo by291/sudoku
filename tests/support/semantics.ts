@@ -12,7 +12,7 @@ import {
   createSession as create,
 } from '@/features/game/model/session'
 import type { GameSession, GameAction } from '@/features/game/model/session'
-import type { WorkBudget } from '@/core/sudoku/budget'
+import type { WorkBudget } from '@reference/core/sudoku/budget'
 import { sessionBoard } from '@/features/game/model/session'
 import { validatePuzzleSnapshot } from '@/sudoku/puzzleSnapshot'
 
