@@ -443,6 +443,7 @@ export const useRecordsStore = defineStore('records', () => {
     error,
     notice,
     busy,
+    backupBusy,
     loaded,
     backupError,
     backupPreview,

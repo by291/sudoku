@@ -18,15 +18,17 @@ import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 
-async function openBackup(page: Page) {
-  const dialog = page.getByRole('dialog', { name: '本地备份与恢复', exact: true })
-  // A restore notice can precede the modal's exit animation; reopen only after it finishes.
-  await expect(dialog).toBeHidden()
-  await page.getByRole('button', { name: '备份与恢复', exact: true }).click()
-  await expect(dialog).toBeVisible()
+async function reachBackupPanel(page: Page) {
+  const panel = page.getByRole('region', { name: '本地备份与恢复', exact: true })
+  await panel.scrollIntoViewIfNeeded()
+  await expect(panel.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
+  await expect(panel.getByRole('button', { name: '导出备份', exact: true })).toBeEnabled()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 }
 
-test('shows a pending file-read failure after the backup sheet is closed', async ({ page }) => {
+test('shows file-read failures beside inline backup actions and allows another import', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     File.prototype.text = () =>
       new Promise<string>((_resolve, reject) => {
@@ -36,23 +38,19 @@ test('shows a pending file-read failure after the backup sheet is closed', async
       })
   })
   await page.goto('/#/records')
-  await openBackup(page)
+  await reachBackupPanel(page)
   await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({
     name: 'delayed.json',
     mimeType: 'application/json',
     buffer: Buffer.from('{}'),
   })
-  await page.getByRole('button', { name: '关闭备份', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: '本地备份与恢复', exact: true })).toBeHidden()
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeDisabled()
 
   await page.evaluate(() => window.dispatchEvent(new Event('reject-backup-read')))
 
   await expect(page.getByRole('alert').filter({ hasText: '备份文件读取失败' })).toBeVisible()
-  await page.getByRole('button', { name: '查看并重试', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: '本地备份与恢复', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '选择备份文件', exact: true })).toBeEnabled()
-  await page.getByRole('button', { name: '关闭备份', exact: true }).click()
-  await expect(page.getByRole('button', { name: '备份与恢复', exact: true })).toBeFocused()
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
 test('rejects a pre-restore Worker result when reset broadcasting is unavailable', async ({
@@ -95,18 +93,14 @@ test('rejects a pre-restore Worker result when reset broadcasting is unavailable
   await expect(page.getByRole('button', { name: '取消出题', exact: true })).toBeVisible()
   const peer = await context.newPage()
   await peer.goto('/#/records')
-  await openBackup(peer)
-  await expect(peer.getByRole('button', { name: '选择备份文件', exact: true })).toBeEnabled()
+  await reachBackupPanel(peer)
+  await expect(peer.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
   await peer.getByLabel('选择备份文件', { exact: true }).setInputFiles({
     name: 'restore.json',
     mimeType: 'application/json',
     buffer: Buffer.from(backupText()),
   })
-  await peer.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  await peer
-    .getByRole('dialog', { name: '恢复备份并替换本机数据？', exact: true })
-    .getByRole('button', { name: '确认恢复', exact: true })
-    .click()
+  await peer.getByRole('button', { name: '确认导入并替换', exact: true }).click()
   await expect(peer.getByRole('status').filter({ hasText: '备份已恢复' })).toBeVisible()
 
   await page.evaluate(() => window.dispatchEvent(new Event('deliver-backup-worker')))
@@ -127,8 +121,8 @@ test('resets a mounted combined lesson to its restored cursor in a peer tab', as
   context,
 }) => {
   await page.goto('/#/records')
-  await openBackup(page)
-  await expect(page.getByRole('button', { name: '选择备份文件', exact: true })).toBeEnabled()
+  await reachBackupPanel(page)
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
   const cursorFile = JSON.parse(backupText())
   cursorFile.settings.lessonStages = { 'killer-combined': 2 }
   await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({
@@ -136,11 +130,7 @@ test('resets a mounted combined lesson to its restored cursor in a peer tab', as
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(cursorFile)),
   })
-  await page.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  await page
-    .getByRole('dialog', { name: '恢复备份并替换本机数据？', exact: true })
-    .getByRole('button', { name: '确认恢复', exact: true })
-    .click()
+  await page.getByRole('button', { name: '确认导入并替换', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '备份已恢复' })).toBeVisible()
   const peer = await context.newPage()
   await peer.goto('/#/learn/killer-combined')
@@ -148,21 +138,14 @@ test('resets a mounted combined lesson to its restored cursor in a peer tab', as
   await expect(peer.getByText(/练习阶段 3 \/ 6/)).toBeVisible()
   await expect(peer.getByText('正在准备或保存练习，请稍候…', { exact: true })).toBeHidden()
 
-  await openBackup(page)
+  await reachBackupPanel(page)
   await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({
     name: 'reset-cursor.json',
     mimeType: 'application/json',
     buffer: Buffer.from(backupText()),
   })
   await expect(page.getByRole('region', { name: '备份预览', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '关闭备份', exact: true })).toBeInViewport({
-    ratio: 1,
-  })
-  await page.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  await page
-    .getByRole('dialog', { name: '恢复备份并替换本机数据？', exact: true })
-    .getByRole('button', { name: '确认恢复', exact: true })
-    .click()
+  await page.getByRole('button', { name: '确认导入并替换', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '备份已恢复' })).toBeVisible()
   await expect(peer.getByText(/练习阶段 1 \/ 6/)).toBeVisible()
   await expect(peer.getByRole('button', { name: '下一阶段', exact: true })).toBeHidden()
@@ -198,7 +181,7 @@ function backupText() {
 
 test('downloads a committed backup and restores notes, history and learning progress after refresh', async ({
   page,
-}) => {
+}, testInfo) => {
   let session = makeSession({
     puzzle: { ...makeSession().puzzle, puzzleVersion: 'sudoku-v1' },
     elapsedMs: 98700,
@@ -225,8 +208,12 @@ test('downloads a committed backup and restores notes, history and learning prog
   })
   await page.getByRole('link', { name: '返回首页', exact: true }).click()
   await page.getByRole('link', { name: /数独足迹/ }).click()
-  await openBackup(page)
-  await expect(page.getByRole('button', { name: '选择备份文件', exact: true })).toBeEnabled()
+  await reachBackupPanel(page)
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
+  await page.screenshot({
+    path: `.superpowers/records-inline/backup-${testInfo.project.name}.png`,
+    animations: 'disabled',
+  })
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: '导出备份', exact: true }).click()
   const download = await downloadPromise
@@ -238,11 +225,10 @@ test('downloads a committed backup and restores notes, history and learning prog
   expect(JSON.parse(text)).toMatchObject({ backupVersion: 1, sessions: [{ session }] })
   expect(JSON.parse(text)).not.toHaveProperty('leases')
   expect(JSON.parse(text)).toMatchObject({ lessons: [{ lessonId: 'rules' }] })
-  await page.getByRole('button', { name: '关闭备份', exact: true }).click()
   await page.getByRole('button', { name: '清空本机数据', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '确认清空', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '本机数据已清空' })).toBeVisible()
-  await openBackup(page)
+  await reachBackupPanel(page)
   await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({
     name: 'sudoku-backup.json',
     mimeType: 'application/json',
@@ -250,14 +236,23 @@ test('downloads a committed backup and restores notes, history and learning prog
   })
   const preview = page.getByRole('region', { name: '备份预览', exact: true })
   await expect(preview).toContainText('存档 1 个')
-  await preview.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: '恢复备份并替换本机数据？' })
-  await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeFocused()
-  await dialog.getByRole('button', { name: '取消', exact: true }).click()
-  await expect(preview.getByRole('button', { name: '替换本机数据', exact: true })).toBeFocused()
+  await preview.scrollIntoViewIfNeeded()
+  await page.screenshot({
+    path: `.superpowers/records-inline/preview-${testInfo.project.name}.png`,
+    animations: 'disabled',
+  })
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(await readSessions(page)).toHaveLength(0)
-  await preview.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  await dialog.getByRole('button', { name: '确认恢复', exact: true }).click()
+  await preview.getByRole('button', { name: '取消预览', exact: true }).click()
+  await expect(preview).toBeHidden()
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeFocused()
+  expect(await readSessions(page)).toHaveLength(0)
+  await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({
+    name: 'sudoku-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(text),
+  })
+  await preview.getByRole('button', { name: '确认导入并替换', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '备份已恢复' })).toBeVisible()
   expect((await readSessions(page))[0]).toMatchObject({ revision: 1, session })
   await page.reload()
@@ -276,8 +271,8 @@ test('downloads a committed backup and restores notes, history and learning prog
 test('rejects incompatible and oversized files without losing current saves', async ({ page }) => {
   await seedSession(page, makeSession())
   await page.goto('/#/records')
-  await openBackup(page)
-  await expect(page.getByRole('button', { name: '选择备份文件', exact: true })).toBeEnabled()
+  await reachBackupPanel(page)
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
   for (const buffer of [
     Buffer.from(backupText().replace('"backupVersion":1', '"backupVersion":2')),
     Buffer.from('{'),
@@ -297,8 +292,8 @@ test('stops a hidden peer editor and preserves only the restored dataset', async
   context,
 }) => {
   await page.goto('/#/records')
-  await openBackup(page)
-  await expect(page.getByRole('button', { name: '选择备份文件', exact: true })).toBeEnabled()
+  await reachBackupPanel(page)
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
   await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({
     name: 'restore.json',
     mimeType: 'application/json',
@@ -315,11 +310,7 @@ test('stops a hidden peer editor and preserves only the restored dataset', async
     document.dispatchEvent(new Event('visibilitychange'))
   })
   await expect(peer.getByRole('button', { name: cellName(2) })).toHaveAccessibleName(/已暂停/)
-  await page.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  await page
-    .getByRole('dialog', { name: '恢复备份并替换本机数据？', exact: true })
-    .getByRole('button', { name: '确认恢复', exact: true })
-    .click()
+  await page.getByRole('button', { name: '确认导入并替换', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '备份已恢复' })).toBeVisible()
   await expect(peer.getByRole('group', { name: '数独棋盘' })).toBeHidden()
   await expect(peer.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -333,8 +324,8 @@ test('stops a hidden peer editor and preserves only the restored dataset', async
 test('retains current data on restore transaction failure and supports retry', async ({ page }) => {
   await seedSession(page, makeSession({ id: 'keep-on-failure' }))
   await page.goto('/#/records')
-  await openBackup(page)
-  await expect(page.getByRole('button', { name: '选择备份文件', exact: true })).toBeEnabled()
+  await reachBackupPanel(page)
+  await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
   await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({
     name: 'restore.json',
     mimeType: 'application/json',
@@ -362,19 +353,11 @@ test('retains current data on restore transaction failure and supports retry', a
       { once: true },
     )
   })
-  await page.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  await page
-    .getByRole('dialog', { name: '恢复备份并替换本机数据？', exact: true })
-    .getByRole('button', { name: '确认恢复', exact: true })
-    .click()
+  await page.getByRole('button', { name: '确认导入并替换', exact: true }).click()
   await expect(page.getByRole('alert').filter({ hasText: '恢复失败' })).toBeVisible()
   expect((await readSessions(page))[0].session.id).toBe('keep-on-failure')
   await page.evaluate(() => window.dispatchEvent(new Event('restore-backup-storage')))
-  await page.getByRole('button', { name: '替换本机数据', exact: true }).click()
-  await page
-    .getByRole('dialog', { name: '恢复备份并替换本机数据？', exact: true })
-    .getByRole('button', { name: '确认恢复', exact: true })
-    .click()
+  await page.getByRole('button', { name: '确认导入并替换', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '备份已恢复' })).toBeVisible()
   expect((await readSessions(page))[0].session.id).toBe(makeSession().id)
 })

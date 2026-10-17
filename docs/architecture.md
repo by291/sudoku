@@ -107,7 +107,7 @@ IndexedDB schema v2 adds derived session/result summaries and compound indexes. 
 
 Schema upgrades do no mathematical work. Legacy coverage stays pending until explicit cancellable maintenance validates one owned payload at a time and fences each repair against concurrent writes/reset. Unavailable computation preserves original records. Unknown counts/progress remain distinct from zero, and unknown slot presence cannot authorize replacement. Missing targeted projections invalidate coverage for repair without scanning unrelated payloads. Asynchronous readiness always finishes before semantic-validation transactions open.
 
-Backups validate the entire bounded file before preview/replacement. Import replaces player collections atomically under the preview's expected dataset epoch, clears leases/quarantine and increments the epoch. Export captures one committed readonly snapshot and reports excluded invalid records. Existing limits, save failures, cross-tab races and reset fences remain unchanged.
+Backups validate the entire bounded file before preview/replacement. The records page exposes import/export directly; a valid file expands an inline preview and explicit replacement confirmation. Import replaces player collections atomically under the preview's expected dataset epoch, clears leases/quarantine and increments the epoch. Export captures one committed readonly snapshot and reports excluded invalid records. Existing limits, save failures, cross-tab races and reset fences remain unchanged.
 
 Shutdown keeps semantic validation alive until the final leave/save settles, then terminates Workers, releases ownership, disposes main memory and closes storage. Every lifetime is idempotent.
 

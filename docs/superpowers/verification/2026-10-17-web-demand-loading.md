@@ -55,6 +55,12 @@ The new regression passed alongside existing dialog/save-picker coverage: 21 bro
 
 The sidebar previously displayed a count only for the selected overview and left other choices as permanent placeholders. A dedicated indexed read now returns all six completion counts without full payload reads or WASM startup. Tests cover nonselected variants, all record tabs, known empty indexes, incomplete legacy result coverage, and reset refresh.
 
+## Inline backup follow-up
+
+Backup import/export now run directly on the records page. Valid files expand an inline preview with cancel and explicit replacement confirmation; no backup modal remains. Delayed read failures stay next to the actions, and backup loading feedback is independent of ordinary record queries. Existing backup formats, atomic replacement, save settling and dataset fencing remain intact.
+
+Verification for both follow-ups: 81 focused unit tests passed; all configured type checks, scoped ESLint/Prettier, root/subpath builds and diff whitespace checks passed. Chromium desktop/mobile and WebKit ran 66 browser cases: 64 passed and 2 desktop-layout skips. Coverage includes actual download/import, cancelled previews and restored focus, invalid/oversized files, failed restore retries, peer resets, pagination and zero-WASM browsing. Inspected screenshots under `.superpowers/records-inline/`.
+
 ## Review and limits
 
 Independent reviews found and verified fixes for shared error-state clearing, unknown-save replacement, reset overview refresh, stale page rollback, retry cursor mismatch, cold lesson geometry, malformed migration cursor identities and missing/corrupt derived projections. No material review findings remain open.

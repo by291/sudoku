@@ -38,6 +38,8 @@ Home reads only lightweight presence/counts; setup, daily and continue sheets re
 
 Records navigation reads all six completion counts from result-summary indexes in one readonly snapshot, independently of the selected tab or variant. Incomplete result coverage remains unknown; an empty validated index displays zero. Detailed statistics and rows still load only for the selected tab.
 
+Backup import/export actions live directly on the records page. A selected valid file expands an inline preview with an explicit replacement warning, cancel action and final confirmation button; neither backup entry nor replacement uses a modal.
+
 Unknown progress/counts are represented explicitly, not as zero. Course metadata and record card structures render immediately. Unknown values use neutral placeholders with accessible loading semantics; recommendation actions wait for real progress. Refresh keeps the last compatible snapshot. Loading feedback uses the existing 350 ms delay; errors remain visible immediately. Reuse existing content geometry where possible, but never retain an empty loading panel in a ready dialog. Setup feedback renders only while visible; resume feedback replaces the introduction. Preserve keyboard focus, dialog ownership and responsive layouts.
 
 The resume picker uses compact rows separated by rules, without individual card outlines. Group variant, difficulty and source together, align progress and elapsed time for scanning, and make the entire row the resume target. Start timestamps remain secondary. Narrow screens stack metadata without clipping it, and all colors use the shared light/dark palette.
