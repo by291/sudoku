@@ -4,6 +4,8 @@ A native, offline Chinese Sudoku client using Compose and the shared synchronous
 
 The Gradle project is named `sudoku`; the application ID and base Kotlin namespace are `dev.sudoku.app`. The player-facing Chinese name remains 一格一念. Builds with this application ID install separately from earlier package identities; transfer existing local progress through backup export and import.
 
+Debug builds use application ID `dev.sudoku.app.debug` and launcher name 一格一念 Debug, allowing installation alongside release builds. Both variants keep the Kotlin namespace `dev.sudoku.app` and have separate local data.
+
 ## Build requirements
 
 - JDK 21, the checked-in Gradle wrapper, Android SDK platform 37, and NDK `29.0.14206865`.

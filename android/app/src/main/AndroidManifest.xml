@@ -3,7 +3,7 @@
     <application
         android:name=".SudokuApplication"
         android:allowBackup="false"
-        android:label="一格一念"
+        android:label="@string/app_name"
         android:theme="@style/Theme.Sudoku"
         android:supportsRtl="true">
         <activity

@@ -40,6 +40,9 @@ android {
         assets.directories.add(file("../core/domain/src/test/resources").absolutePath)
     }
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
