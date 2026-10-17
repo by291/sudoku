@@ -63,6 +63,60 @@ class GameControllerTest {
     }
 
     @Test
+    fun leavingAnActiveGameDoesNotPublishPreparationFeedback() = runTest {
+        val repository = ControllerRepository()
+        val controller = GameController(
+            ControllerEngine(),
+            repository,
+            backgroundScope,
+            "saved",
+            {},
+            { testScheduler.currentTime }
+        )
+        controller.open(GameLaunch.Resume("saved"))
+        runCurrent()
+        controller.resume()
+        runCurrent()
+        val messages = mutableListOf<String?>()
+        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            controller.uiState.collect { messages += it.message }
+        }
+
+        assertTrue(controller.leave())
+        runCurrent()
+
+        assertTrue("Leaving must not insert a cancellation caption above the board", messages.all { it == null })
+        assertEquals(GamePhase.PAUSED, controller.uiState.value.phase)
+    }
+
+    @Test
+    fun failedLeaveKeepsTheSessionPausedAndCanBeRetried() = runTest {
+        val repository = ControllerRepository()
+        val controller = GameController(
+            ControllerEngine(),
+            repository,
+            backgroundScope,
+            "saved",
+            {},
+            { testScheduler.currentTime }
+        )
+        controller.open(GameLaunch.Resume("saved"))
+        runCurrent()
+        controller.resume()
+        runCurrent()
+        repository.ownershipLost = true
+
+        assertFalse(controller.leave())
+        assertEquals(GamePhase.PAUSED, controller.uiState.value.phase)
+        assertEquals("saved", controller.uiState.value.session?.id)
+        assertEquals(null, controller.uiState.value.message)
+        assertTrue(controller.uiState.value.error != null)
+
+        repository.ownershipLost = false
+        assertTrue(controller.leave())
+    }
+
+    @Test
     fun oldGeneratedNotesCannotOverwriteANewerEntryOrAddAssistance() = runTest {
         val repository = ControllerRepository()
         val prepared = ControllerPrepared()

@@ -194,9 +194,14 @@ internal class GameController(
     }
 
     fun cancelPreparation() {
+        // A transition may still be flushing the old save before it publishes PREPARING.
+        // Always fence that work, but show cancellation feedback only for an actual preparation.
         transitionGeneration += 1
         transition?.cancel()
         transition = null
+        if (mutableState.value.phase != GamePhase.PREPARING) {
+            return
+        }
         update {
             if (it.preparationCommitting) {
                 it.copy(phase = GamePhase.PREPARING, message = "正在完成已开始的保存，完成后对局将保持暂停。")
