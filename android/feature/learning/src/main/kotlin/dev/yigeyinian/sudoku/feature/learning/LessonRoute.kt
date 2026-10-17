@@ -18,7 +18,13 @@ fun LessonRoute(lessonId: String, onPractice: (GameLaunch.Practice) -> Unit, onB
 
     LessonScreen(
         // A shared preloaded directory must never appear as an initialized lesson interaction.
-        state = if (state.lessonId == lessonId) state else state.copy(loading = true),
+        state = if (state.lessonId ==
+            lessonId
+        ) {
+            state
+        } else {
+            LearningUiState(lessonId = lessonId, directory = state.directory)
+        },
         onCell = model::selectCell,
         onDigit = model::enterDigit,
         onSubmit = model::submit,

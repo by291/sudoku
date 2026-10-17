@@ -49,6 +49,8 @@ internal data class LearningUiState(
     val error: String? = null
 ) {
     val lesson get() = lessonId?.let { catalogue?.lesson(it) }
+    val lessonEntry get() = directory.firstOrNull { it.id == lessonId }
+    val exerciseReady get() = !loading && epoch != null && cursor != null
     val stage get() = cursor?.let { lesson?.stages?.getOrNull(it.stageIndex) }
     val completedIds get() = progress.map { it.lessonId }.toSet()
 }
@@ -86,6 +88,7 @@ internal class LearningViewModel @Inject constructor(
         generation++
         loader.invalidate()
         mutableState.value = LearningUiState(
+            catalogue = mutableState.value.catalogue,
             directory = loader.snapshot.directory,
             selectedVariant = mutableState.value.selectedVariant,
             lessonId = requestedLessonId
@@ -102,25 +105,32 @@ internal class LearningViewModel @Inject constructor(
             mutableState.value.copy(error = null)
         } else {
             LearningUiState(
+                catalogue = mutableState.value.catalogue.takeIf { mutableState.value.lessonId == lessonId },
                 selectedVariant = mutableState.value.selectedVariant,
                 lessonId = lessonId,
                 directory = loader.snapshot.directory
             )
         }
         loading = viewModelScope.launch {
-            val currentEpoch = repository.readDatasetEpoch()
-            if (operation != generation) return@launch
-            if (currentEpoch is StorageOutcome.Success && mutableState.value.epoch != null &&
-                currentEpoch.value != mutableState.value.epoch
-            ) {
-                loader.invalidate()
-                mutableState.value = LearningUiState(
-                    directory = loader.snapshot.directory,
-                    selectedVariant = mutableState.value.selectedVariant,
-                    lessonId = lessonId
-                )
+            // A directory refresh may retain personal facts, but lesson entry starts without them.
+            if (lessonId == null) {
+                val currentEpoch = repository.readDatasetEpoch()
+                if (operation != generation) return@launch
+                if (currentEpoch is StorageOutcome.Success && mutableState.value.epoch != null &&
+                    currentEpoch.value != mutableState.value.epoch
+                ) {
+                    loader.invalidate()
+                    mutableState.value = LearningUiState(
+                        directory = loader.snapshot.directory,
+                        selectedVariant = mutableState.value.selectedVariant
+                    )
+                }
             }
-            val loaded = loader.read(lessonId)
+            val loaded = loader.read(lessonId) { catalogue ->
+                if (operation == generation) {
+                    mutableState.value = mutableState.value.copy(catalogue = catalogue)
+                }
+            }
             if (operation != generation) {
                 return@launch
             }
@@ -172,7 +182,7 @@ internal class LearningViewModel @Inject constructor(
     }
 
     fun startExercise() {
-        if (mutableState.value.stage != null && !mutableState.value.busy) {
+        if (mutableState.value.exerciseReady && mutableState.value.stage != null && !mutableState.value.busy) {
             mutableState.value = mutableState.value.copy(exerciseStarted = true, error = null)
         }
     }

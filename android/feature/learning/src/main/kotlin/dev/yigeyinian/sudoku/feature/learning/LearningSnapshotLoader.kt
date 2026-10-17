@@ -4,6 +4,7 @@ import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.GameRepository
 import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.learning.LearningContentRepository
+import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.async
@@ -24,37 +25,48 @@ class LearningSnapshotLoader @Inject constructor(
         snapshot = LearningUiState(directory = content.directory)
     }
     private val reads = Mutex()
-    internal suspend fun read(lessonId: String? = null): LearningUiState = reads.withLock {
-        val result = coroutineScope {
-            val epoch = repository.readDatasetEpoch()
-            val catalogueRead = async { lessonId?.let { content.loadLesson(it) } }
-            val settingsRead = async { repository.readSettings() }
-            val progressRead = async { repository.readLessonProgress() }
-            val catalogue = catalogueRead.await()
-            val settings = settingsRead.await()
-            val progress = progressRead.await()
-            val currentEpoch = repository.readDatasetEpoch()
-            when {
-                epoch !is StorageOutcome.Success || currentEpoch !is StorageOutcome.Success ||
-                    settings !is StorageOutcome.Success || progress !is StorageOutcome.Success ->
-                    LearningUiState(loading = false, error = "学习进度暂时无法读取，请重试。")
-                epoch.value != currentEpoch.value ->
-                    LearningUiState(loading = false, error = "本地资料已更新，请重新读取课程。")
-                lessonId != null && catalogue !is EngineOutcome.Completed ->
-                    LearningUiState(loading = false, error = contentFailure(checkNotNull(catalogue)))
-                else -> LearningUiState(
-                    loading = false,
-                    catalogue = (catalogue as? EngineOutcome.Completed)?.value,
-                    directory = content.directory,
-                    settings = settings.value,
-                    progress = progress.value,
-                    epoch = epoch.value
-                )
+    internal suspend fun read(
+        lessonId: String? = null,
+        onLessonLoaded: (LessonCatalogue) -> Unit = {}
+    ): LearningUiState = coroutineScope {
+        // Bundled teaching content is independent of the personal dataset and its read lock.
+        // Publish it early, but only the complete snapshot below may authorize an exercise.
+        val catalogueRead = async {
+            lessonId?.let { content.loadLesson(it) }.also { result ->
+                if (result is EngineOutcome.Completed) onLessonLoaded(result.value)
             }
         }
-        // Publish only a complete epoch-consistent snapshot, never partial or cancelled reads.
-        snapshot = result.copy(catalogue = null, directory = content.directory)
-        result.copy(directory = content.directory)
+        reads.withLock {
+            val result = coroutineScope {
+                val epoch = repository.readDatasetEpoch()
+                val settingsRead = async { repository.readSettings() }
+                val progressRead = async { repository.readLessonProgress() }
+                val catalogue = catalogueRead.await()
+                val settings = settingsRead.await()
+                val progress = progressRead.await()
+                val currentEpoch = repository.readDatasetEpoch()
+                when {
+                    epoch !is StorageOutcome.Success || currentEpoch !is StorageOutcome.Success ||
+                        settings !is StorageOutcome.Success || progress !is StorageOutcome.Success ->
+                        LearningUiState(loading = false, error = "学习进度暂时无法读取，请重试。")
+                    epoch.value != currentEpoch.value ->
+                        LearningUiState(loading = false, error = "本地资料已更新，请重新读取课程。")
+                    lessonId != null && catalogue !is EngineOutcome.Completed ->
+                        LearningUiState(loading = false, error = contentFailure(checkNotNull(catalogue)))
+                    else -> LearningUiState(
+                        loading = false,
+                        catalogue = (catalogue as? EngineOutcome.Completed)?.value,
+                        directory = content.directory,
+                        settings = settings.value,
+                        progress = progress.value,
+                        epoch = epoch.value
+                    )
+                }
+            }
+            // Publish only a complete epoch-consistent snapshot, never partial or cancelled reads.
+            snapshot = result.copy(catalogue = null, directory = content.directory)
+            result.copy(directory = content.directory)
+        }
     }
 }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -100,6 +101,7 @@ internal fun LessonScreen(
 ) {
     val showLoading = rememberDelayedProgress(state.loading)
     val lesson = state.lesson
+    val entry = state.lessonEntry
     val stage = if (state.exerciseStarted) state.stage else lesson?.guided
     var zoomed by remember(state.lessonId) { mutableStateOf(false) }
     val digitKeys = remember {
@@ -139,23 +141,20 @@ internal fun LessonScreen(
             Column(Modifier.widthIn(max = 560.dp).fillMaxSize().then(keyboard)) {
                 LessonHeader(state, onBack, { zoomed = true }, onPractice)
                 when {
-                    state.loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        if (showLoading) CircularProgressIndicator()
-                    }
-                    lesson == null || stage == null -> Column(Modifier.padding(20.dp)) {
+                    entry == null -> Column(Modifier.padding(20.dp)) {
                         Text(state.error ?: "找不到这节课程。", color = MaterialTheme.colorScheme.error)
                         OutlinedButton(onClick = onRetry) { Text("重新读取课程") }
                     }
                     else -> {
                         Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)) {
-                            LessonModeTabs(state.exerciseStarted, !state.busy, onGuide, onStart)
+                            LessonModeTabs(state.exerciseStarted, state.exerciseReady && !state.busy, onGuide, onStart)
                         }
                         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                             val density = LocalDensity.current
                             val measurer = rememberTextMeasurer()
                             val textWidth = with(density) { (maxWidth - 64.dp).roundToPx().coerceAtLeast(1) }
                             val introduction = measurer.measure(
-                                lesson.introduction,
+                                entry.introduction,
                                 MaterialTheme.typography.bodyMedium,
                                 constraints = Constraints(maxWidth = textWidth)
                             )
@@ -172,7 +171,7 @@ internal fun LessonScreen(
                                 with(density) { (introduction.size.height + heading.size.height).toDp() } + 32.dp
                             )
                             val scroll = rememberScrollState()
-                            var retainedHeight by remember(lesson.id, maxWidth, density) { mutableIntStateOf(0) }
+                            var retainedHeight by remember(entry.id, maxWidth, density) { mutableIntStateOf(0) }
                             // Keep the visited scroll extent when the other tab has a shorter explanation/input area.
                             // Otherwise ScrollState clamps its offset and moves the board during the switch.
                             Column(
@@ -185,19 +184,45 @@ internal fun LessonScreen(
                                 if (state.exerciseStarted) {
                                     ExerciseMessage(state, messageHeight)
                                 } else {
-                                    LessonPrinciple(lesson, messageHeight)
+                                    LessonPrinciple(entry.introduction, messageHeight)
                                 }
                                 LessonBoardHeading(state) { zoomed = true }
-                                LessonBoard(stage, state, onCell, Modifier.fillMaxWidth().testTag("lesson-board"))
+                                Box(
+                                    Modifier.fillMaxWidth().aspectRatio(1f).testTag("lesson-board"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (stage != null) {
+                                        LessonBoard(stage, state, onCell, Modifier.fillMaxWidth())
+                                    } else {
+                                        Surface(
+                                            Modifier.fillMaxSize(),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(
+                                                1.dp,
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                            )
+                                        ) { }
+                                        if (showLoading) CircularProgressIndicator()
+                                        if (state.error != null) {
+                                            Column(
+                                                Modifier.padding(20.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Text(state.error, color = MaterialTheme.colorScheme.error)
+                                                TextButton(onClick = onRetry) { Text("重新读取课程") }
+                                            }
+                                        }
+                                    }
+                                }
                                 Spacer(Modifier.height(12.dp))
                                 if (state.exerciseStarted) {
                                     ExerciseInput(state, onDigit, onClear)
-                                } else {
+                                } else if (lesson != null) {
                                     LessonExplanation(lesson)
                                 }
                             }
                         }
-                        LessonPrimaryAction(state, onStart, onSubmit, onNext)
+                        LessonPrimaryAction(state, onStart, onSubmit, onNext, onRetry)
                     }
                 }
             }
@@ -246,6 +271,7 @@ private fun LessonHeader(
 ) {
     var menuOpen by remember(state.lessonId) { mutableStateOf(false) }
     val lesson = state.lesson
+    val entry = state.lessonEntry
     TopAppBar(
         modifier = Modifier.testTag("lesson-header"),
         windowInsets = WindowInsets(0, 0, 0, 0),
@@ -258,19 +284,17 @@ private fun LessonHeader(
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    lesson?.title ?: "课程",
+                    entry?.title ?: "课程",
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.semantics { heading() }
                 )
-                if (lesson != null) {
-                    val courseLessons = state.catalogue?.lessons.orEmpty().filter {
-                        it.practiceVariant == lesson.practiceVariant
-                    }
-                    val number = (courseLessons.indexOfFirst { it.id == lesson.id } + 1).toString().padStart(2, '0')
+                if (entry != null) {
+                    val courseLessons = state.directory.filter { it.practiceVariant == entry.practiceVariant }
+                    val number = (courseLessons.indexOfFirst { it.id == entry.id } + 1).toString().padStart(2, '0')
                     Text(
-                        "${variantLabel(lesson.practiceVariant)} · 第 $number 课",
+                        "${variantLabel(entry.practiceVariant)} · 第 $number 课",
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -341,7 +365,7 @@ private fun LessonModeTabs(exercise: Boolean, enabled: Boolean, onGuide: () -> U
 }
 
 @Composable
-private fun LessonPrinciple(lesson: Lesson, height: Dp) {
+private fun LessonPrinciple(introduction: String, height: Dp) {
     Surface(
         Modifier.fillMaxWidth().height(height),
         shape = RoundedCornerShape(18.dp),
@@ -359,7 +383,7 @@ private fun LessonPrinciple(lesson: Lesson, height: Dp) {
                     style = MaterialTheme.typography.titleSmall
                 )
             }
-            Text(lesson.introduction, style = MaterialTheme.typography.bodyMedium)
+            Text(introduction, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -384,15 +408,15 @@ private fun LessonExplanation(lesson: Lesson) {
 
 @Composable
 private fun LessonBoardHeading(state: LearningUiState, onZoom: () -> Unit) {
-    val lesson = state.lesson ?: return
+    val lesson = state.lesson
     val index = state.cursor?.stageIndex ?: 0
-    val focusedCount = lesson.exercises.first().stages.size
-    val title = if (state.exerciseStarted) {
+    val focusedCount = lesson?.exercises?.first()?.stages?.size ?: 0
+    val title = if (state.exerciseStarted && lesson != null) {
         lesson.exercises[if (index < focusedCount) 0 else 1].title
     } else {
         "示例棋盘"
     }
-    val detail = if (state.exerciseStarted) "第${index + 1} / ${lesson.stages.size}阶段" else "推理依据已标记"
+    val detail = if (state.exerciseStarted) "第${index + 1} / ${lesson?.stages?.size ?: 0}阶段" else "推理依据已标记"
     Row(
         Modifier.fillMaxWidth().height(48.dp * LocalDensity.current.fontScale.coerceAtLeast(1f))
             .testTag("lesson-stage"),
@@ -412,7 +436,7 @@ private fun LessonBoardHeading(state: LearningUiState, onZoom: () -> Unit) {
             maxLines = 1,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        IconButton(onClick = onZoom) { Icon(Icons.Outlined.Fullscreen, "放大棋盘") }
+        IconButton(onClick = onZoom, enabled = lesson != null) { Icon(Icons.Outlined.Fullscreen, "放大棋盘") }
     }
 }
 
@@ -485,10 +509,20 @@ private fun ExerciseInput(state: LearningUiState, onDigit: (Int) -> Unit, onClea
 }
 
 @Composable
-private fun LessonPrimaryAction(state: LearningUiState, onStart: () -> Unit, onSubmit: () -> Unit, onNext: () -> Unit) {
+private fun LessonPrimaryAction(
+    state: LearningUiState,
+    onStart: () -> Unit,
+    onSubmit: () -> Unit,
+    onNext: () -> Unit,
+    onRetry: () -> Unit
+) {
     val showSaving = rememberDelayedProgress(state.busy)
+    val showReading = rememberDelayedProgress(state.loading && state.lesson != null)
     val correct = state.feedback?.correct == true
+    val retry = !state.loading && state.error != null && !state.exerciseReady
     val label = when {
+        retry -> "重试读取课程"
+        showReading -> "正在读取进度…"
         !state.exerciseStarted -> when {
             state.feedback != null || state.placement != null || state.removals.isNotEmpty() -> "返回当前练习"
             (state.cursor?.stageIndex ?: 0) > 0 -> "继续第${(state.cursor?.stageIndex ?: 0) + 1}阶段"
@@ -500,6 +534,7 @@ private fun LessonPrimaryAction(state: LearningUiState, onStart: () -> Unit, onS
         else -> "提交答案"
     }
     val action = when {
+        retry -> onRetry
         !state.exerciseStarted -> onStart
         correct -> onNext
         else -> onSubmit
@@ -511,7 +546,7 @@ private fun LessonPrimaryAction(state: LearningUiState, onStart: () -> Unit, onS
     }
     Button(
         onClick = action,
-        enabled = !state.busy,
+        enabled = !state.busy && (state.exerciseReady || retry),
         colors = ButtonDefaults.buttonColors(
             disabledContainerColor = MaterialTheme.colorScheme.primary,
             disabledContentColor = MaterialTheme.colorScheme.onPrimary

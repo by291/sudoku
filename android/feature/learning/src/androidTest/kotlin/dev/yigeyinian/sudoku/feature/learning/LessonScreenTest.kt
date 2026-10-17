@@ -28,6 +28,7 @@ import dev.yigeyinian.sudoku.model.ThemePreference
 import dev.yigeyinian.sudoku.model.learning.ExerciseAnswer
 import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 import dev.yigeyinian.sudoku.model.learning.LessonCursor
+import dev.yigeyinian.sudoku.model.learning.directoryEntry
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -40,17 +41,18 @@ class LessonScreenTest {
     private var nextActions = 0
     private var practice: GameLaunch.Practice? = null
 
-    private fun showLesson(id: String = "naked-single"): MutableState<LearningUiState> {
+    private fun showLesson(id: String = "naked-single", pending: Boolean = false): MutableState<LearningUiState> {
         val content = InstrumentationRegistry.getInstrumentation().context.assets
             .open("lessons/catalogue.json").bufferedReader().use { it.readText() }
         val catalogue = LessonCatalogue.decode(content)
         val state = mutableStateOf(
             LearningUiState(
-                loading = false,
-                catalogue = catalogue,
+                loading = pending,
+                catalogue = if (pending) null else catalogue,
+                directory = catalogue.lessons.map { it.directoryEntry() },
                 lessonId = id,
-                cursor = LessonCursor(id, 0),
-                epoch = 0
+                cursor = if (pending) null else LessonCursor(id, 0),
+                epoch = if (pending) null else 0
             )
         )
         compose.setContent {
@@ -120,6 +122,34 @@ class LessonScreenTest {
             screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream)
         }
         screenshot.recycle()
+    }
+
+    @Test
+    fun delayedLessonPreservesHeaderTabsBoardAndActionBounds() {
+        val state = showLesson("rules", pending = true)
+        compose.onNodeWithText("认识数独").assertIsDisplayed()
+        compose.onNodeWithText("学习讲解").assertIsDisplayed()
+        compose.onNodeWithTag("start-exercise").assertIsNotEnabled()
+        capture("lesson-loading")
+        val board = compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot
+        val header = compose.onNodeWithTag("lesson-header").fetchSemanticsNode().boundsInRoot
+        val action = compose.onNodeWithTag("start-exercise").fetchSemanticsNode().boundsInRoot
+        val content = InstrumentationRegistry.getInstrumentation().context.assets
+            .open("lessons/catalogue.json").bufferedReader().use { it.readText() }
+        val catalogue = LessonCatalogue.decode(content)
+
+        compose.runOnIdle { state.value = state.value.copy(catalogue = catalogue) }
+        compose.onNodeWithTag("start-exercise").assertIsNotEnabled()
+        assertEquals(board, compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot)
+        compose.runOnIdle {
+            state.value =
+                state.value.copy(loading = false, epoch = 0, cursor = LessonCursor("rules", 0))
+        }
+
+        assertEquals(board, compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot)
+        capture("lesson-loaded")
+        assertEquals(header, compose.onNodeWithTag("lesson-header").fetchSemanticsNode().boundsInRoot)
+        assertEquals(action, compose.onNodeWithTag("start-exercise").fetchSemanticsNode().boundsInRoot)
     }
 
     @Test

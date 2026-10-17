@@ -36,6 +36,80 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LearningViewModelTest {
+    @Test
+    fun `lesson content is visible while durable progress is still pending`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val backing = LearningRepository()
+            val progressGate = CompletableDeferred<Unit>()
+            val repository = object : GameRepository by backing {
+                override suspend fun readLessonProgress(): StorageOutcome<List<LessonProgress>> {
+                    progressGate.await()
+                    return backing.readLessonProgress()
+                }
+            }
+            val courses = catalogue()
+            val model =
+                LearningViewModel(
+                    repository,
+                    LearningSnapshotLoader(
+                        repository,
+                        object : LearningContentRepository {
+                            override val directory = courses.lessons.map { it.directoryEntry() }
+                            override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
+                        }
+                    )
+                )
+
+            model.open("rules")
+            runCurrent()
+
+            assertNotNull(model.uiState.value.lesson)
+            assertTrue(model.uiState.value.loading)
+            assertEquals(null, model.uiState.value.epoch)
+            model.startExercise()
+            assertFalse(model.uiState.value.exerciseStarted)
+
+            progressGate.complete(Unit)
+            advanceUntilIdle()
+
+            assertFalse(model.uiState.value.loading)
+            assertEquals(0L, model.uiState.value.epoch)
+            model.startExercise()
+            assertTrue(model.uiState.value.exerciseStarted)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `personal read failure keeps the guide visible without permitting exercises`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = LearningRepository()
+            repository.failProgress = true
+            val model = model(repository)
+
+            model.open("rules")
+            advanceUntilIdle()
+
+            assertNotNull(model.uiState.value.lesson)
+            assertNotNull(model.uiState.value.error)
+            assertEquals(null, model.uiState.value.epoch)
+            model.startExercise()
+            assertFalse(model.uiState.value.exerciseStarted)
+            val lesson = model.uiState.value.lesson
+
+            repository.failProgress = false
+            model.open("rules")
+            assertEquals(lesson, model.uiState.value.lesson)
+            advanceUntilIdle()
+            assertTrue(model.uiState.value.exerciseReady)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test fun `dataset replacement clears personal progress even if subsequent progress reads fail`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
