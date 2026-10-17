@@ -22,6 +22,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
@@ -60,9 +61,13 @@ internal fun SudokuApp(activity: MainActivity) {
     }
 
     fun back() {
-        // Predictive Back previews the preceding entry, so completion must pop that same stack.
-        if (backStack.size > 1) {
-            backStack.removeLastOrNull()
+        val current = backStack.lastOrNull() as? AppRoute
+        if (current != null && current != AppRoute.Home) {
+            if (current.isPrimaryDestination) {
+                primary(AppRoute.Home)
+            } else {
+                backStack.removeLastOrNull()
+            }
         }
     }
 
@@ -85,21 +90,19 @@ internal fun SudokuApp(activity: MainActivity) {
                     if (!state.loading) Button(onClick = model::retry) { Text("重试") }
                 }
             } else {
-                NavDisplay(
+                val entries = rememberDecoratedNavEntries(
                     backStack = backStack,
-                    onBack = ::back,
                     entryDecorators = listOf(
                         rememberSaveableStateHolderNavEntryDecorator(),
                         rememberViewModelStoreNavEntryDecorator()
                     ),
-                    modifier = Modifier.fillMaxSize(),
                     entryProvider = entryProvider {
                         entry<AppRoute.Home> {
                             DestinationShell(
                                 AppRoute.Home,
                                 state.settings.theme,
                                 state.error,
-                                ::primary,
+                                ::back,
                                 model::setTheme,
                                 model::retry
                             ) {
@@ -116,7 +119,7 @@ internal fun SudokuApp(activity: MainActivity) {
                                 AppRoute.Learning,
                                 state.settings.theme,
                                 state.error,
-                                ::primary,
+                                ::back,
                                 model::setTheme,
                                 model::retry
                             ) {
@@ -128,7 +131,7 @@ internal fun SudokuApp(activity: MainActivity) {
                                 AppRoute.Daily,
                                 state.settings.theme,
                                 state.error,
-                                ::primary,
+                                ::back,
                                 model::setTheme,
                                 model::retry
                             ) {
@@ -140,7 +143,7 @@ internal fun SudokuApp(activity: MainActivity) {
                                 AppRoute.Records,
                                 state.settings.theme,
                                 state.error,
-                                ::primary,
+                                ::back,
                                 model::setTheme,
                                 model::retry
                             ) {
@@ -162,6 +165,16 @@ internal fun SudokuApp(activity: MainActivity) {
                         }
                     }
                 )
+                // Retain visited roots for filters/scroll, but expose only Home and the active
+                // workflow to Back. Hidden roots must never appear in predictive Back previews.
+                val activeRootIndex = backStack.indexOfLast { (it as? AppRoute)?.isPrimaryDestination == true }
+                val activeEntries = entries.drop(activeRootIndex)
+                val visibleEntries = if (backStack[activeRootIndex] == AppRoute.Home) {
+                    activeEntries
+                } else {
+                    listOf(entries[backStack.indexOf(AppRoute.Home)]) + activeEntries
+                }
+                NavDisplay(entries = visibleEntries, onBack = ::back, modifier = Modifier.fillMaxSize())
             }
         }
     }

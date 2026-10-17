@@ -2,14 +2,17 @@ package dev.yigeyinian.sudoku
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.pressBack
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dev.yigeyinian.sudoku.model.Difficulty
@@ -142,16 +145,56 @@ class PlayerWorkflowTest {
     }
 
     @Test
-    fun retainsTheRecordsFilterAcrossPrimaryNavigation() {
-        compose.onNodeWithText("记录", useUnmergedTree = true).performClick()
+    fun retainsTheRecordsFilterWhenReturningThroughHome() {
+        compose.onNodeWithText("我的记录").performScrollTo().performClick()
         awaitText("杀手数独")
         compose.onNodeWithText("杀手数独").performScrollTo().performClick()
-        compose.onNodeWithText("首页", useUnmergedTree = true).performClick()
+        compose.onNodeWithContentDescription("返回首页").performClick()
         awaitText("开始数独")
 
-        compose.onNodeWithText("记录", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("我的记录").performScrollTo().performClick()
         awaitText("杀手数独")
         compose.onNodeWithText("杀手数独").assertIsSelected()
+    }
+
+    @Test
+    fun showsAllHomeEntriesAndContinueWithinTheInitialViewport() {
+        val viewport = compose.onRoot().getUnclippedBoundsInRoot()
+
+        listOf("开始数独", "继续上次", "每日挑战", "学习数独", "我的记录").forEach { label ->
+            val entry = compose.onNodeWithText(label)
+            entry.assertIsDisplayed()
+
+            val bounds = entry.getUnclippedBoundsInRoot()
+            assertTrue(
+                "$label must be fully visible without scrolling",
+                bounds.top >= viewport.top && bounds.bottom <= viewport.bottom
+            )
+        }
+    }
+
+    @Test
+    fun opensEveryWorkflowFromHomeAndReturnsWithoutTabNavigation() {
+        compose.onNodeWithText("首页", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("学习", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("每日", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("记录", useUnmergedTree = true).assertDoesNotExist()
+
+        compose.onNodeWithText("每日挑战").performScrollTo().performClick()
+        awaitText("进入所选挑战")
+        compose.onNodeWithContentDescription("返回首页").performClick()
+        awaitText("开始数独")
+
+        compose.onNodeWithText("学习数独").performScrollTo().performClick()
+        awaitText("每一步，都有理由。")
+        pressBack()
+        awaitText("开始数独")
+
+        compose.onNodeWithText("我的记录").performScrollTo().performClick()
+        awaitText("杀手数独")
+        pressBack()
+        awaitText("开始数独")
+        compose.onNodeWithContentDescription("返回首页").assertDoesNotExist()
     }
 
     private fun awaitText(text: String) {
