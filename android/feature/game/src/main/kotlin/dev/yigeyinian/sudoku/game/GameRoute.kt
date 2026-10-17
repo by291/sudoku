@@ -64,6 +64,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,7 +105,6 @@ fun GameRoute(
     // Keep the outgoing scene stable while saving and throughout the navigation transition.
     val state = departureState ?: currentState
     val scope = rememberCoroutineScope()
-    val showPreparation = rememberDelayedProgress(state.phase == GamePhase.PREPARING)
     var menuOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var restartOpen by remember { mutableStateOf(false) }
@@ -297,25 +298,9 @@ fun GameRoute(
                 verticalArrangement = Arrangement.spacedBy(8.dp, BiasAlignment.Vertical(-0.2f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (showPreparation) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CircularProgressIndicator(Modifier.size(24.dp))
-                        Text(
-                            if (state.preparationCommitting) "正在保存新对局…" else "正在生成并验证唯一解…",
-                            Modifier.weight(1f)
-                        )
-                        TextButton(onClick = model::cancelPreparation, enabled = !state.preparationCommitting) {
-                            Text("取消")
-                        }
-                    }
-                }
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                if (state.session == null && state.phase != GamePhase.PREPARING) {
-                    Button(onClick = { model.startNew(launch) }) { Text("重试") }
+                if (state.session != null) {
+                    state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val expanded = maxWidth >= 600.dp
@@ -327,7 +312,14 @@ fun GameRoute(
                         ) {
                             Column(Modifier.width(boardSize)) {
                                 BoardStatus(state)
-                                BoardWorkspace(state, model::selectCell, model::resume, Modifier.fillMaxWidth())
+                                BoardWorkspace(
+                                    state,
+                                    model::selectCell,
+                                    model::resume,
+                                    model::cancelPreparation,
+                                    { model.startNew(launch) },
+                                    Modifier.fillMaxWidth()
+                                )
                             }
                             GameInputPanel(state, model, { menuOpen = true }, moreMenu, Modifier.weight(1f))
                         }
@@ -339,7 +331,14 @@ fun GameRoute(
                         ) {
                             Column {
                                 BoardStatus(state)
-                                BoardWorkspace(state, model::selectCell, model::resume, Modifier.fillMaxWidth())
+                                BoardWorkspace(
+                                    state,
+                                    model::selectCell,
+                                    model::resume,
+                                    model::cancelPreparation,
+                                    { model.startNew(launch) },
+                                    Modifier.fillMaxWidth()
+                                )
                             }
                             GameInputPanel(state, model, { menuOpen = true }, moreMenu, Modifier.fillMaxWidth())
                         }
@@ -408,7 +407,14 @@ fun GameRoute(
                 ) {
                     Text("检查棋盘", style = MaterialTheme.typography.titleLarge)
                     Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                        BoardWorkspace(state, model::selectCell, model::resume, Modifier.width(540.dp))
+                        BoardWorkspace(
+                            state,
+                            model::selectCell,
+                            model::resume,
+                            model::cancelPreparation,
+                            { model.startNew(launch) },
+                            Modifier.width(540.dp)
+                        )
                     }
                     Text(selectedDescription(state))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -453,10 +459,23 @@ fun GameRoute(
 }
 
 @Composable
-private fun BoardWorkspace(state: GameUiState, onSelect: (Int) -> Unit, onResume: () -> Unit, modifier: Modifier) {
-    val session = state.session ?: return
-    Box(modifier.widthIn(max = 620.dp), contentAlignment = Alignment.Center) {
-        if (state.phase == GamePhase.PAUSED || state.phase == GamePhase.PREPARING) {
+private fun BoardWorkspace(
+    state: GameUiState,
+    onSelect: (Int) -> Unit,
+    onResume: () -> Unit,
+    onCancelPreparation: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier
+) {
+    val session = state.session
+    // Reserve the final square before a session exists; loading feedback never adds an outer row.
+    Box(
+        modifier.widthIn(max = 620.dp).aspectRatio(1f).testTag("game-board-workspace"),
+        contentAlignment = Alignment.Center
+    ) {
+        if (session == null || state.phase == GamePhase.PREPARING) {
+            BoardPreparation(state, onCancelPreparation, onRetry)
+        } else if (state.phase == GamePhase.PAUSED) {
             androidx.compose.material3.Surface(
                 Modifier.fillMaxWidth().aspectRatio(1f),
                 shape = MaterialTheme.shapes.medium,
@@ -508,13 +527,45 @@ private fun BoardWorkspace(state: GameUiState, onSelect: (Int) -> Unit, onResume
 }
 
 @Composable
+private fun BoardPreparation(state: GameUiState, onCancel: () -> Unit, onRetry: () -> Unit) {
+    val showProgress = rememberDelayedProgress(state.phase == GamePhase.PREPARING)
+    androidx.compose.material3.Surface(
+        Modifier.fillMaxSize(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (showProgress) {
+                    CircularProgressIndicator(Modifier.size(24.dp))
+                    Text(if (state.preparationCommitting) "正在保存新对局…" else "正在准备对局…")
+                    TextButton(onClick = onCancel, enabled = !state.preparationCommitting) { Text("取消") }
+                }
+                if (state.session == null) {
+                    state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    if (state.phase != GamePhase.PREPARING && (state.error != null || state.message != null)) {
+                        Button(onClick = onRetry) { Text("重试") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun BoardStatus(state: GameUiState) {
     val showConflicts = rememberDelayedProgress(state.conflictPending)
     val showNotes = rememberDelayedProgress(state.notesPending)
     val showHint = rememberDelayedProgress(state.hintPending)
 
+    val statusLineHeight = with(LocalDensity.current) { MaterialTheme.typography.bodyLarge.lineHeight.toDp() }
     Row(
-        Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        Modifier.fillMaxWidth().padding(bottom = 12.dp).heightIn(min = statusLineHeight),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val daily = state.session?.metadata as? SessionMetadata.Daily

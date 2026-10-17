@@ -151,6 +151,66 @@ class PlayerWorkflowTest {
     }
 
     @Test
+    fun keepsKeysStationaryWhileTheSavedBoardLoads() {
+        val gate = CompletableDeferred<Unit>()
+        controlledEngine.preparationGate = gate
+        try {
+            compose.onNodeWithText("继续上次").performClick()
+            compose.waitUntil(20_000) { controlledEngine.preparationHeld }
+            compose.waitForIdle()
+            val boardBefore = compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            val keyBefore = compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
+            compose.onNodeWithContentDescription("填入数字2").assertIsNotEnabled()
+            compose.onNodeWithTag("cell-0").assertDoesNotExist()
+
+            awaitText("正在准备对局…")
+            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
+            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+
+            gate.complete(Unit)
+            controlledEngine.preparationGate = null
+            awaitText("继续对局")
+            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
+            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+
+            compose.onNodeWithText("继续对局").performClick()
+            compose.onNodeWithTag("cell-0").assertIsDisplayed()
+            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
+            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+        } finally {
+            gate.complete(Unit)
+            controlledEngine.preparationGate = null
+        }
+    }
+
+    @Test
+    fun cancelledPreparationRetainsTheBoardSpaceAndCanBeRetried() {
+        val gate = CompletableDeferred<Unit>()
+        controlledEngine.preparationGate = gate
+        try {
+            compose.onNodeWithText("继续上次").performClick()
+            awaitText("正在准备对局…")
+            val boardBefore = compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            val keyBefore = compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
+
+            compose.onNodeWithText("取消").performClick()
+            awaitText("已取消准备，现有进度保持不变。")
+            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
+            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+
+            gate.complete(Unit)
+            controlledEngine.preparationGate = null
+            compose.onNodeWithText("重试").performClick()
+            awaitText("继续对局")
+            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
+            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+        } finally {
+            gate.complete(Unit)
+            controlledEngine.preparationGate = null
+        }
+    }
+
+    @Test
     fun restoresPausedAndCompletesThroughTheNativeEntryAction() {
         compose.onNodeWithText("继续上次").performClick()
         awaitText("对局已暂停")
@@ -558,11 +618,15 @@ class PlayerWorkflowTest {
     }
 }
 
-/** Holds only conflict delivery so the real pending UI can be measured deterministically. */
+/** Gates native work so pending UI and loaded geometry can be compared deterministically. */
 private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEngine()) : SudokuEngine by native {
     @Volatile var conflictGate: CompletableDeferred<Unit>? = null
 
     @Volatile var conflictHeld: Boolean = false
+
+    @Volatile var preparationGate: CompletableDeferred<Unit>? = null
+
+    @Volatile var preparationHeld: Boolean = false
 
     @Volatile var validationGate: CompletableDeferred<Unit>? = null
 
@@ -576,8 +640,12 @@ private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEn
         native.validatePuzzle(content)
     }
 
-    override suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle> =
-        when (val result = native.prepare(rules)) {
+    override suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle> {
+        preparationGate?.let {
+            preparationHeld = true
+            it.await()
+        }
+        return when (val result = native.prepare(rules)) {
             is EngineOutcome.Completed -> EngineOutcome.Completed(
                 object : PreparedPuzzle by result.value {
                     override suspend fun conflicts(board: List<Int>) = run {
@@ -592,4 +660,5 @@ private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEn
             )
             else -> result
         }
+    }
 }
