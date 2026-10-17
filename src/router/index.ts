@@ -56,6 +56,16 @@ export const router = createRouter({
     },
     { path: '/play/daily', component: () => import('@/features/game/views/DailyView.vue') },
     { path: '/records', component: () => import('@/features/records/views/RecordsView.vue') },
+    {
+      path: '/records/:id',
+      component: () => import('@/features/records/views/ResultView.vue'),
+      meta: {
+        parentNavigation: (route) => ({
+          to: { path: '/records', query: { variant: route.query.variant, tab: 'history' } },
+          label: '返回完成历史',
+        }),
+      },
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

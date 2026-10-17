@@ -353,11 +353,12 @@ test('restores an explicit saved type even when the query chooses Classic and fi
   await enterGameDigit(page, 5)
   await expect(page.getByText('成绩已保存到本机。', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: '查看个人记录', exact: true }).click()
+  await page.getByRole('tab', { name: '完成历史', exact: true }).click()
   await expect(page.getByText('这个玩法还没有完成记录', { exact: false })).toBeVisible()
   await chooseVariant(page, '成绩玩法', '箭头数独')
-  await expect(
-    page.getByRole('heading', { name: '完成记录', exact: true }).locator('..'),
-  ).toContainText('箭头数独 · 自由游玩')
+  await expect(page.getByRole('region', { name: '完成历史', exact: true })).toContainText(
+    '箭头数独 · 自由游玩',
+  )
 })
 test('starts the supported practice tier for every course unit', async ({ page }) => {
   test.setTimeout(180000)

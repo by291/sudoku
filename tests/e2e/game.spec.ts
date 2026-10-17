@@ -120,7 +120,8 @@ test('completes once and displays the saved result', async ({ page }) => {
 
   expect(await countResults(page)).toBe(1)
   await page.getByRole('link', { name: '查看个人记录', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '完成记录' })).toBeVisible()
+  await page.getByRole('tab', { name: '完成历史', exact: true }).click()
+  await expect(page.getByRole('region', { name: '完成历史', exact: true })).toBeVisible()
   await expect(page.getByText('无辅助完成', { exact: true })).toBeVisible()
 })
 test('preserves edge selections when global arrows are used outside the board', async ({

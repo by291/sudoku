@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onScopeDispose, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef } from 'vue'
 import { RouterLink, useRouter, type UseLinkReturn } from 'vue-router'
-import { NAlert, NButton, NCard, NModal } from 'naive-ui'
+import { NAlert, NButton, NCard } from 'naive-ui'
+import ResponsiveDialog from '@/shared/components/ResponsiveDialog.vue'
+import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
-import { sessionLink, modeName } from '@/features/records/model/records'
+import {
+  sessionLink,
+  modeName,
+  sortSavedSessions,
+  summarizeSave,
+} from '@/features/records/model/records'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { getVariantPresentation } from '@/features/game/model/variants'
 import { getDailyStatuses } from '@/features/game/model/daily'
@@ -14,8 +21,14 @@ import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
 
 const router = useRouter()
 const records = useRecordsStore()
+const showLoading = useDelayedProgress(() => records.busy)
 const preferences = usePreferencesStore()
-const unfinished = computed(() => records.sessions.filter((record) => !record.session.completion))
+const unfinished = computed(() =>
+  sortSavedSessions(records.sessions.filter((record) => !record.session.completion)),
+)
+const resumeChoices = computed(() =>
+  unfinished.value.map(({ session }) => ({ session, summary: summarizeSave(session) })),
+)
 const dailyStatuses = computed(() =>
   getDailyStatuses(records.sessions, records.results, records.today),
 )
@@ -47,22 +60,24 @@ async function openSetup(mode: 'free' | 'daily', event: MouseEvent) {
   }
 
   event.preventDefault()
-  if (openingSetup) {
+  if (openingSetup || records.busy) {
     return
   }
 
-  if (event.currentTarget instanceof HTMLElement) {
-    event.currentTarget.focus()
-  }
+  const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  trigger?.focus()
 
   openingSetup = true
   try {
     await records.load()
+    await nextTick()
     // Leaving Home or a newer refresh must not publish a dialog from an outdated read.
     if (disposed || records.busy) {
       return
     }
 
+    // Loading temporarily disables the opener; restore it before the dialog captures focus.
+    trigger?.focus()
     setupMode.value = mode
   } finally {
     openingSetup = false
@@ -100,6 +115,10 @@ function resumeSelected() {
 }
 
 function continueLast(event: MouseEvent) {
+  if (records.busy) {
+    return
+  }
+
   if (event.currentTarget instanceof HTMLElement) {
     event.currentTarget.focus()
   }
@@ -132,34 +151,39 @@ onMounted(records.load)
 </script>
 <template>
   <div class="home-page">
-    <NModal
+    <ResponsiveDialog
       v-model:show="resumeOpen"
-      preset="card"
       title="继续上次"
-      aria-label="继续上次"
       class="resume-dialog"
-      style="width: min(640px, calc(100vw - 32px)); margin: 24px auto"
       @after-leave="restoreResumeFocus"
     >
-      <div class="resume-list">
+      <div class="resume-content">
+        <p class="resume-intro muted">选择一局继续，按开始时间从新到旧排列。</p>
+        <ul class="resume-list" aria-label="未完成的存档">
+          <li v-for="{ session, summary } in resumeChoices" :key="session.id">
+            <RouterLink :to="sessionLink(session)" class="resume-card" @click="resumeOpen = false">
+              <div class="resume-details">
+                <strong class="resume-title">
+                  {{ getVariantPresentation(session.puzzle.rules.kind).label }}
+                  <span class="resume-difficulty">{{
+                    DIFFICULTY_NAMES[session.puzzle.difficulty]
+                  }}</span>
+                </strong>
+                <p class="resume-source">{{ modeName(session) }}</p>
+                <p class="resume-progress">
+                  <span>{{ summary.progressLabel }}</span>
+                  <span>已用时 {{ formatDuration(session.elapsedMs) }}</span>
+                </p>
+                <p class="resume-start muted">
+                  开始于 <time :datetime="session.startedAt">{{ summary.startedAtLabel }}</time>
+                </p>
+              </div>
+              <span class="resume-action">继续 <span aria-hidden="true">→</span></span>
+            </RouterLink>
+          </li>
+        </ul>
+
         <RouterLink
-          v-for="{ session } in unfinished"
-          :key="session.id"
-          :to="sessionLink(session)"
-          class="panel resume-card"
-          @click="resumeOpen = false"
-          ><div>
-            <strong
-              >{{ getVariantPresentation(session.puzzle.rules.kind).label }} ·
-              {{ modeName(session) }}</strong
-            >
-            <p class="muted">
-              {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} · 已用时
-              {{ formatDuration(session.elapsedMs) }}
-            </p>
-          </div>
-          <span>继续 →</span></RouterLink
-        ><RouterLink
           v-if="preferences.settings.currentLessonId"
           v-slot="{ href, navigate }"
           :to="`/learn/${preferences.settings.currentLessonId}`"
@@ -175,7 +199,7 @@ onMounted(records.load)
           ></RouterLink
         >
       </div>
-    </NModal>
+    </ResponsiveDialog>
     <section class="home-intro">
       <div>
         <p class="eyebrow">一点逻辑 · 一点耐心</p>
@@ -184,7 +208,11 @@ onMounted(records.load)
           让数字各归其位，让思绪安静片刻。<br />从轻松一局开始，发现每一步的道理。
         </p>
         <div class="hero-actions">
-          <NButton type="primary" size="large" @click="openSetup('free', $event)"
+          <NButton
+            type="primary"
+            size="large"
+            :disabled="records.busy"
+            @click="openSetup('free', $event)"
             >开始一局数独 <span aria-hidden="true" class="action-arrow">↗</span></NButton
           >
           <NButton
@@ -192,6 +220,7 @@ onMounted(records.load)
             ref="resumeButton"
             type="info"
             size="large"
+            :disabled="records.busy"
             @click="continueLast"
             >继续上次</NButton
           >
@@ -238,6 +267,7 @@ onMounted(records.load)
     <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
       {{ records.error }} <NButton @click="records.load">重试读取</NButton>
     </NAlert>
+    <p v-if="showLoading" role="status" class="muted">正在读取存档…</p>
     <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
       <div class="quarantine-message">
         <span>有 {{ records.quarantined }} 条记录已隔离。</span>
@@ -376,25 +406,86 @@ h1 {
   font-size: 13px;
   margin-bottom: 0;
 }
+.resume-content {
+  display: grid;
+  gap: 16px;
+}
+.resume-intro {
+  margin: 0;
+  font-size: 13px;
+}
 .resume-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 .resume-card {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  padding: 18px 24px;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
   text-decoration: none;
   color: var(--text);
+  transition:
+    background-color 0.18s,
+    border-color 0.18s;
+}
+.resume-card:hover,
+.resume-card:active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.resume-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.resume-details {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.resume-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+.resume-difficulty {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-weight: 500;
 }
 .resume-card p {
-  font-size: 12px;
-  margin: 4px 0 0;
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
 }
-.resume-card > span {
+.resume-source {
+  color: var(--muted);
+}
+.resume-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-variant-numeric: tabular-nums;
+}
+.resume-card .resume-start {
+  margin-top: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.resume-action {
   font-size: 13px;
   color: var(--accent);
+  white-space: nowrap;
 }
 .quarantine-message {
   display: flex;
@@ -424,6 +515,15 @@ h1 {
   }
 }
 @media (max-width: 700px) {
+  .home-page::before,
+  .home-page::after {
+    content: '';
+    flex: 2 0 0;
+  }
+  .home-page::after {
+    /* Share only spare height, keeping the full content group slightly above center. */
+    flex-grow: 3;
+  }
   .home-intro {
     grid-template-columns: 1fr;
     padding: 38px 0 32px;
@@ -439,6 +539,12 @@ h1 {
   }
   .mode-kicker {
     margin-top: 0;
+  }
+}
+@media (max-width: 600px) {
+  .resume-card {
+    gap: 12px;
+    padding: 16px 14px;
   }
 }
 </style>

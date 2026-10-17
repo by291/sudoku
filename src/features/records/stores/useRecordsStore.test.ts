@@ -11,6 +11,64 @@ import type { OwnershipNotice } from '@/storage/ownership'
 import { deferred } from '../../../../tests/support/deferred'
 import { generationInput } from '../../../../tests/support/generation'
 
+it('distinguishes an unread catalog from an empty successfully loaded catalog', async () => {
+  const test = await createTestRuntime()
+  const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
+  const pending = deferred<Awaited<ReturnType<typeof test.runtime.repository.listResults>>>()
+  const read = vi.spyOn(test.runtime.repository, 'listResults').mockReturnValue(pending.promise)
+
+  const loading = records.load()
+
+  expect(records.loaded).toBe(false)
+  expect(records.busy).toBe(true)
+  pending.resolve({ ok: false, error: { kind: 'unavailable', message: 'Injected failure' } })
+  await loading
+  expect(records.loaded).toBe(false)
+  expect(records.error).toContain('读取失败')
+
+  read.mockRestore()
+  await records.load()
+
+  expect(records.loaded).toBe(true)
+  expect(records.results).toEqual([])
+  records.dispose()
+  test.dispose()
+})
+
+it('removes stale completed snapshots immediately when a peer replaces the dataset', async () => {
+  const test = await createTestRuntime()
+  const listeners: ((notice: OwnershipNotice) => void)[] = []
+  vi.spyOn(test.runtime.ownership, 'subscribe').mockImplementation((listener) => {
+    listeners.push(listener)
+    return () => {}
+  })
+  const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
+  const session = makeSession({
+    elapsedMs: 61000,
+    completion: { completedAt: '2026-10-11T01:00:00.000Z', elapsedMs: 61000 },
+  })
+  session.entries = session.puzzle.solution.map((digit, cell) =>
+    session.puzzle.givens[cell] ? 0 : digit,
+  )
+  await test.database.put('results', { formatVersion: 2, session })
+  await records.load()
+  expect(records.results).toHaveLength(1)
+  const pending = deferred<Awaited<ReturnType<typeof test.runtime.repository.listResults>>>()
+  vi.spyOn(test.runtime.repository, 'listResults').mockReturnValue(pending.promise)
+
+  for (const listener of listeners) {
+    listener({ kind: 'reset', epoch: 2 })
+  }
+
+  expect(records.loaded).toBe(false)
+  expect(records.results).toEqual([])
+  pending.resolve({ ok: true, value: [] })
+  await vi.waitFor(() => expect(records.loaded).toBe(true))
+  expect(records.results).toEqual([])
+  records.dispose()
+  test.dispose()
+})
+
 it('settles dirty game and queued preferences before returning a committed backup', async () => {
   const test = await createTestRuntime()
   const records = test.app.runWithContext(() => useRecordsStore(test.pinia))

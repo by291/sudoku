@@ -41,8 +41,8 @@ test('chooses among multiple saved games in an accessible resume dialog', async 
   await page.getByRole('button', { name: '继续上次', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '继续上次', exact: true })
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByRole('link', { name: /数独 · 自由游玩/ })).toHaveCount(2)
-  await dialog.getByRole('link', { name: /箭头数独 · 自由游玩/ }).click()
+  await expect(dialog.getByRole('list', { name: '未完成的存档' }).getByRole('link')).toHaveCount(2)
+  await dialog.getByRole('link', { name: /箭头数独.*自由游玩/ }).click()
   await expect(
     page.getByRole('heading', { name: '自由游玩 · 箭头数独', exact: true }),
   ).toBeVisible()

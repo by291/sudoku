@@ -11,7 +11,14 @@ import { isSudokuVariant } from '@/sudoku/catalogue'
 import { supportedDifficulties } from '@/sudoku/catalogue'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
-import { modeName } from '@/features/records/model/records'
+import {
+  groupCompletedRecords,
+  modeName,
+  sessionLink,
+  summarizeSave,
+  variantSaves,
+} from '@/features/records/model/records'
+import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
 import LocalBackupPanel from '@/features/records/components/LocalBackupPanel.vue'
 
@@ -22,6 +29,15 @@ const router = useRouter()
 const variantQuery = computed(() => parseVariantQuery(route.query.variant))
 const variant = computed(() => (variantQuery.value.valid ? variantQuery.value.value : 'classic'))
 const variantOptions = [...VARIANT_OPTIONS]
+const recordTabs = [
+  { value: 'overview', label: '总览' },
+  { value: 'saves', label: '本地存档' },
+  { value: 'history', label: '完成历史' },
+]
+const tab = computed(() =>
+  route.query.tab === 'saves' || route.query.tab === 'history' ? route.query.tab : 'overview',
+)
+const showProgress = useDelayedProgress(() => records.busy)
 const variantMenuOpen = ref(false)
 const compactNavigationMedia = window.matchMedia('(max-width: 800px)')
 const compactNavigation = ref(compactNavigationMedia.matches)
@@ -37,9 +53,62 @@ const results = computed(() =>
   records.results.filter((record) => record.session.puzzle.rules.kind === variant.value),
 )
 
+const saves = computed(() => {
+  const catalog = variantSaves(records.sessions, variant.value)
+
+  return {
+    latest: catalog.latest
+      ? { ...catalog.latest, summary: summarizeSave(catalog.latest.session) }
+      : null,
+    others: catalog.others.map((record) => ({ ...record, summary: summarizeSave(record.session) })),
+  }
+})
+const historyGroups = computed(() => groupCompletedRecords(results.value))
+
+function variantDestination(value: string) {
+  return {
+    path: '/records',
+    query: { variant: value, ...(tab.value === 'overview' ? {} : { tab: tab.value }) },
+  }
+}
+
+function updateTab(value: string | number) {
+  if (value === 'overview' || value === 'saves' || value === 'history') {
+    void router.push({ path: '/records', query: { ...route.query, tab: value } })
+  }
+}
+
+// Naive UI 2.45.3 tabs omit keyboard semantics; controlled buttons keep this tablist accessible.
+function navigateTabs(event: KeyboardEvent, value: string) {
+  const index = recordTabs.findIndex((item) => item.value === value)
+  let nextIndex: number
+  switch (event.key) {
+    case 'ArrowRight':
+      nextIndex = (index + 1) % recordTabs.length
+      break
+    case 'ArrowLeft':
+      nextIndex = (index + recordTabs.length - 1) % recordTabs.length
+      break
+    case 'Home':
+      nextIndex = 0
+      break
+    case 'End':
+      nextIndex = recordTabs.length - 1
+      break
+    default:
+      return
+  }
+  event.preventDefault()
+  const next = recordTabs[nextIndex]
+  if (next) {
+    updateTab(next.value)
+    document.getElementById(`records-tab-${next.value}`)?.focus()
+  }
+}
+
 function updateVariant(value: unknown) {
   if (isSudokuVariant(value)) {
-    void router.push({ path: '/records', query: { variant: value } })
+    void router.push(variantDestination(value))
   }
 }
 
@@ -82,7 +151,7 @@ function duration(value: number | null) {
       <p class="muted">成绩和存档只属于当前浏览器。定期导出备份，可以在数据丢失后恢复。</p>
     </header>
     <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
-      {{ records.error }} <NButton @click="records.load">重试读取</NButton>
+      {{ records.error }} <NButton :disabled="records.busy" @click="records.load">重试读取</NButton>
     </NAlert>
     <NCard v-if="records.notice" class="feedback-message" size="small" role="status">
       {{ records.notice }}
@@ -93,7 +162,7 @@ function duration(value: number | null) {
         <NButton tag="a" :href="href" @click="navigate">查看标准成绩</NButton>
       </RouterLink>
     </NAlert>
-    <p v-if="records.busy" role="status">正在处理本机记录…</p>
+    <p v-if="showProgress" role="status" aria-live="polite">正在处理本机记录…</p>
     <div class="records-workspace">
       <aside v-if="!compactNavigation" class="records-sidebar">
         <h2 class="sidebar-heading">选择玩法</h2>
@@ -102,7 +171,7 @@ function duration(value: number | null) {
             v-for="choice in variantChoices"
             :key="choice.value"
             v-slot="{ href, navigate }"
-            :to="{ path: '/records', query: { variant: choice.value } }"
+            :to="variantDestination(choice.value)"
             custom
           >
             <NButton
@@ -115,11 +184,11 @@ function duration(value: number | null) {
               @click="navigate"
             >
               <span class="choice-name">{{ choice.label }}</span>
-              <span class="choice-count">{{ choice.completed }} 局</span>
+              <span v-if="records.loaded" class="choice-count">{{ choice.completed }} 局</span>
             </NButton>
           </RouterLink>
         </nav>
-        <div class="records-total">
+        <div v-if="records.loaded" class="records-total">
           <p>我的完成记录</p>
           <span class="muted">共完成 {{ records.results.length }} 局</span>
         </div>
@@ -143,82 +212,196 @@ function duration(value: number | null) {
         />
       </label>
       <section class="records-content" :aria-label="`${getVariantPresentation(variant).label}成绩`">
-        <div class="records-summary">
-          <div class="records-overview">
-            <p class="eyebrow">按玩法积累</p>
-            <h2>{{ getVariantPresentation(variant).label }}</h2>
-            <p class="completion-count">已完成 {{ results.length }} 局</p>
-            <p class="muted">难度与最快成绩按玩法分别计算。</p>
-          </div>
-          <div class="stat-grid">
-            <div class="panel stat">
-              <span>当前连续挑战</span
-              ><strong>{{ summary.currentStreak }} <small>天</small></strong>
-            </div>
-            <div class="panel stat">
-              <span>最长连续挑战</span
-              ><strong>{{ summary.longestStreak }} <small>天</small></strong>
-            </div>
-            <div class="panel stat">
-              <span>正式挑战完成</span
-              ><strong
-                >{{ summary.dailyTotals.unassisted + summary.dailyTotals.assisted }}
-                <small>次</small></strong
-              >
-              <p>
-                无辅助 {{ summary.dailyTotals.unassisted }} · 辅助
-                {{ summary.dailyTotals.assisted }}
-              </p>
-            </div>
-          </div>
+        <div class="record-tabs" role="tablist" aria-label="记录分类">
+          <NButton
+            v-for="item in recordTabs"
+            :id="`records-tab-${item.value}`"
+            :key="item.value"
+            role="tab"
+            :aria-selected="tab === item.value"
+            :aria-controls="`records-panel-${item.value}`"
+            :tabindex="tab === item.value ? 0 : -1"
+            :type="tab === item.value ? 'primary' : 'default'"
+            @click="updateTab(item.value)"
+            @keydown="navigateTabs($event, item.value)"
+            >{{ item.label }}</NButton
+          >
         </div>
-        <section class="panel bests">
-          <h2>自由游玩 · 最快成绩</h2>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">难度</th>
-                <th scope="col">无辅助</th>
-                <th scope="col">辅助完成</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="difficulty in supportedDifficulties(variant)" :key="difficulty">
-                <th scope="row">{{ DIFFICULTY_NAMES[difficulty] }}</th>
-                <td>{{ duration(summary.freeBests[difficulty].unassisted) }}</td>
-                <td>{{ duration(summary.freeBests[difficulty].assisted) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p class="muted small">
-            学习实战和每日练习不参与自由游玩最快成绩。正式挑战在题目日期当天完成才计入连续天数。
-          </p>
+        <section
+          v-if="tab === 'overview'"
+          id="records-panel-overview"
+          role="tabpanel"
+          aria-labelledby="records-tab-overview"
+          class="records-tab-panel"
+        >
+          <template v-if="records.loaded">
+            <div class="records-summary">
+              <div class="records-overview">
+                <p class="eyebrow">按玩法积累</p>
+                <h2>{{ getVariantPresentation(variant).label }}</h2>
+                <p class="completion-count">已完成 {{ results.length }} 局</p>
+                <p class="muted">难度与最快成绩按玩法分别计算。</p>
+              </div>
+              <div class="stat-grid">
+                <div class="panel stat">
+                  <span>当前连续挑战</span
+                  ><strong>{{ summary.currentStreak }} <small>天</small></strong>
+                </div>
+                <div class="panel stat">
+                  <span>最长连续挑战</span
+                  ><strong>{{ summary.longestStreak }} <small>天</small></strong>
+                </div>
+                <div class="panel stat">
+                  <span>正式挑战完成</span
+                  ><strong
+                    >{{ summary.dailyTotals.unassisted + summary.dailyTotals.assisted }}
+                    <small>次</small></strong
+                  >
+                  <p>
+                    无辅助 {{ summary.dailyTotals.unassisted }} · 辅助
+                    {{ summary.dailyTotals.assisted }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <section class="panel bests">
+              <h2>自由游玩 · 最快成绩</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">难度</th>
+                    <th scope="col">无辅助</th>
+                    <th scope="col">辅助完成</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="difficulty in supportedDifficulties(variant)" :key="difficulty">
+                    <th scope="row">{{ DIFFICULTY_NAMES[difficulty] }}</th>
+                    <td>{{ duration(summary.freeBests[difficulty].unassisted) }}</td>
+                    <td>{{ duration(summary.freeBests[difficulty].assisted) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="muted small">
+                学习实战和每日练习不参与自由游玩最快成绩。正式挑战在题目日期当天完成才计入连续天数。
+              </p>
+            </section>
+          </template>
         </section>
-        <section class="panel history">
-          <h2>完成记录</h2>
-          <p v-if="!results.length" class="muted">这个玩法还没有完成记录，先享受解题的过程吧。</p>
-          <ul v-else>
-            <li v-for="{ session } in results" :key="session.id">
-              <div>
-                <strong
-                  >{{ getVariantPresentation(session.puzzle.rules.kind).label }} ·
-                  {{ modeName(session) }}</strong
+        <section
+          v-else-if="tab === 'saves'"
+          id="records-panel-saves"
+          role="tabpanel"
+          aria-labelledby="records-tab-saves"
+          class="records-tab-panel"
+        >
+          <section v-if="records.loaded" class="save-list" aria-label="本地存档">
+            <h2>{{ getVariantPresentation(variant).label }}</h2>
+            <p v-if="!saves.latest && !saves.others.length" class="muted">
+              这个玩法还没有本地存档，开始一局后会自动保存在这里。
+            </p>
+            <article v-if="saves.latest" class="panel latest-save">
+              <p class="eyebrow">最近开始 · 进行中</p>
+              <h3>{{ modeName(saves.latest.session) }}</h3>
+              <p class="muted">
+                {{ DIFFICULTY_NAMES[saves.latest.session.puzzle.difficulty] }} ·
+                {{ saves.latest.summary.progressLabel }} · 已用时
+                {{ formatDuration(saves.latest.session.elapsedMs) }}
+              </p>
+              <p class="muted small">
+                开始于
+                <time :datetime="saves.latest.session.startedAt">{{
+                  saves.latest.summary.startedAtLabel
+                }}</time>
+              </p>
+              <RouterLink
+                v-slot="{ href, navigate }"
+                :to="sessionLink(saves.latest.session)"
+                custom
+              >
+                <NButton tag="a" :href="href" type="primary" class="resume-button" @click="navigate"
+                  >继续存档</NButton
                 >
-                <p class="muted">
-                  {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} ·
-                  {{
-                    session.completion
-                      ? new Date(session.completion.completedAt).toLocaleString('zh-CN')
-                      : ''
-                  }}
-                </p>
-              </div>
-              <div class="history-time">
-                {{ formatDuration(session.elapsedMs)
-                }}<span>{{ session.assistance.assisted ? '辅助完成' : '无辅助完成' }}</span>
-              </div>
-            </li>
-          </ul>
+              </RouterLink>
+            </article>
+            <ul v-if="saves.others.length" class="stored-sessions">
+              <li
+                v-for="{ session, summary: saveSummary } in saves.others"
+                :key="session.id"
+                class="panel stored-session"
+              >
+                <div>
+                  <h3>{{ modeName(session) }}</h3>
+                  <p class="muted">
+                    {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} ·
+                    {{ saveSummary.progressLabel }} · 已用时
+                    {{ formatDuration(session.elapsedMs) }} ·
+                    {{ session.completion ? '已完成' : '进行中' }}
+                  </p>
+                  <p class="muted small">
+                    开始于
+                    <time :datetime="session.startedAt">{{ saveSummary.startedAtLabel }}</time>
+                  </p>
+                </div>
+                <RouterLink v-slot="{ href, navigate }" :to="sessionLink(session)" custom>
+                  <NButton tag="a" :href="href" @click="navigate">{{
+                    session.completion ? '查看存档' : '继续存档'
+                  }}</NButton>
+                </RouterLink>
+              </li>
+            </ul>
+          </section>
+        </section>
+        <section
+          v-else
+          id="records-panel-history"
+          role="tabpanel"
+          aria-labelledby="records-tab-history"
+          class="records-tab-panel"
+        >
+          <section v-if="records.loaded" class="history" aria-label="完成历史">
+            <h2>{{ getVariantPresentation(variant).label }}</h2>
+            <p v-if="!results.length" class="muted">这个玩法还没有完成记录，先享受解题的过程吧。</p>
+            <section v-for="group in historyGroups" :key="group.date" class="panel history-date">
+              <h3>
+                <time :datetime="group.date">{{ group.label }}</time>
+              </h3>
+              <ul>
+                <li v-for="{ session } in group.records" :key="session.id">
+                  <RouterLink
+                    :to="{
+                      path: `/records/${encodeURIComponent(session.id)}`,
+                      query: { variant },
+                    }"
+                    class="history-link"
+                  >
+                    <div>
+                      <strong
+                        >{{ getVariantPresentation(session.puzzle.rules.kind).label }} ·
+                        {{ modeName(session) }}</strong
+                      >
+                      <p class="muted">
+                        {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} ·
+                        {{
+                          session.completion
+                            ? new Date(session.completion.completedAt).toLocaleTimeString('zh-CN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : ''
+                        }}
+                      </p>
+                    </div>
+                    <div class="history-time">
+                      {{ formatDuration(session.elapsedMs)
+                      }}<span>{{ session.assistance.assisted ? '辅助完成' : '无辅助完成' }}</span
+                      ><span class="open-record">查看棋局 →</span>
+                    </div>
+                  </RouterLink>
+                </li>
+              </ul>
+            </section>
+          </section>
         </section>
         <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
           <p>{{ records.quarantined }} 条损坏或不兼容的记录已隔离，有效数据仍可使用。</p>
@@ -311,6 +494,11 @@ function duration(value: number | null) {
 .records-content {
   min-width: 0;
 }
+.record-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
 .records-overview {
   padding: 28px;
   border: 1px solid var(--border);
@@ -388,11 +576,87 @@ td {
   margin: 0;
 }
 .history li {
+  border-bottom: 1px solid var(--border);
+}
+.history li:last-child {
+  border-bottom: 0;
+}
+.history-link {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 16px;
   padding: 18px 0;
-  border-bottom: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+}
+.history-link:hover {
+  color: var(--accent);
+}
+.history-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.history-date {
+  margin-top: 16px;
+}
+.history-date h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.open-record {
+  margin-top: 8px;
+  color: var(--accent);
+}
+.latest-save {
+  background: var(--accent-soft);
+  margin-bottom: 16px;
+}
+.stored-sessions {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.stored-session {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.save-list h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.save-list p {
+  margin: 8px 0;
+}
+.record-tabs :deep(.n-button) {
+  min-height: 44px;
+}
+.records-tab-panel {
+  padding-top: 20px;
+}
+.save-list :deep(.n-button) {
+  min-height: 44px;
+}
+@media (max-width: 480px) {
+  .stored-session,
+  .history-link {
+    align-items: start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .history-time {
+    text-align: left;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .history-time .open-record {
+    margin-top: 0;
+  }
 }
 .history p {
   margin: 4px 0 0;
@@ -425,6 +689,9 @@ td {
   .records-workspace {
     gap: 24px;
   }
+  .records-tab-panel {
+    padding-top: 12px;
+  }
   .records-sidebar {
     top: 16px;
     padding: 16px 12px;
@@ -455,7 +722,7 @@ td {
   }
   .stat,
   .bests,
-  .history {
+  .history-date {
     padding: 16px;
   }
   .stat strong {
@@ -474,9 +741,9 @@ td {
   }
   th,
   td {
-    padding: 8px;
+    padding: 6px 8px;
   }
-  .history li {
+  .history-link {
     padding: 12px 0;
   }
   .history-time {
@@ -484,33 +751,15 @@ td {
   }
 }
 @media (min-width: 1100px) and (max-height: 1000px) {
-  .records-content {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    gap: 16px;
-  }
   .records-summary {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     align-items: stretch;
     gap: 16px;
-    grid-column: 1 / -1;
   }
   .stat-grid {
     gap: 8px;
     margin: 0;
-  }
-  .bests,
-  .history {
-    margin: 0;
-  }
-  .data-actions,
-  .feedback-message {
-    grid-column: 1 / -1;
-  }
-  .data-actions {
-    margin-top: 0;
   }
 }
 @media (max-width: 800px) {

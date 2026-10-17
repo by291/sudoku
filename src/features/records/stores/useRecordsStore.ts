@@ -23,6 +23,7 @@ export const useRecordsStore = defineStore('records', () => {
   const notice = ref<string | null>(null)
   const quarantined = ref(0)
   const busy = ref(false)
+  const loaded = ref(false)
   const backupError = ref<string | null>(null)
   const backupPreview = shallowRef<BackupPreview | null>(null)
   let restoreCandidate: { text: string; epoch: number } | null = null
@@ -70,6 +71,7 @@ export const useRecordsStore = defineStore('records', () => {
         a.session.completion?.completedAt ?? '',
       ),
     )
+    loaded.value = true
     const count = await runtime.repository.countQuarantined()
     if (epoch !== operation) {
       return
@@ -90,6 +92,8 @@ export const useRecordsStore = defineStore('records', () => {
     backupPreview.value = null
     sessions.value = []
     results.value = []
+    // A replacement invalidates the old snapshot before any asynchronous reload can finish.
+    loaded.value = false
     quarantined.value = 0
     busy.value = false
     error.value = null
@@ -237,6 +241,7 @@ export const useRecordsStore = defineStore('records', () => {
     const result = await runtime.repository.clearAll()
     if (result.ok) {
       await resetCatalog()
+      loaded.value = true
       notice.value = '本机数据已清空。'
     } else {
       busy.value = false
@@ -276,6 +281,7 @@ export const useRecordsStore = defineStore('records', () => {
     error,
     notice,
     busy,
+    loaded,
     backupError,
     backupPreview,
     exportBackup,

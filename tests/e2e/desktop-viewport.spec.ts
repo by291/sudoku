@@ -65,6 +65,7 @@ for (const viewport of desktopViewports) {
       await page.goto('/#/records')
 
       await expect(page.getByRole('table')).toBeInViewport({ ratio: 1 })
+      await page.getByRole('tab', { name: '完成历史', exact: true }).click()
       await expect(page.getByText('这个玩法还没有完成记录，先享受解题的过程吧。')).toBeInViewport({
         ratio: 1,
       })
