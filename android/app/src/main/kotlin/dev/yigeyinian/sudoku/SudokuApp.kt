@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -28,7 +29,6 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import androidx.navigation3.ui.NavDisplay
 import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.YigeTheme
 import dev.yigeyinian.sudoku.feature.learning.LearningRoute
@@ -38,6 +38,7 @@ import dev.yigeyinian.sudoku.game.GameRoute
 import dev.yigeyinian.sudoku.game.HomeRoute
 import dev.yigeyinian.sudoku.navigation.AppRoute
 import dev.yigeyinian.sudoku.navigation.DestinationShell
+import dev.yigeyinian.sudoku.navigation.PlayerNavDisplay
 import dev.yigeyinian.sudoku.navigation.isPrimaryDestination
 import kotlinx.coroutines.launch
 
@@ -47,6 +48,7 @@ internal fun SudokuApp(activity: MainActivity) {
     val state by model.uiState.collectAsStateWithLifecycle()
     val backStack = rememberNavBackStack(AppRoute.Home)
     val scope = rememberCoroutineScope()
+    val gameBackActions = remember { mutableMapOf<AppRoute.Game, suspend () -> Boolean>() }
 
     fun primary(route: AppRoute) {
         if (backStack.lastOrNull() == route) {
@@ -159,7 +161,18 @@ internal fun SudokuApp(activity: MainActivity) {
                             )
                         }
                         entry<AppRoute.Game> { route ->
-                            GameRoute(route.launch, onLeave = ::back, onRecords = { primary(AppRoute.Records) })
+                            GameRoute(
+                                route.launch,
+                                onLeave = ::back,
+                                onRecords = { primary(AppRoute.Records) },
+                                registerBackAction = { action ->
+                                    if (action == null) {
+                                        gameBackActions.remove(route)
+                                    } else {
+                                        gameBackActions[route] = action
+                                    }
+                                }
+                            )
                         }
                     }
                 )
@@ -172,7 +185,20 @@ internal fun SudokuApp(activity: MainActivity) {
                 } else {
                     listOf(entries[backStack.indexOf(AppRoute.Home)]) + activeEntries
                 }
-                NavDisplay(entries = visibleEntries, onBack = ::back, modifier = Modifier.fillMaxSize())
+                PlayerNavDisplay(
+                    entries = visibleEntries,
+                    onBack = {
+                        val current = backStack.lastOrNull()
+                        val canLeave = current !is AppRoute.Game || gameBackActions[current]?.invoke() == true
+                        if (canLeave && backStack.lastOrNull() == current) {
+                            back()
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }

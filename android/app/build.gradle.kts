@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.lifecycle.navigation)
     implementation(libs.hilt.compose)
     implementation(libs.navigation.ui)
+    implementation(libs.navigation.event.compose)
     implementation(libs.navigation.runtime)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

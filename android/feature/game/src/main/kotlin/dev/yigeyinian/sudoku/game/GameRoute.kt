@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.view.KeyEvent as AndroidKeyEvent
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +60,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,17 +90,26 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
+fun GameRoute(
+    launch: GameLaunch,
+    onLeave: () -> Unit,
+    onRecords: () -> Unit,
+    registerBackAction: ((suspend () -> Boolean)?) -> Unit
+) {
     val model: GameViewModel = hiltViewModel()
-    val state by model.uiState.collectAsStateWithLifecycle()
+    val currentState by model.uiState.collectAsStateWithLifecycle()
+    var departureState by remember { mutableStateOf<GameUiState?>(null) }
+    // Keep the outgoing scene stable while saving and throughout the navigation transition.
+    val state = departureState ?: currentState
     val scope = rememberCoroutineScope()
     val showPreparation = rememberDelayedProgress(state.phase == GamePhase.PREPARING)
     var menuOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var restartOpen by remember { mutableStateOf(false) }
     var zoomOpen by remember { mutableStateOf(false) }
-    val modalOpen = menuOpen || settingsOpen || restartOpen || zoomOpen || state.hint != null ||
-        state.practiceReplacement != null
+    val modalOpen =
+        departureState != null || menuOpen || settingsOpen || restartOpen || zoomOpen || state.hint != null ||
+            state.practiceReplacement != null
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val activity = LocalContext.current.findActivity()
 
@@ -112,11 +124,33 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
         onDispose { lifecycle.removeObserver(observer) }
     }
 
-    fun leave() {
-        scope.launch { if (model.leave()) onLeave() }
+    suspend fun prepareLeave(): Boolean {
+        if (departureState != null) {
+            return false
+        }
+        departureState = currentState
+        var saved = false
+        try {
+            saved = model.leave()
+            return saved
+        } finally {
+            if (!saved) {
+                departureState = null
+            }
+        }
     }
 
-    BackHandler(enabled = !modalOpen) { leave() }
+    fun leave(destination: () -> Unit = onLeave) {
+        scope.launch { if (prepareLeave()) destination() }
+    }
+
+    val latestLeave by rememberUpdatedState<suspend () -> Boolean> { prepareLeave() }
+    val latestRegistration by rememberUpdatedState(registerBackAction)
+    DisposableEffect(model) {
+        // NavDisplay owns gesture progress; the game only settles its save on completion.
+        latestRegistration { latestLeave() }
+        onDispose { latestRegistration(null) }
+    }
 
     val moreMenu: @Composable () -> Unit = {
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -169,34 +203,47 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
-            if (modalOpen || !state.editable || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            val key = event.nativeKeyEvent
-            when {
-                key.keyCode == AndroidKeyEvent.KEYCODE_Z && (key.isCtrlPressed || key.isMetaPressed) -> {
-                    if (key.isShiftPressed) model.redo() else model.undo()
-                    true
+        modifier = Modifier.fillMaxSize()
+            .then(if (departureState != null) Modifier.clearAndSetSemantics {} else Modifier)
+            .pointerInput(departureState != null) {
+                if (departureState != null) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        }
+                    }
                 }
-                key.isCtrlPressed || key.isMetaPressed || key.isAltPressed -> false
-                key.keyCode in AndroidKeyEvent.KEYCODE_1..AndroidKeyEvent.KEYCODE_9 -> {
-                    model.enterDigit(key.keyCode - AndroidKeyEvent.KEYCODE_1 + 1)
-                    true
+            }.onPreviewKeyEvent { event ->
+                if (modalOpen || !state.editable || event.type != KeyEventType.KeyDown) {
+                    return@onPreviewKeyEvent false
                 }
-                key.keyCode in AndroidKeyEvent.KEYCODE_NUMPAD_1..AndroidKeyEvent.KEYCODE_NUMPAD_9 -> {
-                    model.enterDigit(key.keyCode - AndroidKeyEvent.KEYCODE_NUMPAD_1 + 1)
-                    true
+                val key = event.nativeKeyEvent
+                when {
+                    key.keyCode == AndroidKeyEvent.KEYCODE_Z && (key.isCtrlPressed || key.isMetaPressed) -> {
+                        if (key.isShiftPressed) model.redo() else model.undo()
+                        true
+                    }
+                    key.isCtrlPressed || key.isMetaPressed || key.isAltPressed -> false
+                    key.keyCode in AndroidKeyEvent.KEYCODE_1..AndroidKeyEvent.KEYCODE_9 -> {
+                        model.enterDigit(key.keyCode - AndroidKeyEvent.KEYCODE_1 + 1)
+                        true
+                    }
+                    key.keyCode in AndroidKeyEvent.KEYCODE_NUMPAD_1..AndroidKeyEvent.KEYCODE_NUMPAD_9 -> {
+                        model.enterDigit(key.keyCode - AndroidKeyEvent.KEYCODE_NUMPAD_1 + 1)
+                        true
+                    }
+                    key.keyCode == AndroidKeyEvent.KEYCODE_DEL ||
+                        key.keyCode == AndroidKeyEvent.KEYCODE_FORWARD_DEL -> {
+                        model.erase()
+                        true
+                    }
+                    key.keyCode == AndroidKeyEvent.KEYCODE_N -> {
+                        model.toggleNotes()
+                        true
+                    }
+                    else -> false
                 }
-                key.keyCode == AndroidKeyEvent.KEYCODE_DEL || key.keyCode == AndroidKeyEvent.KEYCODE_FORWARD_DEL -> {
-                    model.erase()
-                    true
-                }
-                key.keyCode == AndroidKeyEvent.KEYCODE_N -> {
-                    model.toggleNotes()
-                    true
-                }
-                else -> false
-            }
-        },
+            },
         topBar = {
             CenterAlignedTopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -205,7 +252,7 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
                     actionIconContentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 navigationIcon = {
-                    IconButton(onClick = ::leave) {
+                    IconButton(onClick = { leave() }) {
                         Icon(
                             Icons.AutoMirrored.Outlined.ArrowBack,
                             "暂停保存并返回"
@@ -302,7 +349,7 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
                         "用时 ${formatElapsedTime(state.elapsedMs)} · " +
                             "${if (state.session?.assistance?.assisted == true) "辅助完成" else "无辅助完成"}"
                     )
-                    Button(onClick = { scope.launch { if (model.leave()) onRecords() } }) { Text("查看记录") }
+                    Button(onClick = { leave(onRecords) }) { Text("查看记录") }
                 }
             }
         }

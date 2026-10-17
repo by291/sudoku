@@ -1,6 +1,7 @@
 package dev.yigeyinian.sudoku
 
 import android.graphics.Bitmap
+import androidx.activity.BackEventCompat
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -104,6 +105,49 @@ class PlayerWorkflowTest {
     @After
     fun closeActivity() {
         activity?.close()
+    }
+
+    @Test
+    fun predictiveBackPreviewsHomeAndCancellationKeepsTheGameRunning() {
+        compose.onNodeWithText("继续上次").performClick()
+        awaitText("继续对局")
+        compose.onNodeWithText("继续对局").performClick()
+        val boardBefore = compose.onNodeWithTag("cell-0").getUnclippedBoundsInRoot()
+
+        activity?.onActivity {
+            it.onBackPressedDispatcher.dispatchOnBackStarted(BackEventCompat(0f, 600f, 0f, BackEventCompat.EDGE_LEFT))
+            it.onBackPressedDispatcher.dispatchOnBackProgressed(
+                BackEventCompat(240f, 600f, 0.5f, BackEventCompat.EDGE_LEFT)
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("开始数独").assertExists()
+        compose.onNodeWithText("对局已暂停").assertDoesNotExist()
+        compose.onNodeWithText("已取消准备，现有进度保持不变。").assertDoesNotExist()
+
+        activity?.onActivity { it.onBackPressedDispatcher.dispatchOnBackCancelled() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("cell-0").assertIsDisplayed()
+        compose.onNodeWithText("对局已暂停").assertDoesNotExist()
+        assertEquals(boardBefore, compose.onNodeWithTag("cell-0").getUnclippedBoundsInRoot())
+
+        activity?.onActivity {
+            it.onBackPressedDispatcher.dispatchOnBackStarted(
+                BackEventCompat(1080f, 600f, 0f, BackEventCompat.EDGE_RIGHT)
+            )
+            it.onBackPressedDispatcher.dispatchOnBackProgressed(
+                BackEventCompat(700f, 600f, 0.7f, BackEventCompat.EDGE_RIGHT)
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("开始数独").assertExists()
+        activity?.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        awaitText("继续上次")
+        compose.waitForIdle()
+        compose.onNodeWithTag("cell-0").assertDoesNotExist()
+
+        compose.onNodeWithText("继续上次").performClick()
+        awaitText("对局已暂停")
     }
 
     @Test
