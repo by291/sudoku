@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -46,10 +47,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-internal fun RecordsOverview(variant: Variant, summary: RecordSummary) {
+internal fun RecordsOverview(variant: Variant, summary: RecordSummary?) {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(shape = RoundedCornerShape(20.dp), color = colors.primaryContainer) {
+        Surface(
+            Modifier.testTag("records-streak"),
+            shape = RoundedCornerShape(20.dp),
+            color = colors.primaryContainer
+        ) {
             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -59,25 +64,31 @@ internal fun RecordsOverview(variant: Variant, summary: RecordSummary) {
                     Text("每日挑战 · 当前连续", style = MaterialTheme.typography.labelLarge, color = colors.primary)
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${summary.currentStreak}", fontSize = 44.sp, lineHeight = 52.sp, color = colors.primary)
+                    Text(
+                        summary?.currentStreak?.toString() ?: "—",
+                        fontSize = 44.sp,
+                        lineHeight = 52.sp,
+                        color = colors.primary
+                    )
                     Text(" 天", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.weight(1f))
                     Text(
-                        "最长 ${summary.longestStreak} 天",
+                        "最长 ${summary?.longestStreak ?: "—"} 天",
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant
                     )
                 }
                 HorizontalDivider(color = colors.primary.copy(alpha = 0.15f))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    DailyTotal(summary.dailyTotals.unassisted, "未使用辅助", Modifier.weight(1f))
-                    DailyTotal(summary.dailyTotals.assisted, "使用辅助", Modifier.weight(1f))
+                    DailyTotal(summary?.dailyTotals?.unassisted, "未使用辅助", Modifier.weight(1f))
+                    DailyTotal(summary?.dailyTotals?.assisted, "使用辅助", Modifier.weight(1f))
                 }
             }
         }
         Spacer(Modifier.size(2.dp))
         RecordSectionHeading("最佳用时", "自由游玩 · ${recordVariantLabel(variant)}")
         Surface(
+            modifier = Modifier.testTag("records-bests"),
             shape = RoundedCornerShape(18.dp),
             color = colors.surface,
             border = BorderStroke(1.dp, colors.onSurface.copy(alpha = 0.1f))
@@ -97,9 +108,9 @@ internal fun RecordsOverview(variant: Variant, summary: RecordSummary) {
                         if (index > 0 || !stacked) {
                             HorizontalDivider(color = colors.onSurface.copy(alpha = 0.08f))
                         }
-                        val times = summary.freeBests.getValue(difficulty)
-                        val unassisted = times.unassisted?.let(::formatElapsedTime) ?: "—"
-                        val assisted = times.assisted?.let(::formatElapsedTime) ?: "—"
+                        val times = summary?.freeBests?.getValue(difficulty)
+                        val unassisted = times?.unassisted?.let(::formatElapsedTime) ?: "—"
+                        val assisted = times?.assisted?.let(::formatElapsedTime) ?: "—"
                         if (stacked) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(difficultyLabel(difficulty), style = MaterialTheme.typography.titleSmall)
@@ -138,9 +149,9 @@ internal fun RecordsOverview(variant: Variant, summary: RecordSummary) {
 }
 
 @Composable
-private fun DailyTotal(count: Int, label: String, modifier: Modifier) {
+private fun DailyTotal(count: Int?, label: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text("$count 局", style = MaterialTheme.typography.titleLarge)
+        Text("${count ?: "—"} 局", style = MaterialTheme.typography.titleLarge)
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

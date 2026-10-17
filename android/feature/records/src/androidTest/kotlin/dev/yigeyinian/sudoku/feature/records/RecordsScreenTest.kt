@@ -113,6 +113,37 @@ class RecordsScreenTest {
         return state
     }
 
+    @Test fun overviewKeepsItsCardsWhileCountsAreUnknown() {
+        val state = show(RecordsUiState())
+        compose.onNodeWithText("每日挑战 · 当前连续").assertIsDisplayed()
+        compose.onNodeWithText("0 局").assertDoesNotExist()
+        capture("records-loading")
+        val card = compose.onNodeWithTag("records-streak").fetchSemanticsNode().boundsInRoot
+        val bests = compose.onNodeWithTag("records-bests").fetchSemanticsNode().boundsInRoot
+
+        compose.runOnIdle {
+            state.value = state.value.copy(
+                loading = false,
+                epoch = 1,
+                summary = dev.yigeyinian.sudoku.model.summarizeRecords(emptyList(), "2026-10-17")
+            )
+        }
+
+        capture("records-loaded")
+        assertEquals(card, compose.onNodeWithTag("records-streak").fetchSemanticsNode().boundsInRoot)
+        assertEquals(bests, compose.onNodeWithTag("records-bests").fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test fun unreadListsShowPlaceholdersInsteadOfFalseEmptyStates() {
+        show(RecordsUiState())
+        tabNode("本地存档").performClick()
+        compose.onNodeWithTag("records-list-placeholder").assertIsDisplayed()
+        compose.onNodeWithText("还没有存档").assertDoesNotExist()
+        tabNode("完成历史").performClick()
+        compose.onNodeWithTag("records-list-placeholder").assertIsDisplayed()
+        compose.onNodeWithText("第一份记录，等你写下").assertDoesNotExist()
+    }
+
     @Test fun recordTabsSeparateOverviewFromEmptyLists() {
         show()
         tabNode("概览").assertIsSelected()
@@ -219,9 +250,10 @@ class RecordsScreenTest {
         compose.runOnIdle { assertTrue(cleaned) }
     }
 
-    @Test fun firstLoadDoesNotShowEmptyStatisticsAndRefreshRetainsLoadedData() {
+    @Test fun firstLoadShowsUnknownStatisticsAndRefreshRetainsLoadedData() {
         val state = show(RecordsUiState())
-        compose.onNodeWithText("最佳用时").assertDoesNotExist()
+        compose.onNodeWithText("0 局").assertDoesNotExist()
+        pageNode("最佳用时").assertIsDisplayed()
         compose.runOnIdle {
             state.value = state.value.copy(
                 loading = false,

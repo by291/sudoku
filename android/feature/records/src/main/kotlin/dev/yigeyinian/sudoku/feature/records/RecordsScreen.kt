@@ -136,7 +136,7 @@ internal fun RecordsScreen(
                         RecordStatus(state, onRetry)
                     }
                 }
-                // An unread dataset is not an empty dataset. Keep the first-load area quiet until it is ready.
+                // Unknown data keeps the same overview structure; list placeholders must not claim an empty dataset.
                 if (state.epoch != null && state.tab == tab) {
                     when (tab) {
                         RecordsTab.OVERVIEW -> item(key = "overview") {
@@ -148,7 +148,7 @@ internal fun RecordsScreen(
                                     }
                                 }
                             } else {
-                                state.summary?.let { RecordsOverview(state.variant, it) }
+                                RecordsOverview(state.variant, state.summary)
                             }
                         }
                         RecordsTab.SAVES -> {
@@ -211,6 +211,17 @@ internal fun RecordsScreen(
                                     Text("加载更多")
                                 }
                             }
+                        }
+                    }
+                } else {
+                    when (tab) {
+                        RecordsTab.OVERVIEW -> item(key = "overview") { RecordsOverview(state.variant, null) }
+                        RecordsTab.SAVES, RecordsTab.HISTORY -> item(key = "unread-list") {
+                            RecordSectionHeading(
+                                if (tab == RecordsTab.SAVES) "${recordVariantLabel(state.variant)}存档" else "完成历史",
+                                "—"
+                            )
+                            RecordListPlaceholder()
                         }
                     }
                 }
