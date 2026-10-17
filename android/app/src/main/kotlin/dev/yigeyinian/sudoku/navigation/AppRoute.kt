@@ -10,8 +10,6 @@ internal sealed interface AppRoute : NavKey {
 
     @Serializable data object Learning : AppRoute
 
-    @Serializable data object Daily : AppRoute
-
     @Serializable data object Records : AppRoute
 
     @Serializable data class Lesson(val lessonId: String) : AppRoute
@@ -21,6 +19,6 @@ internal sealed interface AppRoute : NavKey {
 
 internal val AppRoute.isPrimaryDestination: Boolean
     get() = when (this) {
-        AppRoute.Home, AppRoute.Learning, AppRoute.Daily, AppRoute.Records -> true
+        AppRoute.Home, AppRoute.Learning, AppRoute.Records -> true
         is AppRoute.Game, is AppRoute.Lesson -> false
     }

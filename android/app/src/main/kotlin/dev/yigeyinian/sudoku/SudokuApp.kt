@@ -30,7 +30,6 @@ import dev.yigeyinian.sudoku.designsystem.YigeTheme
 import dev.yigeyinian.sudoku.feature.learning.LearningRoute
 import dev.yigeyinian.sudoku.feature.learning.LessonRoute
 import dev.yigeyinian.sudoku.feature.records.RecordsRoute
-import dev.yigeyinian.sudoku.game.DailyRoute
 import dev.yigeyinian.sudoku.game.GameRoute
 import dev.yigeyinian.sudoku.game.HomeRoute
 import dev.yigeyinian.sudoku.navigation.AppRoute
@@ -109,7 +108,6 @@ internal fun SudokuApp(activity: MainActivity) {
                                 HomeRoute(
                                     onPlay = { backStack.add(AppRoute.Game(it)) },
                                     onLearning = { primary(AppRoute.Learning) },
-                                    onDaily = { primary(AppRoute.Daily) },
                                     onRecords = { primary(AppRoute.Records) }
                                 )
                             }
@@ -124,18 +122,6 @@ internal fun SudokuApp(activity: MainActivity) {
                                 model::retry
                             ) {
                                 LearningRoute(onOpenLesson = { backStack.add(AppRoute.Lesson(it)) })
-                            }
-                        }
-                        entry<AppRoute.Daily> {
-                            DestinationShell(
-                                AppRoute.Daily,
-                                state.settings.theme,
-                                state.error,
-                                ::back,
-                                model::setTheme,
-                                model::retry
-                            ) {
-                                DailyRoute(onPlay = { backStack.add(AppRoute.Game(it)) })
                             }
                         }
                         entry<AppRoute.Records> {

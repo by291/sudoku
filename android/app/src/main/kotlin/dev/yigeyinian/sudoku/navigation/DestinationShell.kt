@@ -71,7 +71,6 @@ internal fun DestinationShell(
                         Text(
                             when (current) {
                                 AppRoute.Learning -> "学习数独"
-                                AppRoute.Daily -> "每日挑战"
                                 AppRoute.Records -> "我的记录"
                                 else -> "一格一念"
                             },

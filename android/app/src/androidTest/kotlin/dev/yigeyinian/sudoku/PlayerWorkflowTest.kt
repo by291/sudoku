@@ -133,8 +133,63 @@ class PlayerWorkflowTest {
     fun opensAndCancelsSetupWithoutReplacingAnExistingSave() {
         compose.onNodeWithText("开始数独").performClick()
         awaitText("继续存档")
-        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("继续存档").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("关闭选择面板").performClick()
         compose.onNodeWithText("继续上次").assertIsDisplayed()
+
+        runBlocking {
+            assertEquals(
+                "player-workflow",
+                (repository.listSessions() as StorageOutcome.Success).value.single().session.id
+            )
+        }
+    }
+
+    @Test
+    fun keepsSetupChoicesAndActionsVisibleOnPhone() {
+        compose.onNodeWithText("开始数独").performClick()
+        awaitText("继续存档")
+
+        listOf("标准数独", "对角数独", "不规则数独", "杀手数独", "温度计数独", "箭头数独")
+            .forEach { compose.onNodeWithContentDescription(it).assertIsDisplayed() }
+        listOf("简单", "中等", "困难", "专家", "继续存档", "开始新局")
+            .forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+    }
+
+    @Test
+    fun changesSetupSelectionWithoutStartingOrReplacingTheSave() {
+        compose.onNodeWithText("开始数独").performClick()
+        awaitText("选择难度")
+        compose.onNodeWithText("专家").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("对角数独").performScrollTo().performClick()
+
+        compose.onNodeWithContentDescription("对角数独").assertIsSelected()
+        compose.onNodeWithText("专家").assertDoesNotExist()
+        compose.onNodeWithText("简单").performScrollTo().assertIsSelected()
+        compose.onNodeWithText("继续存档").assertDoesNotExist()
+        compose.onNodeWithText("开始游戏").assertIsDisplayed()
+        pressBack()
+        awaitText("开始数独")
+
+        runBlocking {
+            assertEquals(
+                "player-workflow",
+                (repository.listSessions() as StorageOutcome.Success).value.single().session.id
+            )
+        }
+    }
+
+    @Test
+    fun dismissesDailySelectionBackToHome() {
+        compose.onNodeWithText("每日挑战").performScrollTo().performClick()
+        awaitText("开始今日挑战")
+        compose.onNodeWithContentDescription("箭头数独").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("箭头数独").assertIsSelected()
+        compose.onNodeWithText("选择难度").assertDoesNotExist()
+        compose.onNodeWithText("开始今日挑战").assertIsDisplayed()
+        pressBack()
+        compose.onNodeWithText("开始今日挑战").assertDoesNotExist()
+        compose.onNodeWithText("开始数独").assertIsDisplayed()
 
         runBlocking {
             assertEquals(
@@ -181,8 +236,8 @@ class PlayerWorkflowTest {
         compose.onNodeWithText("记录", useUnmergedTree = true).assertDoesNotExist()
 
         compose.onNodeWithText("每日挑战").performScrollTo().performClick()
-        awaitText("进入所选挑战")
-        compose.onNodeWithContentDescription("返回首页").performClick()
+        awaitText("开始今日挑战")
+        pressBack()
         awaitText("开始数独")
 
         compose.onNodeWithText("学习数独").performScrollTo().performClick()
