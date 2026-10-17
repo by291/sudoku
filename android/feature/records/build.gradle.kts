@@ -1,3 +1,3 @@
 plugins { id("sudoku.android.feature") }
 
-android { namespace = "dev.yigeyinian.sudoku.feature.records" }
+android { namespace = "dev.sudoku.app.feature.records" }

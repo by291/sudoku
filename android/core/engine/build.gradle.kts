@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.yigeyinian.sudoku.engine"
+    namespace = "dev.sudoku.app.engine"
     compileSdk = 37
     defaultConfig {
         minSdk = 26

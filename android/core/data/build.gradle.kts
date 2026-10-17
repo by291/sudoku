@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.yigeyinian.sudoku.storage"
+    namespace = "dev.sudoku.app.storage"
 }
 
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
@@ -21,7 +21,7 @@ val generateLessonAssets by tasks.registering {
     doLast {
         val root = generatedLessons.get().asFile
         val assets = root.resolve("assets/lessons").apply { mkdirs() }
-        val kotlin = root.resolve("kotlin/dev/yigeyinian/sudoku/storage").apply { mkdirs() }
+        val kotlin = root.resolve("kotlin/dev/sudoku/app/storage").apply { mkdirs() }
         val document = JsonSlurper().parse(source) as Map<*, *>
         val lessons = document["lessons"] as List<*>
         fun quoted(value: Any?) = JsonOutput.toJson(value).replace("$", "\\$")
@@ -37,9 +37,9 @@ val generateLessonAssets by tasks.registering {
                 "Difficulty.${(lesson["practiceDifficulty"] as String).uppercase()}, $stages)"
         }
         kotlin.resolve("BundledLessonDirectory.kt").writeText(
-            "package dev.yigeyinian.sudoku.storage\n" +
-                "import dev.yigeyinian.sudoku.model.learning.LessonDirectoryEntry\n" +
-                "import dev.yigeyinian.sudoku.model.Variant\nimport dev.yigeyinian.sudoku.model.Difficulty\n" +
+            "package dev.sudoku.app.storage\n" +
+                "import dev.sudoku.app.model.learning.LessonDirectoryEntry\n" +
+                "import dev.sudoku.app.model.Variant\nimport dev.sudoku.app.model.Difficulty\n" +
                 "internal object BundledLessonDirectory { val entries = listOf(\n${rows.joinToString(",\n")}\n) }\n"
         )
     }

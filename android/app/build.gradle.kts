@@ -10,15 +10,15 @@ plugins {
 val splitApksByAbi = providers.gradleProperty("splitApksByAbi").map(String::toBooleanStrict).orElse(true).get()
 
 android {
-    namespace = "dev.yigeyinian.sudoku"
+    namespace = "dev.sudoku.app"
     compileSdk = 37
     defaultConfig {
-        applicationId = "dev.yigeyinian.sudoku"
+        applicationId = "dev.sudoku.app"
         minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
-        testInstrumentationRunner = "dev.yigeyinian.sudoku.SudokuTestRunner"
+        testInstrumentationRunner = "dev.sudoku.app.SudokuTestRunner"
         if (!splitApksByAbi) {
             ndk { abiFilters.addAll(listOf("arm64-v8a", "x86_64")) }
         }

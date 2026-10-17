@@ -1,7 +1,7 @@
 plugins { id("sudoku.android.compose") }
 
 android {
-    namespace = "dev.yigeyinian.sudoku.designsystem"
+    namespace = "dev.sudoku.app.designsystem"
     defaultConfig { testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
 }
 

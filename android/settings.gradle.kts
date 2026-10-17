@@ -15,6 +15,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "yigeyinian-android"
+rootProject.name = "sudoku"
 include(":app", ":core:domain", ":core:engine", ":core:data", ":core:design", ":core:ui")
 include(":feature:game", ":feature:learning", ":feature:records")

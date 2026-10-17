@@ -2,6 +2,8 @@
 
 A native, offline Chinese Sudoku client using Compose and the shared synchronous Rust core. Android-specific application and FFI sources live here; the portable computation remains in `../sudoku/core`.
 
+The Gradle project is named `sudoku`; the application ID and base Kotlin namespace are `dev.sudoku.app`. The player-facing Chinese name remains 一格一念. Builds with this application ID install separately from earlier package identities; transfer existing local progress through backup export and import.
+
 ## Build requirements
 
 - JDK 21, the checked-in Gradle wrapper, Android SDK platform 37, and NDK `29.0.14206865`.
