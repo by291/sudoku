@@ -1,4 +1,4 @@
-import { createLessons } from '@/features/learning/model/lessons'
+import { createLessons } from '../support/lessons'
 import { createMainEngine } from '@/sudoku/mainEngine'
 import { loadSudokuModule } from '@/sudoku/wasmModule'
 

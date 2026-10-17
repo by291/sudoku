@@ -7,6 +7,80 @@ import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { deferred } from '../../../../tests/support/deferred'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
+import * as lessonContent from '@/features/learning/model/lessonContent'
+
+it('captures the submitted answer before waiting for lesson content', async () => {
+  const test = await createTestRuntime()
+  const gate = deferred<(typeof LESSONS)[number]>()
+  vi.spyOn(lessonContent, 'createLessonContentLoader').mockReturnValue({ load: () => gate.promise })
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  const answer = { cell: 40, digit: 5 as const }
+
+  const submitted = learning.submitExercise('rules', answer, 0)
+  answer.cell = 80
+  gate.resolve(LESSONS[0])
+
+  expect(await submitted).toMatchObject({ correct: true, advance: true, completed: false })
+  test.dispose()
+})
+
+it('shares a pending progress read across directory and selected-content consumers', async () => {
+  const test = await createTestRuntime()
+  const gate = deferred<void>()
+  const entered = deferred<void>()
+  let reads = 0
+  vi.spyOn(test.runtime.repository, 'readLessonProgress').mockImplementation(async () => {
+    reads++
+    entered.resolve()
+    await gate.promise
+    return { ok: true, value: [] }
+  })
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  const first = learning.load()
+  await entered.promise
+
+  const second = learning.load()
+  gate.resolve()
+  await Promise.all([first, second])
+
+  expect(reads).toBe(1)
+  expect(learning.progressReady).toBe(true)
+  test.dispose()
+})
+
+it('does not let a delayed old lesson replace the latest selected content', async () => {
+  const test = await createTestRuntime()
+  const first = deferred<(typeof LESSONS)[number]>()
+  vi.spyOn(lessonContent, 'createLessonContentLoader').mockReturnValue({
+    load: async (id) => (id === 'rules' ? first.promise : LESSONS[1]),
+  })
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+
+  const pending = learning.loadLesson('rules')
+  await learning.loadLesson('naked-single')
+  first.resolve(LESSONS[0])
+  await pending
+
+  expect(learning.selectedLesson?.id).toBe('naked-single')
+  expect(learning.contentLoading).toBe(false)
+  expect(learning.progressReady).toBe(false)
+  test.dispose()
+})
+
+it('rejects an answer until the durable exercise cursor is known', async () => {
+  const test = await createTestRuntime()
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+
+  const result = await learning.submitExercise('rules', LESSONS[0].exercise.expected, 0)
+
+  expect(result).toMatchObject({ correct: false, advance: false, completed: false })
+  expect(await test.runtime.repository.readSettings()).toMatchObject({
+    ok: true,
+    value: DEFAULT_SETTINGS,
+  })
+  test.dispose()
+})
 
 it('invalidates an old exercise when settings detect a restored epoch and resumes after rereading', async () => {
   const test = await createTestRuntime()

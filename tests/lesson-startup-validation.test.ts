@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import catalogue from '@content/lessons/catalogue.json' with { type: 'json' }
-import { createLessons } from '@/features/learning/model/lessons'
+import { createLessons } from './support/lessons'
 import { loadLessonCatalogue } from '@/features/learning/model/lessonCatalogue'
 
 it('constructs the complete owned catalogue without initializing or calling a Sudoku engine', () => {

@@ -1,4 +1,9 @@
-import { createLessons } from '@/features/learning/model/lessons'
+import catalogue from '@content/lessons/catalogue.json' with { type: 'json' }
+import { loadLessonCatalogue } from '@/features/learning/model/lessonCatalogue'
+
+export function createLessons() {
+  return loadLessonCatalogue(catalogue)
+}
 import type { NewSudokuVariant } from '@/sudoku/contracts'
 
 export const LESSONS = createLessons()

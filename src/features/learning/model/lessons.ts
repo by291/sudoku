@@ -4,7 +4,6 @@ import type {
   LessonExercise,
   ExerciseAnswer,
 } from '@/features/learning/model/exerciseStages'
-import { loadLessonCatalogue } from '@/features/learning/model/lessonCatalogue'
 
 export type Exercise = ExerciseAnswer
 
@@ -21,11 +20,6 @@ export type Lesson = {
   practiceVariant: SudokuVariant
   guided: ExerciseStage
   exercises: readonly LessonExercise[]
-}
-
-/** Load one owned course snapshot; bundled mathematical evidence is proved by the build gate. */
-export function createLessons(): readonly Lesson[] {
-  return loadLessonCatalogue()
 }
 
 export function lessonStages(lesson: Lesson): readonly ExerciseStage[] {

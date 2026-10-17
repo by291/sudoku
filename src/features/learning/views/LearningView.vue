@@ -4,7 +4,6 @@ import { computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
-import { lessonStages } from '@/features/learning/model/lessons'
 import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import {
   parseVariantQuery,
@@ -15,7 +14,7 @@ import {
 const route = useRoute()
 const learning = useLearningStore()
 const showLoading = useDelayedProgress(() => learning.loading)
-const LESSONS = learning.lessons
+const LESSONS = learning.directory
 const preferences = usePreferencesStore()
 const variantQuery = computed(() => parseVariantQuery(route.query.variant))
 const selectedVariant = computed(() =>
@@ -42,13 +41,23 @@ const selectedLessons = computed(() =>
 const completedCount = computed(
   () => selectedLessons.value.filter((lesson) => completedLessonIds.value.has(lesson.id)).length,
 )
-const progressText = computed(
-  () => `已完成 ${completedCount.value} / ${selectedLessons.value.length} 节`,
+const progressText = computed(() =>
+  learning.progressReady
+    ? `已完成 ${completedCount.value} / ${selectedLessons.value.length} 节`
+    : `进度未读取 / ${selectedLessons.value.length} 节`,
+)
+const totalProgressText = computed(() =>
+  learning.progressReady
+    ? `已完成 ${totalCompleted.value} / ${LESSONS.length} 节`
+    : `进度未读取 / ${LESSONS.length} 节`,
 )
 const progressPercentage = computed(() =>
   selectedLessons.value.length ? (completedCount.value / selectedLessons.value.length) * 100 : 0,
 )
 const suggestedLesson = computed(() => {
+  if (!learning.progressReady) {
+    return undefined
+  }
   const unfinished = selectedLessons.value.filter(
     (lesson) => !completedLessonIds.value.has(lesson.id),
   )
@@ -87,10 +96,13 @@ const suggestionStage = computed(() => {
     return ''
   }
 
-  const total = lessonStages(lesson).length
+  const total = lesson.stageCount
   return `第 ${Math.min(learning.exerciseStage(lesson.id) + 1, total)} / ${total} 阶段`
 })
 function lessonStatus(id: string, suggested: boolean): string {
+  if (!learning.progressReady) {
+    return '可阅读'
+  }
   if (completedLessonIds.value.has(id)) {
     return '已完成'
   }
@@ -132,11 +144,18 @@ onMounted(learning.load)
       <p class="eyebrow">循序渐进 / LEARN</p>
       <h1>从看懂一格，到解开整盘</h1>
       <p class="muted learning-introduction">选一种玩法，沿着推理的路径，慢慢练熟。</p>
-      <p v-if="totalCompleted > 0 && totalCompleted < LESSONS.length" class="muted">
-        课程已扩充至 32 节；之前的完成记录保留，新加入的课程可继续学习。
-      </p>
     </header>
-    <p v-if="showLoading" class="muted" role="status">正在读取学习进度，请稍候…</p>
+    <p class="muted learning-load-status" aria-live="polite">
+      <span v-if="showLoading" role="status">正在读取学习进度，请稍候…</span>
+      <span
+        :class="{
+          'concealed-copy':
+            learning.loading || !(totalCompleted > 0 && totalCompleted < LESSONS.length),
+        }"
+      >
+        课程已扩充至 32 节；之前的完成记录保留，新加入的课程可继续学习。
+      </span>
+    </p>
     <NAlert v-if="learning.error" class="feedback-message" type="error" :show-icon="false">
       {{ learning.error }} <NButton @click="learning.load">重试</NButton>
     </NAlert>
@@ -167,13 +186,16 @@ onMounted(learning.load)
               @click="navigate"
             >
               <span class="choice-name">{{ choice.label }}</span>
-              <span class="choice-progress">{{ choice.completed }} / {{ choice.total }}</span>
+              <span class="choice-progress"
+                >{{ learning.progressReady ? choice.completed : '—' }} / {{ choice.total }}</span
+              >
             </NButton>
           </RouterLink>
         </nav>
         <div class="total-progress">
           <p>我的学习进度</p>
           <NProgress
+            v-if="learning.progressReady"
             type="line"
             :percentage="(totalCompleted / LESSONS.length) * 100"
             :show-indicator="false"
@@ -181,9 +203,10 @@ onMounted(learning.load)
             color="var(--accent)"
             rail-color="var(--border)"
             aria-label="全部课程学习进度"
-            :aria-valuetext="`已完成 ${totalCompleted} / ${LESSONS.length} 节`"
+            :aria-valuetext="totalProgressText"
           />
-          <span class="muted">已完成 {{ totalCompleted }} / {{ LESSONS.length }} 节</span>
+          <div v-else class="progress-rail-placeholder" aria-label="全部课程学习进度未读取" />
+          <span class="muted">{{ totalProgressText }}</span>
         </div>
       </aside>
       <section class="course-content" :aria-label="getVariantPresentation(selectedVariant).label">
@@ -211,8 +234,16 @@ onMounted(learning.load)
               </NButton>
             </RouterLink>
           </div>
+          <div v-else class="course-action" :aria-busy="learning.loading">
+            <div class="suggestion-copy">
+              <p class="suggestion-caption">可以先阅读下方课程</p>
+              <p class="suggestion-stage">学习建议待更新</p>
+            </div>
+            <NButton disabled>等待学习进度</NButton>
+          </div>
           <div class="course-progress">
             <NProgress
+              v-if="learning.progressReady"
               type="circle"
               style="width: 100%"
               :percentage="progressPercentage"
@@ -227,7 +258,12 @@ onMounted(learning.load)
                 }}<span class="progress-total"> / {{ selectedLessons.length }}</span>
               </span>
             </NProgress>
-            <p>课程已完成</p>
+            <div v-else class="progress-circle-placeholder" aria-label="课程学习进度未读取">
+              <span class="progress-count"
+                >—<span class="progress-total"> / {{ selectedLessons.length }}</span></span
+              >
+            </div>
+            <p>{{ learning.progressReady ? '课程已完成' : '进度未读取' }}</p>
           </div>
         </div>
         <div class="path-heading">
@@ -263,6 +299,29 @@ onMounted(learning.load)
 </template>
 
 <style scoped>
+.learning-load-status {
+  display: grid;
+  min-height: 1.5em;
+  margin: 0 0 12px;
+}
+.learning-load-status > span {
+  grid-area: 1 / 1;
+}
+.progress-rail-placeholder {
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+}
+.progress-circle-placeholder {
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 5px solid var(--border);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
 .learning-page {
   padding-top: var(--page-top-space);
 }
@@ -358,6 +417,12 @@ h1 {
   margin: 12px 0 0;
   font-size: 14px;
 }
+.concealed-copy {
+  visibility: hidden;
+}
+.suggestion-copy {
+  min-height: 44px;
+}
 .suggestion-caption {
   margin: 0;
   font-size: 13px;
@@ -372,6 +437,7 @@ h1 {
   margin-left: 20px;
 }
 .course-action {
+  min-height: 44px;
   grid-area: action;
   display: flex;
   align-items: center;
@@ -517,7 +583,7 @@ h1 {
     align-items: baseline;
     flex-wrap: wrap;
     gap: 8px 24px;
-    margin-bottom: 24px;
+    margin-bottom: 12px;
   }
   h1 {
     margin: 0;
@@ -567,7 +633,7 @@ h1 {
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
-    max-width: 190px;
+    width: 190px;
     gap: 12px;
   }
 }

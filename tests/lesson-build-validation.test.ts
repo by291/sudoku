@@ -12,6 +12,47 @@ import {
   validateLessonCatalogueMath,
 } from '../scripts/validate-lesson-catalogue'
 
+it('emits a lightweight directory with one independently loaded chunk per lesson', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'sudoku-lesson-assets-'))
+  const path = join(directory, 'catalogue.json')
+  const entry = join(directory, 'entry.js')
+  await writeFile(path, JSON.stringify(catalogue))
+  await writeFile(entry, "export { directory, lessonLoaders } from 'virtual:sudoku-lessons'")
+  let entryCode = ''
+  let lazyLessons = 0
+
+  try {
+    await build({
+      configFile: false,
+      root: directory,
+      logLevel: 'silent',
+      plugins: [
+        lessonCatalogueValidation(path),
+        {
+          name: 'inspect-lesson-assets',
+          generateBundle(_options, bundle) {
+            const entryChunk = Object.values(bundle).find(
+              (item) => item.type === 'chunk' && item.isEntry,
+            )
+            if (entryChunk?.type === 'chunk') {
+              entryCode = entryChunk.code
+              lazyLessons = entryChunk.dynamicImports.length
+            }
+          },
+        },
+      ],
+      build: { write: false, minify: false, lib: { entry, formats: ['es'] } },
+    })
+
+    expect(lazyLessons).toBe(32)
+    expect(entryCode).toContain('introduction')
+    expect(entryCode).not.toContain('candidateOrigin')
+    expect(entryCode).not.toContain('guided:')
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 it('proves every guided and exercise stage with the actual Rust/WASM validator', async () => {
   const engine = await createTestEngine()
   try {
@@ -75,6 +116,8 @@ it('fails closed when the teaching validator throws', () => {
 it('emits the validated asset snapshot even if the source changes before module loading', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'sudoku-lesson-snapshot-'))
   const path = join(directory, 'catalogue.json')
+  const entry = join(directory, 'entry.js')
+  await writeFile(entry, "export { directory, lessonLoaders } from 'virtual:sudoku-lessons'")
   const original = structuredClone(catalogue)
   original.lessons[0].title = '已验证的课程快照'
   await writeFile(path, JSON.stringify(original))
@@ -107,7 +150,7 @@ it('emits the validated asset snapshot even if the source changes before module 
           },
         },
       ],
-      build: { write: false, minify: false, lib: { entry: path, formats: ['es'] } },
+      build: { write: false, minify: false, lib: { entry, formats: ['es'] } },
     })
 
     expect({

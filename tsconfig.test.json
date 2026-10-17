@@ -10,6 +10,6 @@
       "@/core/sudoku/*": ["./tests/reference/typescript-engine/src/core/sudoku/*"]
     }
   },
-  "include": ["src/**/*.test.ts", "tests/**/*.test.ts", "tests/support/**/*.ts"],
+  "include": ["src/**/*.d.ts", "src/**/*.test.ts", "tests/**/*.test.ts", "tests/support/**/*.ts"],
   "exclude": ["tests/e2e/**", "tests/reference/**"]
 }

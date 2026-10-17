@@ -32,7 +32,10 @@ it('loads an owned copy and rejects forged answers, candidates and transfer capa
   catalogue.lessons[0].guided.board[0] = 0
 
   expect(loaded[0].guided.board[0]).toBe(original)
-  expect(loadLessonCatalogue()[0].guided.board[0]).toBe(original)
+  expect(
+    loadLessonCatalogue(JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8')))[0]
+      .guided.board[0],
+  ).toBe(original)
 
   const invalidAnswer = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
   invalidAnswer.lessons[0].guided.answer.expected.digit = 6

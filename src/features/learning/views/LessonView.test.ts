@@ -12,6 +12,8 @@ import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 import { explainStep } from '@/features/game/model/techniquePresentation'
 import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
+import * as lessonContent from '@/features/learning/model/lessonContent'
+import { LESSONS } from '../../../../tests/support/lessons'
 
 const cleanups: (() => void)[] = []
 
@@ -19,6 +21,63 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) {
     cleanup()
   }
+})
+
+it('returns keyboard focus to the guide control after retrying failed content', async () => {
+  const test = await createTestRuntime()
+  cleanups.push(test.dispose)
+  const gate = deferred<(typeof LESSONS)[number]>()
+  let attempt = 0
+  vi.spyOn(lessonContent, 'createLessonContentLoader').mockReturnValue({
+    load: async () => {
+      if (attempt++ === 0) {
+        throw new Error('Injected content failure')
+      }
+      return gate.promise
+    },
+  })
+  await router.push('/learn/rules')
+  const wrapper = mount(LessonView, {
+    attachTo: document.body,
+    global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
+  })
+  cleanups.push(() => wrapper.unmount())
+  await flushPromises()
+  const retry = wrapper.get<HTMLButtonElement>('[role="alert"] button')
+  retry.element.focus()
+
+  await retry.trigger('click')
+  gate.resolve(LESSONS[0])
+  await flushPromises()
+
+  await vi.waitFor(() =>
+    expect(document.activeElement === wrapper.get('input[value="guide"]').element).toBe(true),
+  )
+})
+
+it('allows reading the guide while progress is unknown and keeps exercise submission disabled', async () => {
+  const test = await createTestRuntime()
+  cleanups.push(test.dispose)
+  const gate = deferred<void>()
+  const read = test.runtime.repository.readLessonProgress
+  vi.spyOn(test.runtime.repository, 'readLessonProgress').mockImplementation(async () => {
+    await gate.promise
+    return read()
+  })
+  await router.push('/learn/rules')
+  const wrapper = mount(LessonView, {
+    global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
+  })
+  cleanups.push(() => wrapper.unmount())
+  await vi.waitFor(() => expect(wrapper.findComponent(SudokuBoard).exists()).toBe(true))
+
+  expect(wrapper.get('aside[aria-label="学习讲解"]').text()).toContain('这一步，怎么想')
+  expect(wrapper.text()).toContain('练习进度未读取')
+  await wrapper.get('input[value="exercise"]').setValue(true)
+  expect(wrapper.get('button[aria-label="提交答案"]').attributes('disabled')).toBeDefined()
+
+  gate.resolve()
+  await vi.waitFor(() => expect(wrapper.text()).toContain('练习阶段 1 / 2'))
 })
 
 async function setup(visitSaveGate?: Promise<void>, lessonId = 'rules') {
@@ -38,6 +97,9 @@ async function setup(visitSaveGate?: Promise<void>, lessonId = 'rules') {
   })
   cleanups.push(() => wrapper.unmount())
   await flushPromises()
+  await vi.waitFor(() =>
+    expect(wrapper.get('input[value="exercise"]').attributes('disabled')).toBeUndefined(),
+  )
   await wrapper.get('input[value="exercise"]').setValue(true)
   await wrapper.get('button[aria-label^="第5行第5列"]').trigger('click')
   if (!visitSaveGate) {
@@ -56,7 +118,7 @@ async function submitPlacement(wrapper: Awaited<ReturnType<typeof setup>>['wrapp
 
 it('keeps a placement draft across modes and submits only through the explicit action', async () => {
   const { wrapper, learning } = await setup()
-  const lesson = learning.lessons[0]
+  const lesson = learning.selectedLesson
   if (!lesson) {
     throw new Error('Missing rules lesson')
   }
@@ -112,7 +174,7 @@ it('keeps a placement draft across modes and submits only through the explicit a
 
 it('retains selected eliminations across modes and clears them without changing progress', async () => {
   const { wrapper, learning } = await setup(undefined, 'locked-candidate')
-  const lesson = learning.lessons.find((item) => item.id === 'locked-candidate')
+  const lesson = learning.selectedLesson
   const stage = lesson && lessonStages(lesson)[0]
   const exercise = stage && stageAnswer(stage)
   if (!stage || exercise?.kind !== 'elimination' || !exercise.expected[0]) {

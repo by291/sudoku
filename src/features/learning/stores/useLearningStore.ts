@@ -1,16 +1,23 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef, watch } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { useGameRuntime } from '@/runtime'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import type { LessonProgress } from '@/storage/records'
-import { createLessons, checkExercise, lessonStages } from '@/features/learning/model/lessons'
+import { checkExercise, lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { explainStep } from '@/features/game/model/techniquePresentation'
-import type { Exercise } from '@/features/learning/model/lessons'
+import { LESSON_DIRECTORY } from '@/features/learning/model/lessonDirectory'
+import { createLessonContentLoader } from '@/features/learning/model/lessonContent'
+import type { Exercise, Lesson } from '@/features/learning/model/lessons'
 
 export const useLearningStore = defineStore('learning', () => {
   const runtime = useGameRuntime()
-  const lessons = createLessons()
+  const directory = LESSON_DIRECTORY
+  const content = createLessonContentLoader()
+  const selectedLesson = shallowRef<Lesson>()
+  const contentLoading = ref(false)
+  const contentError = ref<string | null>(null)
+  let contentOperation = 0
   const preferences = usePreferencesStore()
   const progress = shallowRef<readonly LessonProgress[]>([])
   const error = ref<string | null>(null)
@@ -18,6 +25,8 @@ export const useLearningStore = defineStore('learning', () => {
   const exerciseStages = shallowRef<Readonly<Record<string, number>>>({})
   const datasetGeneration = ref(0)
   const readyGeneration = ref<number | null>(null)
+  const progressReady = computed(() => readyGeneration.value === datasetGeneration.value)
+  let progressRequest: Promise<void> | null = null
   let operation = 0
   let datasetEpoch: number | null = null
   let awaitingPreferencesReload = false
@@ -48,7 +57,20 @@ export const useLearningStore = defineStore('learning', () => {
     { flush: 'sync' },
   )
 
-  async function load() {
+  function load(): Promise<void> {
+    if (progressRequest) {
+      return progressRequest
+    }
+    const request = readProgress().finally(() => {
+      if (progressRequest === request) {
+        progressRequest = null
+      }
+    })
+    progressRequest = request
+    return request
+  }
+
+  async function readProgress() {
     const current = ++operation
     loading.value = true
     try {
@@ -93,8 +115,36 @@ export const useLearningStore = defineStore('learning', () => {
     }
   }
 
+  async function loadLesson(id: string) {
+    const current = ++contentOperation
+    if (selectedLesson.value?.id !== id) {
+      selectedLesson.value = undefined
+    }
+    contentError.value = null
+    contentLoading.value = true
+    try {
+      const lesson = await content.load(id)
+      // A slower old route cannot replace the currently selected lesson or its error state.
+      if (current === contentOperation) {
+        selectedLesson.value = lesson
+      }
+    } catch {
+      if (current === contentOperation) {
+        contentError.value = '课程内容读取失败，请重试。'
+      }
+    } finally {
+      if (current === contentOperation) {
+        contentLoading.value = false
+      }
+    }
+  }
+
+  onScopeDispose(() => {
+    contentOperation++
+  })
+
   async function selectLesson(id: string) {
-    if (lessons.some((lesson) => lesson.id === id)) {
+    if (directory.some((lesson) => lesson.id === id)) {
       return preferences.update({ currentLessonId: id })
     }
     return false
@@ -110,13 +160,37 @@ export const useLearningStore = defineStore('learning', () => {
     stageIndex = exerciseStage(id),
   ) {
     const current = operation
-    const lesson = lessons.find((lesson) => lesson.id === id)
-    if (!lesson) {
+    if (!progressReady.value) {
       return {
         correct: false,
         advance: false,
         completed: false,
-        explanation: '找不到这节课程，请返回学习列表。',
+        explanation: '学习进度尚未读取，请稍候或重试。',
+      }
+    }
+
+    // Content can arrive later; the submitted answer belongs to this click, not a mutable draft.
+    const submittedAnswer: Exercise['expected'] =
+      'cell' in answer
+        ? { cell: answer.cell, digit: answer.digit }
+        : answer.map((pair) => ({ cell: pair.cell, digit: pair.digit }))
+    let lesson: Lesson
+    try {
+      lesson = await content.load(id)
+    } catch {
+      return {
+        correct: false,
+        advance: false,
+        completed: false,
+        explanation: '课程内容读取失败，请重试。',
+      }
+    }
+    if (current !== operation || !progressReady.value) {
+      return {
+        correct: false,
+        advance: false,
+        completed: false,
+        explanation: '学习进度已变化，请重新读取后再试。',
       }
     }
 
@@ -132,7 +206,7 @@ export const useLearningStore = defineStore('learning', () => {
     }
     const result = checkExercise(
       { ...lesson, exercise: stageAnswer(stage), explanation: explainStep(stage.step) },
-      answer,
+      submittedAnswer,
     )
     if (!result.correct) {
       return { ...result, advance: false, completed: false }
@@ -203,6 +277,7 @@ export const useLearningStore = defineStore('learning', () => {
 
   function reset() {
     operation++
+    progressRequest = null
     loading.value = false
     datasetGeneration.value++
     readyGeneration.value = null
@@ -214,7 +289,12 @@ export const useLearningStore = defineStore('learning', () => {
   }
 
   return {
-    lessons,
+    directory,
+    selectedLesson,
+    contentLoading,
+    contentError,
+    loadLesson,
+    progressReady,
     progress,
     error,
     loading,

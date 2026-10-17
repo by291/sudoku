@@ -5,6 +5,7 @@ import { gameRuntimeKey } from '@/runtime'
 import LearningView from '@/features/learning/views/LearningView.vue'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { createTestRuntime } from '../../../../tests/support/runtime'
+import { deferred } from '../../../../tests/support/deferred'
 
 const cleanups: (() => void)[] = []
 
@@ -12,6 +13,32 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) {
     cleanup()
   }
+})
+
+it('shows the course directory without inventing progress or recommendations during the first read', async () => {
+  const test = await createTestRuntime()
+  cleanups.push(test.dispose)
+  const gate = deferred<void>()
+  const read = test.runtime.repository.readLessonProgress
+  vi.spyOn(test.runtime.repository, 'readLessonProgress').mockImplementation(async () => {
+    await gate.promise
+    return read()
+  })
+  await router.push('/learn')
+  const wrapper = mount(LearningView, {
+    global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
+  })
+  cleanups.push(() => wrapper.unmount())
+  await flushPromises()
+
+  expect(wrapper.findAll('.lesson-path a')).toHaveLength(12)
+  expect(wrapper.text()).not.toContain('已完成 0')
+  expect(wrapper.text()).not.toContain('推荐从这里开始')
+  expect(wrapper.find('.course-action a').exists()).toBe(false)
+  expect(wrapper.find('.learning-load-status').exists()).toBe(true)
+
+  gate.resolve()
+  await vi.waitFor(() => expect(wrapper.get('.course-action').text()).toContain('开始学习'))
 })
 
 it('distinguishes visited and partially completed lessons while retaining current-lesson priority', async () => {

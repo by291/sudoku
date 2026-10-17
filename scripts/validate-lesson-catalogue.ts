@@ -55,49 +55,137 @@ export function validateLessonCatalogueMath(
   return { lessons: source.lessons.length, stages }
 }
 
-/** Own the verified source snapshot so Vite emits exactly the JSON proved by Rust. */
+const directoryModuleId = 'virtual:sudoku-lessons'
+const lessonModulePrefix = 'virtual:sudoku-lesson/'
+
+type LessonAssets = { source: string; directory: string; lessons: Map<string, string> }
+
+function createLessonAssets(source: string): LessonAssets {
+  const catalogue: unknown = JSON.parse(source)
+  if (!isRecord(catalogue) || !Array.isArray(catalogue.lessons)) {
+    throw new Error('Invalid lesson catalogue schema')
+  }
+  const lessons = new Map<string, string>()
+  const directory = catalogue.lessons.map((lesson: unknown, order) => {
+    if (
+      !isRecord(lesson) ||
+      typeof lesson.id !== 'string' ||
+      typeof lesson.title !== 'string' ||
+      typeof lesson.introduction !== 'string' ||
+      typeof lesson.practiceVariant !== 'string' ||
+      typeof lesson.practiceDifficulty !== 'string' ||
+      !Array.isArray(lesson.exercises) ||
+      lessons.has(lesson.id)
+    ) {
+      throw new Error('Invalid lesson directory entry')
+    }
+    const stageCounts = lesson.exercises.map((exercise: unknown) => {
+      if (!isRecord(exercise) || !Array.isArray(exercise.stages)) {
+        throw new Error('Invalid lesson exercise')
+      }
+      return exercise.stages.length
+    })
+    lessons.set(lesson.id, JSON.stringify(lesson))
+    return {
+      id: lesson.id,
+      order,
+      title: lesson.title,
+      introduction: lesson.introduction,
+      practiceVariant: lesson.practiceVariant,
+      practiceDifficulty: lesson.practiceDifficulty,
+      stageCount: stageCounts.reduce((total, count) => total + count, 0),
+    }
+  })
+  const loaders = [...lessons.keys()].map(
+    (id) => `${JSON.stringify(id)}: () => import(${JSON.stringify(lessonModulePrefix + id)})`,
+  )
+  return {
+    source,
+    lessons,
+    directory: `export const directory = ${JSON.stringify(directory)};\nexport const lessonLoaders = {${loaders.join(',')}};`,
+  }
+}
+
+/** All generated modules own the same source snapshot proved by Rust before publication. */
 export function lessonCatalogueValidation(
   cataloguePath = fileURLToPath(new URL('../content/lessons/catalogue.json', import.meta.url)),
 ): Plugin {
-  let verifiedSource: string | null = null
+  let assets: LessonAssets | null = null
   let catalogueId: string | null = null
+
+  async function validateSnapshot() {
+    const source = await readFile(cataloguePath, 'utf8')
+    const catalogue: unknown = JSON.parse(source)
+    const bindings = createBindings()
+    const wasm = await readFile(
+      new URL('../packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm', import.meta.url),
+    )
+    await bindings.default({ module_or_path: wasm })
+    const result = validateLessonCatalogueMath(catalogue, bindings.validate_teaching_step)
+
+    // Never reread after validation: directory and lazy modules must share the proved bytes.
+    assets = createLessonAssets(source)
+    return result
+  }
 
   return {
     name: 'sudoku-lesson-catalogue-validation',
-    apply: 'build',
     enforce: 'pre',
+    resolveId(id) {
+      if (id === directoryModuleId || id.startsWith(lessonModulePrefix)) {
+        return '\0' + id
+      }
+      return null
+    },
     async buildStart() {
-      verifiedSource = null
+      assets = null
       // Use Vite's resolved identity, including its symlink and platform path policy.
       const resolved = await this.resolve(cataloguePath)
       if (!resolved) {
         throw new Error('The lesson catalogue could not be resolved')
       }
       catalogueId = resolved.id
-      const source = await readFile(cataloguePath, 'utf8')
-      const catalogue: unknown = JSON.parse(source)
-      const bindings = createBindings()
-      const wasm = await readFile(
-        new URL('../packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm', import.meta.url),
-      )
-      await bindings.default({ module_or_path: wasm })
-      const result = validateLessonCatalogueMath(catalogue, bindings.validate_teaching_step)
-
-      // Never reread after validation: a changed file must wait for the next complete build.
-      verifiedSource = source
+      const result = await validateSnapshot()
       this.addWatchFile(cataloguePath)
       this.info(
         `Validated ${result.lessons} lessons and ${result.stages} teaching stages with Rust/WASM`,
       )
     },
     load(id) {
-      if (id !== catalogueId) {
+      if (
+        id !== catalogueId &&
+        id !== '\0' + directoryModuleId &&
+        !id.startsWith('\0' + lessonModulePrefix)
+      ) {
         return null
       }
-      if (verifiedSource === null) {
+      if (assets === null) {
         throw new Error('The lesson catalogue has not passed mathematical validation')
       }
-      return verifiedSource
+      if (id === catalogueId) {
+        return assets.source
+      }
+      if (id === '\0' + directoryModuleId) {
+        return assets.directory
+      }
+      const lesson = assets.lessons.get(id.slice(lessonModulePrefix.length + 1))
+      if (!lesson) {
+        throw new Error('Unknown lesson asset')
+      }
+      return `export default ${lesson};`
+    },
+    async handleHotUpdate(context) {
+      if (context.file !== cataloguePath) {
+        return
+      }
+      await validateSnapshot()
+      for (const module of context.server.moduleGraph.idToModuleMap.values()) {
+        if (module.id?.startsWith('\0virtual:sudoku-lesson')) {
+          context.server.moduleGraph.invalidateModule(module)
+        }
+      }
+      context.server.ws.send({ type: 'full-reload' })
+      return []
     },
   }
 }

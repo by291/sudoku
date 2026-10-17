@@ -15,10 +15,23 @@ import { useLessonExtent } from '@/features/learning/composables/useLessonExtent
 const route = useRoute()
 const router = useRouter()
 const learning = useLearningStore()
-const lesson = computed(() =>
-  learning.lessons.find((lesson) => lesson.id === route.params.lessonId),
+const lessonId = computed(() => String(route.params.lessonId ?? ''))
+const directoryEntry = computed(() =>
+  learning.directory.find((lesson) => lesson.id === lessonId.value),
 )
+const lesson = computed(() =>
+  learning.selectedLesson?.id === lessonId.value ? learning.selectedLesson : undefined,
+)
+watch(
+  lessonId,
+  (id) => {
+    void learning.loadLesson(id)
+  },
+  { immediate: true },
+)
+const showContentLoading = useDelayedProgress(() => learning.contentLoading)
 const practice = computed(() => route.query.practice === '1')
+const lessonPage = useTemplateRef<HTMLElement>('lessonPage')
 const boardRegion = useTemplateRef<HTMLElement>('boardRegion')
 const lessonLayout = useTemplateRef<HTMLElement>('lessonLayout')
 const lessonExtent = useLessonExtent(lessonLayout, () => lesson.value?.id)
@@ -113,7 +126,8 @@ const primaryActionLabel = computed(() => {
 })
 const primaryActionDisabled = computed(
   () =>
-    !inGuide.value && (busy.value || (!canAdvance.value && !completed.value && !canSubmit.value)),
+    !lesson.value ||
+    (!inGuide.value && (busy.value || (!canAdvance.value && !completed.value && !canSubmit.value))),
 )
 
 async function runPrimaryAction() {
@@ -142,10 +156,30 @@ async function advanceStage() {
   const target = exerciseCells.value[0]
   boardRegion.value?.querySelectorAll('button')[target]?.focus()
 }
+
+async function retryLessonContent(event: MouseEvent) {
+  const id = lessonId.value
+  const heading = lessonPage.value?.querySelector<HTMLElement>('h1')
+  const restoreFocus = event.currentTarget === document.activeElement
+  if (restoreFocus) {
+    heading?.focus({ preventScroll: true })
+  }
+
+  await learning.loadLesson(id)
+  await nextTick()
+
+  // The retry control disappears during the request. Preserve its keyboard owner without
+  // taking focus back from someone who navigated or selected another control meanwhile.
+  if (!restoreFocus || lessonId.value !== id || document.activeElement !== heading) {
+    return
+  }
+  const selector = learning.contentError ? '.lesson-content-retry' : 'input[value="guide"]'
+  lessonPage.value?.querySelector<HTMLElement>(selector)?.focus()
+}
 </script>
 
 <template>
-  <section v-if="!lesson" class="panel unknown">
+  <section v-if="!directoryEntry" class="panel unknown">
     <h1>找不到这节课程</h1>
     <RouterLink v-slot="{ href, navigate }" to="/learn" custom>
       <NButton tag="a" type="primary" :href="href" @click="navigate">返回学习列表</NButton>
@@ -153,20 +187,21 @@ async function advanceStage() {
   </section>
   <GameView
     v-else-if="practice"
-    :key="lesson.id"
-    :metadata="{ kind: 'learning', lessonId: lesson.id }"
-    :heading="`${lesson.title} · 实战练习`"
-    :practice-difficulty="lesson.practiceDifficulty"
-    :practice-variant="lesson.practiceVariant"
+    :key="directoryEntry.id"
+    :metadata="{ kind: 'learning', lessonId: directoryEntry.id }"
+    :heading="`${directoryEntry.title} · 实战练习`"
+    :practice-difficulty="directoryEntry.practiceDifficulty"
+    :practice-variant="directoryEntry.practiceVariant"
   />
-  <section v-else-if="stageLesson && displayedStage" class="lesson-page" :aria-busy="busy">
+  <section v-else ref="lessonPage" class="lesson-page" :aria-busy="learning.contentLoading || busy">
     <header class="lesson-heading">
-      <h1>{{ lesson.title }}</h1>
+      <h1 tabindex="-1">{{ directoryEntry.title }}</h1>
       <NRadioGroup
         name="lesson-mode"
         role="radiogroup"
         aria-label="课程模式"
         :value="mode"
+        :disabled="!lesson"
         size="large"
         @update:value="selectMode"
       >
@@ -188,6 +223,7 @@ async function advanceStage() {
       <div ref="lessonLayout" class="lesson-layout">
         <div ref="boardRegion" class="lesson-board">
           <SudokuBoard
+            v-if="displayedStage"
             :board="displayedBoard"
             :givens="displayedStage.board"
             :notes="displayedNotes"
@@ -201,6 +237,7 @@ async function advanceStage() {
             :show-selected-rules="false"
             @select="selectCell"
           />
+          <div v-else class="lesson-board-placeholder" aria-label="课程棋盘待载入" />
           <div class="exercise-toolbar" role="group" aria-label="练习操作">
             <NButton
               type="primary"
@@ -223,16 +260,27 @@ async function advanceStage() {
             :class="{ 'concealed-control': inGuide }"
             layout="row"
             :disabled="inGuide || selected === null || busy || canAdvance || completed"
-            :action-label="stageLesson.exercise.kind === 'placement' ? '填写' : '排除'"
+            :action-label="stageLesson?.exercise.kind === 'placement' ? '填写' : '排除'"
             @digit="answer"
           />
           <div class="exercise-status muted">
             <span>{{ inGuide ? '圆点标出这一步的推理依据' : selectionText }}</span>
             <span v-if="!inGuide" class="keyboard-guide">键盘 1–9 · 方向键移动</span>
           </div>
-          <p class="muted stage-caption">{{ stageCaption }}</p>
+          <p class="muted stage-caption">
+            {{ lesson && learning.progressReady ? stageCaption : '练习进度未读取' }}
+          </p>
           <div class="feedback-slot" aria-live="polite">
-            <p v-if="showBusy" class="muted busy-caption">正在准备或保存练习，请稍候…</p>
+            <NAlert v-if="learning.contentError" type="error" :show-icon="false">
+              {{ learning.contentError }}
+              <NButton class="lesson-content-retry" @click="retryLessonContent">重试</NButton>
+            </NAlert>
+            <p v-else-if="showContentLoading" class="muted busy-caption" role="status">
+              正在读取课程内容，请稍候…
+            </p>
+            <p v-else-if="lesson && showBusy" class="muted busy-caption">
+              正在准备或保存练习，请稍候…
+            </p>
             <NCard
               v-else-if="!inGuide && feedback"
               class="answer-feedback"
@@ -249,10 +297,10 @@ async function advanceStage() {
         <aside class="panel lesson-guide" :aria-label="inGuide ? '学习讲解' : '练习指引'">
           <p class="exercise-kind">{{ exerciseKind }}</p>
           <h2>{{ inGuide ? '这一步，怎么想' : '试着推理一次' }}</h2>
-          <p class="introduction">{{ lesson.introduction }}</p>
+          <p class="introduction">{{ directoryEntry.introduction }}</p>
           <p v-if="!inGuide">{{ exercisePrompt }}</p>
           <p class="muted small">固定教学片段 · 候选数已包含前面推理的排除结果</p>
-          <template v-if="!inGuide && stageLesson.exercise.kind === 'elimination'">
+          <template v-if="!inGuide && stageLesson?.exercise.kind === 'elimination'">
             <p class="muted">已选择 {{ removals.length }} 个排除项</p>
             <ul v-if="removals.length" class="removal-list">
               <li v-for="pair in removals" :key="`${pair.cell}:${pair.digit}`">
@@ -261,7 +309,7 @@ async function advanceStage() {
               </li>
             </ul>
           </template>
-          <div v-if="evidenceVisible" class="explanation">
+          <div v-if="lesson && evidenceVisible" class="explanation">
             <h3 v-if="!inGuide">这一步，怎么想</h3>
             <p>{{ explanation }}</p>
             <ul v-if="evidenceDetails.length" class="evidence-details">
@@ -271,7 +319,11 @@ async function advanceStage() {
           <div class="practice-entry">
             <h3>把方法用起来</h3>
             <p>进入一盘完整数独，试着独立运用这节课的方法。</p>
-            <RouterLink v-slot="{ href, navigate }" :to="`/learn/${lesson.id}?practice=1`" custom>
+            <RouterLink
+              v-slot="{ href, navigate }"
+              :to="`/learn/${directoryEntry.id}?practice=1`"
+              custom
+            >
               <NButton tag="a" size="large" block :href="href" @click="navigate">
                 进入完整棋盘练习 <span aria-hidden="true" class="forward-arrow">→</span>
               </NButton>
@@ -317,6 +369,13 @@ h1 {
 }
 .lesson-board {
   min-width: 0;
+}
+.lesson-board-placeholder {
+  aspect-ratio: 1;
+  width: 100%;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
 }
 h2 {
   margin: 0 0 12px;
