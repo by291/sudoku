@@ -1,0 +1,47 @@
+INSTRUMENTATION_STATUS: class=dev.yigeyinian.sudoku.PlayerWorkflowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+dev.yigeyinian.sudoku.PlayerWorkflowTest:
+INSTRUMENTATION_STATUS: test=keepsKeysStationaryWhileTheSavedBoardLoads
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=dev.yigeyinian.sudoku.PlayerWorkflowTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: expected:<DpRect(left=54.666668.dp, top=403.66666.dp, right=87.333336.dp, bottom=455.66666.dp)> but was:<DpRect(left=54.666668.dp, top=605.3333.dp, right=87.333336.dp, bottom=657.3333.dp)>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at dev.yigeyinian.sudoku.PlayerWorkflowTest.keepsKeysStationaryWhileTheSavedBoardLoads(PlayerWorkflowTest.kt:168)
+
+INSTRUMENTATION_STATUS: stream=
+Error in keepsKeysStationaryWhileTheSavedBoardLoads(dev.yigeyinian.sudoku.PlayerWorkflowTest):
+java.lang.AssertionError: expected:<DpRect(left=54.666668.dp, top=403.66666.dp, right=87.333336.dp, bottom=455.66666.dp)> but was:<DpRect(left=54.666668.dp, top=605.3333.dp, right=87.333336.dp, bottom=657.3333.dp)>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at dev.yigeyinian.sudoku.PlayerWorkflowTest.keepsKeysStationaryWhileTheSavedBoardLoads(PlayerWorkflowTest.kt:168)
+
+INSTRUMENTATION_STATUS: test=keepsKeysStationaryWhileTheSavedBoardLoads
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 2.673
+There was 1 failure:
+1) keepsKeysStationaryWhileTheSavedBoardLoads(dev.yigeyinian.sudoku.PlayerWorkflowTest)
+java.lang.AssertionError: expected:<DpRect(left=54.666668.dp, top=403.66666.dp, right=87.333336.dp, bottom=455.66666.dp)> but was:<DpRect(left=54.666668.dp, top=605.3333.dp, right=87.333336.dp, bottom=657.3333.dp)>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at dev.yigeyinian.sudoku.PlayerWorkflowTest.keepsKeysStationaryWhileTheSavedBoardLoads(PlayerWorkflowTest.kt:168)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

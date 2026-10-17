@@ -58,3 +58,17 @@ Formatting, `qualityCheck`, app assembly, and instrumentation assembly passed. D
 - [Dark 360 × 800 dp, 1.5 font scale: return-refresh regression](verification/2026-10-17-home-preload/home-preload-large-text-tests.txt).
 
 The refresh regression compares bounds and colors at a fixed scroll position. No physical-device startup performance measurement is claimed.
+
+## Reserving the game board during loading
+
+The game previously omitted BoardWorkspace while its session was null. Tools and keys therefore appeared without the square, then moved when loading installed the session. The original gated-load regression measured the digit key's top moving from 403.67 dp to 605.33 dp on the phone: [pre-fix failure](verification/2026-10-17-board-loading/red-test.txt).
+
+BoardWorkspace now reserves its final square from the first composition. Delayed preparation feedback, cancellation/retry, the paused cover, and the real board render inside those same bounds. Preparation no longer inserts an extra outer row. Initial errors and retry are inside the placeholder; there is no initial retry button before an error or cancellation. The status line also retains its normal timer-height minimum when settings hide the timer. Native loading, save ownership, and paused restoration are unchanged.
+
+Tests gate native preparation while using the real repository and native board after release. They compare exact board/key bounds before and after delayed progress, paused restoration, active play, cancellation, and retry, and verify that digits remain disabled before readiness. Formatting, `qualityCheck :app:assembleDebug`, instrumentation assembly, and documentation checks passed. The disposable API 37.2 emulator was used; the personal emulator was untouched.
+
+- [360 × 800 dp: 20 player workflow checks](verification/2026-10-17-board-loading/phone-tests.txt).
+- [320 × 640 dp: 2 board loading checks](verification/2026-10-17-board-loading/small-tests.txt).
+- [800 × 360 dp: 2 board loading checks](verification/2026-10-17-board-loading/landscape-tests.txt).
+
+These results establish layout stability under controlled loading; they do not measure physical-device load speed or TalkBack behavior. The temporary emulator was stopped and deleted after verification.
