@@ -10,7 +10,7 @@ import type { Exercise } from '@/features/learning/model/lessons'
 
 export const useLearningStore = defineStore('learning', () => {
   const runtime = useGameRuntime()
-  const lessons = createLessons(runtime.engine)
+  const lessons = createLessons()
   const preferences = usePreferencesStore()
   const progress = shallowRef<readonly LessonProgress[]>([])
   const error = ref<string | null>(null)

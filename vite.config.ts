@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
+import { lessonCatalogueValidation } from './scripts/validate-lesson-catalogue.ts'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig(({ mode }) => ({
-  plugins: [vue()],
+  plugins: [lessonCatalogueValidation(), vue()],
   resolve: {
     alias: {
       ...(mode === 'test'

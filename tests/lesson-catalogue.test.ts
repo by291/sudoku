@@ -26,26 +26,25 @@ it('shares all stable authored courses and complete stage facts with Android', (
 
 it('loads an owned copy and rejects forged answers, candidates and transfer capabilities', async () => {
   const { loadLessonCatalogue } = await import('@/features/learning/model/lessonCatalogue')
-  const { testEngine } = await import('./support/semantics')
   const catalogue = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
   const original = catalogue.lessons[0].guided.board[0]
-  const loaded = loadLessonCatalogue(testEngine, catalogue)
+  const loaded = loadLessonCatalogue(catalogue)
   catalogue.lessons[0].guided.board[0] = 0
 
   expect(loaded[0].guided.board[0]).toBe(original)
-  expect(loadLessonCatalogue(testEngine)[0].guided.board[0]).toBe(original)
+  expect(loadLessonCatalogue()[0].guided.board[0]).toBe(original)
 
   const invalidAnswer = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
   invalidAnswer.lessons[0].guided.answer.expected.digit = 6
-  expect(() => loadLessonCatalogue(testEngine, invalidAnswer)).toThrow(/answer/)
+  expect(() => loadLessonCatalogue(invalidAnswer)).toThrow(/answer/)
 
   const invalidCandidates = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
   invalidCandidates.lessons[0].guided.candidates = [0]
-  expect(() => loadLessonCatalogue(testEngine, invalidCandidates)).toThrow(/authored teaching/)
+  expect(() => loadLessonCatalogue(invalidCandidates)).toThrow(/catalogue entry/)
 
   const invalidTransform = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
   invalidTransform.lessons[12].transfer.kind = 'swap-rows'
-  expect(() => loadLessonCatalogue(testEngine, invalidTransform)).toThrow(/variant/)
+  expect(() => loadLessonCatalogue(invalidTransform)).toThrow(/variant/)
 })
 
 it('records the original transfer transforms and materialized stage copy without redefining proof oracles', async () => {

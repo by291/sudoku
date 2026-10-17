@@ -5,7 +5,7 @@ import { loadSudokuModule } from '@/sudoku/wasmModule'
 export async function probeOptionalUnitFields() {
   const engine = await createMainEngine(await loadSudokuModule())
   try {
-    const stage = createLessons(engine)[0]?.guided
+    const stage = createLessons()[0]?.guided
     if (!stage || stage.step.kind !== 'placement' || stage.step.evidence.kind !== 'unit') {
       throw new Error('Missing authored unit placement')
     }

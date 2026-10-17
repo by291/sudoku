@@ -10,7 +10,12 @@ test.beforeAll(async () => {
   server = await createServer({
     configFile: false,
     root: process.cwd(),
-    resolve: { alias: { '@': fileURLToPath(new URL('../../src', import.meta.url)) } },
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('../../src', import.meta.url)),
+        '@content': fileURLToPath(new URL('../../content', import.meta.url)),
+      },
+    },
     server: { host: '127.0.0.1', port: 0, hmr: false },
     optimizeDeps: { entries: ['tests/migration/wasm-smoke.html'] },
     logLevel: 'error',

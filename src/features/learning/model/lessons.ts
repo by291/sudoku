@@ -1,11 +1,4 @@
-import type {
-  Board,
-  Difficulty,
-  NoteMask,
-  PuzzleRules,
-  SudokuVariant,
-  LessonCalculation,
-} from '@/sudoku/contracts'
+import type { Board, Difficulty, NoteMask, PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
 import type {
   ExerciseStage,
   LessonExercise,
@@ -30,9 +23,9 @@ export type Lesson = {
   exercises: readonly LessonExercise[]
 }
 
-/** Load one owned course snapshot and validate its mathematical evidence through Rust. */
-export function createLessons(calculation: LessonCalculation): readonly Lesson[] {
-  return loadLessonCatalogue(calculation)
+/** Load one owned course snapshot; bundled mathematical evidence is proved by the build gate. */
+export function createLessons(): readonly Lesson[] {
+  return loadLessonCatalogue()
 }
 
 export function lessonStages(lesson: Lesson): readonly ExerciseStage[] {

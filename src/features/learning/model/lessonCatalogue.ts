@@ -1,11 +1,12 @@
 import catalogueData from '@content/lessons/catalogue.json' with { type: 'json' }
-import type { LessonCalculation, SudokuVariant } from '@/sudoku/contracts'
+import type { SudokuVariant } from '@/sudoku/contracts'
 import { isDifficulty, isRecord } from '@/sudoku/values'
 import { SUDOKU_VARIANTS, supportsDifficulty } from '@/sudoku/catalogue'
 import { LESSON_IDS, lessonStageCount } from '@/features/learning/model/lessonIds'
 import type { Lesson } from '@/features/learning/model/lessons'
 import type { ExerciseStage, ExerciseAnswer } from '@/features/learning/model/exerciseStages'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
+import { isExerciseAnswer, isExerciseStage } from '@/features/learning/model/lessonStageShape'
 
 type AuthoredStage = ExerciseStage & {
   answer: ExerciseAnswer
@@ -29,7 +30,7 @@ function hasChineseCopy(value: unknown): value is string {
   return typeof value === 'string' && /[\u4e00-\u9fff]/u.test(value)
 }
 
-function isStage(value: unknown, calculation: LessonCalculation): value is AuthoredStage {
+function isStage(value: unknown): value is AuthoredStage {
   if (!isRecord(value) || !hasChineseCopy(value.explanation)) {
     return false
   }
@@ -40,17 +41,10 @@ function isStage(value: unknown, calculation: LessonCalculation): value is Autho
     return false
   }
 
-  // Rust validates the whole untrusted stage, including candidate-relative evidence and rule geometry.
-  const validation = calculation.validateTeachingStep(value)
-  if (validation.status !== 'valid') {
-    throw new Error(
-      `Invalid authored teaching step: ${validation.status === 'invalid' ? validation.issues.join('; ') : validation.status}`,
-    )
-  }
-  return true
+  return isExerciseAnswer(value.answer) && isExerciseStage(value)
 }
 
-function isLesson(value: unknown, calculation: LessonCalculation): value is AuthoredLesson {
+function isLesson(value: unknown): value is AuthoredLesson {
   if (
     !isRecord(value) ||
     typeof value.id !== 'string' ||
@@ -74,11 +68,7 @@ function isLesson(value: unknown, calculation: LessonCalculation): value is Auth
   ) {
     return false
   }
-  if (
-    !isStage(value.guided, calculation) ||
-    !Array.isArray(value.exercises) ||
-    value.exercises.length !== 2
-  ) {
+  if (!isStage(value.guided) || !Array.isArray(value.exercises) || value.exercises.length !== 2) {
     return false
   }
   return value.exercises.every(
@@ -87,7 +77,7 @@ function isLesson(value: unknown, calculation: LessonCalculation): value is Auth
       hasChineseCopy(exercise.title) &&
       Array.isArray(exercise.stages) &&
       exercise.stages.length > 0 &&
-      exercise.stages.every((stage: unknown) => isStage(stage, calculation)),
+      exercise.stages.every((stage: unknown) => isStage(stage)),
   )
 }
 
@@ -99,10 +89,7 @@ function stageSnapshot(stage: AuthoredStage): ExerciseStage {
 }
 
 /** Parsing owns a fresh snapshot; no consumer can mutate the imported catalogue or a later load. */
-export function loadLessonCatalogue(
-  calculation: LessonCalculation,
-  source: unknown = catalogueData,
-): readonly Lesson[] {
+export function loadLessonCatalogue(source: unknown = catalogueData): readonly Lesson[] {
   const value: unknown = structuredClone(source)
   if (
     !isRecord(value) ||
@@ -117,7 +104,7 @@ export function loadLessonCatalogue(
 
   return value.lessons.map((input: unknown, index): Lesson => {
     if (
-      !isLesson(input, calculation) ||
+      !isLesson(input) ||
       input.id !== LESSON_IDS[index] ||
       !supportsDifficulty(input.practiceVariant, input.practiceDifficulty)
     ) {

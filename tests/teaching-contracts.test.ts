@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { LESSONS } from './support/lessons'
 import { testEngine } from './support/semantics'
-import { createLessons } from '@/features/learning/model/lessons'
 import { transformStage } from '@/features/learning/model/exerciseStages'
 
 it('all_32_lesson_identities_and_expected_deductions_are_preserved', () => {
@@ -36,7 +35,7 @@ it('lesson_rule_transforms_obey_variant_capabilities', () => {
   ).toThrow(/arrow/)
 })
 
-it('rejects forged conclusions and malformed candidate states before publishing a course', () => {
+it('rejects forged conclusions and malformed candidate states at the Rust teaching validation boundary', () => {
   const stage = LESSONS[0].guided
   if (stage.step.kind !== 'placement') {
     throw new Error('Expected authored placement')
@@ -45,12 +44,6 @@ it('rejects forged conclusions and malformed candidate states before publishing 
   expect(
     testEngine.validateTeachingStep({ ...stage, step: { ...stage.step, digit: 6 } }).status,
   ).toBe('invalid')
-  expect(() =>
-    createLessons({
-      ...testEngine,
-      validateTeachingStep: () => ({ status: 'invalid', issues: ['Fixture rejection'] }),
-    }),
-  ).toThrow(/authored teaching/)
 })
 
 it('treats an explicitly undefined optional unit list as absent and rejects null', () => {

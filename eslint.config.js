@@ -180,7 +180,7 @@ export default [
           ...compositionImportPatterns,
           {
             regex:
-              '^@/(?!shared/model/sudokuPresentation(?:[./]|$)|sudoku/(?:contracts|generationInput|seed|ruleInput|values|catalogue)(?:[./]|$)|features/(?:game|learning|settings)/model/)',
+              '^@/(?!shared/model/sudokuPresentation(?:[./]|$)|sudoku/(?:contracts|generationInput|seed|ruleInput|values|catalogue|guards)(?:[./]|$)|features/(?:game|learning|settings)/model/)',
             message: 'Pure models may only depend on the engine and other pure models.',
           },
         ],
