@@ -53,6 +53,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -292,7 +293,8 @@ fun GameRoute(
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .heightIn(min = availableHeight).padding(horizontal = 12.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                // Split spare vertical space 40/60 so the group sits slightly above center.
+                verticalArrangement = Arrangement.spacedBy(8.dp, BiasAlignment.Vertical(-0.2f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (showPreparation) {

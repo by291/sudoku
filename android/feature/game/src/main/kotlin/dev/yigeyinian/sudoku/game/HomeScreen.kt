@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -76,7 +77,8 @@ internal fun HomeScreen(
                     top = if (wide) 12.dp else 8.dp,
                     bottom = 12.dp
                 ),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+            // Split spare vertical space 40/60 so the group sits slightly above center.
+            verticalArrangement = Arrangement.spacedBy(16.dp, BiasAlignment.Vertical(-0.2f))
         ) {
             if (wide) {
                 Row(
