@@ -68,7 +68,7 @@ it('keeps sparse notes in their digit positions as selection and notes change', 
   wrapper.unmount()
 })
 
-it('keeps conflict and hint markers accessible while preserving the selected keyboard cell', async () => {
+it('describes conflicts without visible markers and preserves hints and keyboard selection', async () => {
   const board = [...emptyBoardProps.board]
   board[0] = 5
   board[1] = 5
@@ -83,7 +83,7 @@ it('keeps conflict and hint markers accessible while preserving the selected key
   expect(buttons[0].classes()).toEqual(expect.arrayContaining(['given', 'selected', 'conflict']))
   expect(buttons[1].classes()).not.toContain('given')
   expect(buttons[1].get('.value').text()).toBe('5')
-  expect(buttons[1].get('.marker').text()).toBe('!')
+  expect(buttons[1].find('.marker').exists()).toBe(false)
   expect(buttons[1].attributes('aria-label')).toContain('冲突，请检查')
   expect(buttons[2].get('.marker').text()).toBe('•')
   expect(buttons[2].attributes('aria-label')).toContain('提示位置')

@@ -28,7 +28,9 @@ Success means that players can complete a game in all three modes; puzzles have 
 
 On desktop, center the board and use physical keyboard input, without an on-screen number pad. Keep a compact common-action row directly below the board; hint explanations may appear beside it. On phones and coarse-pointer devices, place six tools in one row beneath the board, followed by a single row of digits 1–9, following the user's mobile-game reference. Keep the board square, clearly separate the nine 3-by-3 boxes, and scale digits and notes to the available width. The page must not overflow horizontally at a viewport width of 360 pixels.
 
-Use a calm, simple visual design: a light paper-like background, dark text, teal accents, and distinct error and hint states. Support light, dark, and system themes. Use markers or descriptions in addition to color for errors. Buttons must have text or accessible names. Board cells must expose their row, column, fixed value, player value, and notes accessibly.
+Use a calm, simple visual design: a light paper-like background, dark text, teal accents, and distinct error and hint states. Support light, dark, and system themes. Expose conflicts through accessible cell descriptions as well as their background color. Buttons must have text or accessible names. Board cells must expose their row, column, fixed value, player value, and notes accessibly.
+
+The board feedback refinement requested on 2026-10-17 keeps grid lines unchanged on pointer hover. Given and player-entered digits share the same size and 650 font weight, with color alone distinguishing their origin. Conflicting cells use the full soft-error background in both themes, without exclamation marks or a visible repeated violation list above the board; accessible conflict descriptions remain available. Pressing a conflicting cell preserves its error background.
 
 Use Vue Router in hash mode so direct navigation and refresh work on static hosting. Routes are `/`, `/play/free`, `/learn`, `/learn/:lessonId`, `/play/daily`, and `/records`.
 

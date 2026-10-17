@@ -167,8 +167,9 @@ watch(
               {{ digit }}
             </span>
           </span>
-          <span v-if="item.conflicting" class="marker" aria-hidden="true">!</span
-          ><span v-else-if="item.highlighted" class="marker" aria-hidden="true">•</span>
+          <span v-if="item.highlighted && !item.conflicting" class="marker" aria-hidden="true"
+            >•</span
+          >
         </template>
       </button>
       <SudokuClues :geometry="geometry" :obscured="obscured" />
@@ -226,7 +227,6 @@ watch(
 }
 .cell.given {
   color: var(--text);
-  font-weight: 650;
 }
 .cell.peer {
   background: var(--background);
@@ -239,10 +239,7 @@ watch(
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 .cell.conflict {
-  background: color-mix(in srgb, var(--error-soft) 45%, var(--surface));
-}
-.cell.conflict .marker {
-  color: var(--error);
+  background: var(--error-soft);
 }
 .cell.hinted {
   box-shadow: inset 0 0 0 2px var(--accent);
@@ -263,10 +260,7 @@ watch(
   opacity: 1;
   cursor: default;
 }
-.cell:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-.cell:active:not(:disabled) {
+.cell:active:not(:disabled):not(.conflict) {
   background: var(--accent-soft);
 }
 .notes {
@@ -296,6 +290,7 @@ watch(
 .value {
   position: relative;
   z-index: 2;
+  font-weight: 650;
 }
 .value,
 .notes span {

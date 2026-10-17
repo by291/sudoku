@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { violationMessage } from '@/features/game/model/violationPresentation'
 import { NAlert, NButton, NCard } from 'naive-ui'
 import { computed, ref, watch, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -414,22 +413,6 @@ function erase() {
         :show-icon="false"
         >冲突检查超出预算，仅显示已确认的冲突，尚不能保证其他线索有效。</NAlert
       >
-      <ul
-        v-if="
-          hasSession &&
-          highlightConflicts &&
-          presentation.conflictEvaluation.violations.length &&
-          presentation.phase === 'playing'
-        "
-        class="rule-violations"
-      >
-        <li
-          v-for="violation in presentation.conflictEvaluation.violations"
-          :key="violation.constraintId"
-        >
-          {{ violationMessage(violation) }}
-        </li>
-      </ul>
       <NCard
         v-if="hasSession && presentation.readOnly"
         class="feedback-message"
@@ -688,10 +671,6 @@ function erase() {
 .rule-summary {
   color: var(--muted);
   line-height: 1.7;
-}
-.rule-violations {
-  color: var(--error);
-  font-size: 14px;
 }
 .page-heading {
   max-width: 560px;

@@ -105,7 +105,7 @@ The UX refinement approved on 2026-10-12 exposes type cards and the three diffic
 
 Daily play exposes the same six type cards and their individual completion status in its setup modal. Confirming the selected type settles and saves the current session before starting or continuing that type. Medium remains fixed, and completed types explicitly offer practice. Selection alone performs no game transition. On a failed save, retain the unsaved current session and offer retry; switching must not discard its in-memory state.
 
-The shared board retains CSS Grid and existing cell buttons. Draw clue geometry with a responsive SVG layer aligned to the 9×9 grid; decorative SVG has `pointer-events: none` and is hidden from accessibility APIs. Digits, notes, focus rings, and conflict/hint markers remain readable above the drawings.
+The shared board retains CSS Grid and existing cell buttons. Draw clue geometry with a responsive SVG layer aligned to the 9×9 grid; decorative SVG has `pointer-events: none` and is hidden from accessibility APIs. Digits, notes, focus rings, and hint markers remain readable above the drawings. Conflicts use the cell background and accessible descriptions, following the 2026-10-17 board feedback refinement in the [product design](2026-10-11-sudoku-design.md).
 
 - Diagonal: show both marked diagonals with clear rule text.
 - Jigsaw: draw the actual region boundaries and remove misleading 3×3 box borders.

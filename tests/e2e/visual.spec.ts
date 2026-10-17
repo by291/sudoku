@@ -9,7 +9,7 @@ import {
 } from './support'
 import { makeSession } from '../support/gameFixtures'
 
-test('retains conflict markers and fixed sparse note positions in both themes', async ({
+test('shows conflicts through cell backgrounds and preserves sparse notes in both themes', async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 360, height: 850 })
@@ -41,10 +41,17 @@ test('retains conflict markers and fixed sparse note positions in both themes', 
       .getByText(theme, { exact: true })
       .click()
     await expect(conflict).toHaveAccessibleName(/冲突/)
-    await expect(conflict.locator('.marker')).toHaveText('!')
+    await expect(conflict.locator('.marker')).toHaveCount(0)
+    await expect(
+      page.getByText('同一行、列、宫、区域、对角线或笼中的数字不能重复。', { exact: true }),
+    ).toHaveCount(0)
+    await expect(conflict).toHaveCSS(
+      'background-color',
+      theme === '浅色' ? 'rgb(250, 228, 223)' : 'rgb(99, 62, 54)',
+    )
     if (testInfo.project.name === 'desktop') {
       await page.getByRole('group', { name: '数独棋盘' }).screenshot({
-        path: `.superpowers/web-parity/conflict-${theme === '浅色' ? 'light' : 'dark'}.png`,
+        path: `.superpowers/board-feedback/conflict-${theme === '浅色' ? 'light' : 'dark'}.png`,
       })
     }
   }
@@ -133,6 +140,14 @@ test('keeps boards square and focus visible at 360, 390 and desktop widths', asy
 }, testInfo) => {
   await seedSession(page, makeSession())
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
+  const hoverCell = page.getByRole('button', { name: cellName(9) })
+  const gridLines = await hoverCell.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return { right: style.borderRightColor, bottom: style.borderBottomColor }
+  })
+  await hoverCell.hover()
+  await expect(hoverCell).toHaveCSS('border-right-color', gridLines.right)
+  await expect(hoverCell).toHaveCSS('border-bottom-color', gridLines.bottom)
   await selectGameMenuAction(page, '生成候选数')
   await page.getByRole('button', { name: cellName(2) }).click()
   await page.getByRole('button', { name: cellName(2) }).press('ArrowRight')
