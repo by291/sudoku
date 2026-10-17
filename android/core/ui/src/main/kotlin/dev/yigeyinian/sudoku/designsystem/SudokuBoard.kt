@@ -42,9 +42,10 @@ import androidx.compose.ui.semantics.collectionItemInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import dev.yigeyinian.sudoku.model.Evidence
 import dev.yigeyinian.sudoku.model.PuzzleRules
@@ -76,6 +77,7 @@ fun SudokuBoard(
     ) { "Invalid board drawing value" }
     val colors = LocalBoardColors.current
     val focusRequesters = remember { List(81) { FocusRequester() } }
+    val noteMeasurer = rememberTextMeasurer(cacheSize = 64)
     val displayed = givens.indices.map { if (givens[it] != 0) givens[it] else entries[it] }
     val sumLabels = remember(rules) {
         if (rules is PuzzleRules.Killer) {
@@ -114,6 +116,7 @@ fun SudokuBoard(
                             given = givens[cell],
                             value = displayed[cell],
                             noteMask = notes[cell],
+                            noteMeasurer = noteMeasurer,
                             selected = cell == selectedCell,
                             conflict = cell in conflictCells,
                             evidence = cell in allEvidenceCells,
@@ -142,6 +145,7 @@ private fun BoardCell(
     given: Int,
     value: Int,
     noteMask: Int,
+    noteMeasurer: TextMeasurer,
     selected: Boolean,
     conflict: Boolean,
     evidence: Boolean,
@@ -227,7 +231,7 @@ private fun BoardCell(
                 modifier = Modifier.clearAndSetSemantics {}
             )
         } else {
-            CandidateNotes(noteMask, noteSize)
+            CandidateNotes(noteMask, noteSize, noteMeasurer)
         }
         if (clueLabel != null) {
             Text(
@@ -250,32 +254,6 @@ private fun BoardCell(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp).clearAndSetSemantics {}
             )
-        }
-    }
-}
-
-@Composable
-private fun CandidateNotes(mask: Int, noteSize: TextUnit) {
-    val colors = LocalBoardColors.current
-    Column(Modifier.fillMaxSize().padding(3.dp).clearAndSetSemantics {}) {
-        repeat(3) { row ->
-            Row(Modifier.fillMaxWidth().weight(1f)) {
-                repeat(3) { column ->
-                    val digit = row * 3 + column + 1
-                    Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (mask and (1 shl (digit - 1)) != 0) {
-                            // A note owns a third-cell; the inherited body line height clips its glyph.
-                            Text(
-                                digit.toString(),
-                                color = colors.muted,
-                                fontSize = noteSize,
-                                lineHeight = noteSize,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
