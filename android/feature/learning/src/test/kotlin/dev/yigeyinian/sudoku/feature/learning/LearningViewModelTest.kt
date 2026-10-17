@@ -17,6 +17,7 @@ import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.learning.ExerciseAnswer
 import dev.yigeyinian.sudoku.model.learning.LearningContentRepository
 import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
+import dev.yigeyinian.sudoku.model.learning.directoryEntry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,6 +36,30 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LearningViewModelTest {
+    @Test fun `dataset replacement clears personal progress even if subsequent progress reads fail`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = LearningRepository()
+            repository.progress.add(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
+            val model = model(repository)
+            model.open()
+            runCurrent()
+            assertEquals(1, model.uiState.value.overview().completedCount)
+
+            repository.epoch = 1
+            repository.failProgress = true
+            repository.datasetEpochs.emit(1)
+            runCurrent()
+
+            assertTrue(model.uiState.value.progress.isEmpty())
+            assertEquals(null, model.uiState.value.epoch)
+            assertEquals(32, model.uiState.value.directory.size)
+            assertNotNull(model.uiState.value.error)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     private fun catalogue(): LessonCatalogue = LessonCatalogue.decode(
         checkNotNull(javaClass.classLoader.getResourceAsStream("lessons/catalogue.json")).bufferedReader().use {
             it.readText()
@@ -48,14 +73,15 @@ class LearningViewModelTest {
             LearningSnapshotLoader(
                 repository,
                 object : LearningContentRepository {
-                    override suspend fun load() = EngineOutcome.Completed(courses)
+                    override val directory = courses.lessons.map { it.directoryEntry() }
+                    override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
                 }
             )
         )
     }
 
     @Test
-    fun `prepared directory is available before navigation and first open reuses it`() = runTest {
+    fun `static directory is immediate and opening it never decodes lesson boards`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = LearningRepository()
@@ -64,22 +90,22 @@ class LearningViewModelTest {
             val loader = LearningSnapshotLoader(
                 repository,
                 object : LearningContentRepository {
-                    override suspend fun load(): EngineOutcome<LessonCatalogue> {
+                    override val directory = courses.lessons.map { it.directoryEntry() }
+                    override suspend fun loadLesson(id: String): EngineOutcome<LessonCatalogue> {
                         reads++
                         return EngineOutcome.Completed(courses)
                     }
                 }
             )
-            loader.prepare()
             val model = LearningViewModel(repository, loader)
 
-            assertFalse(model.uiState.value.loading)
+            assertTrue(model.uiState.value.loading)
             assertEquals(12, model.uiState.value.overview().lessons.size)
             model.open()
             runCurrent()
 
             assertFalse(model.uiState.value.loading)
-            assertEquals(1, reads)
+            assertEquals(0, reads)
             repository.progress.add(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
             model.open()
             assertEquals(12, model.uiState.value.overview().lessons.size)
@@ -103,10 +129,11 @@ class LearningViewModelTest {
                 }
             },
             object : LearningContentRepository {
-                override suspend fun load() = EngineOutcome.Completed(courses)
+                override val directory = courses.lessons.map { it.directoryEntry() }
+                override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
             }
         )
-        val preparation = launch { loader.prepare() }
+        val preparation = launch { loader.read() }
         runCurrent()
         assertTrue(loader.snapshot.loading)
         assertEquals(null, loader.snapshot.catalogue)
@@ -117,9 +144,9 @@ class LearningViewModelTest {
 
         assertNotNull(loader.snapshot.error)
         assertEquals(null, loader.snapshot.catalogue)
-        loader.prepare()
+        loader.read()
         assertEquals(1L, loader.snapshot.epoch)
-        assertEquals(32, loader.snapshot.catalogue?.lessons?.size)
+        assertEquals(32, loader.snapshot.directory.size)
     }
 
     private fun answerCurrent(model: LearningViewModel) {
@@ -307,12 +334,17 @@ private class LearningRepository : GameRepository {
     var epoch = 0L
     var settings = Settings()
     val progress = mutableListOf<LessonProgress>()
+    var failProgress = false
     var failSettings = false
     var pendingSettings: CompletableDeferred<Unit>? = null
 
     override suspend fun readDatasetEpoch() = StorageOutcome.Success(epoch)
     override suspend fun readSettings() = StorageOutcome.Success(settings)
-    override suspend fun readLessonProgress() = StorageOutcome.Success(progress.toList())
+    override suspend fun readLessonProgress(): StorageOutcome<List<LessonProgress>> = if (failProgress) {
+        StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Progress unavailable"))
+    } else {
+        StorageOutcome.Success(progress.toList())
+    }
     override suspend fun writeSettings(settings: Settings, expectedEpoch: Long): StorageOutcome<Unit> {
         pendingSettings?.await()
         if (failSettings || expectedEpoch != epoch) {

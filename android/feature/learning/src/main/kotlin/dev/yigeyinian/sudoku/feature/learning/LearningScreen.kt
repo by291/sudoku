@@ -70,69 +70,73 @@ internal fun LearningScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp)
         ) {
             item(key = "overview") {
-                LearningHeading(overview, progressReady = state.catalogue != null)
+                LearningHeading(overview, progressReady = state.epoch != null)
                 Spacer(Modifier.height(22.dp))
                 CourseChoices(state.selectedVariant, onVariant)
                 Spacer(Modifier.height(18.dp))
             }
-            when {
-                state.loading -> if (showLoading) {
-                    item(key = "loading") {
-                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(Modifier.semantics { contentDescription = "正在读取课程" })
-                        }
-                    }
-                }
-                state.error != null -> item(key = "error") {
+            if (state.error != null) {
+                item(key = "error") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(state.error, color = MaterialTheme.colorScheme.error)
                         OutlinedButton(onClick = onRetry) { Text("重新读取课程") }
                     }
                 }
-                else -> {
-                    overview.suggested?.let { suggested ->
-                        item(key = "suggested") {
-                            SuggestedLesson(suggested, overview.courseCompleted) { onOpenLesson(suggested.lesson.id) }
-                            Spacer(Modifier.height(24.dp))
+            }
+            overview.suggested?.let { suggested ->
+                item(key = "suggested") {
+                    Box(
+                        Modifier.then(if (state.epoch == null) Modifier.clearAndSetSemantics { } else Modifier)
+                            .alpha(if (state.epoch == null) 0f else 1f)
+                    ) {
+                        SuggestedLesson(suggested, overview.courseCompleted) {
+                            if (state.epoch != null) onOpenLesson(suggested.lesson.id)
                         }
                     }
-                    item(key = "course-heading") {
-                        Row(
-                            Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
+            item(key = "course-heading") {
+                Row(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${courseLabel(state.selectedVariant)}课程",
+                        Modifier.weight(1f).semantics { heading() },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        if (state.epoch ==
+                            null
                         ) {
-                            Text(
-                                "${courseLabel(state.selectedVariant)}课程",
-                                Modifier.weight(1f).semantics { heading() },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                "已完成 ${overview.courseCompleted} / ${overview.lessons.size}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    itemsIndexed(overview.lessons, key = { _, entry -> entry.lesson.id }) { index, entry ->
-                        LessonRow(
-                            entry,
-                            suggested = entry.lesson.id == overview.suggested?.lesson?.id,
-                            first = index == 0,
-                            last = index == overview.lessons.lastIndex,
-                            onOpen = { onOpenLesson(entry.lesson.id) }
-                        )
-                    }
-                    item(key = "footer") {
-                        Box(Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                                "课程自由选择，学过的也可以随时复习",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
+                            "— / ${overview.lessons.size}"
+                        } else {
+                            "已完成 ${overview.courseCompleted} / ${overview.lessons.size}"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            itemsIndexed(overview.lessons, key = { _, entry -> entry.lesson.id }) { index, entry ->
+                LessonRow(
+                    entry,
+                    suggested = entry.lesson.id == overview.suggested?.lesson?.id,
+                    first = index == 0,
+                    last = index == overview.lessons.lastIndex,
+                    onOpen = { onOpenLesson(entry.lesson.id) }
+                )
+            }
+            item(key = "footer") {
+                Box(Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        "课程自由选择，学过的也可以随时复习",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
@@ -286,7 +290,7 @@ private fun SuggestedLesson(entry: LearningLessonEntry, courseCompleted: Int, on
                 Text(caption, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = colors.primary)
                 Text(
                     if (entry.inProgress) {
-                        "第 ${entry.stageIndex + 1} / ${entry.lesson.stages.size} 阶段"
+                        "第 ${entry.stageIndex + 1} / ${entry.lesson.stageCount} 阶段"
                     } else {
                         "第 ${entry.number} 节"
                     },

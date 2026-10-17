@@ -13,6 +13,7 @@ import dev.yigeyinian.sudoku.model.isoInstant
 import dev.yigeyinian.sudoku.model.learning.ExerciseAnswer
 import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 import dev.yigeyinian.sudoku.model.learning.LessonCursor
+import dev.yigeyinian.sudoku.model.learning.directoryEntry
 import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -30,6 +31,9 @@ internal data class ExerciseFeedback(
 internal data class LearningUiState(
     val loading: Boolean = true,
     val catalogue: LessonCatalogue? = null,
+    val directory: List<dev.yigeyinian.sudoku.model.learning.LessonDirectoryEntry> = catalogue?.lessons?.map {
+        it.directoryEntry()
+    }.orEmpty(),
     val progress: List<LessonProgress> = emptyList(),
     val settings: Settings = Settings(),
     val epoch: Long? = null,
@@ -55,50 +59,91 @@ internal class LearningViewModel @Inject constructor(
     private val repository: GameRepository,
     private val loader: LearningSnapshotLoader
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(loader.snapshot)
+    private val mutableState = MutableStateFlow(LearningUiState(directory = loader.snapshot.directory))
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
+    private var observedEpoch: Long? = null
     private var loading: Job? = null
     private var requestedLessonId: String? = null
-    private var opened = false
+
+    init {
+        viewModelScope.launch {
+            loader.datasetEpochs.collect { epoch ->
+                val previous = observedEpoch
+                observedEpoch = epoch
+                if ((previous != null && previous != epoch) ||
+                    (mutableState.value.epoch != null && mutableState.value.epoch != epoch)
+                ) {
+                    invalidatePersonalState()
+                    open(requestedLessonId)
+                }
+            }
+        }
+    }
+
+    private fun invalidatePersonalState() {
+        loading?.cancel()
+        generation++
+        loader.invalidate()
+        mutableState.value = LearningUiState(
+            directory = loader.snapshot.directory,
+            selectedVariant = mutableState.value.selectedVariant,
+            lessonId = requestedLessonId
+        )
+    }
 
     fun open(lessonId: String? = null) {
         requestedLessonId = lessonId
         loading?.cancel()
         val operation = ++generation
-        val prepared = if (!opened && lessonId == null) loader.takePreparedDirectory() else null
-        opened = true
-        if (prepared != null) {
-            mutableState.value = prepared.copy(selectedVariant = mutableState.value.selectedVariant)
-            return
-        }
-
         // Keep the directory mounted during return refreshes. Lessons still wait for a fresh
         // durable cursor before permitting answers; the cached overview is not an exercise state.
         mutableState.value = if (lessonId == null) {
             mutableState.value.copy(error = null)
         } else {
-            LearningUiState(selectedVariant = mutableState.value.selectedVariant, lessonId = lessonId)
+            LearningUiState(
+                selectedVariant = mutableState.value.selectedVariant,
+                lessonId = lessonId,
+                directory = loader.snapshot.directory
+            )
         }
         loading = viewModelScope.launch {
-            val loaded = loader.read()
+            val currentEpoch = repository.readDatasetEpoch()
+            if (operation != generation) return@launch
+            if (currentEpoch is StorageOutcome.Success && mutableState.value.epoch != null &&
+                currentEpoch.value != mutableState.value.epoch
+            ) {
+                loader.invalidate()
+                mutableState.value = LearningUiState(
+                    directory = loader.snapshot.directory,
+                    selectedVariant = mutableState.value.selectedVariant,
+                    lessonId = lessonId
+                )
+            }
+            val loaded = loader.read(lessonId)
             if (operation != generation) {
                 return@launch
             }
+            if (loaded.epoch != null && observedEpoch?.let { loaded.epoch != it } == true) {
+                invalidatePersonalState()
+                open(requestedLessonId)
+                return@launch
+            }
             val catalogue = loaded.catalogue
-            if (catalogue == null) {
+            if (loaded.error != null) {
                 failLoad(checkNotNull(loaded.error))
                 return@launch
             }
-            val lesson = lessonId?.let(catalogue::lesson)
+            val lesson = lessonId?.let { catalogue?.lesson(it) }
             if (lessonId != null && lesson == null) {
                 failLoad("找不到这节课程，请返回学习列表。")
                 return@launch
             }
-            val cursor = lessonId?.let { catalogue.restoreCursor(it, loaded.settings.lessonStages?.get(it) ?: 0) }
+            val cursor = lessonId?.let { catalogue?.restoreCursor(it, loaded.settings.lessonStages?.get(it) ?: 0) }
             mutableState.value = LearningUiState(
                 loading = false,
                 catalogue = catalogue,
+                directory = loaded.directory,
                 progress = loaded.progress,
                 settings = loaded.settings,
                 epoch = loaded.epoch,
@@ -116,6 +161,7 @@ internal class LearningViewModel @Inject constructor(
         viewModelScope.launch {
             val epoch = repository.readDatasetEpoch()
             if (epoch is StorageOutcome.Success && epoch.value != mutableState.value.epoch) {
+                invalidatePersonalState()
                 open(requestedLessonId)
             }
         }
@@ -210,6 +256,7 @@ internal class LearningViewModel @Inject constructor(
                 return@launch
             }
             if (currentEpoch is StorageOutcome.Success && currentEpoch.value != epoch) {
+                invalidatePersonalState()
                 open(requestedLessonId)
                 return@launch
             }
@@ -253,6 +300,7 @@ internal class LearningViewModel @Inject constructor(
                 return@launch
             }
             if (after is StorageOutcome.Success && after.value != epoch) {
+                invalidatePersonalState()
                 open(requestedLessonId)
                 return@launch
             }

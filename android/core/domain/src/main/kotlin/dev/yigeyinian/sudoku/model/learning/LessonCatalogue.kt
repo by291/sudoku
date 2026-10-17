@@ -157,6 +157,72 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
         /** Available without asset I/O; decoding verifies the bundled catalogue against these identities. */
         val bundledLessonCount: Int get() = stableIds.size
 
+        fun decodeLesson(source: String): LessonCatalogue {
+            val lesson = json.decodeFromString<Lesson>(source)
+            require(lesson.id in stableIds) { "Unknown course identity" }
+            validateLesson(lesson)
+            return LessonCatalogue(listOf(lesson))
+        }
+
+        private fun validateLesson(lesson: Lesson) {
+            require(
+                lesson.title.isNotBlank() && hasChineseCopy(lesson.introduction) &&
+                    hasChineseCopy(lesson.explanation)
+            ) { "Missing course copy in ${lesson.id}" }
+            require(lesson.practiceDifficulty in lesson.practiceVariant.difficulties) {
+                "Unsupported practice difficulty in ${lesson.id}"
+            }
+            require(
+                lesson.exercises.size == 2 &&
+                    lesson.exercises.all {
+                        hasChineseCopy(it.title) && it.stages.isNotEmpty()
+                    }
+            ) { "Missing focused or transfer exercise in ${lesson.id}" }
+            require(lesson.stages.size == if (lesson.id.endsWith("-combined")) 6 else 2) {
+                "Changed stage count in ${lesson.id}"
+            }
+            require(lesson.guided == lesson.stages.first()) {
+                "Guided stage must match the first exercise in ${lesson.id}"
+            }
+            require(
+                lesson.transfer.kind != TeachingTransform.SWAP_ROWS || lesson.practiceVariant == Variant.CLASSIC
+            ) {
+                "Row permutations cannot change variant clues"
+            }
+            require((lesson.transfer.source == TransferSource.AUTHORED_ALTERNATE) == (lesson.id == "arrow-rules")) {
+                "Unexpected authored transfer source"
+            }
+
+            for (stage in lesson.stages) {
+                require(stage.rules.variant == lesson.practiceVariant) { "Mismatched course rules in ${lesson.id}" }
+                require(
+                    stage.board.size == BOARD_SIZE && stage.board.all {
+                        it in 0..9
+                    }
+                ) { "Invalid teaching board in ${lesson.id}" }
+                require(
+                    stage.candidates.size == BOARD_SIZE && stage.candidates.all {
+                        it in 0..ALL_DIGITS_MASK
+                    }
+                ) { "Invalid candidate preconditions in ${lesson.id}" }
+                require(
+                    stage.board.indices.all {
+                        stage.board[it] == 0 || stage.candidates[it] == 0
+                    }
+                ) { "Filled cells cannot have candidate preconditions" }
+                require(hasChineseCopy(stage.explanation)) { "Missing Chinese stage explanation" }
+                require(sameAnswer(stage.answer, expectedAnswer(stage.step))) {
+                    "Stage answer disagrees with authored conclusion"
+                }
+                require(
+                    answerPairs(stage.answer).isNotEmpty() &&
+                        answerPairs(stage.answer).all {
+                            it.cell in 0 until BOARD_SIZE && it.digit in 1..9
+                        }
+                ) { "Invalid stage answer" }
+            }
+        }
+
         fun decode(source: String): LessonCatalogue {
             val document = json.decodeFromString<CatalogueDocument>(source)
             require(document.schemaVersion == 1) { "Unsupported lesson catalogue schema" }
@@ -168,64 +234,7 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
             }
             require(document.lessons.map { it.id } == stableIds) { "Course identities or order changed" }
 
-            for (lesson in document.lessons) {
-                require(
-                    lesson.title.isNotBlank() && hasChineseCopy(lesson.introduction) &&
-                        hasChineseCopy(lesson.explanation)
-                ) { "Missing course copy in ${lesson.id}" }
-                require(lesson.practiceDifficulty in lesson.practiceVariant.difficulties) {
-                    "Unsupported practice difficulty in ${lesson.id}"
-                }
-                require(
-                    lesson.exercises.size == 2 &&
-                        lesson.exercises.all {
-                            hasChineseCopy(it.title) && it.stages.isNotEmpty()
-                        }
-                ) { "Missing focused or transfer exercise in ${lesson.id}" }
-                require(lesson.stages.size == if (lesson.id.endsWith("-combined")) 6 else 2) {
-                    "Changed stage count in ${lesson.id}"
-                }
-                require(lesson.guided == lesson.stages.first()) {
-                    "Guided stage must match the first exercise in ${lesson.id}"
-                }
-                require(
-                    lesson.transfer.kind != TeachingTransform.SWAP_ROWS || lesson.practiceVariant == Variant.CLASSIC
-                ) {
-                    "Row permutations cannot change variant clues"
-                }
-                require((lesson.transfer.source == TransferSource.AUTHORED_ALTERNATE) == (lesson.id == "arrow-rules")) {
-                    "Unexpected authored transfer source"
-                }
-
-                for (stage in lesson.stages) {
-                    require(stage.rules.variant == lesson.practiceVariant) { "Mismatched course rules in ${lesson.id}" }
-                    require(
-                        stage.board.size == BOARD_SIZE && stage.board.all {
-                            it in 0..9
-                        }
-                    ) { "Invalid teaching board in ${lesson.id}" }
-                    require(
-                        stage.candidates.size == BOARD_SIZE && stage.candidates.all {
-                            it in 0..ALL_DIGITS_MASK
-                        }
-                    ) { "Invalid candidate preconditions in ${lesson.id}" }
-                    require(
-                        stage.board.indices.all {
-                            stage.board[it] == 0 || stage.candidates[it] == 0
-                        }
-                    ) { "Filled cells cannot have candidate preconditions" }
-                    require(hasChineseCopy(stage.explanation)) { "Missing Chinese stage explanation" }
-                    require(sameAnswer(stage.answer, expectedAnswer(stage.step))) {
-                        "Stage answer disagrees with authored conclusion"
-                    }
-                    require(
-                        answerPairs(stage.answer).isNotEmpty() &&
-                            answerPairs(stage.answer).all {
-                                it.cell in 0 until BOARD_SIZE && it.digit in 1..9
-                            }
-                    ) { "Invalid stage answer" }
-                }
-            }
+            document.lessons.forEach(::validateLesson)
             return LessonCatalogue(document.lessons)
         }
     }

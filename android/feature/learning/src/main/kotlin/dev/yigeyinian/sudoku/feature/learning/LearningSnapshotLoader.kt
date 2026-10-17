@@ -11,36 +11,23 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Prepares the directory before navigation; lesson workflows still refresh durable progress. */
+/** Combines small personal progress reads with only the requested bundled lesson. */
 @Singleton
 class LearningSnapshotLoader @Inject constructor(
     private val repository: GameRepository,
     private val content: LearningContentRepository
 ) {
-    internal var snapshot = LearningUiState()
+    internal var snapshot = LearningUiState(directory = content.directory)
         private set
+    internal val datasetEpochs get() = repository.datasetEpochs
+    internal fun invalidate() {
+        snapshot = LearningUiState(directory = content.directory)
+    }
     private val reads = Mutex()
-    private var preparedForDirectory = false
-
-    /** Errors stay in the learning snapshot for its retry UI, without blocking unrelated play. */
-    suspend fun prepare() {
-        read()
-        preparedForDirectory = true
-    }
-
-    internal fun takePreparedDirectory(): LearningUiState? {
-        if (!preparedForDirectory) {
-            return null
-        }
-        preparedForDirectory = false
-        return snapshot
-    }
-
-    internal suspend fun read(): LearningUiState = reads.withLock {
-        preparedForDirectory = false
+    internal suspend fun read(lessonId: String? = null): LearningUiState = reads.withLock {
         val result = coroutineScope {
             val epoch = repository.readDatasetEpoch()
-            val catalogueRead = async { content.load() }
+            val catalogueRead = async { lessonId?.let { content.loadLesson(it) } }
             val settingsRead = async { repository.readSettings() }
             val progressRead = async { repository.readLessonProgress() }
             val catalogue = catalogueRead.await()
@@ -53,11 +40,12 @@ class LearningSnapshotLoader @Inject constructor(
                     LearningUiState(loading = false, error = "学习进度暂时无法读取，请重试。")
                 epoch.value != currentEpoch.value ->
                     LearningUiState(loading = false, error = "本地资料已更新，请重新读取课程。")
-                catalogue !is EngineOutcome.Completed ->
-                    LearningUiState(loading = false, error = contentFailure(catalogue))
+                lessonId != null && catalogue !is EngineOutcome.Completed ->
+                    LearningUiState(loading = false, error = contentFailure(checkNotNull(catalogue)))
                 else -> LearningUiState(
                     loading = false,
-                    catalogue = catalogue.value,
+                    catalogue = (catalogue as? EngineOutcome.Completed)?.value,
+                    directory = content.directory,
                     settings = settings.value,
                     progress = progress.value,
                     epoch = epoch.value
@@ -65,8 +53,8 @@ class LearningSnapshotLoader @Inject constructor(
             }
         }
         // Publish only a complete epoch-consistent snapshot, never partial or cancelled reads.
-        snapshot = result
-        result
+        snapshot = result.copy(catalogue = null, directory = content.directory)
+        result.copy(directory = content.directory)
     }
 }
 

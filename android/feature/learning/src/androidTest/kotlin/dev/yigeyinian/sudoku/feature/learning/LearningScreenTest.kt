@@ -22,6 +22,7 @@ import dev.yigeyinian.sudoku.model.Settings
 import dev.yigeyinian.sudoku.model.ThemePreference
 import dev.yigeyinian.sudoku.model.Variant
 import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
+import dev.yigeyinian.sudoku.model.learning.directoryEntry
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -37,7 +38,7 @@ class LearningScreenTest {
     @Test
     fun fixedCourseHeadingAppearsImmediatelyAndProgressDoesNotMoveIt() {
         val catalogue = catalogue()
-        val state = mutableStateOf(LearningUiState())
+        val state = mutableStateOf(LearningUiState(directory = catalogue.lessons.map { it.directoryEntry() }))
         compose.setContent {
             YigeTheme(ThemePreference.SYSTEM) {
                 LearningScreen(state.value, {}, {}, {})
@@ -54,6 +55,7 @@ class LearningScreenTest {
         compose.runOnIdle {
             state.value = LearningUiState(
                 loading = false,
+                epoch = 0,
                 catalogue = catalogue,
                 progress = listOf(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
             )
@@ -66,10 +68,32 @@ class LearningScreenTest {
         compose.onNodeWithContentDescription("全部课程学习进度").assertIsDisplayed()
     }
 
+    @Test fun progressFailureKeepsStaticLessonsBrowsable() {
+        val courses = catalogue()
+        compose.setContent {
+            YigeTheme(ThemePreference.SYSTEM) {
+                LearningScreen(
+                    LearningUiState(
+                        loading = false,
+                        directory = courses.lessons.map { it.directoryEntry() },
+                        error = "学习进度暂时无法读取，请重试。"
+                    ),
+                    {},
+                    {},
+                    {}
+                )
+            }
+        }
+        compose.onNodeWithText("32 节互动课程，按自己的节奏来").assertIsDisplayed()
+        compose.onNodeWithText("学习进度暂时无法读取，请重试。").assertIsDisplayed()
+        compose.onNodeWithTag("lesson-rules").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("0 / 32").assertDoesNotExist()
+    }
+
     @Test
     fun everyVariantIsSelectableAndOffersItsOwnFirstLesson() {
         val catalogue = catalogue()
-        val state = mutableStateOf(LearningUiState(loading = false, catalogue = catalogue))
+        val state = mutableStateOf(LearningUiState(loading = false, epoch = 0, catalogue = catalogue))
         var opened: String? = null
         compose.setContent {
             YigeTheme(ThemePreference.SYSTEM) {
@@ -95,6 +119,7 @@ class LearningScreenTest {
     fun savedCourseCanBeContinuedAndAnyLaterLessonCanBeOpened() {
         val state = LearningUiState(
             loading = false,
+            epoch = 0,
             catalogue = catalogue(),
             settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1)),
             progress = listOf(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
@@ -115,11 +140,12 @@ class LearningScreenTest {
     }
 
     @Test
-    fun completedCourseOffersReviewAndLoadingCannotOpenAnUnreadyLesson() {
+    fun completedCourseKeepsReviewDuringRefreshAndHidesItForAnUnknownDataset() {
         val catalogue = catalogue()
         val state = mutableStateOf(
             LearningUiState(
                 loading = false,
+                epoch = 0,
                 catalogue = catalogue,
                 progress = catalogue.lessons.map { LessonProgress(it.id, "2026-10-17T00:00:00.000Z") }
             )
@@ -134,6 +160,8 @@ class LearningScreenTest {
         compose.onNodeWithTag("suggested-lesson-action").performScrollTo().assertTextContains("复习课程").performClick()
         compose.runOnIdle { assertEquals("rules", opened) }
         compose.runOnIdle { state.value = state.value.copy(loading = true) }
+        compose.onNodeWithTag("suggested-lesson-action").assertIsDisplayed()
+        compose.runOnIdle { state.value = state.value.copy(epoch = null, progress = emptyList()) }
         compose.onNodeWithTag("suggested-lesson-action").assertDoesNotExist()
     }
 }

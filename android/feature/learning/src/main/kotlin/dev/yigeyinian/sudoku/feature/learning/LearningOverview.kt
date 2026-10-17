@@ -4,7 +4,7 @@ import dev.yigeyinian.sudoku.model.learning.Lesson
 import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 
 internal data class LearningLessonEntry(
-    val lesson: Lesson,
+    val lesson: dev.yigeyinian.sudoku.model.learning.LessonDirectoryEntry,
     val number: Int,
     val completed: Boolean,
     val inProgress: Boolean,
@@ -21,10 +21,10 @@ internal data class LearningOverview(
 
 /** Derives presentation from authored course order and durable progress without advancing any lesson. */
 internal fun LearningUiState.overview(): LearningOverview {
-    val allLessons = catalogue?.lessons.orEmpty()
+    val allLessons = directory
     val completed = completedIds.intersect(allLessons.map { it.id }.toSet())
     val course = allLessons.filter { it.practiceVariant == selectedVariant }.mapIndexed { index, lesson ->
-        val stage = catalogue?.restoreCursor(lesson.id, settings.lessonStages?.get(lesson.id) ?: 0)?.stageIndex ?: 0
+        val stage = settings.lessonStages?.get(lesson.id)?.takeIf { it in 0 until lesson.stageCount } ?: 0
         val isCompleted = lesson.id in completed
         LearningLessonEntry(
             lesson = lesson,
