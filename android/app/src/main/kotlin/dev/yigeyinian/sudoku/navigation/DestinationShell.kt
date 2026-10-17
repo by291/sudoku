@@ -84,7 +84,9 @@ internal fun DestinationShell(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { themeOpen = true }) { Icon(Icons.Outlined.Palette, "界面主题") }
+                    if (current == AppRoute.Home) {
+                        IconButton(onClick = { themeOpen = true }) { Icon(Icons.Outlined.Palette, "界面主题") }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
@@ -104,7 +106,7 @@ internal fun DestinationShell(
         }
     }
 
-    if (themeOpen) {
+    if (current == AppRoute.Home && themeOpen) {
         AlertDialog(
             onDismissRequest = { themeOpen = false },
             title = { Text("界面主题") },
