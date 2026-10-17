@@ -1,5 +1,11 @@
 package dev.yigeyinian.sudoku.game
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,6 +25,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -76,120 +84,147 @@ internal fun GameSetupSheet(
     var difficulty by rememberSaveable { mutableStateOf(Difficulty.EASY) }
     var rulesOpen by rememberSaveable { mutableStateOf(false) }
     androidx.compose.runtime.LaunchedEffect(daily, variant) { onLoad(daily, variant) }
-    val saved = state.freeSave?.takeIf { it.variant == variant && it.completion == null }
-    val ready = !state.sheetLoading && state.sheetError == null && (daily || !state.freePending)
-    val showLoading = rememberDelayedProgress(state.sheetLoading)
-    val dailyStatus = state.dailyStatus(variant)
-    val startLabel = if (daily) {
-        when (dailyStatus) {
-            DailyEntryStatus.COMPLETED -> "再次练习"
-            DailyEntryStatus.IN_PROGRESS -> "继续今日挑战"
-            DailyEntryStatus.NOT_STARTED, DailyEntryStatus.PENDING -> "开始今日挑战"
-        }
-    } else if (saved != null) {
-        "开始新局"
-    } else {
-        "开始游戏"
-    }
 
     GameEntrySheet(
         title = if (daily) "今日挑战" else "开始一局",
         subtitle = if (daily) "${state.today} · 中等难度" else null,
         onDismiss = onDismiss
-    ) {
+    ) { entranceFinished ->
+        val presentation = rememberEntryPresentation(state, entranceFinished)
+        val saved = presentation.freeSave?.takeIf { it.variant == variant && it.completion == null }
+        val ready =
+            entranceFinished && !presentation.sheetLoading && presentation.sheetError == null &&
+                (daily || !presentation.freePending)
+        val showLoading = rememberDelayedProgress(state.sheetLoading)
+        val dailyStatus = presentation.dailyStatus(variant)
+        val startLabel = if (daily) {
+            when (dailyStatus) {
+                DailyEntryStatus.COMPLETED -> "再次练习"
+                DailyEntryStatus.IN_PROGRESS -> "继续今日挑战"
+                DailyEntryStatus.NOT_STARTED, DailyEntryStatus.PENDING -> "开始今日挑战"
+            }
+        } else if (saved != null) {
+            "开始新局"
+        } else {
+            "开始游戏"
+        }
+
         Column(
-            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "选择玩法",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                VariantOptions(variant, onSelect = {
-                    variant = it
-                    if (difficulty !in it.difficulties) {
-                        difficulty = Difficulty.EASY
+            Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "选择玩法",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    VariantOptions(variant, onSelect = {
+                        variant = it
+                        if (difficulty !in it.difficulties) {
+                            difficulty = Difficulty.EASY
+                        }
+                    }, status = if (daily) presentation::dailyStatus else null)
+                    Text(
+                        variantSummary(variant),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!daily) {
+                    DifficultyOptions(variant, difficulty, onSelect = { difficulty = it })
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val completed = Variant.entries.count {
+                            presentation.dailyStatus(it) ==
+                                DailyEntryStatus.COMPLETED
+                        }
+                        Text(
+                            if (presentation.daily.size == Variant.entries.size &&
+                                presentation.daily.values.none { it == dev.yigeyinian.sudoku.model.DailyStatus.PENDING }
+                            ) {
+                                "今日已完成 $completed / 6"
+                            } else {
+                                "今日已完成 — / 6"
+                            },
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = { rulesOpen = true }) { Text("挑战规则") }
                     }
-                }, status = if (daily) state::dailyStatus else null)
-                Text(
-                    variantSummary(variant),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (!daily) {
-                DifficultyOptions(variant, difficulty, onSelect = { difficulty = it })
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val completed = Variant.entries.count { state.dailyStatus(it) == DailyEntryStatus.COMPLETED }
-                    Text(
-                        if (state.daily.size == Variant.entries.size &&
-                            state.daily.values.none { it == dev.yigeyinian.sudoku.model.DailyStatus.PENDING }
-                        ) {
-                            "今日已完成 $completed / 6"
-                        } else {
-                            "今日已完成 — / 6"
-                        },
-                        Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    TextButton(onClick = { rulesOpen = true }) { Text("挑战规则") }
-                }
-                if (dailyStatus == DailyEntryStatus.COMPLETED) {
-                    Text(
-                        "正式成绩已保留，再次游玩记为练习。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (dailyStatus == DailyEntryStatus.COMPLETED) {
+                        Text(
+                            "正式成绩已保留，再次游玩记为练习。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
-            if (state.sheetError != null) {
-                Text(
-                    state.sheetError,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-                TextButton(onClick = { onLoad(daily, variant) }) { Text("重新读取") }
-            }
-            if (!daily && saved != null) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(
-                        onClick = { onPlay(GameLaunch.Resume(saved.id)) },
-                        enabled = ready,
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("继续存档", style = MaterialTheme.typography.labelLarge)
-                                Text(
-                                    "${variantLabel(
-                                        variant
-                                    )} · ${difficultyLabel(saved.difficulty)} · " +
-                                        formatElapsedTime(saved.elapsedMs),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+            // Only the optional content changes height. The footer stays outside this transition,
+            // and the sheet's expanded anchor follows the measured height upward from the bottom.
+            AnimatedContent(
+                modifier = Modifier.fillMaxWidth(),
+                targetState = SetupDetails(presentation.sheetError, saved.takeUnless { daily }),
+                contentKey = { it.error to it.save?.id },
+                transitionSpec = {
+                    (fadeIn(tween(160)) togetherWith fadeOut(tween(100))).using(
+                        SizeTransform { _, _ -> tween(220) }
+                    )
+                },
+                label = "Setup saved game details"
+            ) { details ->
+                Column {
+                    details.error?.let { message ->
+                        Column(Modifier.padding(top = 18.dp)) {
+                            Text(
+                                message,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            TextButton(onClick = { onLoad(daily, variant) }) { Text("重新读取") }
+                        }
+                    }
+                    val displayedSave = details.save
+                    if (displayedSave != null) {
+                        Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Surface(
+                                onClick = { onPlay(GameLaunch.Resume(displayedSave.id)) },
+                                enabled = ready && saved?.id == displayedSave.id,
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text("继续存档", style = MaterialTheme.typography.labelLarge)
+                                        Text(
+                                            "${variantLabel(
+                                                displayedSave.variant
+                                            )} · ${difficultyLabel(displayedSave.difficulty)} · " +
+                                                formatElapsedTime(displayedSave.elapsedMs),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Icon(
+                                        Icons.AutoMirrored.Outlined.ArrowForward,
+                                        null,
+                                        Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
-                            Icon(
-                                Icons.AutoMirrored.Outlined.ArrowForward,
-                                null,
-                                Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            Text(
+                                "开始新局会替换这份未完成存档。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    Text(
-                        "开始新局会替换这份未完成存档。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }
@@ -198,8 +233,12 @@ internal fun GameSetupSheet(
                 onClick = {
                     onPlay(if (daily) GameLaunch.Daily(variant, state.today) else GameLaunch.Free(variant, difficulty))
                 },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("setup-start"),
                 enabled = ready,
+                colors = ButtonDefaults.buttonColors(
+                    disabledContainerColor = MaterialTheme.colorScheme.primary,
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary
+                ),
                 shape = RoundedCornerShape(14.dp)
             ) { Text(if (showLoading) "读取中…" else startLabel) }
         }
@@ -220,6 +259,8 @@ internal fun GameSetupSheet(
         )
     }
 }
+
+private data class SetupDetails(val error: String?, val save: dev.yigeyinian.sudoku.model.GameSummary?)
 
 @Composable
 private fun VariantOptions(selected: Variant, onSelect: (Variant) -> Unit, status: ((Variant) -> DailyEntryStatus)?) {
