@@ -1,9 +1,12 @@
 package dev.yigeyinian.sudoku
 
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
@@ -26,6 +29,7 @@ import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.GameRepository
 import dev.yigeyinian.sudoku.model.PreparedPuzzle
 import dev.yigeyinian.sudoku.model.Puzzle
+import dev.yigeyinian.sudoku.model.PuzzleContent
 import dev.yigeyinian.sudoku.model.PuzzleRules
 import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.StorageOutcome
@@ -37,6 +41,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -336,6 +341,58 @@ class PlayerWorkflowTest {
     }
 
     @Test
+    fun keepsHomeActionsStableWhileReturningRefreshesSavedGames() {
+        // Establish the navigation target's scroll position before comparing action bounds.
+        compose.onNodeWithText("学习数独").performScrollTo()
+        val start = compose.onNodeWithText("开始数独")
+        val resume = compose.onNodeWithText("继续上次")
+        val startBounds = start.fetchSemanticsNode().boundsInRoot
+        val resumeBounds = resume.fetchSemanticsNode().boundsInRoot
+        val startPixels = start.captureToImage().toPixelMap()
+        val resumePixels = resume.captureToImage().toPixelMap()
+        val gate = CompletableDeferred<Unit>()
+        controlledEngine.validationGate = gate
+
+        try {
+            compose.onNodeWithText("每日挑战").performClick()
+            compose.onNodeWithText("开始今日挑战").assertIsEnabled()
+            assertFalse(controlledEngine.validationHeld)
+            pressBack()
+            compose.onNodeWithText("学习数独").performScrollTo().performClick()
+            awaitText("每一步，都有理由。")
+            pressBack()
+            compose.waitUntil(20_000) { controlledEngine.validationHeld }
+
+            start.assertIsNotEnabled()
+            resume.assertIsNotEnabled()
+            assertEquals(startBounds, start.fetchSemanticsNode().boundsInRoot)
+            assertEquals(resumeBounds, resume.fetchSemanticsNode().boundsInRoot)
+            val loadingStartPixels = start.captureToImage().toPixelMap()
+            val loadingResumePixels = resume.captureToImage().toPixelMap()
+            // Sample the solid fill above the label, away from rounded corners and glyphs.
+            assertEquals(
+                startPixels[startPixels.width / 2, startPixels.height / 5],
+                loadingStartPixels[loadingStartPixels.width / 2, loadingStartPixels.height / 5]
+            )
+            assertEquals(
+                resumePixels[resumePixels.width / 2, resumePixels.height / 5],
+                loadingResumePixels[loadingResumePixels.width / 2, loadingResumePixels.height / 5]
+            )
+            compose.mainClock.advanceTimeBy(500)
+            compose.onNodeWithText("正在读取存档…").assertDoesNotExist()
+        } finally {
+            gate.complete(Unit)
+            controlledEngine.validationGate = null
+        }
+        compose.waitUntil(20_000) {
+            runCatching { start.assertIsEnabled() }.isSuccess
+        }
+        resume.assertIsEnabled()
+        assertEquals(startBounds, start.fetchSemanticsNode().boundsInRoot)
+        assertEquals(resumeBounds, resume.fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test
     fun dismissesDailySelectionBackToHome() {
         compose.onNodeWithText("每日挑战").performScrollTo().performClick()
         awaitText("开始今日挑战")
@@ -426,6 +483,18 @@ private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEn
     @Volatile var conflictGate: CompletableDeferred<Unit>? = null
 
     @Volatile var conflictHeld: Boolean = false
+
+    @Volatile var validationGate: CompletableDeferred<Unit>? = null
+
+    @Volatile var validationHeld: Boolean = false
+
+    override suspend fun validatePuzzle(content: PuzzleContent) = run {
+        validationGate?.let {
+            validationHeld = true
+            it.await()
+        }
+        native.validatePuzzle(content)
+    }
 
     override suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle> =
         when (val result = native.prepare(rules)) {

@@ -89,7 +89,7 @@ internal fun SudokuApp(activity: MainActivity) {
                 ) {
                     if (showStartupProgress) CircularProgressIndicator()
                     if (state.error != null || showStartupProgress) {
-                        Text(state.error ?: "正在准备数独计算组件…", Modifier.padding(vertical = 24.dp))
+                        Text(state.error ?: "正在准备首页…", Modifier.padding(vertical = 24.dp))
                     }
                     if (!state.loading) Button(onClick = model::retry) { Text("重试") }
                 }

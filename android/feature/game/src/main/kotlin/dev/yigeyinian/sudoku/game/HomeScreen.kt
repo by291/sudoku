@@ -119,7 +119,8 @@ private fun HomeHero(
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
-    val showLoading = rememberDelayedProgress(state.loading)
+    // Refreshing an existing snapshot must not replace the home actions beneath a sheet.
+    val showLoading = rememberDelayedProgress(state.loading && !state.hasLoadedSnapshot)
 
     Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = colors.primaryContainer) {
         Column(
@@ -173,26 +174,20 @@ private fun HomeHero(
             }
 
             when {
-                state.loading -> StartButton(
-                    onStart,
-                    Modifier.fillMaxWidth(),
-                    enabled = false,
-                    showLoading = showLoading
-                )
                 state.error != null -> Column {
                     Text(state.error, color = colors.error, style = MaterialTheme.typography.bodyMedium)
                     TextButton(onClick = onRetry) { Text("重新读取存档") }
                 }
                 largeText -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StartButton(onStart, Modifier.fillMaxWidth())
+                    StartButton(onStart, Modifier.fillMaxWidth(), enabled = !state.loading, showLoading = showLoading)
                     if (hasSaves) {
-                        ContinueButton(onContinue, Modifier.fillMaxWidth())
+                        ContinueButton(onContinue, Modifier.fillMaxWidth(), enabled = !state.loading)
                     }
                 }
                 else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StartButton(onStart, Modifier.weight(1f))
+                    StartButton(onStart, Modifier.weight(1f), enabled = !state.loading, showLoading = showLoading)
                     if (hasSaves) {
-                        ContinueButton(onContinue)
+                        ContinueButton(onContinue, enabled = !state.loading)
                     }
                 }
             }
@@ -212,7 +207,11 @@ private fun StartButton(
         enabled = enabled,
         modifier = modifier.heightIn(min = 52.dp),
         shape = RoundedCornerShape(14.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        colors = ButtonDefaults.buttonColors(
+            disabledContainerColor = MaterialTheme.colorScheme.primary,
+            disabledContentColor = MaterialTheme.colorScheme.onPrimary
+        )
     ) {
         Text(
             if (showLoading) "正在读取存档…" else "开始数独",
@@ -222,7 +221,11 @@ private fun StartButton(
         )
         Spacer(Modifier.width(8.dp))
         if (showLoading) {
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            CircularProgressIndicator(
+                Modifier.size(18.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = 2.dp
+            )
         } else {
             Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
         }
@@ -230,15 +233,18 @@ private fun StartButton(
 }
 
 @Composable
-private fun ContinueButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ContinueButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.heightIn(min = 52.dp),
         shape = RoundedCornerShape(14.dp),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+            disabledContainerColor = MaterialTheme.colorScheme.secondary,
+            disabledContentColor = MaterialTheme.colorScheme.onSecondary
         )
     ) { Text("继续上次", style = MaterialTheme.typography.titleSmall) }
 }
@@ -287,10 +293,10 @@ private fun HomeDestinations(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Outlined.BarChart, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Outlined.BarChart, null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("我的记录", style = MaterialTheme.typography.titleSmall)
-                    val description = if (state.loading || state.error != null) {
+                    val description = if ((state.loading && !state.hasLoadedSnapshot) || state.error != null) {
                         "成绩统计 · 本地备份"
                     } else if (state.results.isEmpty()) {
                         "收藏每一次进步"

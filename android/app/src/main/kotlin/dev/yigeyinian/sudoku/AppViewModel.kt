@@ -3,6 +3,7 @@ package dev.yigeyinian.sudoku
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.yigeyinian.sudoku.game.GameEntryLoader
 import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.GameRepository
 import dev.yigeyinian.sudoku.model.Settings
@@ -10,6 +11,8 @@ import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.SudokuEngine
 import dev.yigeyinian.sudoku.model.ThemePreference
 import javax.inject.Inject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -27,7 +30,8 @@ internal data class AppUiState(
 @HiltViewModel
 internal class AppViewModel @Inject constructor(
     private val engine: SudokuEngine,
-    private val repository: GameRepository
+    private val repository: GameRepository,
+    private val gameEntryLoader: GameEntryLoader
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(AppUiState())
     val uiState = mutableState.asStateFlow()
@@ -57,8 +61,21 @@ internal class AppViewModel @Inject constructor(
                     return@launch
                 }
             }
-            reloadSettings()
-            mutableState.value = mutableState.value.copy(ready = true, loading = false)
+            val home = coroutineScope {
+                val settings = async { reloadSettings() }
+                val savedGames = async { gameEntryLoader.prepareHome() }
+                settings.await()
+                savedGames.await()
+            }
+            when (home) {
+                is StorageOutcome.Success ->
+                    mutableState.value = mutableState.value.copy(ready = true, loading = false)
+                is StorageOutcome.Failure ->
+                    mutableState.value = mutableState.value.copy(
+                        loading = false,
+                        error = "存档暂时无法读取，请重试。原有进度已保留。"
+                    )
+            }
         }
     }
 

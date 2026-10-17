@@ -34,13 +34,13 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
     var continueOpen by rememberSaveable { mutableStateOf(false) }
     val saves = state.sessions.filter { it.session.completion == null }
 
-    LaunchedEffect(model) { model.refresh() }
+    LaunchedEffect(model) { model.open() }
 
     LaunchedEffect(dailyOpen) {
         if (dailyOpen) {
             while (true) {
-                model.refresh()
                 delay(60_000)
+                model.refresh()
             }
         }
     }
@@ -57,7 +57,10 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
             }
         },
         onLearning = onLearning,
-        onDaily = { dailyOpen = true },
+        onDaily = {
+            model.refreshIfDateChanged()
+            dailyOpen = true
+        },
         onRecords = onRecords,
         onRetry = model::refresh
     )
