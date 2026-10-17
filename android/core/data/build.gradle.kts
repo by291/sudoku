@@ -29,3 +29,6 @@ dependencies {
     androidTestImplementation(libs.android.test.core)
     androidTestImplementation(libs.coroutines.test)
 }
+
+// The immutable bundled asset is proved during the build, never on the player's navigation path.
+tasks.named("preBuild") { dependsOn(":core:engine:validateLearningContent") }

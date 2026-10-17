@@ -27,6 +27,6 @@ object StorageModule {
 
     @Provides
     @Singleton
-    fun learningContent(@ApplicationContext context: Context, engine: SudokuEngine): LearningContentRepository =
-        AssetLearningContentRepository(context, engine)
+    fun learningContent(@ApplicationContext context: Context): LearningContentRepository =
+        AssetLearningContentRepository(context)
 }

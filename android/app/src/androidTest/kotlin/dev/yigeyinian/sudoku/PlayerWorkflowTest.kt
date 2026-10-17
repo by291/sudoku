@@ -30,6 +30,7 @@ import dev.yigeyinian.sudoku.engine.RustSudokuEngine
 import dev.yigeyinian.sudoku.model.Difficulty
 import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.GameRepository
+import dev.yigeyinian.sudoku.model.LogicalStep
 import dev.yigeyinian.sudoku.model.PreparedPuzzle
 import dev.yigeyinian.sudoku.model.Puzzle
 import dev.yigeyinian.sudoku.model.PuzzleContent
@@ -37,6 +38,7 @@ import dev.yigeyinian.sudoku.model.PuzzleRules
 import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.SudokuEngine
+import dev.yigeyinian.sudoku.model.Validation
 import dev.yigeyinian.sudoku.model.createSession
 import dev.yigeyinian.sudoku.runtime.EngineModule
 import java.io.File
@@ -568,6 +570,18 @@ class PlayerWorkflowTest {
     }
 
     @Test
+    fun opensBundledLessonsWithoutRuntimeMathematicalValidation() {
+        controlledEngine.teachingValidationUnavailable = true
+        compose.onNodeWithText("学习数独").performScrollTo().performClick()
+        awaitText("开始学习")
+        compose.onNodeWithText("开始学习").performScrollTo().performClick()
+        awaitText("开始课程练习")
+
+        compose.onNodeWithTag("lesson-board").assertIsDisplayed()
+        compose.onNodeWithTag("cell-0").assertExists()
+    }
+
+    @Test
     fun opensEveryWorkflowFromHomeAndReturnsWithoutTabNavigation() {
         compose.onNodeWithText("首页", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("学习", useUnmergedTree = true).assertDoesNotExist()
@@ -631,6 +645,19 @@ private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEn
     @Volatile var validationGate: CompletableDeferred<Unit>? = null
 
     @Volatile var validationHeld: Boolean = false
+
+    @Volatile var teachingValidationUnavailable = false
+
+    override suspend fun validateTeachingStep(
+        board: List<Int>,
+        candidates: List<Int>,
+        rules: PuzzleRules,
+        step: LogicalStep
+    ): EngineOutcome<Validation> = if (teachingValidationUnavailable) {
+        EngineOutcome.Failed("Runtime teaching validation is unavailable")
+    } else {
+        native.validateTeachingStep(board, candidates, rules, step)
+    }
 
     override suspend fun validatePuzzle(content: PuzzleContent) = run {
         validationGate?.let {

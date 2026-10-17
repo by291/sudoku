@@ -3,12 +3,9 @@ package dev.yigeyinian.sudoku.model.learning
 import dev.yigeyinian.sudoku.model.ALL_DIGITS_MASK
 import dev.yigeyinian.sudoku.model.BOARD_SIZE
 import dev.yigeyinian.sudoku.model.Difficulty
-import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.LogicalStep
 import dev.yigeyinian.sudoku.model.Placement
 import dev.yigeyinian.sudoku.model.PuzzleRules
-import dev.yigeyinian.sudoku.model.SudokuEngine
-import dev.yigeyinian.sudoku.model.Validation
 import dev.yigeyinian.sudoku.model.Variant
 import dev.yigeyinian.sudoku.model.variant
 import kotlinx.serialization.SerialName
@@ -114,7 +111,7 @@ private data class CatalogueDocument(
     val lessons: List<Lesson>
 )
 
-/** Owns authored presentation only; decode validates structure, then validate asks Rust to establish mathematical evidence. */
+/** Owns authored presentation and structural decoding; bundled mathematical evidence is checked at build time. */
 class LessonCatalogue private constructor(val lessons: List<Lesson>) {
     private val byId = lessons.associateBy { it.id }
 
@@ -143,31 +140,6 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
         val completed = cursor.stageIndex == lesson.stages.lastIndex
         val next = LessonCursor(cursor.lessonId, if (completed) 0 else cursor.stageIndex + 1)
         return ExerciseSubmission(next, true, !completed, completed, "推理正确！" + stage.explanation)
-    }
-
-    /** Incomplete native validation is returned intact and must not publish the catalogue as mathematically checked. */
-    suspend fun validate(engine: SudokuEngine): EngineOutcome<Validation> {
-        for (lesson in lessons) {
-            for (stage in lesson.stages) {
-                when (
-                    val result = engine.validateTeachingStep(
-                        stage.board,
-                        stage.candidates,
-                        stage.rules,
-                        stage.step
-                    )
-                ) {
-                    is EngineOutcome.Completed -> if (result.value is Validation.Invalid) {
-                        return result
-                    }
-                    is EngineOutcome.BudgetExhausted -> return result
-                    EngineOutcome.Cancelled -> return result
-                    EngineOutcome.TimedOut -> return result
-                    is EngineOutcome.Failed -> return result
-                }
-            }
-        }
-        return EngineOutcome.Completed(Validation.Valid)
     }
 
     companion object {
