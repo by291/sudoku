@@ -1,6 +1,5 @@
 package dev.yigeyinian.sudoku.game
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.yigeyinian.sudoku.designsystem.NumberPad
+import dev.yigeyinian.sudoku.designsystem.numberPadColumns
 
 /** Keeps the tool strip and digit entry together in both portrait and landscape. */
 @Composable
@@ -190,44 +191,11 @@ private fun GameDigits(
     onDigit: (Int) -> Unit,
     onNote: (Int) -> Unit
 ) {
-    val density = LocalDensity.current
-    val textMeasurer = rememberTextMeasurer()
-    val digitStyle = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp)
-    val digitWidth = remember(textMeasurer, digitStyle, density) {
-        (1..9).maxOf { textMeasurer.measure(it.toString(), digitStyle).size.width }
-    }
-    // Measure the rendered font instead of switching layouts at an arbitrary font-scale threshold.
-    // Compact keys trade touch width for direct digit access; zoom retains the full-size keypad.
-    val keyWidth = maxOf(28.dp, with(density) { digitWidth.toDp() } + 12.dp)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = if (maxWidth >= keyWidth * 9 + 32.dp) 9 else 3
+        val columns = numberPadColumns(maxWidth)
         val keyGap = if (columns == 9) 4.dp else 8.dp
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            repeat(9 / columns) { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(keyGap)) {
-                    repeat(columns) { column ->
-                        val digit = row * columns + column + 1
-                        Surface(
-                            onClick = { onDigit(digit) },
-                            enabled = enabled,
-                            modifier = Modifier.weight(1f).semantics {
-                                contentDescription = if (noteMode) "笔记数字$digit" else "填入数字$digit"
-                            },
-                            shape = RoundedCornerShape(7.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                            color = Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.38f)
-                        ) {
-                            Box(Modifier.heightIn(min = 52.dp), contentAlignment = Alignment.Center) {
-                                Text(
-                                    digit.toString(),
-                                    style = digitStyle.copy(fontSize = if (noteMode) 20.sp else 24.sp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            NumberPad(enabled, noteMode, onDigit)
             repeat(9 / columns) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(keyGap)) {
                     repeat(columns) { column ->

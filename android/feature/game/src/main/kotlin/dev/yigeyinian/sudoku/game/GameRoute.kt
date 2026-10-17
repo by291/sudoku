@@ -367,7 +367,7 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
                             model.selectCell(((state.selectedCell ?: 0) + 1) % 81)
                         }) { Text("下一格") }
                     }
-                    NumberPad(state.inputEditable, state.noteMode, model::enterDigit)
+                    NumberPad(state.inputEditable, state.noteMode, model::enterDigit, expandedTargets = true)
                     TextButton(onClick = { zoomOpen = false }) { Text("关闭") }
                 }
             }
