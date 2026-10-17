@@ -14,6 +14,7 @@ import {
 } from '@/storage/records'
 import type { SnapshotValidators } from '@/storage/records'
 import type {
+  CompletionCountsRead,
   DailyStatusesRead,
   HomeRead,
   OverviewRead,
@@ -70,6 +71,34 @@ export async function readHome(db: IDBPDatabase<SudokuDatabase>): Promise<HomeRe
       .count(prefixRange([1]))
     const resultCount = await transaction.objectStore('resultSummaries').count()
     return { ...snapshot, unfinishedCount, resultCount }
+  })
+}
+
+export async function readCompletionCounts(
+  db: IDBPDatabase<SudokuDatabase>,
+): Promise<CompletionCountsRead> {
+  const transaction = db.transaction(['resultSummaries', 'meta'], 'readonly')
+  return commitTransaction(transaction, async () => {
+    const snapshot = await readState(transaction, 'results')
+    if (snapshot.coverage === 'pending') {
+      return { ...snapshot, counts: null }
+    }
+    const counts = {
+      classic: 0,
+      diagonal: 0,
+      jigsaw: 0,
+      killer: 0,
+      thermo: 0,
+      arrow: 0,
+    } satisfies Record<SudokuVariant, number>
+    const index = transaction.objectStore('resultSummaries').index('by-variant-order')
+    // All navigation counts share one snapshot and need only index keys, not saved boards.
+    await Promise.all(
+      SUDOKU_VARIANTS.map(async (variant) => {
+        counts[variant] = await index.count(prefixRange([variant]))
+      }),
+    )
+    return { ...snapshot, counts }
   })
 }
 

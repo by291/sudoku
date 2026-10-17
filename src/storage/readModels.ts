@@ -58,6 +58,10 @@ export type HomeRead = SummarySnapshot & {
   resultCount: number | null
 }
 
+export type CompletionCountsRead = SummarySnapshot & {
+  counts: Record<SudokuVariant, number> | null
+}
+
 export type SlotSummaryRead = SummarySnapshot & { summary: GameSummary | null }
 export type DailyStatusesRead = SummarySnapshot & { statuses: readonly DailyVariantStatus[] }
 export type RecordSummary = {

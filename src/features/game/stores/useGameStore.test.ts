@@ -85,6 +85,10 @@ function setup(heavy = false) {
         ok: false,
         error: { kind: 'unavailable', message: 'Unused summary fixture' },
       }),
+      readCompletionCounts: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Unused summary fixture' },
+      }),
       readDailyStatuses: async () => ({
         ok: false,
         error: { kind: 'unavailable', message: 'Unused summary fixture' },

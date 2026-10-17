@@ -8,6 +8,7 @@ import type { GameSession } from '@/features/game/model/session'
 import type { LessonProgress, ResultRecord, SessionRecord, StorageOutcome } from '@/storage/records'
 import type { ParseResult, SudokuVariant } from '@/sudoku/contracts'
 import type {
+  CompletionCountsRead,
   HomeRead,
   DailyStatusesRead,
   SummaryPage,
@@ -50,6 +51,7 @@ export interface GameRepository {
     variant?: SudokuVariant,
   ): Promise<StorageOutcome<SlotSummaryRead>>
   readHome(): Promise<StorageOutcome<HomeRead>>
+  readCompletionCounts(): Promise<StorageOutcome<CompletionCountsRead>>
   readDailyStatuses(date: string): Promise<StorageOutcome<DailyStatusesRead>>
   readSummaryPage(query: SummaryPageQuery): Promise<StorageOutcome<SummaryPage>>
   readOverview(variant: SudokuVariant, today: string): Promise<StorageOutcome<OverviewRead>>
@@ -280,6 +282,7 @@ export function createGameRepository(
     readSession: (id) => readSelected('sessions', id, (raw) => parseSessionRecord(raw, validators)),
     readResult: (id) => readSelected('results', id, (raw) => parseResultRecord(raw, validators)),
     readHome: () => access(reads.readHome),
+    readCompletionCounts: () => access(reads.readCompletionCounts),
     readSlotSummary: (mode, variant) => access((db) => reads.readSlotSummary(db, mode, variant)),
     readDailyStatuses: (date) => access((db) => reads.readDailyStatuses(db, date)),
     readSummaryPage: (query) => access((db) => reads.readSummaryPage(db, query)),

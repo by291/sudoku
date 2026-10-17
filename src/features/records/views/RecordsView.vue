@@ -192,12 +192,7 @@ function duration(value: number | null | undefined) {
             >
               <span class="choice-name">{{ choice.label }}</span>
               <span class="choice-count"
-                >{{
-                  choice.value === variant && records.completedCount !== null
-                    ? records.completedCount
-                    : '—'
-                }}
-                局</span
+                >{{ records.completionCounts?.[choice.value] ?? '—' }} 局</span
               >
             </NButton>
           </RouterLink>

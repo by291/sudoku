@@ -66,17 +66,27 @@ async function seedCompletedRecords(page: Page) {
 test('keeps statistics and completion history readable in a short desktop window', async ({
   page,
   isMobile,
-}) => {
+}, testInfo) => {
   test.skip(isMobile, 'Desktop records columns')
   await page.setViewportSize({ width: 1100, height: 720 })
   await seedCompletedRecords(page)
 
   await page.goto('/#/records?variant=arrow')
   await expect(page.getByRole('table')).toBeInViewport({ ratio: 1 })
+  const navigation = page.getByRole('navigation', { name: '成绩玩法', exact: true })
+  await expect(navigation.getByRole('link', { name: '标准数独 1 局', exact: true })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: '箭头数独 3 局', exact: true })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: /0 局$/ })).toHaveCount(4)
+  await page.screenshot({
+    path: `.superpowers/records-inline/counts-${testInfo.project.name}.png`,
+    animations: 'disabled',
+  })
   await page.getByRole('tab', { name: '完成历史', exact: true }).click()
   const history = page.getByRole('list').filter({ hasText: '箭头数独' })
 
   await expect(history.getByRole('listitem')).toHaveCount(3)
+  await expect(navigation.getByRole('link', { name: '标准数独 1 局', exact: true })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: '箭头数独 3 局', exact: true })).toBeVisible()
   await expect(history).toBeInViewport({ ratio: 1 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1100)
 })

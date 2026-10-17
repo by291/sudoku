@@ -22,6 +22,7 @@ export const useRecordsStore = defineStore('records', () => {
   const rows = shallowRef<readonly GameSummary[]>([])
   const summary = shallowRef<RecordSummary | null>(null)
   const completedCount = ref<number | null>(null)
+  const completionCounts = shallowRef<Record<SudokuVariant, number> | null>(null)
   const result = shallowRef<ResultRecord | null>(null)
   const pending = ref(false)
   const nextCursor = shallowRef<SummaryCursor | null>(null)
@@ -79,37 +80,23 @@ export const useRecordsStore = defineStore('records', () => {
       return
     }
 
-    if (target.tab === 'overview') {
-      const response = await runtime.repository.readOverview(target.variant, today.value)
-      if (current !== operation) {
-        return
-      }
-      readBusy.value = false
-      if (!response.ok) {
-        error.value = '本机记录读取失败，请重试。'
-        return
-      }
-      pending.value = response.value.coverage === 'pending'
-      if (!pending.value) {
-        summary.value = response.value.summary
-        completedCount.value = response.value.completedCount
-        loaded.value = true
-      }
-      return
-    }
-
-    const response = await runtime.repository.readSummaryPage({
-      kind: target.tab === 'saves' ? 'sessions' : 'results',
-      variant: target.variant,
-      cursor,
-    })
+    const [response, counts] = await Promise.all([
+      target.tab === 'overview'
+        ? runtime.repository.readOverview(target.variant, today.value)
+        : runtime.repository.readSummaryPage({
+            kind: target.tab === 'saves' ? 'sessions' : 'results',
+            variant: target.variant,
+            cursor,
+          }),
+      runtime.repository.readCompletionCounts(),
+    ])
     if (current !== operation) {
       return
     }
     readBusy.value = false
-    if (!response.ok) {
+    if (!response.ok || !counts.ok) {
       // A cursor belongs to one dataset generation; restart rather than mix snapshots.
-      if (cursor && response.error.kind === 'revision-conflict') {
+      if (!response.ok && cursor && response.error.kind === 'revision-conflict') {
         clearReadSnapshot()
         await readSelection(target)
         return
@@ -117,10 +104,16 @@ export const useRecordsStore = defineStore('records', () => {
       error.value = '本机记录读取失败，请重试。'
       return
     }
-    pending.value = response.value.coverage === 'pending'
-    if (!pending.value) {
-      rows.value = response.value.rows
-      nextCursor.value = response.value.nextCursor
+    completionCounts.value = counts.value.counts
+    pending.value = response.value.coverage === 'pending' || counts.value.coverage === 'pending'
+    if (response.value.coverage === 'ready') {
+      if ('summary' in response.value) {
+        summary.value = response.value.summary
+        completedCount.value = response.value.completedCount
+      } else {
+        rows.value = response.value.rows
+        nextCursor.value = response.value.nextCursor
+      }
       loaded.value = true
     }
   }
@@ -166,6 +159,7 @@ export const useRecordsStore = defineStore('records', () => {
     selection = null
     readOwner = null
     readBusy.value = false
+    completionCounts.value = null
     clearReadSnapshot()
   }
 
@@ -238,6 +232,7 @@ export const useRecordsStore = defineStore('records', () => {
     maintenance?.abort()
     // A replacement invalidates the old snapshot before any asynchronous reload can finish.
     clearReadSnapshot()
+    completionCounts.value = null
     quarantined.value = 0
     readBusy.value = false
     backupBusy.value = false
@@ -438,6 +433,7 @@ export const useRecordsStore = defineStore('records', () => {
     rows,
     summary,
     completedCount,
+    completionCounts,
     result,
     pending,
     nextCursor,

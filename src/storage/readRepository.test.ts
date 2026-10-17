@@ -4,6 +4,7 @@ import { deleteDB, openDB } from 'idb'
 import { openSudokuDatabase } from '@/storage/database'
 import { createGameRepository } from '@/storage/repository'
 import { createOwnershipCoordinator } from '@/storage/ownership'
+import { initialSummaryState, projectRecord } from '@/storage/projections'
 import { testEngine } from '../../tests/support/semantics'
 import { makeSession } from '../../tests/support/gameFixtures'
 
@@ -31,6 +32,52 @@ afterEach(async () => {
     database.close()
     await deleteDB(database.name)
   }
+})
+
+it('counts every variant from result indexes without loading canonical boards or computation', async () => {
+  const { database, repository, prepareValidation, validators } = await setup()
+  const session = makeSession({
+    completion: { completedAt: '2026-10-17T01:00:00.000Z', elapsedMs: 0 },
+  })
+  session.entries = session.puzzle.solution.map((digit, cell) =>
+    session.puzzle.givens[cell] ? 0 : digit,
+  )
+  await database.put('results', { formatVersion: 2, session })
+  await database.put('resultSummaries', projectRecord(session, 0, 'results'))
+
+  const counts = await repository.readCompletionCounts()
+
+  expect(counts).toMatchObject({
+    ok: true,
+    value: {
+      coverage: 'ready',
+      counts: { classic: 1, diagonal: 0, jigsaw: 0, killer: 0, thermo: 0, arrow: 0 },
+    },
+  })
+  expect(prepareValidation).not.toHaveBeenCalled()
+  expect(validators.validatePuzzle).not.toHaveBeenCalled()
+})
+
+it('keeps incomplete result counts unknown but does not block them on legacy sessions', async () => {
+  const { database, repository } = await setup()
+  const state = initialSummaryState(false)
+  await database.put('meta', state, 'summaries')
+
+  expect(await repository.readCompletionCounts()).toMatchObject({
+    ok: true,
+    value: { coverage: 'pending', counts: null },
+  })
+
+  state.results.complete = true
+  await database.put('meta', state, 'summaries')
+
+  expect(await repository.readCompletionCounts()).toMatchObject({
+    ok: true,
+    value: {
+      coverage: 'ready',
+      counts: { classic: 0, diagonal: 0, jigsaw: 0, killer: 0, thermo: 0, arrow: 0 },
+    },
+  })
 })
 
 it('browses an empty projected database without preparing mathematical validation', async () => {

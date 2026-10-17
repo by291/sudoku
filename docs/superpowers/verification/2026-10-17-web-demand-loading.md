@@ -51,6 +51,10 @@ The reported screenshots exposed permanent loading reservations in ready dialogs
 
 The new regression passed alongside existing dialog/save-picker coverage: 21 browser tests across desktop Chromium, mobile Chromium and WebKit. Six focused component tests, application and E2E type checks, scoped ESLint/Prettier, root/subpath production builds and `git diff --check` passed. Inspected desktop/mobile light and dark screenshots under `.superpowers/dialog-redesign/`; save selection, long metadata, full-row targets, focus restoration and the recent-course action remain covered.
 
+## Records navigation counts follow-up
+
+The sidebar previously displayed a count only for the selected overview and left other choices as permanent placeholders. A dedicated indexed read now returns all six completion counts without full payload reads or WASM startup. Tests cover nonselected variants, all record tabs, known empty indexes, incomplete legacy result coverage, and reset refresh.
+
 ## Review and limits
 
 Independent reviews found and verified fixes for shared error-state clearing, unknown-save replacement, reset overview refresh, stale page rollback, retry cursor mismatch, cold lesson geometry, malformed migration cursor identities and missing/corrupt derived projections. No material review findings remain open.
