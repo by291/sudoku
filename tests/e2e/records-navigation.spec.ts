@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { test, expect } from './support'
+import { test, expect, seedRecords } from './support'
 import { makeSession } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
 import { VARIANT_PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
@@ -58,24 +58,7 @@ async function seedCompletedRecords(page: Page) {
   }))
   await page.goto('/#/')
   await expect(page.getByRole('button', { name: /开始一局数独/ })).toBeVisible()
-  await page.evaluate(async (results) => {
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sudoku-local', 1)
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction('results', 'readwrite')
-
-      for (const result of results) {
-        transaction.objectStore('results').put(result)
-      }
-
-      transaction.oncomplete = () => resolve()
-      transaction.onabort = () => reject(transaction.error)
-    })
-    database.close()
-  }, results)
+  await seedRecords(page, 'results', results)
 
   return results
 }
@@ -241,24 +224,10 @@ test('retains all local saves, highlights the latest unfinished session and resu
   if (!completed) {
     throw new Error('Missing completed fixture')
   }
-  await page.evaluate(
-    async (sessions) => {
-      const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('sudoku-local', 1)
-        request.onsuccess = () => resolve(request.result)
-        request.onerror = () => reject(request.error)
-      })
-      await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction('sessions', 'readwrite')
-        for (const session of sessions) {
-          transaction.objectStore('sessions').put({ formatVersion: 2, revision: 1, session })
-        }
-        transaction.oncomplete = () => resolve()
-        transaction.onabort = () => reject(transaction.error)
-      })
-      database.close()
-    },
-    [older, completed, newest],
+  await seedRecords(
+    page,
+    'sessions',
+    [older, completed, newest].map((session) => ({ session })),
   )
   await page.goto('/#/records?variant=classic&tab=saves')
   const saves = page.getByRole('region', { name: '本地存档', exact: true })

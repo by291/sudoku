@@ -190,6 +190,7 @@ test('retains a type selected from the default free URL after refresh', async ({
   await expect(
     page.getByRole('heading', { name: '自由游玩 · 箭头数独', exact: true }),
   ).toBeVisible()
+  await expect(page.getByRole('group', { name: '数独棋盘', exact: true })).toBeVisible()
   const saved = (await readSessions(page))[0].session
   await expect(page).toHaveURL(new RegExp(`variant=arrow.*session=${saved.id}`))
   await expect(page).toHaveURL(/source=home/)

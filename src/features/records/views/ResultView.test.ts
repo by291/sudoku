@@ -77,7 +77,7 @@ it('shows a missing-result recovery when the route ID is absent and after a peer
 
   await router.push('/records/fixture-free-session')
   await flushPromises()
-  expect(wrapper.find('[aria-label="数独棋盘"]').exists()).toBe(true)
+  await vi.waitFor(() => expect(wrapper.find('[aria-label="数独棋盘"]').exists()).toBe(true))
   await database.clear('results')
 
   for (const listener of listeners) {

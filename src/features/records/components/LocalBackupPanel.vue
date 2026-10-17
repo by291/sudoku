@@ -26,6 +26,7 @@ function openBackupDialog() {
     trigger.focus()
   }
   open.value = true
+  void records.inspectBackup()
 }
 
 async function downloadBackup() {

@@ -1,99 +1,87 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef } from 'vue'
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink, useRouter, type UseLinkReturn } from 'vue-router'
-import { NAlert, NButton, NCard } from 'naive-ui'
+import { NAlert, NButton } from 'naive-ui'
 import ResponsiveDialog from '@/shared/components/ResponsiveDialog.vue'
 import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
-import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
+import { useHomeRecords } from '@/features/home/composables/useHomeRecords'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
-import {
-  sessionLink,
-  modeName,
-  sortSavedSessions,
-  summarizeSave,
-} from '@/features/records/model/records'
+import { sessionLink, modeName, summarizeProjection } from '@/features/records/model/records'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import { getVariantPresentation } from '@/features/game/model/variants'
-import { getDailyStatuses } from '@/features/game/model/daily'
-import type { SudokuVariant } from '@/sudoku/contracts'
-import type { Difficulty } from '@/sudoku/contracts'
+import type { SudokuVariant, Difficulty } from '@/sudoku/contracts'
 import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
 
 const router = useRouter()
-const records = useRecordsStore()
-const showLoading = useDelayedProgress(() => records.busy)
+const home = useHomeRecords()
+const {
+  today,
+  unfinishedCount,
+  loading,
+  pending,
+  error,
+  sheetBusy,
+  sheetPending,
+  sheetError,
+  sheetBlocked,
+  selectedSave,
+  dailyStatuses,
+  nextCursor,
+  pageNumber,
+} = home
+const showLoading = useDelayedProgress(loading)
+const showSheetLoading = useDelayedProgress(sheetBusy)
 const preferences = usePreferencesStore()
-const unfinished = computed(() =>
-  sortSavedSessions(records.sessions.filter((record) => !record.session.completion)),
-)
 const resumeChoices = computed(() =>
-  unfinished.value.map(({ session }) => ({ session, summary: summarizeSave(session) })),
+  home.resumeChoices.value.map((session) => ({
+    session,
+    summary: summarizeProjection(session),
+  })),
 )
-const dailyStatuses = computed(() =>
-  getDailyStatuses(records.sessions, records.results, records.today),
-)
-const completedDailyCount = computed(
-  () => dailyStatuses.value.filter((status) => status.state === 'completed').length,
-)
-const recordsDescription = computed(() =>
-  records.results.length
-    ? `已完成 ${records.results.length} 局，回顾用时、成绩与每日挑战。`
-    : '完成第一局，留下属于你的数独足迹。',
-)
+const recordsDescription = computed(() => {
+  if (home.resultCount.value === null) {
+    return '已完成 — 局，回顾用时、成绩与每日挑战。'
+  }
+  return home.resultCount.value
+    ? `已完成 ${home.resultCount.value} 局，回顾用时、成绩与每日挑战。`
+    : '完成第一局，留下属于你的数独足迹。'
+})
 const setupMode = ref<'free' | 'daily' | null>(null)
 const variant = ref<SudokuVariant>('classic')
 const difficulty = ref<Difficulty>('easy')
-const selectedSave = computed(
-  () =>
-    unfinished.value.find(
-      ({ session }) => session.mode === 'free' && session.puzzle.rules.kind === variant.value,
-    )?.session ?? null,
-)
 const resumeOpen = ref(false)
 const resumeButton = useTemplateRef<InstanceType<typeof NButton>>('resumeButton')
-let openingSetup = false
-let disposed = false
 
-async function openSetup(mode: 'free' | 'daily', event: MouseEvent) {
+function openSetup(mode: 'free' | 'daily', event: MouseEvent) {
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
     return
   }
-
   event.preventDefault()
-  if (openingSetup || records.busy) {
-    return
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.focus()
   }
-
-  const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
-  trigger?.focus()
-
-  openingSetup = true
-  try {
-    await records.load()
-    await nextTick()
-    // Leaving Home or a newer refresh must not publish a dialog from an outdated read.
-    if (disposed || records.busy) {
-      return
-    }
-
-    // Loading temporarily disables the opener; restore it before the dialog captures focus.
-    trigger?.focus()
-    setupMode.value = mode
-  } finally {
-    openingSetup = false
-  }
+  setupMode.value = mode
+  void home.openSheet(
+    mode === 'free' ? { kind: 'free', variant: variant.value } : { kind: 'daily' },
+  )
 }
 
-onScopeDispose(() => {
-  disposed = true
+watch(variant, () => {
+  if (setupMode.value === 'free') {
+    void home.openSheet({ kind: 'free', variant: variant.value })
+  }
+})
+watch([setupMode, resumeOpen], ([mode, resume]) => {
+  if (!mode && !resume) {
+    home.closeSheet()
+  }
 })
 
 function startSelected() {
   const mode = setupMode.value
-  if (!mode) {
+  if (!mode || sheetBlocked.value) {
     return
   }
-
   setupMode.value = null
   void router.push({
     path: `/play/${mode}`,
@@ -106,32 +94,30 @@ function startSelected() {
 }
 
 function resumeSelected() {
-  if (!selectedSave.value) {
+  if (!selectedSave.value || sheetBlocked.value) {
     return
   }
-
   setupMode.value = null
   void router.push(sessionLink(selectedSave.value))
 }
 
-function continueLast(event: MouseEvent) {
-  if (records.busy) {
-    return
-  }
-
+async function continueLast(event: MouseEvent) {
   if (event.currentTarget instanceof HTMLElement) {
     event.currentTarget.focus()
   }
-
-  if (unfinished.value.length === 1) {
-    const record = unfinished.value[0]
-    if (record) {
-      void router.push(sessionLink(record.session))
-    }
-  } else if (!unfinished.value.length && preferences.settings.currentLessonId) {
+  if (unfinishedCount.value === 0 && preferences.settings.currentLessonId) {
     void router.push(`/learn/${preferences.settings.currentLessonId}`)
-  } else {
-    resumeOpen.value = true
+    return
+  }
+  resumeOpen.value = true
+  await home.openSheet({ kind: 'resume' })
+  if (!resumeOpen.value || sheetBlocked.value) {
+    return
+  }
+  const only = home.resumeChoices.value[0]
+  if (only && home.resumeChoices.value.length === 1 && !nextCursor.value) {
+    resumeOpen.value = false
+    void router.push(sessionLink(only))
   }
 }
 
@@ -147,7 +133,7 @@ function continueRecentLesson(event: MouseEvent, navigate: UseLinkReturn['naviga
   resumeOpen.value = false
 }
 
-onMounted(records.load)
+onMounted(home.load)
 </script>
 <template>
   <div class="home-page">
@@ -157,17 +143,26 @@ onMounted(records.load)
       class="resume-dialog"
       @after-leave="restoreResumeFocus"
     >
-      <div class="resume-content">
-        <p class="resume-intro muted">选择一局继续，按开始时间从新到旧排列。</p>
+      <div class="resume-content" :aria-busy="sheetBusy">
+        <NAlert
+          v-if="sheetError || sheetPending"
+          :type="sheetError ? 'error' : 'info'"
+          :show-icon="false"
+        >
+          {{ sheetError ?? '旧存档需要整理后才能列出。' }}
+          <NButton :disabled="sheetBusy" @click="home.retry">整理存档并重试</NButton>
+        </NAlert>
+        <p class="resume-intro muted">
+          <span v-if="showSheetLoading" role="status">正在读取存档…</span>
+          <span v-else>选择一局继续，按开始时间从新到旧排列。</span>
+        </p>
         <ul class="resume-list" aria-label="未完成的存档">
           <li v-for="{ session, summary } in resumeChoices" :key="session.id">
             <RouterLink :to="sessionLink(session)" class="resume-card" @click="resumeOpen = false">
               <div class="resume-details">
                 <strong class="resume-title">
-                  {{ getVariantPresentation(session.puzzle.rules.kind).label }}
-                  <span class="resume-difficulty">{{
-                    DIFFICULTY_NAMES[session.puzzle.difficulty]
-                  }}</span>
+                  {{ getVariantPresentation(session.variant).label }}
+                  <span class="resume-difficulty">{{ DIFFICULTY_NAMES[session.difficulty] }}</span>
                 </strong>
                 <p class="resume-source">{{ modeName(session) }}</p>
                 <p class="resume-progress">
@@ -183,6 +178,15 @@ onMounted(records.load)
           </li>
         </ul>
 
+        <nav v-if="pageNumber > 1 || nextCursor" class="resume-pagination" aria-label="存档分页">
+          <NButton :disabled="sheetBlocked || pageNumber === 1" @click="home.changePage('previous')"
+            >上一页</NButton
+          >
+          <span>第 {{ pageNumber }} 页</span>
+          <NButton :disabled="sheetBlocked || !nextCursor" @click="home.changePage('next')"
+            >下一页</NButton
+          >
+        </nav>
         <RouterLink
           v-if="preferences.settings.currentLessonId"
           v-slot="{ href, navigate }"
@@ -211,16 +215,16 @@ onMounted(records.load)
           <NButton
             type="primary"
             size="large"
-            :disabled="records.busy"
+            :disabled="loading"
             @click="openSetup('free', $event)"
             >开始一局数独 <span aria-hidden="true" class="action-arrow">↗</span></NButton
           >
           <NButton
-            v-if="unfinished.length || preferences.settings.currentLessonId"
+            v-if="unfinishedCount !== 0 || preferences.settings.currentLessonId"
             ref="resumeButton"
             type="info"
             size="large"
-            :disabled="records.busy"
+            :disabled="loading"
             @click="continueLast"
             >继续上次</NButton
           >
@@ -234,6 +238,9 @@ onMounted(records.load)
         >
           {{ cell % 5 === 0 ? (cell % 9) + 1 : '' }}
         </div>
+      </div>
+      <div class="loading-slot home-loading-slot" :aria-busy="loading">
+        <p v-if="showLoading" role="status" class="muted">正在读取存档…</p>
       </div>
     </section>
     <div class="mode-grid">
@@ -255,38 +262,39 @@ onMounted(records.load)
           ><span class="mode-icon">◷</span>
           <p class="mode-kicker">每天，一次小挑战</p>
           <h2>每日挑战 <span>↗</span></h2>
-          <p>{{ records.today }} · 已完成 {{ completedDailyCount }} / 6 种玩法</p></a
+          <p>{{ today }} · 每天六种玩法，打开查看今日进度。</p></a
         ></RouterLink
       ><RouterLink to="/records" class="panel mode-card"
         ><span class="mode-icon" aria-hidden="true">▤</span>
         <p class="mode-kicker">每一局，都有收获</p>
         <h2>数独足迹 <span aria-hidden="true">↗</span></h2>
-        <p>{{ recordsDescription }}</p></RouterLink
+        <p :aria-busy="loading">{{ recordsDescription }}</p></RouterLink
       >
     </div>
-    <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
-      {{ records.error }} <NButton @click="records.load">重试读取</NButton>
+    <NAlert
+      v-if="error || pending"
+      class="feedback-message"
+      :type="error ? 'error' : 'info'"
+      :show-icon="false"
+    >
+      {{ error ?? '旧存档需要整理，完成后可查看本机进度。' }}
+      <NButton :disabled="loading || sheetBusy" @click="home.retry">{{
+        pending ? '整理存档并重试' : '重试读取'
+      }}</NButton>
     </NAlert>
-    <p v-if="showLoading" role="status" class="muted">正在读取存档…</p>
-    <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
-      <div class="quarantine-message">
-        <span>有 {{ records.quarantined }} 条记录已隔离。</span>
-        <RouterLink v-slot="{ href, navigate }" to="/records" custom>
-          <NButton tag="a" type="primary" size="large" :href="href" @click="navigate"
-            >查看并清理</NButton
-          >
-        </RouterLink>
-      </div>
-    </NCard>
     <GameSetupDialog
       v-if="setupMode"
       v-model:variant="variant"
       v-model:difficulty="difficulty"
       :mode="setupMode"
-      :saved-session="selectedSave"
+      :saved-summary="selectedSave"
+      retryable
       :statuses="dailyStatuses"
-      :busy="records.busy"
-      :error="records.error"
+      :busy="sheetBusy"
+      :blocked="sheetPending || !!sheetError"
+      :statuses-ready="!sheetBlocked"
+      :error="sheetError ?? (sheetPending ? '旧存档需要整理，完成后才能开始。' : null)"
+      @retry="home.retry"
       @cancel="setupMode = null"
       @start="startSelected"
       @resume="resumeSelected"
@@ -294,7 +302,29 @@ onMounted(records.load)
   </div>
 </template>
 <style scoped>
+.loading-slot {
+  min-height: 32px;
+}
+.loading-slot p {
+  margin: 4px 0;
+}
+/* The intro's existing bottom padding reserves feedback without changing the content group. */
+.home-loading-slot {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+}
+.resume-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
 .home-intro {
+  position: relative;
   display: grid;
   grid-template-columns: 1.3fr 1fr;
   align-items: center;

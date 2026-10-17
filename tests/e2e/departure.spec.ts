@@ -20,6 +20,7 @@ for (const action of ['toolbar', 'browser-back', 'lesson-return'] as const) {
       // Establish an in-app history entry; direct test navigation may replace the initial entry.
       await page.getByRole('link', { name: '返回首页', exact: true }).click()
       await page.getByRole('button', { name: '继续上次', exact: true }).click()
+      await expect(page).toHaveURL(/session=fixture-free-session/)
     }
     const gameUrl = page.url()
     const parentLabel = lessonPractice ? '返回本节课程' : '返回首页'
@@ -101,7 +102,7 @@ test('holds board geometry and blocks input while the outgoing save is delayed',
   const before = await boardGeometry()
   await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sudoku-local', 1)
+      const request = indexedDB.open('sudoku-local')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })

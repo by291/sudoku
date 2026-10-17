@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onScopeDispose, watch } from 'vue'
 import { NAlert, NButton } from 'naive-ui'
 import { RouterLink, useRoute } from 'vue-router'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
@@ -11,10 +11,16 @@ import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 
 const records = useRecordsStore()
+const reader = Symbol('result-view')
+onScopeDispose(() => records.releaseReader(reader))
 const route = useRoute()
-// Stay attached to the validated catalog so dataset replacement cannot leave an old result visible.
-const session = computed(
-  () => records.results.find((record) => record.session.id === route.params.id)?.session ?? null,
+const session = computed(() => records.result?.session ?? null)
+watch(
+  () => route.params.id,
+  (id) => {
+    void records.loadResult(typeof id === 'string' ? id : '', reader)
+  },
+  { immediate: true },
 )
 const board = computed(() => (session.value ? sessionBoard(session.value) : []))
 const showProgress = useDelayedProgress(() => records.busy)
@@ -24,8 +30,6 @@ const backTarget = computed(() => {
 
   return { path: '/records', query: { variant, tab: 'history' } }
 })
-
-onMounted(records.load)
 </script>
 
 <template>
@@ -38,9 +42,11 @@ onMounted(records.load)
 
     <NAlert v-if="records.error" type="error" :show-icon="false" class="feedback-message">
       {{ records.error }}
-      <NButton :disabled="records.busy" @click="records.load">重试读取</NButton>
+      <NButton :disabled="records.busy" @click="records.retry">重试读取</NButton>
     </NAlert>
-    <p v-if="showProgress" role="status" aria-live="polite">正在读取完成记录…</p>
+    <div class="loading-slot" :aria-busy="records.busy">
+      <p v-if="showProgress" role="status" aria-live="polite">正在读取完成记录…</p>
+    </div>
 
     <div v-if="records.loaded && session" class="result-layout">
       <section class="result-board" aria-label="已完成的只读棋盘">
@@ -98,6 +104,20 @@ onMounted(records.load)
         </p>
       </section>
     </div>
+    <div
+      v-else-if="!records.loaded && !records.error"
+      class="result-layout"
+      aria-busy="true"
+      aria-label="完成记录尚未读取"
+    >
+      <div class="result-placeholder panel" aria-hidden="true"></div>
+      <div class="panel result-summary">
+        <h2>—</h2>
+        <p>完成用时 —</p>
+        <p>完成时间 —</p>
+        <p>辅助情况 —</p>
+      </div>
+    </div>
     <NAlert
       v-else-if="records.loaded && !records.busy"
       type="info"
@@ -114,6 +134,17 @@ onMounted(records.load)
 </template>
 
 <style scoped>
+.loading-slot {
+  min-height: 32px;
+}
+.loading-slot p {
+  margin: 4px 0;
+}
+.result-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
 .result-page {
   padding-top: var(--page-top-space);
 }

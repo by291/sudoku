@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NAlert, NButton, NCard, NSelect } from 'naive-ui'
-import { onMounted, onScopeDispose, ref, computed } from 'vue'
+import { watch, onScopeDispose, ref, computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   parseVariantQuery,
@@ -12,17 +12,18 @@ import { supportedDifficulties } from '@/sudoku/catalogue'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import {
-  groupCompletedRecords,
+  groupCompletedSummaries,
   modeName,
   sessionLink,
-  summarizeSave,
-  variantSaves,
+  summarizeProjection,
 } from '@/features/records/model/records'
 import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
 import LocalBackupPanel from '@/features/records/components/LocalBackupPanel.vue'
 
 const records = useRecordsStore()
+const reader = Symbol('records-view')
+onScopeDispose(() => records.releaseReader(reader))
 const confirmation = ref<'clear' | 'quarantine' | null>(null)
 const route = useRoute()
 const router = useRouter()
@@ -41,29 +42,29 @@ const showProgress = useDelayedProgress(() => records.busy)
 const variantMenuOpen = ref(false)
 const compactNavigationMedia = window.matchMedia('(max-width: 800px)')
 const compactNavigation = ref(compactNavigationMedia.matches)
-const variantChoices = computed(() =>
-  VARIANT_OPTIONS.map((choice) => ({
-    ...choice,
-    completed: records.results.filter((record) => record.session.puzzle.rules.kind === choice.value)
-      .length,
-  })),
-)
-const summary = computed(() => records.summaries[variant.value])
-const results = computed(() =>
-  records.results.filter((record) => record.session.puzzle.rules.kind === variant.value),
-)
-
+const summary = computed(() => records.summary)
+const results = computed(() => records.rows)
 const saves = computed(() => {
-  const catalog = variantSaves(records.sessions, variant.value)
-
+  const latest = records.rows.find((row) => !row.completedAt)
   return {
-    latest: catalog.latest
-      ? { ...catalog.latest, summary: summarizeSave(catalog.latest.session) }
-      : null,
-    others: catalog.others.map((record) => ({ ...record, summary: summarizeSave(record.session) })),
+    latest: latest ? { session: latest, summary: summarizeProjection(latest) } : null,
+    others: records.rows
+      .filter((row) => row !== latest)
+      .map((session) => ({
+        session,
+        summary: summarizeProjection(session),
+      })),
   }
 })
-const historyGroups = computed(() => groupCompletedRecords(results.value))
+const historyGroups = computed(() => groupCompletedSummaries(records.rows))
+
+watch(
+  [tab, variant],
+  ([selectedTab, selectedVariant]) => {
+    void records.load({ tab: selectedTab, variant: selectedVariant }, reader)
+  },
+  { immediate: true },
+)
 
 function variantDestination(value: string) {
   return {
@@ -119,7 +120,6 @@ function updateNavigationLayout() {
 
 compactNavigationMedia.addEventListener('change', updateNavigationLayout)
 onScopeDispose(() => compactNavigationMedia.removeEventListener('change', updateNavigationLayout))
-onMounted(records.load)
 
 function requestConfirmation(action: 'clear' | 'quarantine', event: MouseEvent) {
   if (event.currentTarget instanceof HTMLElement) {
@@ -139,8 +139,8 @@ async function confirm() {
   }
 }
 
-function duration(value: number | null) {
-  return value === null ? '—' : formatDuration(value)
+function duration(value: number | null | undefined) {
+  return value == null ? '—' : formatDuration(value)
 }
 </script>
 <template>
@@ -149,9 +149,13 @@ function duration(value: number | null) {
       <p class="eyebrow">一点积累 / RECORDS</p>
       <h1>我的数独足迹</h1>
       <p class="muted">成绩和存档只属于当前浏览器。定期导出备份，可以在数据丢失后恢复。</p>
+      <div class="loading-slot" :aria-busy="records.busy">
+        <p v-if="showProgress" role="status" aria-live="polite">正在处理本机记录…</p>
+      </div>
     </header>
     <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
-      {{ records.error }} <NButton :disabled="records.busy" @click="records.load">重试读取</NButton>
+      {{ records.error }}
+      <NButton :disabled="records.busy" @click="records.retry">重试读取</NButton>
     </NAlert>
     <NCard v-if="records.notice" class="feedback-message" size="small" role="status">
       {{ records.notice }}
@@ -162,13 +166,16 @@ function duration(value: number | null) {
         <NButton tag="a" :href="href" @click="navigate">查看标准成绩</NButton>
       </RouterLink>
     </NAlert>
-    <p v-if="showProgress" role="status" aria-live="polite">正在处理本机记录…</p>
+    <NAlert v-if="records.pending" class="feedback-message" type="info" :show-icon="false">
+      旧存档需要整理，完成后可查看完整记录。
+      <NButton :disabled="records.busy" @click="records.retry">整理存档并重试</NButton>
+    </NAlert>
     <div class="records-workspace">
       <aside v-if="!compactNavigation" class="records-sidebar">
         <h2 class="sidebar-heading">选择玩法</h2>
         <nav class="records-navigation" aria-label="成绩玩法">
           <RouterLink
-            v-for="choice in variantChoices"
+            v-for="choice in VARIANT_OPTIONS"
             :key="choice.value"
             v-slot="{ href, navigate }"
             :to="variantDestination(choice.value)"
@@ -184,13 +191,20 @@ function duration(value: number | null) {
               @click="navigate"
             >
               <span class="choice-name">{{ choice.label }}</span>
-              <span v-if="records.loaded" class="choice-count">{{ choice.completed }} 局</span>
+              <span class="choice-count"
+                >{{
+                  choice.value === variant && records.completedCount !== null
+                    ? records.completedCount
+                    : '—'
+                }}
+                局</span
+              >
             </NButton>
           </RouterLink>
         </nav>
-        <div v-if="records.loaded" class="records-total">
+        <div class="records-total">
           <p>我的完成记录</p>
-          <span class="muted">共完成 {{ records.results.length }} 局</span>
+          <span class="muted">选择玩法查看对应成绩</span>
         </div>
       </aside>
       <label v-else class="variant-field"
@@ -234,32 +248,34 @@ function duration(value: number | null) {
           aria-labelledby="records-tab-overview"
           class="records-tab-panel"
         >
-          <template v-if="records.loaded">
+          <div :aria-busy="records.busy || !records.loaded">
             <div class="records-summary">
               <div class="records-overview">
                 <p class="eyebrow">按玩法积累</p>
                 <h2>{{ getVariantPresentation(variant).label }}</h2>
-                <p class="completion-count">已完成 {{ results.length }} 局</p>
+                <p class="completion-count">已完成 {{ records.completedCount ?? '—' }} 局</p>
                 <p class="muted">难度与最快成绩按玩法分别计算。</p>
               </div>
               <div class="stat-grid">
                 <div class="panel stat">
                   <span>当前连续挑战</span
-                  ><strong>{{ summary.currentStreak }} <small>天</small></strong>
+                  ><strong>{{ summary?.currentStreak ?? '—' }} <small>天</small></strong>
                 </div>
                 <div class="panel stat">
                   <span>最长连续挑战</span
-                  ><strong>{{ summary.longestStreak }} <small>天</small></strong>
+                  ><strong>{{ summary?.longestStreak ?? '—' }} <small>天</small></strong>
                 </div>
                 <div class="panel stat">
                   <span>正式挑战完成</span
                   ><strong
-                    >{{ summary.dailyTotals.unassisted + summary.dailyTotals.assisted }}
+                    >{{
+                      summary ? summary.dailyTotals.unassisted + summary.dailyTotals.assisted : '—'
+                    }}
                     <small>次</small></strong
                   >
                   <p>
-                    无辅助 {{ summary.dailyTotals.unassisted }} · 辅助
-                    {{ summary.dailyTotals.assisted }}
+                    无辅助 {{ summary?.dailyTotals.unassisted ?? '—' }} · 辅助
+                    {{ summary?.dailyTotals.assisted ?? '—' }}
                   </p>
                 </div>
               </div>
@@ -277,8 +293,8 @@ function duration(value: number | null) {
                 <tbody>
                   <tr v-for="difficulty in supportedDifficulties(variant)" :key="difficulty">
                     <th scope="row">{{ DIFFICULTY_NAMES[difficulty] }}</th>
-                    <td>{{ duration(summary.freeBests[difficulty].unassisted) }}</td>
-                    <td>{{ duration(summary.freeBests[difficulty].assisted) }}</td>
+                    <td>{{ duration(summary?.freeBests[difficulty].unassisted) }}</td>
+                    <td>{{ duration(summary?.freeBests[difficulty].assisted) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -286,7 +302,7 @@ function duration(value: number | null) {
                 学习实战和每日练习不参与自由游玩最快成绩。正式挑战在题目日期当天完成才计入连续天数。
               </p>
             </section>
-          </template>
+          </div>
         </section>
         <section
           v-else-if="tab === 'saves'"
@@ -295,16 +311,25 @@ function duration(value: number | null) {
           aria-labelledby="records-tab-saves"
           class="records-tab-panel"
         >
-          <section v-if="records.loaded" class="save-list" aria-label="本地存档">
+          <section
+            class="save-list"
+            aria-label="本地存档"
+            :aria-busy="records.busy || !records.loaded"
+          >
             <h2>{{ getVariantPresentation(variant).label }}</h2>
-            <p v-if="!saves.latest && !saves.others.length" class="muted">
+            <p v-if="records.loaded && !saves.latest && !saves.others.length" class="muted">
               这个玩法还没有本地存档，开始一局后会自动保存在这里。
             </p>
+            <article v-if="!records.loaded" class="panel record-placeholder" aria-hidden="true">
+              <h3>—</h3>
+              <p class="muted">已填 — / — 格 · 已用时 —</p>
+              <p class="muted small">开始于 —</p>
+            </article>
             <article v-if="saves.latest" class="panel latest-save">
               <p class="eyebrow">最近开始 · 进行中</p>
               <h3>{{ modeName(saves.latest.session) }}</h3>
               <p class="muted">
-                {{ DIFFICULTY_NAMES[saves.latest.session.puzzle.difficulty] }} ·
+                {{ DIFFICULTY_NAMES[saves.latest.session.difficulty] }} ·
                 {{ saves.latest.summary.progressLabel }} · 已用时
                 {{ formatDuration(saves.latest.session.elapsedMs) }}
               </p>
@@ -333,10 +358,9 @@ function duration(value: number | null) {
                 <div>
                   <h3>{{ modeName(session) }}</h3>
                   <p class="muted">
-                    {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} ·
-                    {{ saveSummary.progressLabel }} · 已用时
-                    {{ formatDuration(session.elapsedMs) }} ·
-                    {{ session.completion ? '已完成' : '进行中' }}
+                    {{ DIFFICULTY_NAMES[session.difficulty] }} · {{ saveSummary.progressLabel }} ·
+                    已用时 {{ formatDuration(session.elapsedMs) }} ·
+                    {{ session.completedAt ? '已完成' : '进行中' }}
                   </p>
                   <p class="muted small">
                     开始于
@@ -345,7 +369,7 @@ function duration(value: number | null) {
                 </div>
                 <RouterLink v-slot="{ href, navigate }" :to="sessionLink(session)" custom>
                   <NButton tag="a" :href="href" @click="navigate">{{
-                    session.completion ? '查看存档' : '继续存档'
+                    session.completedAt ? '查看存档' : '继续存档'
                   }}</NButton>
                 </RouterLink>
               </li>
@@ -359,15 +383,25 @@ function duration(value: number | null) {
           aria-labelledby="records-tab-history"
           class="records-tab-panel"
         >
-          <section v-if="records.loaded" class="history" aria-label="完成历史">
+          <section
+            class="history"
+            aria-label="完成历史"
+            :aria-busy="records.busy || !records.loaded"
+          >
             <h2>{{ getVariantPresentation(variant).label }}</h2>
-            <p v-if="!results.length" class="muted">这个玩法还没有完成记录，先享受解题的过程吧。</p>
+            <p v-if="records.loaded && !results.length" class="muted">
+              这个玩法还没有完成记录，先享受解题的过程吧。
+            </p>
+            <section v-if="!records.loaded" class="panel record-placeholder" aria-hidden="true">
+              <h3>—</h3>
+              <p class="muted">完成时间 — · 用时 —</p>
+            </section>
             <section v-for="group in historyGroups" :key="group.date" class="panel history-date">
               <h3>
                 <time :datetime="group.date">{{ group.label }}</time>
               </h3>
               <ul>
-                <li v-for="{ session } in group.records" :key="session.id">
+                <li v-for="session in group.records" :key="session.id">
                   <RouterLink
                     :to="{
                       path: `/records/${encodeURIComponent(session.id)}`,
@@ -377,14 +411,14 @@ function duration(value: number | null) {
                   >
                     <div>
                       <strong
-                        >{{ getVariantPresentation(session.puzzle.rules.kind).label }} ·
+                        >{{ getVariantPresentation(session.variant).label }} ·
                         {{ modeName(session) }}</strong
                       >
                       <p class="muted">
-                        {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} ·
+                        {{ DIFFICULTY_NAMES[session.difficulty] }} ·
                         {{
-                          session.completion
-                            ? new Date(session.completion.completedAt).toLocaleTimeString('zh-CN', {
+                          session.completedAt
+                            ? new Date(session.completedAt).toLocaleTimeString('zh-CN', {
                                 hour: '2-digit',
                                 minute: '2-digit',
                               })
@@ -394,7 +428,7 @@ function duration(value: number | null) {
                     </div>
                     <div class="history-time">
                       {{ formatDuration(session.elapsedMs)
-                      }}<span>{{ session.assistance.assisted ? '辅助完成' : '无辅助完成' }}</span
+                      }}<span>{{ session.assisted ? '辅助完成' : '无辅助完成' }}</span
                       ><span class="open-record">查看棋局 →</span>
                     </div>
                   </RouterLink>
@@ -403,6 +437,23 @@ function duration(value: number | null) {
             </section>
           </section>
         </section>
+        <nav
+          v-if="tab !== 'overview' && (records.pageNumber > 1 || records.nextCursor)"
+          class="record-pagination"
+          aria-label="记录分页"
+        >
+          <NButton
+            :disabled="records.busy || records.pageNumber === 1"
+            @click="records.changePage('previous')"
+            >上一页</NButton
+          >
+          <span>第 {{ records.pageNumber }} 页</span>
+          <NButton
+            :disabled="records.busy || !records.nextCursor"
+            @click="records.changePage('next')"
+            >下一页</NButton
+          >
+        </nav>
         <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
           <p>{{ records.quarantined }} 条损坏或不兼容的记录已隔离，有效数据仍可使用。</p>
           <NButton @click="requestConfirmation('quarantine', $event)">清理损坏记录</NButton>
@@ -431,10 +482,36 @@ function duration(value: number | null) {
   </section>
 </template>
 <style scoped>
+.loading-slot {
+  /* Reuse the heading gap so delayed feedback preserves short-screen record density. */
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  display: flex;
+  align-items: center;
+  height: var(--page-heading-space);
+  font-size: 12px;
+  line-height: 16px;
+}
+.loading-slot p {
+  margin: 0;
+}
+.record-placeholder {
+  min-height: 140px;
+}
+.record-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+
 .records-page {
   padding-top: var(--page-top-space);
 }
 .records-heading {
+  position: relative;
   margin-bottom: var(--page-heading-space);
 }
 .records-workspace {
@@ -680,7 +757,7 @@ td {
     margin: 4px 0 8px;
     font-size: 28px;
   }
-  .records-heading > p:last-child {
+  .records-heading > p:last-of-type {
     margin: 0;
   }
   .eyebrow {

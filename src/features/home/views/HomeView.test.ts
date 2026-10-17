@@ -1,8 +1,8 @@
+import { initialSummaryState } from '@/storage/projections'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import HomeView from '@/features/home/views/HomeView.vue'
-import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import type { GameSession } from '@/features/game/model/session'
 import { gameRuntimeKey } from '@/runtime'
@@ -21,9 +21,7 @@ afterEach(async () => {
 async function setup(sessions: GameSession[], currentLessonId: string | null = null) {
   const test = await createTestRuntime()
   cleanups.push(test.dispose)
-  const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
   const preferences = test.app.runWithContext(() => usePreferencesStore(test.pinia))
-  cleanups.push(records.dispose)
   if (currentLessonId) {
     preferences.settings = { ...preferences.settings, currentLessonId }
   }
@@ -31,6 +29,11 @@ async function setup(sessions: GameSession[], currentLessonId: string | null = n
     await test.database.put('sessions', { formatVersion: 2, revision: 1, session })
   }
 
+  await test.database.put('meta', initialSummaryState(false), 'summaries')
+  expect((await test.runtime.repository.maintainSummaries()).ok).toBe(true)
+  const homeRead = vi.spyOn(test.runtime.repository, 'readHome')
+  const sessionsRead = vi.spyOn(test.runtime.repository, 'listSessions')
+  const resultsRead = vi.spyOn(test.runtime.repository, 'listResults')
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -46,7 +49,10 @@ async function setup(sessions: GameSession[], currentLessonId: string | null = n
     global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
   })
   cleanups.push(() => wrapper.unmount())
-  await vi.waitFor(() => expect(records.loaded).toBe(true))
+  await vi.waitFor(() => expect(homeRead).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(wrapper.find('button[disabled]').exists()).toBe(false))
+  expect(sessionsRead).not.toHaveBeenCalled()
+  expect(resultsRead).not.toHaveBeenCalled()
   await flushPromises()
 
   const resume = wrapper.findAll('button').find((button) => button.text() === '继续上次')
@@ -54,7 +60,7 @@ async function setup(sessions: GameSession[], currentLessonId: string | null = n
     throw new Error('Missing Continue Last action')
   }
 
-  return { wrapper, router, resume }
+  return { ...test, wrapper, router, resume }
 }
 
 it('shows recent-first save details and resumes the exact selected daily practice', async () => {
@@ -72,7 +78,7 @@ it('shows recent-first save details and resumes the exact selected daily practic
   const { resume, router } = await setup([older, recent])
 
   await resume.trigger('click')
-  await flushPromises()
+  await vi.waitFor(() => expect(document.querySelectorAll('[role="dialog"] a')).toHaveLength(2))
 
   const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[role="dialog"] a'))
   expect(links.map((link) => link.getAttribute('href'))).toEqual([
@@ -98,7 +104,7 @@ it('resumes a single save directly even when a recent lesson is available', asyn
   const { resume, router } = await setup([makeSession({ id: 'only-save' })], 'rules')
 
   await resume.trigger('click')
-  await flushPromises()
+  await vi.waitFor(() => expect(router.currentRoute.value.query.session).toBe('only-save'))
 
   expect(router.currentRoute.value.query.session).toBe('only-save')
   expect(document.querySelector('[role="dialog"]')).toBeNull()

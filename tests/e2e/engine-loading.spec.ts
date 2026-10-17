@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { useNextGenerationSeed } from './support'
 
 for (const root of ['http://127.0.0.1:4173/', 'http://127.0.0.1:4174/sudoku/']) {
-  test(`retries unavailable engine assets before opening storage at ${root}`, async ({ page }) => {
+  test(`browses without WASM and retries unavailable computation locally at ${root}`, async ({
+    page,
+  }) => {
     let failures = 2
     let downloads = 0
     await page.route('**/*.wasm', async (route) => {
@@ -13,35 +16,34 @@ for (const root of ['http://127.0.0.1:4173/', 'http://127.0.0.1:4174/sudoku/']) 
       }
       await route.continue()
     })
-    await page.addInitScript(() => {
-      Reflect.set(window, 'engineTestDatabaseOpens', 0)
-      const open = IDBFactory.prototype.open
-      IDBFactory.prototype.open = function (this: IDBFactory, name: string, version?: number) {
-        Reflect.set(
-          window,
-          'engineTestDatabaseOpens',
-          Number(Reflect.get(window, 'engineTestDatabaseOpens')) + 1,
-        )
-        return open.call(this, name, version)
-      }
-    })
 
     await page.goto(root)
+    await expect(page.getByRole('button', { name: /开始一局数独/ })).toBeEnabled()
+    await page.goto(`${root}#/learn/rules`)
+    await expect(page.getByRole('heading', { name: '认识数独', exact: true })).toBeVisible()
+    await expect(page.getByRole('group', { name: '数独棋盘', exact: true })).toBeVisible()
+    await page.goto(`${root}#/records`)
+    await expect(page.getByText('已完成 0 局', { exact: true })).toBeVisible()
+    await page.goto(`${root}#/play/daily`)
+    await expect(page.getByText('今日已完成 0 / 6 种玩法', { exact: true })).toBeVisible()
+    expect(downloads).toBe(0)
+
+    await useNextGenerationSeed(page, 'lazy-browsing-retry')
+    await page.goto(`${root}#/play/free?start=1&difficulty=easy`)
     for (let attempt = 0; attempt < 2; attempt++) {
-      await expect(page.getByText('数独引擎加载失败，请重试。')).toBeVisible({ timeout: 3000 })
-      expect(await page.evaluate(() => Reflect.get(window, 'engineTestDatabaseOpens'))).toBe(0)
-      await page.getByRole('button', { name: '重试', exact: true }).focus()
+      // Wait for this attempt rather than pressing the prior failure's still-rendered retry.
+      await expect.poll(() => downloads).toBe(attempt + 1)
+      await expect(page.getByRole('alert').filter({ hasText: '出题失败，请重试。' })).toBeVisible()
+      await expect(page.getByRole('main', { name: '数独游戏', exact: true })).toBeVisible()
+      await page.getByRole('button', { name: '重试出题', exact: true }).focus()
       await page.keyboard.press('Enter')
     }
 
-    await expect(page.getByRole('main', { name: '数独游戏', exact: true })).toBeVisible()
+    await expect(page.getByRole('group', { name: '数独棋盘', exact: true })).toBeVisible()
     expect(downloads).toBe(3)
-    expect(
-      await page.evaluate(() => Reflect.get(window, 'engineTestDatabaseOpens')),
-    ).toBeGreaterThan(0)
   })
 
-  test(`rejects mismatched engine identities and retries fresh code at ${root}`, async ({
+  test(`rejects mismatched computation identities while browsing remains available at ${root}`, async ({
     page,
   }) => {
     let mismatch = true
@@ -68,11 +70,16 @@ for (const root of ['http://127.0.0.1:4173/', 'http://127.0.0.1:4174/sudoku/']) 
     })
 
     await page.goto(root)
-    await expect(page.getByText('数独引擎加载失败，请重试。')).toBeVisible({ timeout: 3000 })
-    await expect(page.getByRole('main', { name: '数独游戏', exact: true })).toHaveCount(0)
-    mismatch = false
-    await page.getByRole('button', { name: '重试', exact: true }).click()
-
+    await expect(page.getByRole('button', { name: /开始一局数独/ })).toBeEnabled()
+    await useNextGenerationSeed(page, 'lazy-engine-retry')
+    await page.getByRole('button', { name: /开始一局数独/ }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: '出题失败，请重试。' })).toBeVisible()
     await expect(page.getByRole('main', { name: '数独游戏', exact: true })).toBeVisible()
+
+    mismatch = false
+    await page.getByRole('button', { name: '重试出题', exact: true }).click()
+
+    await expect(page.getByRole('group', { name: '数独棋盘', exact: true })).toBeVisible()
   })
 }

@@ -75,7 +75,7 @@ test('keeps edits when a new-game dialog is cancelled and yields game shortcuts'
 
 test('selects the daily type in a dialog without starting on selection', async ({ page }) => {
   await page.goto('/#/')
-  await page.getByRole('link', { name: /每日挑战/ }).click()
+  await page.getByRole('link', { name: /每天，一次小挑战/ }).click()
   const dialog = page.getByRole('dialog', { name: '选择每日挑战', exact: true })
   await expect(dialog).toBeVisible()
   await dialog.getByText('箭头数独', { exact: true }).click()
@@ -178,7 +178,7 @@ test('uses persistent labelled switches for game preferences', async ({ page }) 
     .poll(() =>
       page.evaluate(async () => {
         const database = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = indexedDB.open('sudoku-local', 1)
+          const request = indexedDB.open('sudoku-local')
           request.onsuccess = () => resolve(request.result)
           request.onerror = () => reject(request.error)
         })
