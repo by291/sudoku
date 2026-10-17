@@ -2,8 +2,11 @@ package dev.yigeyinian.sudoku
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -83,12 +86,15 @@ internal fun SudokuApp(activity: MainActivity) {
     val showStartupProgress = rememberDelayedProgress(!state.ready && state.loading)
 
     YigeTheme(state.settings.theme) {
+        // Subscribe during bootstrap so the first destination is measured with real system insets.
+        // Creating the subscription only inside Scaffold otherwise draws Home once with zero insets.
+        val startupInsets = WindowInsets.safeDrawing
         val lightBackground = MaterialTheme.colorScheme.background.luminance() > 0.5f
         SideEffect { activity.setSystemBarAppearance(lightBackground) }
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             if (!state.ready) {
                 Column(
-                    Modifier.fillMaxSize().padding(32.dp),
+                    Modifier.fillMaxSize().windowInsetsPadding(startupInsets).padding(32.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {

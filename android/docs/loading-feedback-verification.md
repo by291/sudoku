@@ -2,6 +2,14 @@
 
 Date: 2026-10-17.
 
+## Cold-start Home geometry
+
+Cold-start frame capture exposed a separate layout jump after preloading had completed. The startup placeholder did not subscribe to Compose window insets. Home's first Scaffold therefore measured with zero system insets; the next frame applied the status/navigation bars and recentered the entry group. At 360 × 800 dp, the Start button moved down by 48 physical pixels on a density-3 emulator.
+
+The app now subscribes to `WindowInsets.safeDrawing` throughout bootstrap and applies that padding to startup feedback. The first destination receives initialized insets without changing Home's final styling, spacing, or alignment. This follows the installed Compose Foundation 1.12.0 inset lifecycle and [Android's inset phase guidance](https://developer.android.com/develop/ui/compose/system/insets-ui#insets-and-jetpack-compose-phases).
+
+`HomeStartupTest` observes actual draw frames around gated native readiness instead of waiting for Compose to become idle. It failed before the fix with Start bounds moving from y=1110 to y=1158 px, then passed after the change. A separate real cold-start capture showed the hero top remaining at y=462 px in all 14 captured Home frames. These measurements use a disposable API 37.2 ARM emulator; they do not establish physical-device startup latency.
+
 ## Policy and scope
 
 Transient progress appears only after 350 ms of continuous pending work. Completion immediately clears the feedback, cancels the pending timer, and permits the actual transition. No minimum display duration or artificial operation delay is introduced. Each subsequent operation starts a fresh delay. Errors and the actual enabled state of controls remain immediate.
