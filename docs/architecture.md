@@ -12,11 +12,11 @@ packages/sudoku-wasm/pkg/        # Generated and ignored
 src/
   main.ts, App.vue, ReadyApplication.vue, runtime.ts
   sudoku/{contracts,values,catalogue,seed,generationInput,ruleInput,puzzleSnapshot}
-  sudoku/{wasmModule,mainEngine,workerEngine}
+  sudoku/{wasmModule,mainEngine,workerEngine,lazyComputation}
   layouts/, router/, theme/, styles/
   shared/{components,composables,model,utils}/
   features/
-    home/views/
+    home/{views,composables}/
     game/{views,components,composables,model,stores}/
     learning/{views,composables,model,stores}/
     records/{views,components,model,stores}/
@@ -79,9 +79,9 @@ BLAKE3 contexts and the 43-byte phase frame are version-owned. Frame fields are 
 
 `pnpm wasm:build` builds locked Rust/WASM, installs the pinned wasm-bindgen CLI if needed, and emits JS/WASM/declarations into the ignored workspace package. A build-time TypeScript compiler transform wraps self-contained generated glue in a collectable factory. Each instance owns separate memory; compiled immutable code can be shared. There is no source evaluation, handwritten pointer protocol, raw-memory alias or browser-side fallback solver.
 
-App loads, compiles and validates the module before constructing runtime/repository/stores or decoding IndexedDB. Retry fetches fresh code. Stale bootstrap completion disposes its engine. Pinia 4.0.3 resolves store injections through the Vue application context, so `main.ts` publishes the ready runtime with an application-level provider before mounting `ReadyApplication.vue`.
+App constructs browsing services after initial route resolution without downloading WASM. Pinia 4.0.3 resolves store injections through the Vue application context, so `main.ts` publishes the runtime with an application-level provider before mounting `ReadyApplication.vue`. Runtime readiness means services are available; `ensureEngine()` separately shares the lazy module download, validation and initialization. Failed initialization is retryable, and a late initializer disposes its engine after shutdown.
 
-Initial route resolution and WASM download run concurrently; runtime publication and application rendering wait for both. Retry restarts initial navigation before waiting again. Game leave guards identify the target navigation, and a scope-owned resolve guard pauses/saves only after that target's page is loaded. Cancelled targets cannot pause the current game while their page downloads finish.
+Game operations and full persisted-record validation await engine readiness before using synchronous computation. Summary browsing, course directories and guided content require no engine. The lazy Worker client copies caller-owned inputs before waiting for initialization and supports cancellation during that wait. Initial route retry restarts navigation before waiting again. Game leave guards identify the target navigation, and a scope-owned resolve guard pauses/saves only after that target's page is loaded. Cancelled targets cannot pause the current game while their page downloads finish.
 
 `useGameLifecycle` also guards session-changing route updates, including lesson-practice query exits, while excluding URL synchronization for an already installed session. `prepareLeave` uses the existing fenced transition and persistence contracts to block navigation on save failure. The view retains an inert outgoing presentation while saving; completion, cancellation, and route errors release it only for the relevant target. Hidden/pagehide events immediately clear this hold and conceal the board. Browser shutdown remains best effort.
 
@@ -103,13 +103,19 @@ Rust edits return owned entries/notes and board facts. TypeScript commits indepe
 
 Storage writes format-2 records and normalizes independently validated format-1 Classic records. Layer/history chains, mode metadata, daily formal eligibility, original completion facts and first-result retention remain validated. Mathematical puzzle/completion and rated-summary semantics use injected ready synchronous validators; there is no await or Worker round trip in an IDB decoding transaction. Budget exhaustion or validator failure aborts as unavailable and never quarantines/deletes inconclusive data. Corrupt optional assessments become explicit unavailability without discarding a valid game.
 
+IndexedDB schema v2 adds derived session/result summaries and compound indexes. Canonical records and projections change atomically; portable backup/session formats remain unchanged. Home reads counts, setup reads one slot or today's formal IDs, records queries only the active tab/filter, and detail/resume reads one canonical record. Summary pages contain at most 30 rows ordered by descending time and ascending ID; cursors carry filters, dataset epoch and projection generation. Views retain one page and reset incompatible cursors rather than mixing snapshots. Per-variant overview walks compact result summaries, never full boards/history.
+
+Schema upgrades do no mathematical work. Legacy coverage stays pending until explicit cancellable maintenance validates one owned payload at a time and fences each repair against concurrent writes/reset. Unavailable computation preserves original records. Unknown counts/progress remain distinct from zero, and unknown slot presence cannot authorize replacement. Missing targeted projections invalidate coverage for repair without scanning unrelated payloads. Asynchronous readiness always finishes before semantic-validation transactions open.
+
 Backups validate the entire bounded file before preview/replacement. Import replaces player collections atomically under the preview's expected dataset epoch, clears leases/quarantine and increments the epoch. Export captures one committed readonly snapshot and reports excluded invalid records. Existing limits, save failures, cross-tab races and reset fences remain unchanged.
 
 Shutdown keeps semantic validation alive until the final leave/save settles, then terminates Workers, releases ownership, disposes main memory and closes storage. Every lifetime is idempotent.
 
 ## Teaching, presentation and verification
 
-The learning store structurally decodes all 32 stable courses without engine calls. `scripts/validate-lesson-catalogue.ts` is a mandatory Vite production-build plugin: Rust/WASM validates every guided and exercise stage, rejects invalid or incomplete outcomes, and Vite consumes the exact verified source snapshot. Runtime guards retain explicit DTO shapes, ranges, answer consistency, and owned copies. Rust remains responsible for candidate-relative evidence validation in the build and independent contract tests; storage and backup mathematical validators are unchanged. Authored arrays, explanations, answers and course IDs remain teaching/presentation data. Prior candidate eliminations are an explicit precondition of an authored state; independent course proofs establish them. Teaching may choose any sound unit pattern; live hints retain ordered replay and direct advanced-proof validation. Progress cursors remain epoch-fenced settings facts; final committed lesson completions and full-board practice have independent lifetimes.
+`scripts/validate-lesson-catalogue.ts` generates a lightweight typed directory and 32 separate lazy lesson modules from one authored source. Its mandatory Vite production-build gate validates every guided and exercise stage with Rust/WASM, rejects invalid or incomplete outcomes, and bundles the exact verified source snapshot. The learning store decodes only requested content, keeps at most three decoded lessons, and fences stale selections. Directory metadata and guides do not wait for personal progress; exercise submission/advancement still requires durable progress readiness. Pending content preserves the page regions used by the loaded lesson.
+
+Runtime guards retain explicit DTO shapes, ranges, answer consistency, and owned copies. Rust remains responsible for candidate-relative evidence validation in the build and independent contract tests; storage and backup mathematical validators are unchanged. Authored arrays, explanations, answers and course IDs remain teaching/presentation data. Prior candidate eliminations are an explicit precondition of an authored state; independent course proofs establish them. Teaching may choose any sound unit pattern; live hints retain ordered replay and direct advanced-proof validation. Progress cursors remain epoch-fenced settings facts; final committed lesson completions and full-board practice have independent lifetimes.
 
 Chinese technique/violation text belongs to game presentation; shared board drawing consumes DTOs and owned metadata. Display-only digit/mask formatting cannot infer candidates or Sudoku validity. A new primitive must support candidates, conflicts, completion, exact counting, deductions/evidence, validation and accessible drawing together.
 
