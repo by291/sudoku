@@ -42,6 +42,7 @@ import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.SessionRecord
 import dev.yigeyinian.sudoku.model.Settings
 import dev.yigeyinian.sudoku.model.Variant
+import dev.yigeyinian.sudoku.model.variant
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,7 +62,13 @@ class RecordsScreenTest {
     private var retries = 0
 
     private fun show(
-        initial: RecordsUiState = RecordsUiState(loading = false, epoch = 1),
+        initial: RecordsUiState =
+            RecordsUiState(
+                loading = false,
+                epoch = 1,
+                summary = dev.yigeyinian.sudoku.model.summarizeRecords(emptyList(), "2026-10-17")
+            ),
+        historyItems: List<dev.yigeyinian.sudoku.model.SummaryItem> = emptyList(),
         backup: Boolean = false
     ): MutableState<RecordsUiState> {
         val state = mutableStateOf(initial)
@@ -73,7 +80,21 @@ class RecordsScreenTest {
                     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                         RecordsScreen(
                             state.value,
-                            onVariant = { state.value = state.value.copy(variant = it) },
+                            onVariant = { variant ->
+                                state.value = state.value.copy(
+                                    variant = variant,
+                                    items = (if (state.value.tab == RecordsTab.HISTORY) historyItems else initial.items)
+                                        .filter { it.summary?.variant == variant }
+                                )
+                            },
+                            onTab = { tab ->
+                                state.value = state.value.copy(
+                                    tab = tab,
+                                    items = (if (tab == RecordsTab.HISTORY) historyItems else initial.items)
+                                        .filter { it.summary?.variant == state.value.variant }
+                                        .sortedByDescending { it.summary?.startedAt }
+                                )
+                            },
                             onResume = { resumed = it },
                             onRetry = { retries++ },
                             onExport = { exports++ },
@@ -142,9 +163,13 @@ class RecordsScreenTest {
             RecordsUiState(
                 loading = false,
                 epoch = 1,
-                sessions = listOf(first, diagonal, latest).map { SessionRecord(revision = 1, session = it) },
-                results = listOf(ResultRecord(session = completed))
-            )
+                items = listOf(first, diagonal, latest).map { it.summaryItem() },
+                summary = dev.yigeyinian.sudoku.model.summarizeRecords(
+                    listOf(ResultRecord(session = completed)),
+                    "2026-10-17"
+                )
+            ),
+            historyItems = listOf(completed.summaryItem())
         )
         capture("overview")
 
@@ -197,7 +222,13 @@ class RecordsScreenTest {
     @Test fun firstLoadDoesNotShowEmptyStatisticsAndRefreshRetainsLoadedData() {
         val state = show(RecordsUiState())
         compose.onNodeWithText("最佳用时").assertDoesNotExist()
-        compose.runOnIdle { state.value = state.value.copy(loading = false, epoch = 1) }
+        compose.runOnIdle {
+            state.value = state.value.copy(
+                loading = false,
+                epoch = 1,
+                summary = dev.yigeyinian.sudoku.model.summarizeRecords(emptyList(), "2026-10-17")
+            )
+        }
         pageNode("最佳用时").assertIsDisplayed()
         compose.runOnIdle { state.value = state.value.copy(loading = true) }
         compose.onNodeWithText("最佳用时").assertIsDisplayed()
@@ -250,3 +281,11 @@ private fun session(
     elapsedMs = 272000,
     assistance = Assistance()
 )
+
+private fun GameSession.summaryItem(): dev.yigeyinian.sudoku.model.SummaryItem {
+    val summary = dev.yigeyinian.sudoku.model.GameSummary(
+        id, 1, puzzle.rules.variant, puzzle.difficulty, metadata,
+        startedAt, elapsedMs, completion, assistance.assisted, 0, puzzle.givens.count { it == 0 }
+    )
+    return dev.yigeyinian.sudoku.model.SummaryItem(id, summary)
+}

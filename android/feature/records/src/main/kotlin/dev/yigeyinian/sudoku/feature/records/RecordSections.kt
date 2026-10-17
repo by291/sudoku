@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
 import dev.yigeyinian.sudoku.designsystem.difficultyLabel
 import dev.yigeyinian.sudoku.designsystem.formatElapsedTime
 import dev.yigeyinian.sudoku.model.GameMode
-import dev.yigeyinian.sudoku.model.GameSession
+import dev.yigeyinian.sudoku.model.GameSummary
 import dev.yigeyinian.sudoku.model.RecordSummary
 import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.Variant
@@ -225,7 +225,7 @@ internal fun EmptyRecords(title: String, description: String) {
 }
 
 @Composable
-internal fun FeaturedSave(session: GameSession, enabled: Boolean, onResume: () -> Unit) {
+internal fun FeaturedSave(session: GameSummary, enabled: Boolean, onResume: () -> Unit) {
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -259,7 +259,7 @@ internal fun FeaturedSave(session: GameSession, enabled: Boolean, onResume: () -
 }
 
 @Composable
-internal fun RecordEntry(session: GameSession, enabled: Boolean, history: Boolean, onOpen: () -> Unit) {
+internal fun RecordEntry(session: GameSummary, enabled: Boolean, history: Boolean, onOpen: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val action = when {
         history -> "查看记录"
@@ -336,18 +336,18 @@ internal fun RecordEntry(session: GameSession, enabled: Boolean, history: Boolea
     }
 }
 
-private fun recordTitle(session: GameSession): String {
+private fun recordTitle(session: GameSummary): String {
     val mode = when (session.mode) {
         GameMode.FREE -> "自由游玩"
         GameMode.DAILY -> "每日挑战"
         GameMode.LEARNING -> "学习实战"
     }
-    return "$mode · ${difficultyLabel(session.puzzle.difficulty)}"
+    return "$mode · ${difficultyLabel(session.difficulty)}"
 }
 
-private fun assistanceLabel(session: GameSession) = if (session.assistance.assisted) "使用辅助" else "未使用辅助"
+private fun assistanceLabel(session: GameSummary) = if (session.assisted) "使用辅助" else "未使用辅助"
 
-private fun recordDetail(session: GameSession): String {
+private fun recordDetail(session: GameSummary): String {
     val daily = session.metadata as? SessionMetadata.Daily
     if (daily != null) {
         val attempt = if (daily.formalAttempt) "正式挑战" else "挑战练习"
@@ -356,7 +356,7 @@ private fun recordDetail(session: GameSession): String {
     return assistanceLabel(session)
 }
 
-private fun recordDate(session: GameSession): String {
+private fun recordDate(session: GameSummary): String {
     val daily = session.metadata as? SessionMetadata.Daily
     if (daily != null) {
         return "挑战日期 ${daily.challengeDate}"

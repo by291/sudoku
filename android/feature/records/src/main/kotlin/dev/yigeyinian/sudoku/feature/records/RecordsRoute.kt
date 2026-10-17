@@ -12,10 +12,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.yigeyinian.sudoku.model.GameLaunch
+import dev.yigeyinian.sudoku.model.challengeDate
+import dev.yigeyinian.sudoku.model.challengeRefreshDelay
+import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -81,7 +87,20 @@ fun RecordsRoute(
         }
     }
 
-    LaunchedEffect(model) { model.refresh() }
+    LaunchedEffect(model) { model.observe() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.refresh() }
+    LaunchedEffect(model) {
+        var date = challengeDate(Instant.now())
+        while (true) {
+            delay(challengeRefreshDelay(Instant.now()))
+            val today = challengeDate(Instant.now())
+            if (today != date) {
+                date = today
+                model.refresh()
+            }
+        }
+    }
+    LaunchedEffect(backupOpen) { if (backupOpen) model.openBackup() }
     LaunchedEffect(state.replacementGeneration) {
         if (state.replacementGeneration > deliveredReplacement) {
             deliveredReplacement = state.replacementGeneration
@@ -90,6 +109,8 @@ fun RecordsRoute(
     }
 
     RecordsScreen(
+        onTab = model::selectTab,
+        onMore = model::loadMore,
         state = state.copy(busy = state.busy || documentLoading),
         onVariant = model::selectVariant,
         onResume = { onResume(GameLaunch.Resume(it)) },

@@ -20,6 +20,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -27,62 +28,138 @@ internal data class RecordsUiState(
     val loading: Boolean = true,
     val busy: Boolean = false,
     val variant: Variant = Variant.CLASSIC,
-    val sessions: List<SessionRecord> = emptyList(),
-    val results: List<ResultRecord> = emptyList(),
+    val items: List<dev.yigeyinian.sudoku.model.SummaryItem> = emptyList(),
+    val next: dev.yigeyinian.sudoku.model.SummaryCursor? = null,
+    val pending: Boolean = false,
+    val summary: RecordSummary? = null,
+    val tab: RecordsTab = RecordsTab.OVERVIEW,
     val epoch: Long? = null,
     val quarantined: Int = 0,
     val preview: BackupPreview? = null,
     val error: String? = null,
     val notice: String? = null,
     val replacementGeneration: Long = 0
-) {
-    val summary: RecordSummary get() = summarizeRecords(results, challengeDate(Instant.now()), variant)
-}
+)
+
+internal enum class RecordsTab(val label: String) { OVERVIEW("概览"), SAVES("本地存档"), HISTORY("完成历史") }
 
 @HiltViewModel
-internal class RecordsViewModel @Inject constructor(private val repository: GameRepository) : ViewModel() {
+internal class RecordsViewModel @Inject constructor(
+    private val repository: GameRepository,
+    private val reads: dev.yigeyinian.sudoku.model.GameReadRepository
+) : ViewModel() {
     private val mutableState = MutableStateFlow(RecordsUiState())
     val uiState = mutableState.asStateFlow()
     var pendingExport: BackupExport? = null
         private set
     private var operationGeneration = 0L
+    private var readJob: kotlinx.coroutines.Job? = null
     private var retryOperation: (suspend () -> Unit)? = null
 
     fun refresh() {
         if (mutableState.value.busy) {
             return
         }
-        viewModelScope.launch { load() }
+        readJob?.cancel()
+        readJob = viewModelScope.launch { load() }
     }
 
-    fun selectVariant(variant: Variant) = mutableState.update { it.copy(variant = variant) }
+    fun selectVariant(variant: Variant) {
+        if (variant != mutableState.value.variant) {
+            mutableState.update {
+                it.copy(variant = variant, epoch = null, items = emptyList(), next = null, summary = null)
+            }
+            refresh()
+        }
+    }
+
+    fun selectTab(tab: RecordsTab) {
+        if (tab != mutableState.value.tab) {
+            mutableState.update { it.copy(tab = tab, epoch = null, items = emptyList(), next = null, summary = null) }
+            refresh()
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
+    suspend fun observe() {
+        reads.changes.debounce(100).collect { refresh() }
+    }
+
+    fun loadMore() {
+        if (mutableState.value.next != null && !mutableState.value.loading) {
+            readJob = viewModelScope.launch { load(more = true) }
+        }
+    }
+
+    fun openBackup() {
+        viewModelScope.launch {
+            when (val result = repository.countQuarantined()) {
+                is StorageOutcome.Success -> mutableState.update { it.copy(quarantined = result.value) }
+                is StorageOutcome.Failure -> mutableState.update { it.copy(error = "隔离记录暂时无法读取，请重试。") }
+            }
+        }
+    }
 
     fun retry() {
         if (mutableState.value.busy) {
             return
         }
         val retry = retryOperation
-        if (retry == null) refresh() else viewModelScope.launch { retry() }
+        if (retry != null) {
+            viewModelScope.launch { retry() }
+        } else if (mutableState.value.pending) {
+            repairPending()
+        } else {
+            refresh()
+        }
     }
 
-    private suspend fun load() {
+    private fun repairPending() {
+        viewModelScope.launch {
+            perform("整理记录失败", retry = { repairPending() }) {
+                reads.backfill().requireSuccess()
+                load()
+            }
+        }
+    }
+
+    private suspend fun load(more: Boolean = false) {
         val generation = ++operationGeneration
         mutableState.update { it.copy(loading = true, error = null) }
         try {
-            val epoch = repository.readDatasetEpoch().requireSuccess()
-            val sessions = repository.listSessions().requireSuccess()
-            val results = repository.listResults().requireSuccess()
-            val quarantined = repository.countQuarantined().requireSuccess()
-            val currentEpoch = repository.readDatasetEpoch().requireSuccess()
-            check(epoch == currentEpoch) { "读取期间本机数据已变化，请重新读取。" }
+            val before = mutableState.value
+            val overview = if (before.tab == RecordsTab.OVERVIEW) {
+                reads.readOverview(before.variant, challengeDate(Instant.now())).requireSuccess()
+            } else {
+                null
+            }
+            var append = more
+            val page = if (before.tab != RecordsTab.OVERVIEW) {
+                val outcome = reads.readPage(
+                    before.variant,
+                    results = before.tab == RecordsTab.HISTORY,
+                    cursor = if (more) before.next else null
+                )
+                if (outcome is StorageOutcome.Failure && outcome.error.kind == StorageFailureKind.REVISION_CONFLICT) {
+                    append = false
+                    reads.readPage(before.variant, results = before.tab == RecordsTab.HISTORY).requireSuccess()
+                } else {
+                    outcome.requireSuccess()
+                }
+            } else {
+                null
+            }
+            val epoch = overview?.epoch ?: checkNotNull(page).epoch
+            check(repository.readDatasetEpoch().requireSuccess() == epoch) { "读取期间本机数据已变化，请重新读取。" }
             if (generation == operationGeneration) {
                 mutableState.update {
                     it.copy(
                         loading = false,
-                        sessions = sessions,
-                        results = results,
                         epoch = epoch,
-                        quarantined = quarantined,
+                        summary = overview?.summary,
+                        pending = overview?.pending ?: checkNotNull(page).pending,
+                        items = ((if (append) before.items else emptyList()) + page?.items.orEmpty()).takeLast(120),
+                        next = page?.next,
                         error = null
                     )
                 }
@@ -162,6 +239,10 @@ internal class RecordsViewModel @Inject constructor(private val repository: Game
                 mutableState.update {
                     it.copy(
                         preview = null,
+                        epoch = null,
+                        items = emptyList(),
+                        next = null,
+                        summary = null,
                         notice = "备份已恢复，全部对局已暂停。",
                         replacementGeneration =
                         it.replacementGeneration + 1
@@ -183,6 +264,10 @@ internal class RecordsViewModel @Inject constructor(private val repository: Game
                 mutableState.update {
                     it.copy(
                         preview = null,
+                        epoch = null,
+                        items = emptyList(),
+                        next = null,
+                        summary = null,
                         notice = "本机数据已清空。",
                         replacementGeneration =
                         it.replacementGeneration + 1
@@ -200,7 +285,7 @@ internal class RecordsViewModel @Inject constructor(private val repository: Game
         viewModelScope.launch {
             perform("清理隔离记录失败", retry = { removeQuarantined() }) {
                 repository.removeQuarantined().requireSuccess()
-                mutableState.update { it.copy(notice = "隔离记录已清理。") }
+                mutableState.update { it.copy(notice = "隔离记录已清理。", quarantined = 0) }
                 load()
             }
         }

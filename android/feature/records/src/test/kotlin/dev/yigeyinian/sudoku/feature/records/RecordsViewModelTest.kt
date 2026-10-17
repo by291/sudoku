@@ -28,11 +28,67 @@ import kotlinx.coroutines.test.setMain
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordsViewModelTest {
+    @Test fun `only the selected tab reads data and stale pagination replaces the old list`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = RecordsRepositoryFake()
+            var pages = 0
+            var version = 0L
+            val reads = object : dev.yigeyinian.sudoku.model.GameReadRepository by recordReads(repository) {
+                override suspend fun readPage(
+                    variant: dev.yigeyinian.sudoku.model.Variant?,
+                    results: Boolean,
+                    unfinished: Boolean,
+                    cursor: dev.yigeyinian.sudoku.model.SummaryCursor?
+                ): StorageOutcome<dev.yigeyinian.sudoku.model.SummaryPage> {
+                    pages++
+                    if (cursor != null && cursor.generation != version) {
+                        return StorageOutcome.Failure(StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Changed"))
+                    }
+                    return StorageOutcome.Success(
+                        dev.yigeyinian.sudoku.model.SummaryPage(
+                            1,
+                            listOf(dev.yigeyinian.sudoku.model.SummaryItem("version-$version", null)),
+                            dev.yigeyinian.sudoku.model.SummaryCursor(
+                                1,
+                                version,
+                                variant,
+                                results,
+                                unfinished,
+                                100,
+                                "last"
+                            ),
+                            true
+                        )
+                    )
+                }
+            }
+            val model = RecordsViewModel(repository, reads)
+            model.refresh()
+            runCurrent()
+            assertEquals(0, pages)
+            model.selectTab(RecordsTab.SAVES)
+            runCurrent()
+            assertEquals(1, pages)
+            assertEquals(listOf("version-0"), model.uiState.value.items.map { it.id })
+
+            version++
+            model.loadMore()
+            runCurrent()
+
+            assertEquals(3, pages)
+            assertEquals(listOf("version-1"), model.uiState.value.items.map { it.id })
+            assertNull(model.uiState.value.error)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test fun `failed replacement keeps preview and offers retry without reporting success`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake()
-            val model = RecordsViewModel(repository)
+            val model = RecordsViewModel(repository, recordReads(repository))
             model.refresh()
             runCurrent()
             model.previewImport("fixture")
@@ -60,7 +116,7 @@ class RecordsViewModelTest {
     @Test fun `document provider failure never reports exported success`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val model = RecordsViewModel(RecordsRepositoryFake())
+            val model = RecordsRepositoryFake().let { RecordsViewModel(it, recordReads(it)) }
             model.refresh()
             runCurrent()
             assertNotNull(model.prepareExport())
@@ -126,4 +182,27 @@ private class RecordsRepositoryFake : GameRepository {
         token: EditorToken,
         previous: PreviousSession?
     ): StorageOutcome<SessionRecord> = error("Unused")
+}
+
+private fun recordReads(repository: GameRepository) = object : dev.yigeyinian.sudoku.model.GameReadRepository by (
+    java.lang.reflect.Proxy.newProxyInstance(
+        dev.yigeyinian.sudoku.model.GameReadRepository::class.java.classLoader,
+        arrayOf(dev.yigeyinian.sudoku.model.GameReadRepository::class.java)
+    ) { _, method, _ ->
+        error("Unexpected records query: ${method.name}")
+    } as dev.yigeyinian.sudoku.model.GameReadRepository
+    ) {
+    override suspend fun readOverview(
+        variant: dev.yigeyinian.sudoku.model.Variant,
+        today: String
+    ): StorageOutcome<dev.yigeyinian.sudoku.model.OverviewSnapshot> {
+        val epoch = (repository.readDatasetEpoch() as StorageOutcome.Success).value
+        return StorageOutcome.Success(
+            dev.yigeyinian.sudoku.model.OverviewSnapshot(
+                epoch,
+                dev.yigeyinian.sudoku.model.summarizeRecords(emptyList(), today, variant),
+                false
+            )
+        )
+    }
 }

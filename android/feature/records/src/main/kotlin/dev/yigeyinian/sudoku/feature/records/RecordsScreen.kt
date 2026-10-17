@@ -56,12 +56,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private enum class RecordsTab(val label: String) {
-    OVERVIEW("概览"),
-    SAVES("本地存档"),
-    HISTORY("完成历史")
-}
-
 @Composable
 internal fun RecordsScreen(
     state: RecordsUiState,
@@ -75,18 +69,24 @@ internal fun RecordsScreen(
     onClear: () -> Unit,
     onCleanup: () -> Unit,
     backupOpen: Boolean = false,
-    onDismissBackup: () -> Unit = {}
+    onDismissBackup: () -> Unit = {},
+    onTab: (RecordsTab) -> Unit = {},
+    onMore: () -> Unit = {}
 ) {
     var tab by rememberSaveable { mutableStateOf(RecordsTab.OVERVIEW) }
+    androidx.compose.runtime.LaunchedEffect(tab) { onTab(tab) }
     val scrollStates = rememberSaveableStateHolder()
     val available = !state.loading && !state.busy && state.epoch != null
     val showProgress = rememberDelayedProgress(state.loading || state.busy)
-    val saves = state.sessions.map { it.session }.filter { it.puzzle.rules.variant == state.variant }
-        .sortedByDescending { it.startedAt }
+    val saves = if (tab == RecordsTab.SAVES && state.tab == tab) state.items.mapNotNull { it.summary } else emptyList()
     val featured = saves.firstOrNull { it.completion == null }
-    val results = state.results.map { it.session }.filter {
-        it.puzzle.rules.variant == state.variant && it.completion != null
-    }.sortedByDescending { it.completion?.completedAt }
+    val results = if (tab == RecordsTab.HISTORY &&
+        state.tab == tab
+    ) {
+        state.items.mapNotNull { it.summary }.filter { it.completion != null }
+    } else {
+        emptyList()
+    }
     val history = results.groupBy {
         Instant.parse(it.completion?.completedAt).atZone(ZoneId.systemDefault()).toLocalDate()
     }
@@ -137,14 +137,25 @@ internal fun RecordsScreen(
                     }
                 }
                 // An unread dataset is not an empty dataset. Keep the first-load area quiet until it is ready.
-                if (state.epoch != null) {
+                if (state.epoch != null && state.tab == tab) {
                     when (tab) {
-                        RecordsTab.OVERVIEW -> item(key = "overview") { RecordsOverview(state.variant, state.summary) }
+                        RecordsTab.OVERVIEW -> item(key = "overview") {
+                            if (state.pending) {
+                                Column {
+                                    RecordCaption("历史记录尚未整理完成，统计暂不可用")
+                                    androidx.compose.material3.TextButton(onClick = onRetry, enabled = !state.busy) {
+                                        Text("继续整理")
+                                    }
+                                }
+                            } else {
+                                state.summary?.let { RecordsOverview(state.variant, it) }
+                            }
+                        }
                         RecordsTab.SAVES -> {
                             item(key = "saves-heading") {
-                                RecordSectionHeading("${recordVariantLabel(state.variant)}存档", "${saves.size} 个存档")
+                                RecordSectionHeading("${recordVariantLabel(state.variant)}存档", "已显示 ${saves.size} 个存档")
                             }
-                            if (saves.isEmpty()) {
+                            if (saves.isEmpty() && !state.pending) {
                                 item(key = "empty-saves") { EmptyRecords("还没有存档", "开始一局后，可以从这里接着解。") }
                             }
                             featured?.let { session ->
@@ -166,9 +177,12 @@ internal fun RecordsScreen(
                         }
                         RecordsTab.HISTORY -> {
                             item(key = "history-heading") {
-                                RecordSectionHeading("完成历史", "${recordVariantLabel(state.variant)} · ${results.size} 局")
+                                RecordSectionHeading(
+                                    "完成历史",
+                                    "${recordVariantLabel(state.variant)} · 已显示 ${results.size} 局"
+                                )
                             }
-                            if (results.isEmpty()) {
+                            if (results.isEmpty() && !state.pending) {
                                 item(key = "empty-history") {
                                     EmptyRecords("第一份记录，等你写下", "完成对局后，可以在这里回看。")
                                 }
@@ -180,6 +194,21 @@ internal fun RecordsScreen(
                                 items(entries, key = { "result:${it.id}" }) { session ->
                                     RecordEntry(session, available, history = true) { onResume(session.id) }
                                     Spacer(Modifier.height(8.dp))
+                                }
+                            }
+                        }
+                    }
+                    if (tab != RecordsTab.OVERVIEW) {
+                        items(state.items.filter { it.summary == null }, key = { "pending:${it.id}" }) { row ->
+                            androidx.compose.material3.TextButton(onClick = {
+                                onResume(row.id)
+                            }) { Text("待确认的记录 · 点按读取") }
+                        }
+                        if (state.pending) item { RecordCaption("部分记录仍在整理，当前列表尚未完整") }
+                        if (state.next != null) {
+                            item {
+                                androidx.compose.material3.TextButton(onClick = onMore, enabled = !state.loading) {
+                                    Text("加载更多")
                                 }
                             }
                         }
