@@ -1,5 +1,5 @@
 import { LESSONS } from '../support/lessons'
-import { test, expect, cellName, enterExerciseDigit } from './support'
+import { test, expect, cellName, enterExerciseDigit, selectLessonMode } from './support'
 import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 
@@ -38,15 +38,18 @@ test('recommends the next unfinished lesson and resumes the last visited lesson'
   page,
 }, testInfo) => {
   await page.goto('/#/learn/rules')
+  await selectLessonMode(page, '动手练习')
   await page.getByRole('button', { name: cellName(40) }).click()
   await enterExerciseDigit(page, 5)
+  await page.getByRole('button', { name: '提交答案', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('推理正确')
   await page.getByRole('button', { name: '下一阶段', exact: true }).click()
   const transfer = stageAnswer(lessonStages(LESSONS[0])[1])
   if (transfer.kind !== 'placement') throw new Error('Expected placement transfer')
   await page.getByRole('button', { name: cellName(transfer.expected.cell) }).click()
   await enterExerciseDigit(page, transfer.expected.digit)
-  await expect(page.getByText('本课全部练习已完成，进度已保存。')).toBeVisible()
+  await page.getByRole('button', { name: '提交答案', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('本课全部练习已完成，进度已保存。')
   await page.getByRole('link', { name: '返回课程列表', exact: true }).click()
   await expect(page.getByRole('progressbar', { name: '标准数独学习进度' })).toHaveAttribute(
     'aria-valuetext',

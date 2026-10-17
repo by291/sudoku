@@ -4,6 +4,8 @@ import { computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
+import { lessonStages } from '@/features/learning/model/lessons'
+import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import {
   parseVariantQuery,
   getVariantPresentation,
@@ -12,6 +14,7 @@ import {
 
 const route = useRoute()
 const learning = useLearningStore()
+const showLoading = useDelayedProgress(() => learning.loading)
 const LESSONS = learning.lessons
 const preferences = usePreferencesStore()
 const variantQuery = computed(() => parseVariantQuery(route.query.variant))
@@ -78,6 +81,25 @@ const suggestionCaption = computed(() => {
 
   return completedCount.value ? '下一步，试试这节课' : '推荐从这里开始'
 })
+const suggestionStage = computed(() => {
+  const lesson = suggestedLesson.value
+  if (!lesson || completedLessonIds.value.has(lesson.id)) {
+    return ''
+  }
+
+  const total = lessonStages(lesson).length
+  return `第 ${Math.min(learning.exerciseStage(lesson.id) + 1, total)} / ${total} 阶段`
+})
+function lessonStatus(id: string, suggested: boolean): string {
+  if (completedLessonIds.value.has(id)) {
+    return '已完成'
+  }
+  if (id === preferences.settings.currentLessonId || learning.exerciseStage(id) > 0) {
+    return '学习中'
+  }
+
+  return suggested ? '推荐学习' : '可学习'
+}
 const classicStages: Readonly<Record<string, string>> = {
   rules: '起步 · 认识棋盘',
   'naked-single': '基础 · 寻找唯一',
@@ -105,7 +127,7 @@ onMounted(learning.load)
 </script>
 
 <template>
-  <section class="learning-page">
+  <section class="learning-page" :aria-busy="learning.loading">
     <header class="learning-heading">
       <p class="eyebrow">循序渐进 / LEARN</p>
       <h1>从看懂一格，到解开整盘</h1>
@@ -114,6 +136,7 @@ onMounted(learning.load)
         课程已扩充至 32 节；之前的完成记录保留，新加入的课程可继续学习。
       </p>
     </header>
+    <p v-if="showLoading" class="muted" role="status">正在读取学习进度，请稍候…</p>
     <NAlert v-if="learning.error" class="feedback-message" type="error" :show-icon="false">
       {{ learning.error }} <NButton @click="learning.load">重试</NButton>
     </NAlert>
@@ -171,7 +194,12 @@ onMounted(learning.load)
             <p class="course-description">{{ getVariantPresentation(selectedVariant).ruleText }}</p>
           </div>
           <div v-if="suggestedLesson" class="course-action">
-            <p class="suggestion-caption">{{ suggestionCaption }} · {{ suggestedLesson.title }}</p>
+            <div class="suggestion-copy">
+              <p class="suggestion-caption">
+                {{ suggestionCaption }} · {{ suggestedLesson.title }}
+              </p>
+              <p v-if="suggestionStage" class="suggestion-stage">{{ suggestionStage }}</p>
+            </div>
             <RouterLink v-slot="{ href, navigate }" :to="`/learn/${suggestedLesson.id}`" custom>
               <NButton
                 tag="a"
@@ -222,7 +250,7 @@ onMounted(learning.load)
                 <p>{{ step.lesson.introduction }}</p>
               </div>
               <span class="step-status">
-                {{ step.completed ? '已完成' : step.suggested ? '推荐学习' : '可学习' }}
+                {{ lessonStatus(step.lesson.id, step.suggested) }}
                 <span class="step-arrow" aria-hidden="true">↗</span>
               </span>
             </RouterLink>
@@ -333,6 +361,12 @@ h1 {
 .suggestion-caption {
   margin: 0;
   font-size: 13px;
+}
+.suggestion-stage {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .forward-arrow {
   margin-left: 20px;

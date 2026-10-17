@@ -14,6 +14,7 @@ export const useLearningStore = defineStore('learning', () => {
   const preferences = usePreferencesStore()
   const progress = shallowRef<readonly LessonProgress[]>([])
   const error = ref<string | null>(null)
+  const loading = ref(false)
   const exerciseStages = shallowRef<Readonly<Record<string, number>>>({})
   const datasetGeneration = ref(0)
   const readyGeneration = ref<number | null>(null)
@@ -49,39 +50,46 @@ export const useLearningStore = defineStore('learning', () => {
 
   async function load() {
     const current = ++operation
-    await preferences.load()
-    if (current !== operation) {
-      return
-    }
-    if (preferences.error) {
-      error.value = '学习设置尚未读取，请重试。'
-      return
-    }
+    loading.value = true
+    try {
+      await preferences.load()
+      if (current !== operation) {
+        return
+      }
+      if (preferences.error) {
+        error.value = '学习设置尚未读取，请重试。'
+        return
+      }
 
-    const fence = await runtime.repository.readDatasetEpoch()
-    if (current !== operation) {
-      return
-    }
+      const fence = await runtime.repository.readDatasetEpoch()
+      if (current !== operation) {
+        return
+      }
 
-    if (!fence.ok) {
-      error.value = '学习进度读取失败，请重试。'
+      if (!fence.ok) {
+        error.value = '学习进度读取失败，请重试。'
 
-      return
-    }
+        return
+      }
 
-    const result = await runtime.repository.readLessonProgress()
-    if (current !== operation) {
-      return
-    }
+      const result = await runtime.repository.readLessonProgress()
+      if (current !== operation) {
+        return
+      }
 
-    if (result.ok) {
-      datasetEpoch = fence.value
-      progress.value = result.value
-      exerciseStages.value = preferences.settings.lessonStages ?? {}
-      error.value = null
-      readyGeneration.value = datasetGeneration.value
-    } else {
-      error.value = '学习进度读取失败，请重试。'
+      if (result.ok) {
+        datasetEpoch = fence.value
+        progress.value = result.value
+        exerciseStages.value = preferences.settings.lessonStages ?? {}
+        error.value = null
+        readyGeneration.value = datasetGeneration.value
+      } else {
+        error.value = '学习进度读取失败，请重试。'
+      }
+    } finally {
+      if (current === operation) {
+        loading.value = false
+      }
     }
   }
 
@@ -195,6 +203,7 @@ export const useLearningStore = defineStore('learning', () => {
 
   function reset() {
     operation++
+    loading.value = false
     datasetGeneration.value++
     readyGeneration.value = null
     datasetEpoch = null
@@ -208,6 +217,7 @@ export const useLearningStore = defineStore('learning', () => {
     lessons,
     progress,
     error,
+    loading,
     datasetGeneration,
     readyGeneration,
     exerciseStage,

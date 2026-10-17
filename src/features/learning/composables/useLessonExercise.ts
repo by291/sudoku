@@ -17,6 +17,7 @@ export function useLessonExercise(
   const learning = useLearningStore()
   const currentLesson = computed(() => toValue(lesson))
   const inPractice = computed(() => toValue(practice))
+  const mode = ref<'guide' | 'exercise'>('guide')
   const stageIndex = ref(0)
   const canAdvance = ref(false)
   const completed = ref(false)
@@ -48,11 +49,11 @@ export function useLessonExercise(
   })
 
   const selected = ref<number | null>(null)
+  const placement = ref<{ cell: number; digit: Digit } | null>(null)
   const removals = ref<{ cell: number; digit: Digit }[]>([])
   const feedback = ref<string | null>(null)
   const correct = ref(false)
   const busy = ref(false)
-  const showExplanation = ref(false)
   const exerciseCells = computed(() =>
     !stageLesson.value
       ? []
@@ -62,7 +63,7 @@ export function useLessonExercise(
   )
   const exercisePrompt = computed(() =>
     stageLesson.value?.exercise.kind === 'placement'
-      ? '点击圆点标出的空格，填写应该出现的数字。'
+      ? '点击圆点标出的空格，选择应该出现的数字，再提交答案。'
       : '点击圆点标出的格子，选择可以排除的候选数。再次选择可撤回，然后提交全部排除。',
   )
   const selectionText = computed(() =>
@@ -77,6 +78,20 @@ export function useLessonExercise(
           .filter((pair) => pair.cell === cell)
           .reduce((remaining, pair) => remaining & ~maskOf(pair.digit), mask),
       ) ?? [],
+  )
+  const exerciseBoard = computed(
+    () =>
+      stageLesson.value?.board.map((value, cell) =>
+        placement.value?.cell === cell ? placement.value.digit : value,
+      ) ?? [],
+  )
+  const canSubmit = computed(
+    () =>
+      mode.value === 'exercise' &&
+      !busy.value &&
+      !canAdvance.value &&
+      !completed.value &&
+      (stageLesson.value?.exercise.kind === 'elimination' || placement.value !== null),
   )
   // Local feedback belongs to a lesson and route mode, independently of durable progress writes.
   let ownerGeneration = 0
@@ -102,12 +117,15 @@ export function useLessonExercise(
       initializingRoute = routeChanged
       const owner = ++ownerGeneration
       const id = currentLesson.value?.id
+      if (routeChanged) {
+        mode.value = 'guide'
+      }
       selected.value = null
+      placement.value = null
       removals.value = []
       feedback.value = null
       correct.value = false
       busy.value = true
-      showExplanation.value = false
       stageIndex.value = 0
       canAdvance.value = false
       completed.value = false
@@ -139,11 +157,19 @@ export function useLessonExercise(
     { immediate: true },
   )
 
-  async function answer(digit: Digit) {
+  function selectMode(value: string | number | boolean) {
+    if (value === 'guide' || value === 'exercise') {
+      mode.value = value
+    }
+  }
+
+  function answer(digit: Digit) {
     if (
       inPractice.value ||
+      mode.value !== 'exercise' ||
       !stageLesson.value ||
       selected.value === null ||
+      stageLesson.value.board[selected.value] !== 0 ||
       busy.value ||
       canAdvance.value ||
       completed.value
@@ -164,46 +190,27 @@ export function useLessonExercise(
         ? removals.value.filter((item) => item.cell !== pair.cell || item.digit !== pair.digit)
         : [...removals.value, pair]
     } else {
-      const owner = ownerGeneration
-      busy.value = true
-      const result = await learning.submitExercise(
-        stageLesson.value.id,
-        {
-          cell: selected.value,
-          digit,
-        },
-        stageIndex.value,
-      )
-      if (disposed || owner !== ownerGeneration) {
-        return
-      }
-
-      feedback.value = result.explanation
-      correct.value = result.correct
-      canAdvance.value = result.advance
-      completed.value = result.completed
-      busy.value = false
+      placement.value = { cell: selected.value, digit }
     }
+
+    feedback.value = null
+    correct.value = false
   }
 
-  async function submitEliminations() {
-    if (
-      inPractice.value ||
-      !stageLesson.value ||
-      busy.value ||
-      canAdvance.value ||
-      completed.value
-    ) {
+  async function submitAnswer() {
+    if (inPractice.value || !stageLesson.value || !canSubmit.value) {
+      return
+    }
+
+    const supplied =
+      stageLesson.value.exercise.kind === 'elimination' ? [...removals.value] : placement.value
+    if (!supplied) {
       return
     }
 
     const owner = ownerGeneration
     busy.value = true
-    const result = await learning.submitExercise(
-      stageLesson.value.id,
-      removals.value,
-      stageIndex.value,
-    )
+    const result = await learning.submitExercise(stageLesson.value.id, supplied, stageIndex.value)
     if (disposed || owner !== ownerGeneration) {
       return
     }
@@ -216,8 +223,14 @@ export function useLessonExercise(
   }
 
   function resetExercise() {
+    if (busy.value || canAdvance.value || completed.value) {
+      return
+    }
+
+    placement.value = null
     removals.value = []
     feedback.value = null
+    correct.value = false
   }
 
   function nextStage() {
@@ -226,16 +239,17 @@ export function useLessonExercise(
     }
     stageIndex.value++
     selected.value = null
+    placement.value = null
     removals.value = []
     feedback.value = null
     correct.value = false
     canAdvance.value = false
-    showExplanation.value = false
   }
 
   function handleExerciseKey(event: KeyboardEvent) {
     if (
       inPractice.value ||
+      mode.value !== 'exercise' ||
       !currentLesson.value ||
       selected.value === null ||
       busy.value ||
@@ -253,7 +267,7 @@ export function useLessonExercise(
     }
 
     event.preventDefault()
-    void answer(digit)
+    answer(digit)
   }
 
   onMounted(() => window.addEventListener('keydown', handleExerciseKey))
@@ -265,17 +279,21 @@ export function useLessonExercise(
 
   return {
     selected,
+    placement,
+    mode,
+    selectMode,
     removals,
     feedback,
     correct,
     busy,
-    showExplanation,
     exerciseCells,
     exercisePrompt,
     selectionText,
     exampleNotes,
+    exerciseBoard,
+    canSubmit,
     answer,
-    submitEliminations,
+    submitAnswer,
     resetExercise,
     stageLesson,
     stageCaption,

@@ -10,6 +10,7 @@ import {
   cellName,
   enterGameDigit,
   enterExerciseDigit,
+  selectLessonMode,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
 
@@ -143,6 +144,7 @@ test('resets a mounted combined lesson to its restored cursor in a peer tab', as
   await expect(page.getByRole('status').filter({ hasText: '备份已恢复' })).toBeVisible()
   const peer = await context.newPage()
   await peer.goto('/#/learn/killer-combined')
+  await selectLessonMode(peer, '动手练习')
   await expect(peer.getByText(/练习阶段 3 \/ 6/)).toBeVisible()
   await expect(peer.getByText('正在准备或保存练习，请稍候…', { exact: true })).toBeHidden()
 
@@ -172,6 +174,7 @@ test('resets a mounted combined lesson to its restored cursor in a peer tab', as
   if (answer.kind === 'placement') {
     await peer.getByRole('button', { name: cellName(answer.expected.cell) }).click()
     await enterExerciseDigit(peer, answer.expected.digit)
+    await peer.getByRole('button', { name: '提交答案', exact: true }).click()
   } else {
     for (const { cell, digit } of answer.expected) {
       await peer.getByRole('button', { name: cellName(cell) }).click()

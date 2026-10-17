@@ -42,13 +42,25 @@ export async function enterGameDigit(page: Page, digit: number) {
 }
 
 export async function enterExerciseDigit(page: Page, digit: number, action = '填写') {
-  await expect(page.getByText('正在准备或保存练习，请稍候…', { exact: true })).toBeHidden()
-  const touchDigit = page.getByRole('button', { name: `${action}数字${digit}`, exact: true })
+  const touchDigit = page.getByRole('button', {
+    name: `${action}数字${digit}`,
+    exact: true,
+    includeHidden: true,
+  })
+  // Progress feedback is deferred; control readiness remains the authoritative input gate.
+  await expect(touchDigit).toBeEnabled()
   if (await touchDigit.isVisible()) {
     await touchDigit.click()
   } else {
     await page.keyboard.press(String(digit))
   }
+}
+
+export async function selectLessonMode(page: Page, label: '学习讲解' | '动手练习') {
+  const modes = page.getByRole('radiogroup', { name: '课程模式', exact: true })
+  // Naive UI 2.45.3 routes pointer input through the label; its native radio ignores pointers.
+  await modes.getByText(label, { exact: true }).click()
+  await expect(modes.getByRole('radio', { name: label, exact: true })).toBeChecked()
 }
 
 export async function selectGameMenuAction(

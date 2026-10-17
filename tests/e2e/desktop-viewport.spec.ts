@@ -4,6 +4,7 @@ import {
   seedSession,
   cellName,
   enterExerciseDigit,
+  selectLessonMode,
   makeVariantHintSession,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
@@ -26,6 +27,7 @@ for (const viewport of desktopViewports) {
       page,
     }) => {
       await page.goto('/#/learn/locked-candidate')
+      await selectLessonMode(page, '动手练习')
 
       await expect(page.getByRole('group', { name: '数独棋盘', exact: true })).toBeInViewport({
         ratio: 1,
@@ -50,8 +52,10 @@ for (const viewport of desktopViewports) {
       page,
     }) => {
       await page.goto('/#/learn/rules')
+      await selectLessonMode(page, '动手练习')
       await page.getByRole('button', { name: cellName(40) }).click()
       await enterExerciseDigit(page, 5)
+      await page.getByRole('button', { name: '提交答案', exact: true }).click()
 
       await expect(page.getByRole('status')).toContainText('推理正确')
       await expect(page.getByRole('status')).toBeInViewport({ ratio: 1 })

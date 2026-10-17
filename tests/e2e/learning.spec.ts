@@ -1,11 +1,19 @@
 import { LESSONS } from '../support/lessons'
-import { test, expect, cellName, readSessions, enterExerciseDigit } from './support'
+import {
+  test,
+  expect,
+  cellName,
+  readSessions,
+  enterExerciseDigit,
+  selectLessonMode,
+} from './support'
 import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { VARIANT_OPTIONS } from '@/features/game/model/variants'
 
 test('completes the rules exercise using only keyboard navigation', async ({ page }, testInfo) => {
   await page.goto('/#/learn/rules')
+  await selectLessonMode(page, '动手练习')
   await expect(page.getByText('正在准备或保存练习，请稍候…', { exact: true })).toBeHidden()
   const first = page.getByRole('button', { name: cellName(0) })
 
@@ -28,13 +36,23 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
   }
 
   await expect(page.getByRole('button', { name: cellName(40) })).toBeFocused()
+  await expect(
+    page.getByRole('button', { name: '填写数字5', exact: true, includeHidden: true }),
+  ).toBeEnabled()
   await page.keyboard.press('9')
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: '提交答案', exact: true })).toBeFocused()
+  await page.keyboard.press('Enter')
   await expect(page.getByRole('status')).toContainText('还差一点')
+  await page.keyboard.press('Shift+Tab')
   await page.keyboard.press('ArrowRight')
   await expect(page.getByRole('button', { name: cellName(41) })).toBeFocused()
   await page.keyboard.press('ArrowLeft')
   await page.keyboard.press('5')
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Enter')
   await expect(page.getByRole('status')).toContainText('推理正确')
+  await page.keyboard.press('Shift+Tab')
   await page.keyboard.press('ArrowRight')
   await expect(page.getByRole('button', { name: cellName(41) })).toBeFocused()
   await page.keyboard.press('ArrowLeft')
@@ -51,6 +69,7 @@ test('teaches all thirty-two units with every required stage, retry and durable 
   for (const lesson of LESSONS) {
     await page.goto(`/#/learn/${lesson.id}`)
     await expect(page.getByRole('heading', { name: lesson.title, exact: true })).toBeVisible()
+    await selectLessonMode(page, '动手练习')
     const stages = lessonStages(lesson)
     for (const [index, stage] of stages.entries()) {
       const exercise = stageAnswer(stage)
@@ -58,8 +77,10 @@ test('teaches all thirty-two units with every required stage, retry and durable 
         const { cell, digit } = exercise.expected
         await page.getByRole('button', { name: cellName(cell) }).click()
         await enterExerciseDigit(page, digit === 9 ? 8 : 9)
+        await page.getByRole('button', { name: '提交答案', exact: true }).click()
         await expect(page.getByRole('status')).toContainText('还差一点')
         await enterExerciseDigit(page, digit)
+        await page.getByRole('button', { name: '提交答案', exact: true }).click()
       } else {
         await page.getByRole('button', { name: '提交排除', exact: true }).click()
         await expect(page.getByRole('status')).toContainText('还差一点')
@@ -76,7 +97,7 @@ test('teaches all thirty-two units with every required stage, retry and durable 
         await page.getByRole('button', { name: '下一阶段', exact: true }).click()
       }
     }
-    await expect(page.getByText('本课全部练习已完成，进度已保存。')).toBeVisible()
+    await expect(page.getByRole('status')).toContainText('本课全部练习已完成，进度已保存。')
     await page.getByRole('link', { name: /返回课程列表/ }).click()
     await expect(
       page.getByRole('link').filter({ hasText: lesson.title }).filter({ hasText: '已完成' }),
