@@ -11,8 +11,15 @@ target/
 packages/sudoku-wasm/pkg/
 .tools/
 
+# Local IDE and operating-system metadata.
+.idea/
+*.iml
+.DS_Store
+
 android/**/.gradle/
 android/**/.kotlin/
 android/**/build/
 android/local.properties
 android/.native-tools/
+# Android Studio's local daemon choice; shared build toolchains and CI use JDK 21.
+android/gradle/gradle-daemon-jvm.properties
