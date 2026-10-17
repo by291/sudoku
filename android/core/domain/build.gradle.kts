@@ -7,6 +7,11 @@ kotlin { jvmToolchain(21) }
 
 sourceSets.test { resources.srcDir("../../../content") }
 
+// The Web interop step consumes this test output, including after Gradle restores cached results.
+tasks.test {
+    outputs.file(layout.buildDirectory.file("interop/android-backup-v1.json"))
+}
+
 dependencies {
     api(libs.serialization)
     api(libs.coroutines)

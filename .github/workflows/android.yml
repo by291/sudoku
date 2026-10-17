@@ -17,7 +17,7 @@ jobs:
   android:
     name: Native client checks and APKs
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,11 +32,27 @@ jobs:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0 ndk;29.0.14206865'
       - name: Set up repository-pinned Rust
         run: rustup show
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          cache: true
+      - name: Verify the current Web backup against the shared fixture
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm wasm:build
+          pnpm exec vitest run --config android/interop/vitest.config.ts
       - name: Check and build native client
         working-directory: android
         run: |
           ./gradlew qualityCheck :app:assembleDebug --no-daemon
           ./gradlew :app:assembleRelease --no-daemon
+      - name: Restore the actual Android backup through Web storage
+        env:
+          ANDROID_INTEROP_REIMPORT: '1'
+        run: pnpm exec vitest run --config android/interop/vitest.config.ts
       - name: Verify all native ELF and APK alignment
         run: |
           for abi in arm64-v8a x86_64; do
@@ -52,6 +68,7 @@ jobs:
             android/app/build/outputs/apk/
             android/app/build/reports/
             android/core/*/build/reports/
+            android/core/domain/build/interop/
             android/feature/*/build/reports/
           retention-days: 7
           if-no-files-found: ignore
