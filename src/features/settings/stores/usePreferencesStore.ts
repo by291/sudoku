@@ -11,8 +11,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const needsReload = ref(false)
   let loaded = false
   let initialPatches: Partial<Settings> = {}
+  // Serialize writes so a newer write cannot overtake one already in flight. Superseded
+  // queued operations exit, and only the latest generation may publish its result.
   let tail = Promise.resolve()
-  let epoch = 0
+  let operationGeneration = 0
   const datasetEpoch = ref<number | null>(null)
 
   async function load() {
@@ -20,9 +22,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
       return
     }
 
-    const current = epoch
+    const current = operationGeneration
     const fence = await runtime.repository.readDatasetEpoch()
-    if (current !== epoch) {
+    if (current !== operationGeneration) {
       return
     }
 
@@ -33,7 +35,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
     }
 
     const result = await runtime.repository.readSettings()
-    if (current !== epoch) {
+    if (current !== operationGeneration) {
       return
     }
 
@@ -63,25 +65,28 @@ export const usePreferencesStore = defineStore('preferences', () => {
     ) {
       return Promise.resolve(false)
     }
+
     // Before reading a committed base, retain only explicit patches. Optimistic defaults
     // must never overwrite restored metadata that this tab has not loaded yet.
     const initialPatch = loaded ? null : { ...initialPatches, ...patch }
     if (initialPatch) {
       initialPatches = initialPatch
     }
+
     let snapshot = { ...settings.value, ...patch }
     if (options.optimistic) {
       settings.value = snapshot
     }
-    const current = ++epoch
+
+    const current = ++operationGeneration
     const writing = tail.then(async () => {
-      if (current !== epoch) {
+      if (current !== operationGeneration) {
         return false
       }
 
       if (datasetEpoch.value === null || initialPatch !== null) {
         const fence = await runtime.repository.readDatasetEpoch()
-        if (current !== epoch) {
+        if (current !== operationGeneration) {
           return false
         }
 
@@ -90,6 +95,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
           return false
         }
+
         if (options.expectedEpoch !== undefined && options.expectedEpoch !== fence.value) {
           loaded = false
           initialPatches = {}
@@ -99,13 +105,15 @@ export const usePreferencesStore = defineStore('preferences', () => {
         }
 
         const stored = await runtime.repository.readSettings()
-        if (current !== epoch) {
+        if (current !== operationGeneration) {
           return false
         }
+
         if (!stored.ok) {
           error.value = '偏好读取失败，请保持页面打开并重试。'
           return false
         }
+
         snapshot = { ...stored.value, ...(initialPatch ?? patch) }
         loaded = true
         datasetEpoch.value = fence.value
@@ -116,19 +124,24 @@ export const usePreferencesStore = defineStore('preferences', () => {
       }
 
       const result = await runtime.repository.writeSettings(snapshot, datasetEpoch.value)
-      if (current === epoch) {
+      if (current === operationGeneration) {
         if (result.ok && !options.optimistic) {
           settings.value = snapshot
         }
         error.value = result.ok ? null : '偏好尚未保存，请保持页面打开并重试。'
       }
 
-      if (current === epoch && !result.ok && result.error.kind === 'revision-conflict') {
+      if (
+        current === operationGeneration &&
+        !result.ok &&
+        result.error.kind === 'revision-conflict'
+      ) {
         loaded = false
         needsReload.value = true
         error.value = '本机数据已变化，请重新读取设置。'
       }
-      return current === epoch && result.ok
+
+      return current === operationGeneration && result.ok
     })
     tail = writing.then(() => undefined)
 
@@ -136,7 +149,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
   }
 
   async function reset() {
-    epoch++
+    operationGeneration++
     settings.value = { ...DEFAULT_SETTINGS }
     loaded = false
     datasetEpoch.value = null
@@ -156,6 +169,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
       await load()
       return loaded && error.value === null
     }
+
     return update({})
   }
 

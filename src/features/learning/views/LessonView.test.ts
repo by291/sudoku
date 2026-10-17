@@ -7,6 +7,7 @@ import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { deferred } from '../../../../tests/support/deferred'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
+import type { ExerciseSubmissionResult } from '@/features/learning/model/lessons'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 import { explainStep } from '@/features/game/model/techniquePresentation'
@@ -274,22 +275,15 @@ it('reinitializes a mounted lesson from the restored cursor and clears its old f
 
 it('ignores an answer completing after dataset restoration on the same lesson', async () => {
   const test = await setup()
-  const answer = deferred<{
-    correct: boolean
-    explanation: string
-    advance: boolean
-    completed: boolean
-  }>()
+  const answer = deferred<ExerciseSubmissionResult>()
   vi.spyOn(test.learning, 'submitExercise').mockReturnValue(answer.promise)
   window.dispatchEvent(new KeyboardEvent('keydown', { key: '5' }))
   await submitPlacement(test.wrapper)
 
   await restoreEmptyDataset(test)
   answer.resolve({
-    correct: true,
+    kind: 'advance',
     explanation: 'Stale restore answer',
-    advance: true,
-    completed: true,
   })
   await flushPromises()
 
@@ -326,12 +320,7 @@ it('waits for the last-visited write before accepting a stage answer', async () 
 
 it('does not publish a delayed answer into another lesson', async () => {
   const { wrapper, learning } = await setup()
-  const answer = deferred<{
-    correct: boolean
-    explanation: string
-    advance: boolean
-    completed: boolean
-  }>()
+  const answer = deferred<ExerciseSubmissionResult>()
   const submitting = vi.spyOn(learning, 'submitExercise').mockImplementation(() => answer.promise)
 
   window.dispatchEvent(new KeyboardEvent('keydown', { key: '5' }))
@@ -340,10 +329,8 @@ it('does not publish a delayed answer into another lesson', async () => {
   await router.push('/learn/naked-single')
   await flushPromises()
   answer.resolve({
-    correct: true,
+    kind: 'advance',
     explanation: 'Stale answer feedback',
-    advance: true,
-    completed: false,
   })
   await flushPromises()
 

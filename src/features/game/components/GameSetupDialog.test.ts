@@ -1,7 +1,22 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, expect, it, vi } from 'vitest'
 import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
-import { makeSession } from '../../../../tests/support/gameFixtures'
+import type { GameSummary } from '@/storage/readModels'
+
+const savedSummary: GameSummary = {
+  id: 'saved-classic',
+  revision: 2,
+  mode: 'free',
+  variant: 'classic',
+  difficulty: 'medium',
+  metadata: { kind: 'free' },
+  startedAt: '2026-10-11T00:00:00.000Z',
+  elapsedMs: 125000,
+  completedAt: null,
+  assisted: false,
+  filledCount: 5,
+  fillableCount: 50,
+}
 
 const cleanups: (() => void)[] = []
 
@@ -63,7 +78,7 @@ it('announces generation once and prevents restarting or changing its pending se
     props: {
       variant: 'classic',
       difficulty: 'easy',
-      savedSession: makeSession(),
+      savedSummary,
       generating: true,
     },
   })
@@ -90,4 +105,26 @@ it('announces generation once and prevents restarting or changing its pending se
   expect(wrapper.emitted('resume')).toBeUndefined()
   action('取消').click()
   expect(wrapper.emitted('cancel')).toEqual([[]])
+})
+
+it('offers resume and replacement details from a compact summary alone', async () => {
+  const wrapper = mount(GameSetupDialog, {
+    attachTo: document.body,
+    props: { variant: 'classic', difficulty: 'easy', savedSummary },
+  })
+  cleanups.push(() => wrapper.unmount())
+  await flushPromises()
+
+  expect(document.body.textContent).toContain('有未完成的存档（中等')
+  expect(document.body.textContent).toContain('02:05')
+  expect(action('继续存档').disabled).toBe(false)
+  action('继续存档').click()
+  expect(wrapper.emitted('resume')).toEqual([[]])
+
+  await wrapper.setProps({
+    savedSummary: { ...savedSummary, completedAt: '2026-10-11T00:03:00.000Z' },
+  })
+
+  expect(document.body.textContent).not.toContain('继续存档')
+  expect(document.body.textContent).not.toContain('有未完成的存档')
 })

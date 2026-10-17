@@ -18,9 +18,16 @@ it('shares all stable authored courses and complete stage facts with Android', (
   ).toEqual(LESSON_IDS.map(lessonStageCount))
 
   // This sealed pre-Rust snapshot checks extraction fidelity; independent course proofs check mathematics.
-  const authored: unknown = JSON.parse(
+  const authored: Record<string, unknown>[] = JSON.parse(
     gunzipSync(readFileSync('tests/fixtures/teaching-contracts.json.gz')).toString('utf8'),
   )
+  // The sealed fixture retains the old flattened aliases; compare its owned content contract.
+  for (const lesson of authored) {
+    delete lesson.board
+    delete lesson.candidates
+    delete lesson.rules
+    delete lesson.exercise
+  }
   expect(JSON.parse(JSON.stringify(LESSONS))).toEqual(authored)
 })
 

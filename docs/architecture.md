@@ -10,7 +10,7 @@ sudoku/
   wasm/src/{dto,conversion,prepared}
 packages/sudoku-wasm/pkg/        # Generated and ignored
 src/
-  main.ts, App.vue, ReadyApplication.vue, runtime.ts
+  main.ts, App.vue, ApplicationBootstrapState.vue, ReadyApplication.vue, runtime.ts
   sudoku/{contracts,values,catalogue,seed,generationInput,ruleInput,puzzleSnapshot}
   sudoku/{wasmModule,mainEngine,workerEngine,lazyComputation}
   layouts/, router/, theme/, styles/
@@ -29,7 +29,7 @@ src/
 | `sudoku/core`                                              | Reusable synchronous Rust computation, with no browser, JS, Vue, storage, clock, entropy source or async runtime |
 | `sudoku/wasm`                                              | Typed fallible conversion and owned WASM handles; no application policy or database behavior                     |
 | `src/sudoku/contracts.ts`                                  | Type-only aliases of generated DTOs and explicit frontend envelopes; read-only mapping preserves tuples          |
-| `src/sudoku/values.ts`, `catalogue.ts`                     | Scalar shape guards, technique IDs and presentation capabilities; no solving or WASM initialization              |
+| `src/sudoku/values.ts`, `catalogue.ts`                     | Canonical scalar guards in values; exhaustive variant membership, technique IDs and capabilities in catalogue    |
 | `src/sudoku/seed.ts`, `generationInput.ts`, `ruleInput.ts` | Owned request assembly, strict byte/hex identity, rule DTO copies                                                |
 | `src/sudoku/wasmModule.ts`                                 | Vite-managed binary download and compilation                                                                     |
 | `src/sudoku/mainEngine.ts`                                 | Ready, scoped, bounded live edits/notes/conflicts/completion/review and synchronous semantic validation          |
@@ -40,12 +40,14 @@ src/
 | `shared/`                                                  | Controlled board/number-pad/dialogs, accessible drawing, display-only mask formatting and keyboard ownership     |
 | `features/game/model/`                                     | Session layers/history/assistance, clocks, daily policy, names and explanations                                  |
 | `features/game/stores/`                                    | Player actions, prepared-layout lifetime, persistence/save queue and fenced transitions                          |
-| `features/game/composables/`                               | Route entry, keyboard/touch ownership, lifecycle listeners and route-leave behavior                              |
+| `features/game/composables/`                               | Route entry, keyboard/touch ownership, daily status reads, lifecycle listeners and route-leave behavior          |
 | `features/learning/`                                       | Authored 32-course data, structural catalogue decoding, exercise flow and progress                               |
-| `features/records/`, `settings/`                           | Stored-fact aggregation, backups, confirmed local-data controls and preferences                                  |
+| `features/records/`, `settings/`                           | Summary presentation, coordinated browsing/backups, confirmed local-data controls and preferences                |
 | `storage/`                                                 | Validated records, IndexedDB transactions, editing leases, revisions, epochs and broadcasts                      |
 
 Features compose their own workflows. Shared presentation cannot load an engine or import feature state, storage, workers or runtime. Pure models receive computation through narrow contracts rather than loading WASM. Browser services consume persisted models, never feature views/stores or application presentation. `runtime.ts` is the composition owner; there is no generic infrastructure container.
+
+Pure-model restrictions cover recursive game, learning, settings and records model paths. Models may import explicit persisted contracts from `storage/readModels.ts` and `storage/records.ts` using `import type`; runtime imports and arbitrary storage types remain restricted. Shared presentation cannot import `idb` directly. Scalar guards come from `sudoku/values.ts`, variant membership comes from `sudoku/catalogue.ts`, and `sudoku/guards.ts` owns bridge and rule transport validation without re-exporting scalar guards.
 
 Shared presentation composables own only generic UI lifetimes, such as cancellable delayed progress feedback. `ResponsiveDialog` retains Naive UI's modal ownership while adapting its card to a narrow-screen sheet. Records owns completed-result viewing and reads validated result snapshots; historical viewing does not enter the editable game-session workflow.
 
@@ -83,7 +85,7 @@ BLAKE3 contexts and the 43-byte phase frame are version-owned. Frame fields are 
 
 `pnpm wasm:build` builds locked Rust/WASM, installs the pinned wasm-bindgen CLI if needed, and emits JS/WASM/declarations into the ignored workspace package. A build-time TypeScript compiler transform wraps self-contained generated glue in a collectable factory. Each instance owns separate memory; compiled immutable code can be shared. There is no source evaluation, handwritten pointer protocol, raw-memory alias or browser-side fallback solver.
 
-App constructs browsing services after initial route resolution without downloading WASM. Pinia 4.0.3 resolves store injections through the Vue application context, so `main.ts` publishes the runtime with an application-level provider before mounting `ReadyApplication.vue`. Runtime readiness means services are available; `ensureEngine()` separately shares the lazy module download, validation and initialization. Failed initialization is retryable, and a late initializer disposes its engine after shutdown.
+`ApplicationBootstrapState.vue` and the controlled `shared/components/ApplicationLoadingState.vue` present application startup and retry. App constructs browsing services after initial route resolution without downloading WASM. Pinia 4.0.3 resolves store injections through the Vue application context, so `main.ts` publishes the runtime with an application-level provider before mounting `ReadyApplication.vue`. Runtime readiness means services are available; `ensureEngine()` separately shares the lazy module download, validation and initialization. Failed initialization is retryable, and a late initializer disposes its engine after shutdown.
 
 Game operations and full persisted-record validation await engine readiness before using synchronous computation. Summary browsing, course directories and guided content require no engine. The lazy Worker client copies caller-owned inputs before waiting for initialization and supports cancellation during that wait. Initial route retry restarts navigation before waiting again. Game leave guards identify the target navigation, and a scope-owned resolve guard pauses/saves only after that target's page is loaded. Cancelled targets cannot pause the current game while their page downloads finish.
 
@@ -103,13 +105,17 @@ Live conflicts own a separate abort generation keyed by puzzle/board/editability
 
 Rust edits return owned entries/notes and board facts. TypeScript commits independent before/after layers, preserves assistance as a permanent attempt fact, and retains redo only when no board change occurred. Undo/redo restore layers and ask Rust for completion. Keyboard, touch and hint application use the same actions. Clock, selection, session IDs, assistance counters, records/statistics and UI feedback remain frontend responsibilities.
 
-`sessionPersistence.ts` owns save serialization, dirty snapshots and lease/revision handling. `sessionTransitions.ts` owns operation generations, cancellation, save-before-switch ordering and install/restore flows. Immutable snapshots and epoch/ownership/revision captures stay on the original side of every await. A peer reset/import invalidates stale workflows; an old write cannot adopt a new dataset's lease. First memory-only play cannot silently overwrite a recovered save.
+`sessionPersistence.ts` owns save serialization, dirty snapshots and lease/revision handling. `sessionTransitions.ts` owns operation generations, cancellation, save-before-switch ordering and install/restore flows. Replacement leases distinguish absent, borrowed and newly acquired ownership. A cleanup barrier settles the prior replacement before a superseding acquisition can reuse the same owner fence; successful installation explicitly transfers the proposed token to persistence. `useDailyStatuses` owns reactive status reads, request fencing and disposal independently of daily-entry actions. Immutable snapshots and epoch/ownership/revision captures stay on the original side of every await. A peer reset/import invalidates stale workflows; an old write cannot adopt a new dataset's lease. First memory-only play cannot silently overwrite a recovered save.
 
 Storage writes format-2 records and normalizes independently validated format-1 Classic records. Layer/history chains, mode metadata, daily formal eligibility, original completion facts and first-result retention remain validated. Mathematical puzzle/completion and rated-summary semantics use injected ready synchronous validators; there is no await or Worker round trip in an IDB decoding transaction. Budget exhaustion or validator failure aborts as unavailable and never quarantines/deletes inconclusive data. Corrupt optional assessments become explicit unavailability without discarding a valid game.
 
 IndexedDB schema v2 adds derived session/result summaries and compound indexes. Canonical records and projections change atomically; portable backup/session formats remain unchanged. Home reads counts, setup reads one slot or today's formal IDs, records queries detailed content only for the active tab/filter, and detail/resume reads one canonical record. Records navigation additionally counts all six variants through result-summary indexes in one readonly snapshot, without reading canonical boards or initializing computation. Summary pages contain at most 30 rows ordered by descending time and ascending ID; cursors carry filters, dataset epoch and projection generation. Views retain one page and reset incompatible cursors rather than mixing snapshots. Per-variant overview walks compact result summaries, never full boards/history.
 
+`readModels.ts` owns compact read contracts. `readRepository.ts` owns IndexedDB summary queries, `summaryCoverage.ts` owns shared coverage metadata and fenced invalidation, `summaryMaintenance.ts` owns cancellable legacy repair, and `summaryStatistics.ts` aggregates validated compact result projections. Runtime readiness finishes before maintenance opens semantic-validation transactions.
+
 Schema upgrades do no mathematical work. Legacy coverage stays pending until explicit cancellable maintenance validates one owned payload at a time and fences each repair against concurrent writes/reset. Unavailable computation preserves original records. Unknown counts/progress remain distinct from zero, and unknown slot presence cannot authorize replacement. Missing targeted projections invalidate coverage for repair without scanning unrelated payloads. Asynchronous readiness always finishes before semantic-validation transactions open.
+
+The public `useRecordsStore` coordinates browsing, backup replacement, game saves and cross-store reset. Its internal `recordsReader.ts` owns active read snapshots, paging and maintenance; `recordsBackup.ts` owns backup operation identity, previews and errors. Panels report bounded file errors through named store actions. Reset/replacement fencing remains in the public coordinator.
 
 Backups validate the entire bounded file before preview/replacement. The records page exposes import/export directly; a valid file expands an inline preview and explicit replacement confirmation. Import replaces player collections atomically under the preview's expected dataset epoch, clears leases/quarantine and increments the epoch. Export captures one committed readonly snapshot and reports excluded invalid records. Existing limits, save failures, cross-tab races and reset fences remain unchanged.
 
@@ -118,6 +124,8 @@ Shutdown keeps semantic validation alive until the final leave/save settles, the
 ## Teaching, presentation and verification
 
 `scripts/validate-lesson-catalogue.ts` generates a lightweight typed directory and 32 separate lazy lesson modules from one authored source. Its mandatory Vite production-build gate validates every guided and exercise stage with Rust/WASM, rejects invalid or incomplete outcomes, and bundles the exact verified source snapshot. The learning store decodes only requested content, keeps at most three decoded lessons, and fences stale selections. Directory metadata and guides do not wait for personal progress; exercise submission/advancement still requires durable progress readiness. Pending content preserves the page regions used by the loaded lesson.
+
+`Lesson` retains authored metadata, its guided stage and exercise collections without duplicating guided board/answer fields. `ExerciseSubmissionResult` explicitly distinguishes incorrect, unavailable, cancelled, save-failed, advance and completed outcomes. The learning store owns the submission orchestration: only durable progress can authorize advancement or completion, and optional cursor cleanup cannot undo committed lesson completion.
 
 Runtime guards retain explicit DTO shapes, ranges, answer consistency, and owned copies. Rust remains responsible for candidate-relative evidence validation in the build and independent contract tests; storage and backup mathematical validators are unchanged. Authored arrays, explanations, answers and course IDs remain teaching/presentation data. Prior candidate eliminations are an explicit precondition of an authored state; independent course proofs establish them. Teaching may choose any sound unit pattern; live hints retain ordered replay and direct advanced-proof validation. Progress cursors remain epoch-fenced settings facts; final committed lesson completions and full-board practice have independent lifetimes.
 

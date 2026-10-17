@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NConfigProvider, zhCN, dateZhCN } from 'naive-ui'
 import { useTheme } from '@/theme/useTheme'
-import EngineLoadingState from '@/shared/components/EngineLoadingState.vue'
+import ApplicationLoadingState from '@/shared/components/ApplicationLoadingState.vue'
 import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 
 const props = defineProps<{ failed: boolean }>()
@@ -18,6 +18,10 @@ const showLoading = useDelayedProgress(() => !props.failed)
     :locale="zhCN"
     :date-locale="dateZhCN"
   >
-    <EngineLoadingState v-show="failed || showLoading" :failed="failed" @retry="$emit('retry')" />
+    <ApplicationLoadingState
+      v-show="failed || showLoading"
+      :failed="failed"
+      @retry="$emit('retry')"
+    />
   </NConfigProvider>
 </template>

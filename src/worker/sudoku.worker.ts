@@ -1,5 +1,6 @@
 import { createWorkerEngine } from '@/sudoku/workerEngine'
-import { BRIDGE_VERSION, isRecord } from '@/sudoku/guards'
+import { BRIDGE_VERSION } from '@/sudoku/guards'
+import { isRecord } from '@/sudoku/values'
 import { parseWorkerRequest } from '@/worker/protocol'
 import type { WorkerResponse, WorkerReady, WorkerInitializationFailed } from '@/worker/protocol'
 

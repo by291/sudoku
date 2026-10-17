@@ -63,17 +63,21 @@ export type CompletionCountsRead = SummarySnapshot & {
 }
 
 export type SlotSummaryRead = SummarySnapshot & { summary: GameSummary | null }
+
 export type DailyStatusesRead = SummarySnapshot & { statuses: readonly DailyVariantStatus[] }
+
 export type RecordSummary = {
   freeBests: Record<Difficulty, { assisted: number | null; unassisted: number | null }>
   dailyTotals: { assisted: number; unassisted: number }
   currentStreak: number
   longestStreak: number
 }
+
 export type OverviewRead = SummarySnapshot & {
   summary: RecordSummary | null
   completedCount: number | null
 }
+
 export type SummaryMaintenance = SummarySnapshot & { processed: number }
 
 export const SUMMARY_PAGE_SIZE = 30

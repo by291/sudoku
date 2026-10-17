@@ -52,6 +52,7 @@ Primary references:
 - Keep functions and components focused on a coherent responsibility. Extract a unit when it improves understanding or reuse, rather than enforcing an arbitrary line count or splitting every small operation into its own file.
 - Keep complete workflows under their feature. Place route views in `views/`, business components in `components/`, and logic in the applicable `model/`, `stores/`, or `composables/` directory; omit unused directories and colocate tests.
 - Keep browser services under explicit owners: persistence and editing leases in `storage/`, computation in `worker/`, and application service composition in `src/runtime.ts`. Do not introduce an `infrastructure/` directory as a generic container.
+- Keep compact summary queries in `storage/readRepository.ts`, coverage metadata in `summaryCoverage.ts`, legacy repair in `summaryMaintenance.ts`, and projection aggregation in `summaryStatistics.ts`. Records browsing and backup work belong to `recordsReader.ts` and `recordsBackup.ts` behind the public records coordinator; daily status reads belong to `useDailyStatuses`.
 - Use `@/` for source imports. Keep worker asset URLs literal and relative, and allow relative imports for test fixtures outside `src/`.
 - Keep templates easy to scan. Move substantial calculations and branching into named functions or computed values.
 - Name domain constants instead of repeating magic values. Document the meaning of bit masks, seeded generation, timing rules, and other non-obvious invariants.
@@ -83,6 +84,7 @@ Primary references:
 - Views should compose a workflow, render its state, and handle presentation-local decisions. Move route initialization, asynchronous loading, and a complete exercise workflow into a feature composable when they obscure that purpose.
 - Keep a store's public actions aligned with player operations. Extract resource management or an independent persistence/transition responsibility behind a narrow typed contract; do not split one transaction across loosely coordinated stores.
 - Extract pure transformations and validation into ordinary functions. Use a composable for reactive state or lifecycle effects, not as a naming convention for every helper.
+- Pure feature models, including nested model directories and records models, must stay independent of Vue, browser services and application state. Import persisted types explicitly with `import type` from `storage/readModels` or `storage/records`; those exceptions do not permit runtime imports or arbitrary storage dependencies.
 - Assess excessive responsibility by reasons to change, coupled state, and dependencies, not total line count. A component with substantial cohesive CSS or static teaching data does not require splitting solely because it is long.
 - Do not hide dependency cycles with barrel exports, move business rules into generic `utils`, or introduce callback-heavy context objects just to make a file shorter. Keep dependencies explicit and preserve the enforced direction.
 
@@ -117,6 +119,7 @@ Primary references:
 - Clean up event listeners, timers, subscriptions, and worker resources when their owning scope is disposed.
 - Keep Sudoku rules out of templates and components. Keep database writes behind the persistence module.
 - Keep root providers and resource lifetime in App, visual navigation in AppLayout, and shared components independent of features, storage, workers, and the application runtime. Follow the enforced dependency rules described in Web Architecture.
+- Shared presentation must not import `idb` directly. Application startup presentation describes route/service readiness; lazy engine readiness remains owned by the computation services.
 
 ## Styles and interaction
 

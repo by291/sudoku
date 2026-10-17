@@ -104,6 +104,18 @@ it('returns an explicit failure when IndexedDB cannot open', async () => {
     error: { kind: 'unavailable' },
   })
 })
+
+it('classifies a failed database acquisition as unavailable for a write operation', async () => {
+  const repository = createGameRepository(() => Promise.reject(new Error('Storage blocked')))
+
+  const result = await repository.writeLessonProgress(
+    { lessonId: 'rules', completedAt: '2026-10-11T01:00:00.000Z' },
+    1,
+  )
+
+  expect(result).toMatchObject({ ok: false, error: { kind: 'unavailable' } })
+})
+
 it('does not claim write success after its connection has closed', async () => {
   const { database, repository } = await setup()
   database.close()
@@ -359,15 +371,28 @@ it('keeps saved records when synchronous semantic validation exhausts its budget
     ...engine,
     validatePuzzle: () => ({ status: 'budget-exhausted' }),
   })
+  const owner = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
+  const lease = await owner.acquireOwnership(record.session.id, 'budget-test')
+  if (!lease.ok || !lease.value) {
+    throw new Error('Fixture lease failed')
+  }
 
   try {
     expect(await repository.listSessions()).toMatchObject({
       ok: false,
       error: { kind: 'unavailable' },
     })
+    // A semantic budget failure must outrank the write-failed policy and preserve the saved revision.
+    expect(
+      await repository.writeSession(record.session, record.revision, lease.value),
+    ).toMatchObject({
+      ok: false,
+      error: { kind: 'unavailable' },
+    })
     expect(await database.get('sessions', record.session.id)).toEqual(record)
     expect(await database.count('quarantine')).toBe(0)
   } finally {
+    owner.dispose()
     engine.dispose()
   }
 })

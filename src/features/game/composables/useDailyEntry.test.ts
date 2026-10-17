@@ -167,3 +167,53 @@ it('preserves an explicit daily start URL without waiting for summary readiness'
   await vi.waitFor(() => expect(runtime.worker.generate).toHaveBeenCalledOnce())
   expect(game.error).toContain('出题失败')
 })
+
+it('ignores an older date summary after the daily date advances', async () => {
+  const previousDate = deferred<Awaited<ReturnType<GameRepository['readDailyStatuses']>>>()
+  const { entry, runtime } = await setup((test) => {
+    vi.spyOn(test.runtime.repository, 'readDailyStatuses').mockReturnValueOnce(previousDate.promise)
+  })
+  await vi.waitFor(() => expect(runtime.repository.readDailyStatuses).toHaveBeenCalledOnce())
+
+  entry.today.value = '2026-10-12'
+  await vi.waitFor(() => expect(entry.statusesReady.value).toBe(true))
+  expect(entry.completedCount.value).toBe(0)
+  previousDate.resolve({
+    ok: true,
+    value: {
+      coverage: 'ready',
+      epoch: 1,
+      generation: 1,
+      statuses: [{ variant: 'classic', state: 'completed' }],
+    },
+  })
+  await flushPromises()
+
+  expect(entry.statusesReady.value).toBe(true)
+  expect(entry.completedCount.value).toBe(0)
+  expect(entry.statuses.value).toContainEqual({ variant: 'classic', state: 'available' })
+})
+
+it('does not publish a delayed daily summary after disposal', async () => {
+  const pending = deferred<Awaited<ReturnType<GameRepository['readDailyStatuses']>>>()
+  const { entry, runtime, wrapper } = await setup((test) => {
+    vi.spyOn(test.runtime.repository, 'readDailyStatuses').mockReturnValueOnce(pending.promise)
+  })
+  await vi.waitFor(() => expect(runtime.repository.readDailyStatuses).toHaveBeenCalledOnce())
+
+  wrapper.unmount()
+  pending.resolve({
+    ok: true,
+    value: {
+      coverage: 'ready',
+      epoch: 1,
+      generation: 1,
+      statuses: [{ variant: 'classic', state: 'completed' }],
+    },
+  })
+  await flushPromises()
+
+  expect(entry.statuses.value).toEqual([])
+  expect(entry.statusesReady.value).toBe(false)
+  expect(entry.completedCount.value).toBeNull()
+})

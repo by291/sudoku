@@ -143,6 +143,7 @@ it('labels all cells and removes values and notes from paused presentation', asy
   ).toBe(true)
   wrapper.unmount()
 })
+
 it('explains selected Arrow clues and removes clue details while paused', async () => {
   const wrapper = mount(SudokuBoard, {
     props: {

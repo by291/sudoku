@@ -1,6 +1,7 @@
-import { BOARD_SIZE } from '@/sudoku/values'
+import { BOARD_SIZE, isRecord } from '@/sudoku/values'
+import { isSudokuVariant } from '@/sudoku/catalogue'
 import type { EngineInfo } from '@sudoku/wasm'
-import type { Difficulty, PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
+import type { PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
 
 export const BRIDGE_VERSION = 3
 export const PUZZLE_VERSION = 'sudoku-v11'
@@ -52,27 +53,6 @@ export function validateEngineInfo(info: EngineInfo): void {
   }
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-export function isDifficulty(value: unknown): value is Difficulty {
-  return value === 'easy' || value === 'medium' || value === 'hard' || value === 'expert'
-}
-
-const VARIANT_TAGS = {
-  classic: true,
-  diagonal: true,
-  jigsaw: true,
-  killer: true,
-  thermo: true,
-  arrow: true,
-} satisfies Record<SudokuVariant, true>
-
-export function isVariant(value: unknown): value is SudokuVariant {
-  return typeof value === 'string' && Object.hasOwn(VARIANT_TAGS, value)
-}
-
 function cellList(value: unknown): value is number[] {
   return (
     Array.isArray(value) &&
@@ -112,5 +92,5 @@ const RULE_SHAPES = {
 
 /** Structural transport guard only; Rust validates connected geometry, partitions and equations. */
 export function isRulesShape(value: unknown): value is PuzzleRules {
-  return isRecord(value) && isVariant(value.kind) && RULE_SHAPES[value.kind](value)
+  return isRecord(value) && isSudokuVariant(value.kind) && RULE_SHAPES[value.kind](value)
 }

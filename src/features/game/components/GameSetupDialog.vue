@@ -9,7 +9,6 @@ import { isDifficulty } from '@/sudoku/values'
 import { supportedDifficulties, supportsDifficulty } from '@/sudoku/catalogue'
 import type { Difficulty } from '@/sudoku/contracts'
 import type { GameSummary } from '@/storage/readModels'
-import type { GameSession } from '@/features/game/model/session'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
 import { getVariantPresentation, VARIANT_OPTIONS } from '@/features/game/model/variants'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
@@ -18,7 +17,6 @@ import GenerationStatus from '@/features/game/components/GenerationStatus.vue'
 const props = withDefaults(
   defineProps<{
     mode?: 'free' | 'daily'
-    savedSession?: GameSession | null
     savedSummary?: GameSummary | null
     statusesReady?: boolean
     blocked?: boolean
@@ -30,7 +28,6 @@ const props = withDefaults(
   }>(),
   {
     mode: 'free',
-    savedSession: null,
     savedSummary: null,
     statusesReady: true,
     blocked: false,
@@ -45,12 +42,6 @@ const processing = computed(() => props.busy || props.generating || props.blocke
 const unfinishedSave = computed(() => {
   if (props.savedSummary && !props.savedSummary.completedAt) {
     return { difficulty: props.savedSummary.difficulty, elapsedMs: props.savedSummary.elapsedMs }
-  }
-  if (props.savedSession && !props.savedSession.completion) {
-    return {
-      difficulty: props.savedSession.puzzle.difficulty,
-      elapsedMs: props.savedSession.elapsedMs,
-    }
   }
   return null
 })

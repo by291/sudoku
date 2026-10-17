@@ -14,6 +14,8 @@ export function useHomeRecords() {
   const loading = ref(false)
   const pending = ref(false)
   const error = ref<string | null>(null)
+  let homeOperation = 0
+
   const sheetBusy = ref(false)
   const sheetPending = ref(false)
   const sheetError = ref<string | null>(null)
@@ -23,7 +25,6 @@ export function useHomeRecords() {
   const nextCursor = shallowRef<SummaryCursor | null>(null)
   const pageNumber = ref(1)
   let pageCursors: (SummaryCursor | null)[] = [null]
-  let homeOperation = 0
   let sheetOperation = 0
   let sheet: HomeSheet | null = null
   let maintenance: AbortController | null = null
@@ -33,15 +34,19 @@ export function useHomeRecords() {
     const operation = ++homeOperation
     loading.value = true
     today.value = getChallengeDate(runtime.wallNow())
+
     const response = await runtime.repository.readHome()
+    // Only the latest read may publish counts after reset or scope disposal.
     if (operation !== homeOperation) {
       return
     }
+
     loading.value = false
     if (!response.ok) {
       error.value = '本机记录读取失败，请重试。'
       return
     }
+
     pending.value = response.value.coverage === 'pending'
     unfinishedCount.value = response.value.unfinishedCount
     resultCount.value = response.value.resultCount
@@ -53,13 +58,17 @@ export function useHomeRecords() {
     if (!target) {
       return
     }
+
     const operation = ++sheetOperation
     sheetBusy.value = true
     sheetError.value = null
+
     const response = await readSheet(target, cursor)
+    // Closing or switching sheets invalidates responses from the previous owner.
     if (operation !== sheetOperation) {
       return
     }
+
     sheetBusy.value = false
     if (!response.ok) {
       if (cursor && response.error.kind === 'revision-conflict') {
@@ -69,13 +78,16 @@ export function useHomeRecords() {
         await loadSheet()
         return
       }
+
       sheetError.value = '存档读取失败，请重试。'
       return
     }
+
     sheetPending.value = response.value.coverage === 'pending'
     if (sheetPending.value) {
       return
     }
+
     if ('summary' in response.value) {
       selectedSave.value = response.value.summary
     } else if ('statuses' in response.value) {
@@ -90,9 +102,11 @@ export function useHomeRecords() {
     if (target.kind === 'free') {
       return runtime.repository.readSlotSummary('free', target.variant)
     }
+
     if (target.kind === 'daily') {
       return runtime.repository.readDailyStatuses(today.value)
     }
+
     return runtime.repository.readSummaryPage({ kind: 'sessions', unfinishedOnly: true, cursor })
   }
 
@@ -100,6 +114,7 @@ export function useHomeRecords() {
     maintenance?.abort()
     today.value = getChallengeDate(runtime.wallNow())
     sheet = target
+
     selectedSave.value = null
     resumeChoices.value = []
     dailyStatuses.value = []
@@ -107,6 +122,7 @@ export function useHomeRecords() {
     nextCursor.value = null
     pageNumber.value = 1
     pageCursors = [null]
+
     await loadSheet()
   }
 
@@ -121,6 +137,7 @@ export function useHomeRecords() {
     if (sheetBlocked.value || sheet?.kind !== 'resume') {
       return
     }
+
     const previousPage = pageNumber.value
     if (direction === 'next') {
       if (!nextCursor.value) {
@@ -133,10 +150,12 @@ export function useHomeRecords() {
     } else {
       return
     }
+
     const target = sheet
     const reading = loadSheet(pageCursors[pageNumber.value - 1] ?? null)
     const current = sheetOperation
     await reading
+
     // Another sheet owns its own page state even if this older request finishes last.
     if (current === sheetOperation && target === sheet && sheetError.value) {
       pageNumber.value = previousPage
@@ -150,10 +169,13 @@ export function useHomeRecords() {
       const controller = new AbortController()
       maintenance = controller
       sheetBusy.value = true
+
       const response = await runtime.repository.maintainSummaries(controller.signal)
+      // A reset or another sheet supersedes this maintenance result.
       if (operation !== sheetOperation) {
         return
       }
+
       sheetBusy.value = false
       if (!response.ok) {
         const message = '旧存档整理暂时无法完成，请重试。原始数据仍然保留。'
@@ -162,12 +184,14 @@ export function useHomeRecords() {
         return
       }
     }
+
     const target = sheet
     const current = sheetOperation
     await load()
     if (current !== sheetOperation || target !== sheet) {
       return
     }
+
     await loadSheet(pageCursors[pageNumber.value - 1] ?? null)
   }
 
@@ -175,6 +199,7 @@ export function useHomeRecords() {
     if (notice.kind !== 'reset') {
       return
     }
+
     // Never retain summaries from the replaced dataset while the new read is pending.
     unfinishedCount.value = null
     resultCount.value = null
@@ -187,6 +212,7 @@ export function useHomeRecords() {
     void load()
     void loadSheet()
   })
+
   onScopeDispose(() => {
     homeOperation++
     closeSheet()

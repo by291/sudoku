@@ -53,7 +53,7 @@ const {
   answer,
   submitAnswer,
   resetExercise,
-  stageLesson,
+  exercisePresentation,
   stageCaption,
   canAdvance,
   completed,
@@ -69,7 +69,9 @@ watch(
 )
 
 const inGuide = computed(() => mode.value === 'guide')
-const displayedStage = computed(() => (inGuide.value ? lesson.value?.guided : stageLesson.value))
+const displayedStage = computed(() =>
+  inGuide.value ? lesson.value?.guided : exercisePresentation.value?.stage,
+)
 const displayedBoard = computed(() =>
   inGuide.value ? (lesson.value?.guided.board ?? []) : exerciseBoard.value,
 )
@@ -93,7 +95,7 @@ const exerciseKind = computed(() => {
     return '跟着示例看思路'
   }
 
-  return stageLesson.value?.exercise.kind === 'placement' ? '填写练习' : '候选数排除'
+  return exercisePresentation.value?.answer.kind === 'placement' ? '填写练习' : '候选数排除'
 })
 const feedbackSummary = computed(() => {
   if (!correct.value) {
@@ -122,7 +124,7 @@ const primaryActionLabel = computed(() => {
     return '进入完整棋盘练习'
   }
 
-  return stageLesson.value?.exercise.kind === 'placement' ? '提交答案' : '提交排除'
+  return exercisePresentation.value?.answer.kind === 'placement' ? '提交答案' : '提交排除'
 })
 const primaryActionDisabled = computed(
   () =>
@@ -260,7 +262,7 @@ async function retryLessonContent(event: MouseEvent) {
             :class="{ 'concealed-control': inGuide }"
             layout="row"
             :disabled="inGuide || selected === null || busy || canAdvance || completed"
-            :action-label="stageLesson?.exercise.kind === 'placement' ? '填写' : '排除'"
+            :action-label="exercisePresentation?.answer.kind === 'placement' ? '填写' : '排除'"
             @digit="answer"
           />
           <div class="exercise-status muted">
@@ -300,7 +302,7 @@ async function retryLessonContent(event: MouseEvent) {
           <p class="introduction">{{ directoryEntry.introduction }}</p>
           <p v-if="!inGuide">{{ exercisePrompt }}</p>
           <p class="muted small">固定教学片段 · 候选数已包含前面推理的排除结果</p>
-          <template v-if="!inGuide && stageLesson?.exercise.kind === 'elimination'">
+          <template v-if="!inGuide && exercisePresentation?.answer.kind === 'elimination'">
             <p class="muted">已选择 {{ removals.length }} 个排除项</p>
             <ul v-if="removals.length" class="removal-list">
               <li v-for="pair in removals" :key="`${pair.cell}:${pair.digit}`">

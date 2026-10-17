@@ -1,12 +1,8 @@
 import { SEED_BYTE_LENGTH } from '@/sudoku/seed'
 import type { Difficulty, SudokuVariant } from '@/sudoku/contracts'
-import {
-  PUZZLE_VERSION,
-  VARIANT_PUZZLE_VERSION,
-  isRecord,
-  isVariant,
-  isDifficulty,
-} from '@/sudoku/guards'
+import { PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/sudoku/guards'
+import { isRecord, isDifficulty } from '@/sudoku/values'
+import { isSudokuVariant } from '@/sudoku/catalogue'
 
 export type GenerationInput = { seed: Uint8Array; difficulty: Difficulty } & (
   | { variant: 'classic'; puzzleVersion: typeof PUZZLE_VERSION }
@@ -24,7 +20,7 @@ export function createGenerationInput(
   seed: Uint8Array,
 ): GenerationInput {
   if (
-    !isVariant(variant) ||
+    !isSudokuVariant(variant) ||
     !isDifficulty(difficulty) ||
     !(seed instanceof Uint8Array) ||
     seed.length !== SEED_BYTE_LENGTH ||
@@ -43,7 +39,7 @@ export function parseGenerationInput(
 ): { valid: true; value: GenerationInput } | { valid: false; issues: string[] } {
   if (
     !isRecord(value) ||
-    !isVariant(value.variant) ||
+    !isSudokuVariant(value.variant) ||
     !isDifficulty(value.difficulty) ||
     !(value.seed instanceof Uint8Array) ||
     value.seed.length !== SEED_BYTE_LENGTH ||

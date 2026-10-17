@@ -101,7 +101,10 @@ export function explainStepEvidence(step: LogicalStep): readonly string[] {
   }
 
   const details = evidence.domains.map(({ cell, mask }) => {
-    const label = evidence.kind === 'arrow' ? (cell === evidence.circle ? '圆圈' : '箭杆') : ''
+    let label = ''
+    if (evidence.kind === 'arrow') {
+      label = cell === evidence.circle ? '圆圈' : '箭杆'
+    }
 
     return `${label}${cellPosition(cell)}：${digitsIn(mask).join('、')}`
   })
@@ -162,12 +165,15 @@ export function explainStep(step: LogicalStep): string {
                   .join('、')}`,
             )
             .join('；')
-    const reason =
-      evidence.kind === 'cage'
-        ? `笼内数字不能重复，总和为${evidence.sum}`
-        : evidence.kind === 'thermo'
-          ? `温度计从圆头开始严格递增，各格必须留出后续数字的位置`
-          : '箭头上的数字总和等于圆圈内数字'
+    let reason: string
+    if (evidence.kind === 'cage') {
+      reason = `笼内数字不能重复，总和为${evidence.sum}`
+    } else if (evidence.kind === 'thermo') {
+      reason = '温度计从圆头开始严格递增，各格必须留出后续数字的位置'
+    } else {
+      reason = '箭头上的数字总和等于圆圈内数字'
+    }
+
     const deduction =
       step.technique === 'cage-combination' || step.technique === 'arrow-combination'
         ? '检查下列范围内满足求和及行、列、宫不重复规则的组合后'
@@ -190,13 +196,17 @@ export function explainStep(step: LogicalStep): string {
     'naked-pair': `${cells}都只有候选数${digits}，这两个数字必须占据这两个格子，所以同一单元的其他格子不能再填${digits}`,
     'hidden-pair': `数字${digits}在这个单元中只能占据${cells}这两个位置，所以这两个格子的其他候选数可以排除`,
   }
-  const premises = evidence.premises.map((premise) =>
-    premise.kind === 'cage'
-      ? `笼总和${premise.sum}及不重复限制`
-      : premise.kind === 'thermo'
-        ? '温度计递增限制'
-        : '箭头求和限制',
-  )
+  const premises = evidence.premises.map((premise) => {
+    if (premise.kind === 'cage') {
+      return `笼总和${premise.sum}及不重复限制`
+    }
+    if (premise.kind === 'thermo') {
+      return '温度计递增限制'
+    }
+
+    return '箭头求和限制'
+  })
+
   if (evidence.units?.some((unit) => unit.kind === 'diagonal')) {
     premises.push('对角线不重复限制')
   }

@@ -35,17 +35,19 @@ it('requires each stage in order, retains a wrong answer and commits completion 
   }
   await learning.load()
   const stages = lesson.exercises.flatMap((exercise) => exercise.stages)
-  expect(
-    (await learning.submitExercise(lesson.id, stageAnswer(stages[0]).expected, 1)).correct,
-  ).toBe(false)
-  expect((await learning.submitExercise(lesson.id, { cell: 80, digit: 9 }, 0)).correct).toBe(false)
+  expect((await learning.submitExercise(lesson.id, stageAnswer(stages[0]).expected, 1)).kind).toBe(
+    'unavailable',
+  )
+  expect((await learning.submitExercise(lesson.id, { cell: 80, digit: 9 }, 0)).kind).toBe(
+    'incorrect',
+  )
   for (let stage = 0; stage < stages.length; stage++) {
     const result = await learning.submitExercise(
       lesson.id,
       stageAnswer(stages[stage]).expected,
       stage,
     )
-    expect(result.correct).toBe(true)
+    expect(result.kind).toBe(stage === stages.length - 1 ? 'completed' : 'advance')
     expect(learning.progress.some((item) => item.lessonId === lesson.id)).toBe(
       stage === stages.length - 1,
     )

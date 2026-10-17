@@ -1,5 +1,6 @@
 import { completeSession } from '../../../../tests/support/semantics'
 import { encodeSeed } from '@/sudoku/seed'
+import { isRecord } from '@/sudoku/values'
 import { expect, it, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { router } from '@/router/index'
@@ -59,12 +60,9 @@ it.each(['free', 'learning', 'daily'] as const)(
       entered.resolve()
       return pending.promise
     }
-    const generating = game.startGame(
-      generationInput('classic', 'easy', 'pre-restore'),
-      metadata,
-      undefined,
-      mode === 'daily' ? restored.id : undefined,
-    )
+    const generating = game.startGame(generationInput('classic', 'easy', 'pre-restore'), metadata, {
+      id: mode === 'daily' ? restored.id : undefined,
+    })
     await entered.promise
 
     expect(
@@ -248,6 +246,109 @@ it('releases a delayed acquired lease exactly once after cancellation', async ()
 
   expect(release).toHaveBeenCalledTimes(1)
   expect(test.game.phase).toBe('paused')
+})
+
+it('releases an independently acquired previous lease after cancellation during a denied replacement epoch read', async () => {
+  const test = await setup()
+  await test.game.leaveGame()
+  test.game.dropSession()
+
+  const previousId = makeSession().id
+  const acquire = test.runtime.ownership.acquireOwnership
+  const readEpoch = test.runtime.repository.readDatasetEpoch
+  const entered = deferred<void>()
+  const gate = deferred<void>()
+  let deniedReplacement = false
+  test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
+  test.runtime.ownership.acquireOwnership = async (id, owner) => {
+    if (id === previousId) {
+      return acquire(id, owner)
+    }
+
+    deniedReplacement = true
+    return { ok: true, value: null }
+  }
+  test.runtime.repository.readDatasetEpoch = async () => {
+    if (deniedReplacement) {
+      entered.resolve()
+      await gate.promise
+    }
+
+    return readEpoch()
+  }
+  const replace = vi.spyOn(test.runtime.repository, 'replaceActiveSession')
+  const starting = test.game.startGame(generationInput('classic', 'easy', 'denied-cancel'), {
+    kind: 'free',
+  })
+  await entered.promise
+  expect(await test.database.get('leases', previousId)).toMatchObject({
+    ownerId: test.runtime.ownerId,
+  })
+
+  test.game.cancelLoading()
+  gate.resolve()
+
+  expect(await starting).toEqual({ status: 'cancelled' })
+  expect(await test.database.get('leases', previousId)).toMatchObject({ expiresAt: 0 })
+  expect(replace).not.toHaveBeenCalled()
+  expect(test.game.session).toBeNull()
+  expect(test.game.error).toBe('已取消出题。')
+  expect(await test.database.count('sessions')).toBe(1)
+})
+
+it('preserves the restored lease and subsequent save when superseding a denied replacement', async () => {
+  const test = await setup()
+  await test.game.leaveGame()
+  test.game.dropSession()
+
+  const previousId = makeSession().id
+  const acquire = test.runtime.ownership.acquireOwnership
+  const readEpoch = test.runtime.repository.readDatasetEpoch
+  const entered = deferred<void>()
+  const gate = deferred<void>()
+  let pauseEpochRead = false
+  test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
+  test.runtime.ownership.acquireOwnership = async (id, owner) => {
+    if (id === previousId) {
+      return acquire(id, owner)
+    }
+
+    pauseEpochRead = true
+    return { ok: true, value: null }
+  }
+  test.runtime.repository.readDatasetEpoch = async () => {
+    if (pauseEpochRead) {
+      pauseEpochRead = false
+      entered.resolve()
+      await gate.promise
+    }
+
+    return readEpoch()
+  }
+  const starting = test.game.startGame(generationInput('classic', 'easy', 'denied-supersede'), {
+    kind: 'free',
+  })
+  await entered.promise
+
+  const restoring = test.game.restoreSession(previousId)
+  await flushPromises()
+  gate.resolve()
+
+  expect(await restoring).toEqual({ status: 'ready' })
+  expect(await starting).toEqual({ status: 'cancelled' })
+  expect(test.game.session?.id).toBe(previousId)
+  expect(test.game.readOnly).toBe(false)
+  const restoredLease = await test.database.get('leases', previousId)
+  expect(isRecord(restoredLease) && restoredLease.expiresAt).toBeGreaterThan(0)
+
+  await test.game.resume()
+  test.game.dispatch({ kind: 'enter', cell: 2, digit: 4 })
+  await test.game.periodicSave()
+
+  expect(test.game.saveState).toBe('saved')
+  expect(test.game.readOnly).toBe(false)
+  const stored = await test.runtime.repository.readSession(previousId)
+  expect(stored.ok && stored.value?.session.entries[2]).toBe(4)
 })
 
 it('releases the current editing lease once when replacing its own game', async () => {

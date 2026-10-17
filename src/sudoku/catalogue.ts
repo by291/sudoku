@@ -1,3 +1,12 @@
+import type {
+  BasicClassicTechnique,
+  AdvancedTechnique,
+  ClassicTechnique,
+  AdvancedEvidence,
+  Technique,
+  RuleEvidence,
+  LogicalStep,
+} from '@/sudoku/contracts'
 import type { PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
 import type { Difficulty } from '@/sudoku/contracts'
 
@@ -32,18 +41,8 @@ export const SUDOKU_VARIANTS = [
 ] as const satisfies readonly SudokuVariant[]
 
 export function isSudokuVariant(value: unknown): value is SudokuVariant {
-  return SUDOKU_VARIANTS.some((variant) => variant === value)
+  return typeof value === 'string' && Object.hasOwn(DIFFICULTY_CAPABILITIES, value)
 }
-
-import type {
-  BasicClassicTechnique,
-  AdvancedTechnique,
-  ClassicTechnique,
-  AdvancedEvidence,
-  Technique,
-  RuleEvidence,
-  LogicalStep,
-} from '@/sudoku/contracts'
 
 export const TECHNIQUES: readonly BasicClassicTechnique[] = [
   'naked-single',

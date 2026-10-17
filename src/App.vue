@@ -2,7 +2,7 @@
 import { onMounted, onScopeDispose, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import ReadyApplication from '@/ReadyApplication.vue'
-import EngineBootstrapState from '@/EngineBootstrapState.vue'
+import ApplicationBootstrapState from '@/ApplicationBootstrapState.vue'
 import { createGameRuntime } from '@/runtime'
 import type { GameRuntime } from '@/runtime'
 
@@ -28,6 +28,7 @@ async function start() {
   if (disposed || runtime.value) {
     return
   }
+
   const current = ++generation
   const retry = phase.value === 'failed'
   phase.value = 'loading'
@@ -36,11 +37,14 @@ async function start() {
   try {
     // Browsing starts with storage services; computation is requested by actual game operations.
     await prepareInitialNavigation(retry)
+    // Disposal or a newer retry owns the outcome after navigation completes.
     if (disposed || current !== generation) {
       return
     }
+
     preparedRuntime = createGameRuntime()
-    // Pinia runs store setup in the application context, so publish there before mounting stores.
+
+    // Pinia 4.0.3 resolves store injections in the app context; publish before mounting stores.
     props.installRuntime(preparedRuntime)
     runtime.value = preparedRuntime
     preparedRuntime = null
@@ -48,6 +52,7 @@ async function start() {
   } catch (error: unknown) {
     console.error('Sudoku application initialization failed', error)
     preparedRuntime?.dispose?.()
+
     if (!disposed && current === generation) {
       phase.value = 'failed'
     }
@@ -58,6 +63,7 @@ onMounted(start)
 onScopeDispose(() => {
   disposed = true
   generation++
+
   if (application.value?.shutdown) {
     void application.value.shutdown()
   } else {
@@ -68,5 +74,5 @@ onScopeDispose(() => {
 
 <template>
   <ReadyApplication v-if="runtime && phase === 'ready'" ref="application" />
-  <EngineBootstrapState v-else :failed="phase === 'failed'" @retry="start" />
+  <ApplicationBootstrapState v-else :failed="phase === 'failed'" @retry="start" />
 </template>

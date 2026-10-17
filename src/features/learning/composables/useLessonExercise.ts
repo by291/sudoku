@@ -8,7 +8,6 @@ import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import type { Lesson } from '@/features/learning/model/lessons'
 import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
-import { explainStep } from '@/features/game/model/techniquePresentation'
 
 export function useLessonExercise(
   lesson: MaybeRefOrGetter<Lesson | undefined>,
@@ -22,20 +21,9 @@ export function useLessonExercise(
   const canAdvance = ref(false)
   const completed = ref(false)
   const stages = computed(() => (currentLesson.value ? lessonStages(currentLesson.value) : []))
-  const stageLesson = computed(() => {
-    const source = currentLesson.value
+  const exercisePresentation = computed(() => {
     const stage = stages.value[stageIndex.value]
-    return source && stage
-      ? {
-          ...source,
-          board: stage.board,
-          candidates: stage.candidates,
-          rules: stage.rules,
-          exercise: stageAnswer(stage),
-          step: stage.step,
-          explanation: explainStep(stage.step),
-        }
-      : undefined
+    return stage ? { stage, answer: stageAnswer(stage) } : undefined
   })
   const stageCaption = computed(() => {
     let start = 0
@@ -55,14 +43,14 @@ export function useLessonExercise(
   const correct = ref(false)
   const busy = ref(false)
   const exerciseCells = computed(() =>
-    !stageLesson.value
+    !exercisePresentation.value
       ? []
-      : stageLesson.value.exercise.kind === 'placement'
-        ? [stageLesson.value.exercise.expected.cell]
-        : [...new Set(stageLesson.value.exercise.expected.map((pair) => pair.cell))],
+      : exercisePresentation.value.answer.kind === 'placement'
+        ? [exercisePresentation.value.answer.expected.cell]
+        : [...new Set(exercisePresentation.value.answer.expected.map((pair) => pair.cell))],
   )
   const exercisePrompt = computed(() =>
-    stageLesson.value?.exercise.kind === 'placement'
+    exercisePresentation.value?.answer.kind === 'placement'
       ? '点击圆点标出的空格，选择应该出现的数字，再提交答案。'
       : '点击圆点标出的格子，选择可以排除的候选数。再次选择可撤回，然后提交全部排除。',
   )
@@ -73,7 +61,7 @@ export function useLessonExercise(
   )
   const exampleNotes = computed(
     () =>
-      stageLesson.value?.candidates.map((mask, cell) =>
+      exercisePresentation.value?.stage.candidates.map((mask, cell) =>
         removals.value
           .filter((pair) => pair.cell === cell)
           .reduce((remaining, pair) => remaining & ~maskOf(pair.digit), mask),
@@ -81,7 +69,7 @@ export function useLessonExercise(
   )
   const exerciseBoard = computed(
     () =>
-      stageLesson.value?.board.map((value, cell) =>
+      exercisePresentation.value?.stage.board.map((value, cell) =>
         placement.value?.cell === cell ? placement.value.digit : value,
       ) ?? [],
   )
@@ -91,7 +79,7 @@ export function useLessonExercise(
       !busy.value &&
       !canAdvance.value &&
       !completed.value &&
-      (stageLesson.value?.exercise.kind === 'elimination' || placement.value !== null),
+      (exercisePresentation.value?.answer.kind === 'elimination' || placement.value !== null),
   )
   // Local feedback belongs to a lesson and route mode, independently of durable progress writes.
   let ownerGeneration = 0
@@ -167,9 +155,9 @@ export function useLessonExercise(
     if (
       inPractice.value ||
       mode.value !== 'exercise' ||
-      !stageLesson.value ||
+      !exercisePresentation.value ||
       selected.value === null ||
-      stageLesson.value.board[selected.value] !== 0 ||
+      exercisePresentation.value.stage.board[selected.value] !== 0 ||
       busy.value ||
       canAdvance.value ||
       completed.value
@@ -177,8 +165,8 @@ export function useLessonExercise(
       return
     }
 
-    if (stageLesson.value.exercise.kind === 'elimination') {
-      if (!(stageLesson.value.candidates[selected.value] & maskOf(digit))) {
+    if (exercisePresentation.value.answer.kind === 'elimination') {
+      if (!(exercisePresentation.value.stage.candidates[selected.value] & maskOf(digit))) {
         return
       }
 
@@ -198,27 +186,53 @@ export function useLessonExercise(
   }
 
   async function submitAnswer() {
-    if (inPractice.value || !stageLesson.value || !canSubmit.value) {
+    if (
+      inPractice.value ||
+      !currentLesson.value ||
+      !exercisePresentation.value ||
+      !canSubmit.value
+    ) {
       return
     }
 
     const supplied =
-      stageLesson.value.exercise.kind === 'elimination' ? [...removals.value] : placement.value
+      exercisePresentation.value.answer.kind === 'elimination'
+        ? [...removals.value]
+        : placement.value
     if (!supplied) {
       return
     }
 
     const owner = ownerGeneration
     busy.value = true
-    const result = await learning.submitExercise(stageLesson.value.id, supplied, stageIndex.value)
+    const result = await learning.submitExercise(currentLesson.value.id, supplied, stageIndex.value)
     if (disposed || owner !== ownerGeneration) {
       return
     }
 
     feedback.value = result.explanation
-    correct.value = result.correct
-    canAdvance.value = result.advance
-    completed.value = result.completed
+    canAdvance.value = false
+    completed.value = false
+    switch (result.kind) {
+      case 'incorrect':
+      case 'unavailable':
+        correct.value = false
+        break
+      case 'cancelled':
+      case 'save-failed':
+        correct.value = true
+        break
+      case 'advance':
+        correct.value = true
+        canAdvance.value = true
+        break
+      case 'completed':
+        correct.value = true
+        completed.value = true
+        break
+      default:
+        result satisfies never
+    }
     busy.value = false
   }
 
@@ -295,7 +309,7 @@ export function useLessonExercise(
     answer,
     submitAnswer,
     resetExercise,
-    stageLesson,
+    exercisePresentation,
     stageCaption,
     canAdvance,
     completed,

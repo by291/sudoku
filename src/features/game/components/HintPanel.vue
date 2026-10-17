@@ -21,8 +21,22 @@ watch(
 const steps = computed(() => (props.hint.kind === 'deduction' ? props.hint.steps : []))
 const step = computed(() => steps.value[stepIndex.value])
 const evidenceDetails = computed(() => (step.value ? explainStepEvidence(step.value) : []))
+const unavailableMessage = computed(() => {
+  if (props.hint.kind === 'unavailable') {
+    if (props.hint.reason === 'complete') {
+      return '棋盘已经完成。'
+    }
+    if (props.hint.reason === 'budget-exhausted') {
+      return '提示计算超出预算，未应用任何推理。请稍后重试。'
+    }
+  }
+
+  return '当前没有可解释的逻辑步骤。请检查填写，或尝试调整思路。'
+})
+
 watch(step, (current) => emit('highlight', current ?? null), { immediate: true })
 </script>
+
 <template>
   <section class="panel hint-panel" aria-label="逻辑提示说明" aria-live="polite">
     <h2>找到下一步</h2>
@@ -51,17 +65,12 @@ watch(step, (current) => emit('highlight', current ?? null), { immediate: true }
       </div></template
     >
     <p v-else>
-      {{
-        hint.kind === 'unavailable' && hint.reason === 'complete'
-          ? '棋盘已经完成。'
-          : hint.kind === 'unavailable' && hint.reason === 'budget-exhausted'
-            ? '提示计算超出预算，未应用任何推理。请稍后重试。'
-            : '当前没有可解释的逻辑步骤。请检查填写，或尝试调整思路。'
-      }}
+      {{ unavailableMessage }}
     </p>
     <NButton class="dismiss" @click="$emit('dismiss')">关闭提示</NButton>
   </section>
 </template>
+
 <style scoped>
 .hint-panel {
   margin-top: 16px;

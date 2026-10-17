@@ -5,6 +5,7 @@ import { openSudokuDatabase } from '@/storage/database'
 import { createGameRepository } from '@/storage/repository'
 import { createOwnershipCoordinator } from '@/storage/ownership'
 import { initialSummaryState, projectRecord } from '@/storage/projections'
+import type { GameSummary } from '@/storage/readModels'
 import { testEngine } from '../../tests/support/semantics'
 import { makeSession } from '../../tests/support/gameFixtures'
 
@@ -25,6 +26,19 @@ async function setup() {
   const ownership = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
 
   return { database, repository, prepareValidation, validators, ownership }
+}
+
+function makeResultSummary(overrides: Partial<GameSummary> = {}) {
+  const summary = {
+    ...projectRecord(
+      makeSession({ completion: { completedAt: '2026-10-11T01:00:00.000Z', elapsedMs: 0 } }),
+      0,
+      'results',
+    ),
+    ...overrides,
+  }
+
+  return { ...summary, orderTime: -Date.parse(summary.completedAt ?? ''), unfinished: 0 }
 }
 
 afterEach(async () => {
@@ -302,6 +316,122 @@ it('keeps original result facts in projections when a completed session is writt
       completedCount: 1,
       summary: { freeBests: { easy: { unassisted: 5000 } } },
     },
+  })
+})
+
+it('aggregates compact summaries by variant, mode, difficulty and assistance with one row per ID', async () => {
+  const { database, repository, validators, prepareValidation } = await setup()
+  const unassistedFree = makeResultSummary({ id: 'free', elapsedMs: 60000 })
+  const summaries = [
+    unassistedFree,
+    unassistedFree,
+    makeResultSummary({ id: 'assisted-free', elapsedMs: 30000, assisted: true }),
+    makeResultSummary({ id: 'slower-free', elapsedMs: 90000 }),
+    makeResultSummary({ id: 'medium-free', elapsedMs: 80000, difficulty: 'medium' }),
+    makeResultSummary({
+      id: 'learn',
+      elapsedMs: 1000,
+      mode: 'learning',
+      metadata: { kind: 'learning', lessonId: 'rules' },
+    }),
+    makeResultSummary({
+      id: 'practice',
+      elapsedMs: 1000,
+      mode: 'daily',
+      metadata: { kind: 'daily', challengeDate: '2026-10-11', formalAttempt: false },
+    }),
+    makeResultSummary({
+      id: 'classic-daily',
+      mode: 'daily',
+      metadata: { kind: 'daily', challengeDate: '2026-10-11', formalAttempt: true },
+    }),
+    makeResultSummary({
+      id: 'arrow-daily',
+      variant: 'arrow',
+      mode: 'daily',
+      assisted: true,
+      metadata: { kind: 'daily', challengeDate: '2026-10-11', formalAttempt: true },
+    }),
+    makeResultSummary({ id: 'arrow-free', variant: 'arrow', elapsedMs: 3000 }),
+  ]
+  for (const summary of summaries) {
+    // IDB key identity permits one result per attempt, even if the same ID is written again.
+    await database.put('resultSummaries', summary)
+  }
+
+  const classic = await repository.readOverview('classic', '2026-10-11')
+  const arrow = await repository.readOverview('arrow', '2026-10-11')
+
+  expect(classic).toMatchObject({
+    ok: true,
+    value: {
+      completedCount: 7,
+      summary: {
+        freeBests: {
+          easy: { assisted: 30000, unassisted: 60000 },
+          medium: { assisted: null, unassisted: 80000 },
+          hard: { assisted: null, unassisted: null },
+          expert: { assisted: null, unassisted: null },
+        },
+        dailyTotals: { assisted: 0, unassisted: 1 },
+        currentStreak: 1,
+        longestStreak: 1,
+      },
+    },
+  })
+  expect(arrow).toMatchObject({
+    ok: true,
+    value: {
+      completedCount: 2,
+      summary: {
+        freeBests: { easy: { assisted: null, unassisted: 3000 } },
+        dailyTotals: { assisted: 1, unassisted: 0 },
+        currentStreak: 1,
+      },
+    },
+  })
+  expect(await database.count('results')).toBe(0)
+  expect(prepareValidation).not.toHaveBeenCalled()
+  expect(validators.validatePuzzle).not.toHaveBeenCalled()
+})
+
+it('uses formal Beijing completion dates for year-boundary streaks while retaining late totals', async () => {
+  const { database, repository } = await setup()
+  const dates = [
+    { id: 'd1', date: '2026-12-30', completedAt: '2026-12-30T01:00:00.000Z', assisted: false },
+    // UTC is still December 30, but Beijing has entered December 31.
+    { id: 'd2', date: '2026-12-31', completedAt: '2026-12-30T16:00:00.000Z', assisted: true },
+    { id: 'd3', date: '2027-01-01', completedAt: '2027-01-01T01:00:00.000Z', assisted: false },
+    // The formal result counts, but Beijing has already entered January 3.
+    { id: 'late', date: '2027-01-02', completedAt: '2027-01-02T16:00:00.000Z', assisted: false },
+  ]
+  for (const { id, date, completedAt, assisted } of dates) {
+    await database.put(
+      'resultSummaries',
+      makeResultSummary({
+        id,
+        completedAt,
+        assisted,
+        mode: 'daily',
+        metadata: { kind: 'daily', challengeDate: date, formalAttempt: true },
+      }),
+    )
+  }
+
+  expect(await repository.readOverview('classic', '2027-01-02')).toMatchObject({
+    ok: true,
+    value: {
+      completedCount: 4,
+      summary: { currentStreak: 3, longestStreak: 3, dailyTotals: { assisted: 1, unassisted: 3 } },
+    },
+  })
+  expect(await repository.readOverview('classic', '2027-01-03')).toMatchObject({
+    ok: true,
+    value: { summary: { currentStreak: 0, longestStreak: 3 } },
+  })
+  expect(await repository.readOverview('classic', '2026-12-30')).toMatchObject({
+    ok: true,
+    value: { summary: { currentStreak: 1, longestStreak: 1 } },
   })
 })
 

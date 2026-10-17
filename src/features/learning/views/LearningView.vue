@@ -68,28 +68,26 @@ const suggestedLesson = computed(() => {
     selectedLessons.value[0]
   )
 })
-const suggestionLabel = computed(() => {
+type RecommendationKind = 'review' | 'continue' | 'next' | 'start'
+
+const recommendationKind = computed<RecommendationKind>(() => {
   if (suggestedLesson.value && completedLessonIds.value.has(suggestedLesson.value.id)) {
-    return '复习课程'
+    return 'review'
   }
-
   if (suggestedLesson.value?.id === preferences.settings.currentLessonId) {
-    return '继续学习'
+    return 'continue'
   }
 
-  return completedCount.value ? '学习下一节' : '开始学习'
+  return completedCount.value ? 'next' : 'start'
 })
-const suggestionCaption = computed(() => {
-  if (suggestionLabel.value === '复习课程') {
-    return '全部学完了，再巩固一次'
-  }
-
-  if (suggestionLabel.value === '继续学习') {
-    return '接着上次的思路'
-  }
-
-  return completedCount.value ? '下一步，试试这节课' : '推荐从这里开始'
-})
+const recommendationCopy = {
+  review: { label: '复习课程', caption: '全部学完了，再巩固一次' },
+  continue: { label: '继续学习', caption: '接着上次的思路' },
+  next: { label: '学习下一节', caption: '下一步，试试这节课' },
+  start: { label: '开始学习', caption: '推荐从这里开始' },
+} satisfies Record<RecommendationKind, { label: string; caption: string }>
+const suggestionLabel = computed(() => recommendationCopy[recommendationKind.value].label)
+const suggestionCaption = computed(() => recommendationCopy[recommendationKind.value].caption)
 const suggestionStage = computed(() => {
   const lesson = suggestedLesson.value
   if (!lesson || completedLessonIds.value.has(lesson.id)) {
@@ -226,7 +224,7 @@ onMounted(learning.load)
             <RouterLink v-slot="{ href, navigate }" :to="`/learn/${suggestedLesson.id}`" custom>
               <NButton
                 tag="a"
-                :type="suggestionLabel === '继续学习' ? 'info' : 'primary'"
+                :type="recommendationKind === 'continue' ? 'info' : 'primary'"
                 :href="href"
                 @click="navigate"
               >

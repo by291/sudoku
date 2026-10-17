@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import type { BoardGeometry, BoardEdge } from '@/shared/model/boardGeometry'
 import { getCageOutline } from '@/shared/model/boardGeometry'
 
+const ARROW_CIRCLE_RADIUS = 0.34
+
 const props = defineProps<{ geometry: BoardGeometry; obscured: boolean }>()
 
 function center(cell: number) {
@@ -39,7 +41,8 @@ function arrowPath(circle: number, shaft: readonly number[]): string {
   const next = center(shaft[0])
   const distance = Math.hypot(next.x - start.x, next.y - start.y)
 
-  return `M${start.x + ((next.x - start.x) * 0.34) / distance},${start.y + ((next.y - start.y) * 0.34) / distance} ${shaft
+  // Begin the shaft at the circle edge so its line does not cross the circle interior.
+  return `M${start.x + ((next.x - start.x) * ARROW_CIRCLE_RADIUS) / distance},${start.y + ((next.y - start.y) * ARROW_CIRCLE_RADIUS) / distance} ${shaft
     .map((cell) => {
       const point = center(cell)
 
@@ -86,6 +89,7 @@ const drawings = computed(() =>
 )
 const boundaries = computed(() => props.geometry.boundaries.map(edgePath))
 </script>
+
 <template>
   <svg
     v-if="!obscured"
@@ -111,7 +115,7 @@ const boundaries = computed(() => props.geometry.boundaries.map(edgePath))
         <circle :cx="clue.point.x" :cy="clue.point.y" r="0.32" class="bulb" />
       </template>
       <template v-else-if="clue.kind === 'arrow'">
-        <circle :cx="clue.point.x" :cy="clue.point.y" r="0.34" class="arrow" />
+        <circle :cx="clue.point.x" :cy="clue.point.y" :r="ARROW_CIRCLE_RADIUS" class="arrow" />
         <path :d="clue.path" class="arrow" />
         <path :d="clue.head" class="arrow" />
       </template>
@@ -119,6 +123,7 @@ const boundaries = computed(() => props.geometry.boundaries.map(edgePath))
     </g>
   </svg>
 </template>
+
 <style scoped>
 .sudoku-clues {
   position: absolute;

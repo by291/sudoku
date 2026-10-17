@@ -47,10 +47,9 @@ async function readBackupFile(event: Event) {
     return
   }
   const current = ++fileGeneration
-  records.cancelRestore()
-  records.backupError = null
+  records.beginBackupFileSelection()
   if (file.size > BACKUP_LIMITS.bytes) {
-    records.backupError = '备份文件超过 25 MiB，本机数据没有改变。'
+    records.reportBackupFileError('too-large')
     return
   }
   reading.value = true
@@ -62,7 +61,7 @@ async function readBackupFile(event: Event) {
     }
   } catch {
     if (current === fileGeneration) {
-      records.backupError = '备份文件读取失败，请重新选择文件。'
+      records.reportBackupFileError('unreadable')
     }
   } finally {
     if (current === fileGeneration) {

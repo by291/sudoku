@@ -10,6 +10,7 @@ export type PersistenceCheckpoint = {
   readonly token: OwnershipToken | null
   readonly revision: number
   readonly dirty: boolean
+  /** Attachment identity survives writes; revisions advance within that same attachment. */
   readonly attachment: number
 }
 
@@ -32,6 +33,7 @@ export function createSessionPersistence(
   }
 
   function isCurrent(checkpoint: PersistenceCheckpoint): boolean {
+    // Reattaching the same session invalidates old continuations; saving a newer revision does not.
     return checkpoint.sessionId === sessionId && checkpoint.attachment === attachment
   }
 

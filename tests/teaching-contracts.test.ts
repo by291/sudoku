@@ -12,7 +12,15 @@ it('all_32_lesson_identities_and_expected_deductions_are_preserved', () => {
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(
     'c5105e8ba1a054cf5f4a036e31026914dc9b75312dd7f9d0fb50c40e4d86b13c',
   )
-  const expected: unknown = JSON.parse(gunzipSync(bytes).toString('utf8'))
+  const expected: Record<string, unknown>[] = JSON.parse(gunzipSync(bytes).toString('utf8'))
+
+  // Remove only the retired guided aliases; all sealed authored content remains the oracle.
+  for (const lesson of expected) {
+    delete lesson.board
+    delete lesson.candidates
+    delete lesson.rules
+    delete lesson.exercise
+  }
 
   expect(LESSONS).toHaveLength(32)
   expect(JSON.parse(JSON.stringify(LESSONS))).toEqual(expected)

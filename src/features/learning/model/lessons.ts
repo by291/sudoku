@@ -1,22 +1,16 @@
-import type { Board, Difficulty, NoteMask, PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
+import type { Difficulty, SudokuVariant } from '@/sudoku/contracts'
 import type {
   ExerciseStage,
   LessonExercise,
   ExerciseAnswer,
 } from '@/features/learning/model/exerciseStages'
 
-export type Exercise = ExerciseAnswer
-
 export type Lesson = {
   id: string
   title: string
   introduction: string
-  board: Board
-  candidates: readonly NoteMask[]
   explanation: string
-  exercise: Exercise
   practiceDifficulty: Difficulty
-  rules: PuzzleRules
   practiceVariant: SudokuVariant
   guided: ExerciseStage
   exercises: readonly LessonExercise[]
@@ -27,26 +21,38 @@ export function lessonStages(lesson: Lesson): readonly ExerciseStage[] {
 }
 
 export function checkExercise(
-  lesson: Lesson,
-  answer: Exercise['expected'],
+  exercise: { answer: ExerciseAnswer; explanation: string },
+  answer: ExerciseAnswer['expected'],
 ): { correct: boolean; explanation: string } {
   let correct = false
-  if (lesson.exercise.kind === 'placement' && !Array.isArray(answer) && 'cell' in answer) {
+  if (exercise.answer.kind === 'placement' && !Array.isArray(answer) && 'cell' in answer) {
     correct =
-      answer.cell === lesson.exercise.expected.cell &&
-      answer.digit === lesson.exercise.expected.digit
+      answer.cell === exercise.answer.expected.cell &&
+      answer.digit === exercise.answer.expected.digit
   }
 
-  if (lesson.exercise.kind === 'elimination' && Array.isArray(answer)) {
+  if (exercise.answer.kind === 'elimination' && Array.isArray(answer)) {
     const supplied = new Set(answer.map((pair) => `${pair.cell}:${pair.digit}`))
-    const expected = new Set(lesson.exercise.expected.map((pair) => `${pair.cell}:${pair.digit}`))
+    const expected = new Set(exercise.answer.expected.map((pair) => `${pair.cell}:${pair.digit}`))
     correct = supplied.size === expected.size && [...expected].every((pair) => supplied.has(pair))
   }
 
   return {
     correct,
     explanation: correct
-      ? '推理正确！' + lesson.explanation
+      ? '推理正确！' + exercise.explanation
       : '还差一点。请重新检查单元内候选数的位置，可以继续尝试。',
   }
 }
+
+/**
+ * Advance and completion require durable progress. Cancelled and save-failed outcomes retain
+ * correct-answer feedback, but cannot authorize a transition to the next stage or practice.
+ */
+export type ExerciseSubmissionResult =
+  | { kind: 'incorrect'; explanation: string }
+  | { kind: 'unavailable'; explanation: string }
+  | { kind: 'cancelled'; explanation: string }
+  | { kind: 'save-failed'; explanation: string }
+  | { kind: 'advance'; explanation: string }
+  | { kind: 'completed'; explanation: string }

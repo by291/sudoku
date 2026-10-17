@@ -15,7 +15,7 @@ const compositionImportPatterns = [
   ...sourceImportPatterns,
   {
     regex:
-      '^@/(?:(?:App|ReadyApplication|EngineBootstrapState)(?:\\.|$)|main(?:\\.|$)|layouts/|router(?:/|$)|theme/)',
+      '^@/(?:(?:App|ReadyApplication|ApplicationBootstrapState)(?:\\.|$)|main(?:\\.|$)|layouts/|router(?:/|$)|theme/)',
     message: 'Business and browser-service modules must not depend on application presentation.',
   },
 ]
@@ -126,6 +126,7 @@ export default [
     ignores: ['src/**/*.test.ts'],
     rules: {
       ...restrictImports({
+        paths: ['idb'],
         patterns: [
           ...compositionImportPatterns,
           {
@@ -171,7 +172,7 @@ export default [
     },
   },
   {
-    files: ['src/features/{game,learning,settings}/model/*.ts'],
+    files: ['src/features/{game,learning,settings,records}/model/**/*.ts'],
     ignores: ['src/**/*.test.ts'],
     rules: {
       ...restrictImports({
@@ -180,8 +181,13 @@ export default [
           ...compositionImportPatterns,
           {
             regex:
-              '^@/(?!shared/model/sudokuPresentation(?:[./]|$)|sudoku/(?:contracts|generationInput|seed|ruleInput|values|catalogue|guards)(?:[./]|$)|features/(?:game|learning|settings)/model/)',
+              '^@/(?!storage/(?:readModels|records)$|shared/model/sudokuPresentation(?:[./]|$)|sudoku/(?:contracts|generationInput|seed|ruleInput|values|catalogue|guards)(?:[./]|$)|features/(?:game|learning|settings|records)/model/)',
             message: 'Pure models may only depend on the engine and other pure models.',
+          },
+          {
+            regex: '^@/storage/(?:readModels|records)$',
+            allowTypeImports: true,
+            message: 'Pure models may only import explicit persisted contracts as types.',
           },
         ],
       }),

@@ -1,5 +1,6 @@
 import { LESSONS, VARIANT_EXAMPLES } from '../../../../tests/support/lessons'
 import { expect, it } from 'vitest'
+import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { checkExercise } from '@/features/learning/model/lessons'
 import { EXAMPLES } from '../../../../tests/fixtures/classicLessonExamples'
 import { solvedBoard } from '../../../../tests/fixtures/sudoku'
@@ -26,8 +27,10 @@ it('provides six lessons with explicit exercises and mode-appropriate practice',
 
   for (const lesson of LESSONS) {
     expect(lesson.explanation).toMatch(/[\u4e00-\u9fff]/)
-    expect(checkExercise(lesson, lesson.exercise.expected).correct).toBe(true)
-    expect(checkExercise(lesson, { cell: 80, digit: 9 }).correct).toBe(false)
+    const exercise = { answer: stageAnswer(lesson.guided), explanation: lesson.explanation }
+
+    expect(checkExercise(exercise, exercise.answer.expected).correct).toBe(true)
+    expect(checkExercise(exercise, { cell: 80, digit: 9 }).correct).toBe(false)
   }
 })
 it('keeps six Classic identities and adds five independently answerable rule lessons', () => {
@@ -45,9 +48,8 @@ it('keeps six Classic identities and adds five independently answerable rule les
 
     expect(lesson).toMatchObject({
       practiceVariant: variant,
-      rules: { kind: variant },
+      guided: { rules: { kind: variant }, step: { kind: 'placement', ...answer } },
       practiceDifficulty: 'easy',
-      exercise: { kind: 'placement', expected: answer },
     })
   }
 })
@@ -133,14 +135,19 @@ it('verifies frozen witnesses against an independent solution and unit facts', (
 })
 it('compares distinct elimination pairs as a set and rejects missing or extra answers', () => {
   const lesson = LESSONS.find((lesson) => lesson.id === 'hidden-pair')
-  if (!lesson || lesson.exercise.kind !== 'elimination') {
+  if (!lesson) {
     throw new Error('Missing elimination')
   }
 
-  const answer = lesson.exercise.expected
+  const exercise = { answer: stageAnswer(lesson.guided), explanation: lesson.explanation }
+  if (exercise.answer.kind !== 'elimination') {
+    throw new Error('Missing elimination')
+  }
 
-  expect(checkExercise(lesson, [...answer].reverse()).correct).toBe(true)
-  expect(checkExercise(lesson, [...answer, answer[0]]).correct).toBe(true)
-  expect(checkExercise(lesson, answer.slice(1)).correct).toBe(false)
-  expect(checkExercise(lesson, [...answer, { cell: 80, digit: 9 }]).correct).toBe(false)
+  const answer = exercise.answer.expected
+
+  expect(checkExercise(exercise, [...answer].reverse()).correct).toBe(true)
+  expect(checkExercise(exercise, [...answer, answer[0]]).correct).toBe(true)
+  expect(checkExercise(exercise, answer.slice(1)).correct).toBe(false)
+  expect(checkExercise(exercise, [...answer, { cell: 80, digit: 9 }]).correct).toBe(false)
 })

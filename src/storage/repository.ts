@@ -18,6 +18,7 @@ import type {
   SummaryMaintenance,
 } from '@/storage/readModels'
 import * as reads from '@/storage/readRepository'
+import { maintainSummaries } from '@/storage/summaryMaintenance'
 import {
   advanceSummaryGeneration,
   initialSummaryState,
@@ -121,6 +122,12 @@ export function storageError(
   }
 }
 
+type AccessPolicy = {
+  /** Failure classification only; each operation selects its own IndexedDB transaction mode. */
+  failureKind?: 'unavailable' | 'write-failed'
+  prepareValidation?: boolean
+}
+
 export function createGameRepository(
   database: DatabaseProvider,
   validators: SnapshotValidators,
@@ -142,19 +149,19 @@ export function createGameRepository(
 
   async function access<T>(
     operation: (db: IDBPDatabase<SudokuDatabase>) => Promise<T>,
-    write = false,
-    validate = false,
+    policy: AccessPolicy = {},
   ): Promise<StorageOutcome<T>> {
     let db: IDBPDatabase<SudokuDatabase>
     try {
       // Finish asynchronous engine readiness before opening semantic-validation transactions.
-      if (validate) {
+      if (policy.prepareValidation) {
         await options.prepareValidation?.()
       }
       db = await database()
     } catch (error) {
       return storageError(error, 'unavailable')
     }
+
     try {
       return { ok: true, value: await operation(db) }
     } catch (error) {
@@ -162,9 +169,13 @@ export function createGameRepository(
         return { ok: false, error: { kind: error.kind, message: error.message } }
       }
 
-      const unavailable = error instanceof SnapshotValidationUnavailable || !write
+      // Semantic unavailability takes precedence even for operations classified as writes.
+      const failureKind =
+        error instanceof SnapshotValidationUnavailable
+          ? 'unavailable'
+          : (policy.failureKind ?? 'unavailable')
 
-      return storageError(error, unavailable ? 'unavailable' : 'write-failed')
+      return storageError(error, failureKind)
     }
   }
 
@@ -208,8 +219,7 @@ export function createGameRepository(
           return records
         })
       },
-      false,
-      store !== 'lessons',
+      { prepareValidation: store !== 'lessons' },
     )
   }
 
@@ -224,26 +234,29 @@ export function createGameRepository(
           [kind, 'sessionSummaries', 'resultSummaries', 'quarantine', 'meta'],
           'readwrite',
         )
+
         return commitTransaction(transaction, async () => {
           const raw = await transaction.objectStore(kind).get(id)
           if (raw === undefined) {
             return null
           }
+
           const parsed = parse(raw)
           if (parsed.valid) {
             return parsed.value
           }
+
           await transaction
             .objectStore('quarantine')
             .put({ store: kind, key: id, value: raw, issues: parsed.issues }, `${kind}:${id}`)
           await transaction.objectStore(kind).delete(id)
           await transaction.objectStore(summaryStore(kind)).delete(id)
           await advanceSummaryGeneration(transaction)
+
           return null
         })
       },
-      false,
-      true,
+      { prepareValidation: true },
     )
   }
 
@@ -261,6 +274,7 @@ export function createGameRepository(
       // Format-1 Classic saves may omit rules and therefore have no modern slot index entry.
       rawRecords.push(...(await sessions.index('by-format-mode').getAll([1, mode], 2)))
     }
+
     const records = new Map<string, SessionRecord>()
     for (const raw of rawRecords) {
       const parsed = parseSessionRecord(raw, validators)
@@ -270,11 +284,14 @@ export function createGameRepository(
           'The active slot contains invalid data; repair saved games',
         )
       }
+
       records.set(parsed.value.session.id, parsed.value)
     }
+
     if (records.size > 1) {
       throw new StorageConflict('revision-conflict', 'Multiple records occupy one active slot')
     }
+
     return [...records.values()]
   }
 
@@ -288,7 +305,7 @@ export function createGameRepository(
     readSummaryPage: (query) => access((db) => reads.readSummaryPage(db, query)),
     readOverview: (variant, today) => access((db) => reads.readOverview(db, variant, today)),
     maintainSummaries: (signal) =>
-      access((db) => reads.maintainSummaries(db, validators, options.prepareValidation, signal)),
+      access((db) => maintainSummaries(db, validators, options.prepareValidation, signal)),
     readSlot: (mode, variant) =>
       access(
         async (db) => {
@@ -298,11 +315,10 @@ export function createGameRepository(
             return records[0] ?? null
           })
         },
-        false,
-        true,
+        { prepareValidation: true },
       ),
     exportBackup: (exportedAt) =>
-      access((db) => readBackupSnapshot(db, exportedAt, validators), false, true),
+      access((db) => readBackupSnapshot(db, exportedAt, validators), { prepareValidation: true }),
     restoreBackup: async (text, expectedEpoch) => {
       let parsed
       try {
@@ -311,13 +327,14 @@ export function createGameRepository(
       } catch (error) {
         return storageError(error, 'unavailable')
       }
+
       if (!parsed.valid) {
         return storageError(new TypeError(parsed.issues.join('; ')), 'write-failed')
       }
-      const result = await access(
-        (db) => replaceBackupSnapshot(db, parsed.value, expectedEpoch),
-        true,
-      )
+
+      const result = await access((db) => replaceBackupSnapshot(db, parsed.value, expectedEpoch), {
+        failureKind: 'write-failed',
+      })
       if (result.ok) {
         options.onReset?.()
       }
@@ -405,8 +422,7 @@ export function createGameRepository(
             return record
           })
         },
-        true,
-        true,
+        { failureKind: 'write-failed', prepareValidation: true },
       ),
     replaceActiveSession: (session, token, previous, signal) =>
       access(
@@ -472,48 +488,50 @@ export function createGameRepository(
             return record
           })
         },
-        true,
-        true,
+        { failureKind: 'write-failed', prepareValidation: true },
       ),
     clearAll: async () => {
-      const result = await access(async (db) => {
-        const transaction = db.transaction(
-          [
-            'sessions',
-            'results',
-            'sessionSummaries',
-            'resultSummaries',
-            'lessons',
-            'settings',
-            'quarantine',
-            'leases',
-            'meta',
-          ],
-          'readwrite',
-        )
-        await commitTransaction(transaction, async () => {
-          const epoch = await transaction.objectStore('meta').get('epoch')
-          if (typeof epoch !== 'number' || !Number.isSafeInteger(epoch)) {
-            throw new TypeError('Invalid dataset epoch')
-          }
+      const result = await access(
+        async (db) => {
+          const transaction = db.transaction(
+            [
+              'sessions',
+              'results',
+              'sessionSummaries',
+              'resultSummaries',
+              'lessons',
+              'settings',
+              'quarantine',
+              'leases',
+              'meta',
+            ],
+            'readwrite',
+          )
+          await commitTransaction(transaction, async () => {
+            const epoch = await transaction.objectStore('meta').get('epoch')
+            if (typeof epoch !== 'number' || !Number.isSafeInteger(epoch)) {
+              throw new TypeError('Invalid dataset epoch')
+            }
 
-          for (const store of [
-            'sessions',
-            'results',
-            'sessionSummaries',
-            'resultSummaries',
-            'lessons',
-            'settings',
-            'quarantine',
-            'leases',
-          ] as const) {
-            await transaction.objectStore(store).clear()
-          }
+            for (const store of [
+              'sessions',
+              'results',
+              'sessionSummaries',
+              'resultSummaries',
+              'lessons',
+              'settings',
+              'quarantine',
+              'leases',
+            ] as const) {
+              await transaction.objectStore(store).clear()
+            }
 
-          await transaction.objectStore('meta').put(epoch + 1, 'epoch')
-          await transaction.objectStore('meta').put(initialSummaryState(true), 'summaries')
-        })
-      }, true)
+            await transaction.objectStore('meta').put(epoch + 1, 'epoch')
+            await transaction.objectStore('meta').put(initialSummaryState(true), 'summaries')
+          })
+        },
+        { failureKind: 'write-failed' },
+      )
       if (result.ok) {
         options.onReset?.()
       }
@@ -560,39 +578,48 @@ export function createGameRepository(
         })
       }),
     writeSettings: (settings, expectedEpoch) =>
-      access(async (db) => {
-        const parsed = parseSettings(settings)
-        if (!parsed.valid) {
-          throw new TypeError(parsed.issues.join('; '))
-        }
+      access(
+        async (db) => {
+          const parsed = parseSettings(settings)
+          if (!parsed.valid) {
+            throw new TypeError(parsed.issues.join('; '))
+          }
 
-        const transaction = db.transaction(['settings', 'meta'], 'readwrite')
-        await commitTransaction(transaction, async () => {
-          await assertDatasetEpoch(transaction, expectedEpoch)
-          await transaction
-            .objectStore('settings')
-            .put({ formatVersion: 1, ...parsed.value }, 'preferences')
-        })
-      }, true),
+          const transaction = db.transaction(['settings', 'meta'], 'readwrite')
+          await commitTransaction(transaction, async () => {
+            await assertDatasetEpoch(transaction, expectedEpoch)
+            await transaction
+              .objectStore('settings')
+              .put({ formatVersion: 1, ...parsed.value }, 'preferences')
+          })
+        },
+        { failureKind: 'write-failed' },
+      ),
     writeLessonProgress: (progress, expectedEpoch) =>
-      access(async (db) => {
-        const parsed = parseLessonProgress(progress)
-        if (!parsed.valid) {
-          throw new TypeError(parsed.issues.join('; '))
-        }
+      access(
+        async (db) => {
+          const parsed = parseLessonProgress(progress)
+          if (!parsed.valid) {
+            throw new TypeError(parsed.issues.join('; '))
+          }
 
-        const transaction = db.transaction(['lessons', 'meta'], 'readwrite')
-        await commitTransaction(transaction, async () => {
-          await assertDatasetEpoch(transaction, expectedEpoch)
-          await transaction.objectStore('lessons').put({ formatVersion: 1, ...parsed.value })
-        })
-      }, true),
+          const transaction = db.transaction(['lessons', 'meta'], 'readwrite')
+          await commitTransaction(transaction, async () => {
+            await assertDatasetEpoch(transaction, expectedEpoch)
+            await transaction.objectStore('lessons').put({ formatVersion: 1, ...parsed.value })
+          })
+        },
+        { failureKind: 'write-failed' },
+      ),
     removeQuarantined: () =>
-      access(async (db) => {
-        const transaction = db.transaction('quarantine', 'readwrite')
-        await commitTransaction(transaction, async () => {
-          await transaction.store.clear()
-        })
-      }, true),
+      access(
+        async (db) => {
+          const transaction = db.transaction('quarantine', 'readwrite')
+          await commitTransaction(transaction, async () => {
+            await transaction.store.clear()
+          })
+        },
+        { failureKind: 'write-failed' },
+      ),
   }
 }

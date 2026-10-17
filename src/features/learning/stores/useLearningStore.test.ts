@@ -21,7 +21,7 @@ it('captures the submitted answer before waiting for lesson content', async () =
   answer.cell = 80
   gate.resolve(LESSONS[0])
 
-  expect(await submitted).toMatchObject({ correct: true, advance: true, completed: false })
+  expect(await submitted).toMatchObject({ kind: 'advance' })
   test.dispose()
 })
 
@@ -72,9 +72,9 @@ it('rejects an answer until the durable exercise cursor is known', async () => {
   const test = await createTestRuntime()
   const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
 
-  const result = await learning.submitExercise('rules', LESSONS[0].exercise.expected, 0)
+  const result = await learning.submitExercise('rules', stageAnswer(LESSONS[0].guided).expected, 0)
 
-  expect(result).toMatchObject({ correct: false, advance: false, completed: false })
+  expect(result).toMatchObject({ kind: 'unavailable' })
   expect(await test.runtime.repository.readSettings()).toMatchObject({
     ok: true,
     value: DEFAULT_SETTINGS,
@@ -165,7 +165,7 @@ it('allows retries, persists progress once, and retains it across lesson selecti
   const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
   await learning.load()
 
-  expect((await learning.submitExercise('rules', { cell: 80, digit: 9 })).correct).toBe(false)
+  expect((await learning.submitExercise('rules', { cell: 80, digit: 9 })).kind).toBe('incorrect')
   expect(learning.progress).toHaveLength(0)
   for (const [index, stage] of lessonStages(LESSONS[0]).entries()) {
     await learning.submitExercise('rules', stageAnswer(stage).expected, index)
@@ -193,7 +193,7 @@ it('ignores an exercise completion that finishes after progress reset', async ()
 
     return { ok: true, value: undefined }
   }
-  await learning.submitExercise('rules', LESSONS[0].exercise.expected, 0)
+  await learning.submitExercise('rules', stageAnswer(LESSONS[0].guided).expected, 0)
   const submitting = learning.submitExercise(
     'rules',
     stageAnswer(lessonStages(LESSONS[0])[1]).expected,
@@ -246,8 +246,8 @@ it('resumes committed stages after reload while preserving old completion facts'
   ])
   expect(
     (await learning.submitExercise(lesson.id, stageAnswer(lessonStages(lesson)[0]).expected, 0))
-      .correct,
-  ).toBe(false)
+      .kind,
+  ).toBe('unavailable')
   test.dispose()
 })
 
@@ -264,13 +264,12 @@ it('retains a failed completion for retry and never announces it as committed', 
   })
   const failed = await learning.submitExercise('rules', stageAnswer(stages[1]).expected, 1)
 
-  expect(failed).toMatchObject({ correct: true, completed: false, advance: false })
+  expect(failed).toMatchObject({ kind: 'save-failed' })
   expect(learning.progress).toHaveLength(0)
   expect(learning.exerciseStage('rules')).toBe(1)
   test.runtime.repository.writeLessonProgress = write
   expect(await learning.submitExercise('rules', stageAnswer(stages[1]).expected, 1)).toMatchObject({
-    correct: true,
-    completed: true,
+    kind: 'completed',
   })
   expect(learning.progress).toHaveLength(1)
   test.dispose()
@@ -285,9 +284,10 @@ it('does not resume an optimistic stage after its settings transaction fails', a
     error: { kind: 'write-failed', message: 'fixture failure' },
   })
 
-  expect(await learning.submitExercise('rules', LESSONS[0].exercise.expected, 0)).toMatchObject({
-    correct: true,
-    advance: false,
+  expect(
+    await learning.submitExercise('rules', stageAnswer(LESSONS[0].guided).expected, 0),
+  ).toMatchObject({
+    kind: 'save-failed',
   })
   await learning.load()
   expect(learning.exerciseStage('rules')).toBe(0)
@@ -314,7 +314,31 @@ it('does not announce completion after a reset during stage-cursor cleanup', asy
   learning.reset()
   gate.resolve()
 
-  expect(await completing).toMatchObject({ completed: false })
+  expect(await completing).toMatchObject({ kind: 'cancelled' })
   expect(learning.progress).toEqual([])
+  test.dispose()
+})
+
+it('keeps durable completion when optional exercise-cursor cleanup fails', async () => {
+  const test = await createTestRuntime()
+  const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  await learning.load()
+  const stages = lessonStages(LESSONS[0])
+  await learning.submitExercise('rules', stageAnswer(stages[0]).expected, 0)
+  vi.spyOn(test.runtime.repository, 'writeSettings').mockResolvedValue({
+    ok: false,
+    error: { kind: 'write-failed', message: 'Injected cursor cleanup failure' },
+  })
+
+  const result = await learning.submitExercise('rules', stageAnswer(stages[1]).expected, 1)
+
+  expect(result).toMatchObject({ kind: 'completed' })
+  expect(learning.progress).toHaveLength(1)
+  expect(await test.runtime.repository.readLessonProgress()).toMatchObject({
+    ok: true,
+    value: [{ lessonId: 'rules' }],
+  })
+  expect(learning.exerciseStage('rules')).toBe(0)
+  expect(learning.error).toBeNull()
   test.dispose()
 })

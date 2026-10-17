@@ -1,13 +1,7 @@
 import type { Puzzle } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
-import { isBoard } from '@/sudoku/values'
-import {
-  isDifficulty,
-  isRecord,
-  isRulesShape,
-  PUZZLE_VERSION,
-  VARIANT_PUZZLE_VERSION,
-} from '@/sudoku/guards'
+import { isBoard, isDifficulty, isRecord } from '@/sudoku/values'
+import { isRulesShape, PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/sudoku/guards'
 import { copyRules } from '@/sudoku/ruleInput'
 
 export type PuzzleSnapshotResult =

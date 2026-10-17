@@ -32,6 +32,7 @@ beforeEach(async () => {
   vi.stubGlobal('matchMedia', () => media)
   test = await createTestRuntime()
 })
+
 afterEach(async () => {
   await flushPromises()
   test.dispose()

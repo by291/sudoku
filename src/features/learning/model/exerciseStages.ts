@@ -4,6 +4,10 @@ import type { PuzzleRules, Unit } from '@/sudoku/contracts'
 import { copyRules } from '@/sudoku/ruleInput'
 import type { LessonCalculation } from '@/sudoku/contracts'
 
+// Engine symmetry identifiers preserve the authored transfer geometry.
+const HALF_TURN_SYMMETRY = 2
+const TRANSPOSE_SYMMETRY = 7
+
 export type ExerciseAnswer =
   | { kind: 'placement'; expected: { cell: number; digit: Digit } }
   | { kind: 'elimination'; expected: readonly { cell: number; digit: Digit }[] }
@@ -146,7 +150,7 @@ export function transformStage(
       ? stage.rules
       : calculation.transformRules({
           rules: copyRules(stage.rules),
-          symmetry: transform === 'rotate' ? 2 : 7,
+          symmetry: transform === 'rotate' ? HALF_TURN_SYMMETRY : TRANSPOSE_SYMMETRY,
         })
   const step =
     stage.step.kind === 'placement'

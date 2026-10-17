@@ -482,3 +482,71 @@ it('does not roll an older page number into a new failing variant query', async 
   records.dispose()
   test.dispose()
 })
+
+it('starts a backup file selection by clearing only its preview and file error channel', async () => {
+  const test = await createTestRuntime()
+  const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
+  const text = JSON.stringify({
+    backupVersion: 1,
+    exportedAt: '2026-10-14T03:00:00.000Z',
+    sessions: [],
+    results: [],
+    lessons: [],
+    settings: DEFAULT_SETTINGS,
+  })
+  await records.previewRestore(text)
+  records.error = 'Existing record read failure'
+  records.notice = 'Existing backup notice'
+
+  records.reportBackupFileError('too-large')
+
+  expect(records.backupError).toBe('备份文件超过 25 MiB，本机数据没有改变。')
+  records.beginBackupFileSelection()
+
+  expect(records.backupError).toBeNull()
+  expect(records.backupPreview).toBeNull()
+  expect(records.error).toBe('Existing record read failure')
+  expect(records.notice).toBe('Existing backup notice')
+  await records.restoreBackup()
+  expect(await test.database.get('meta', 'epoch')).toBe(1)
+
+  records.reportBackupFileError('unreadable')
+  expect(records.backupError).toBe('备份文件读取失败，请重新选择文件。')
+  records.dispose()
+  test.dispose()
+})
+
+it('does not publish an obsolete save failure into a newer backup after dataset replacement', async () => {
+  const test = await createTestRuntime()
+  const listeners: ((notice: OwnershipNotice) => void)[] = []
+  vi.spyOn(test.runtime.ownership, 'subscribe').mockImplementation((listener) => {
+    listeners.push(listener)
+    return () => {}
+  })
+  const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
+  const game = test.app.runWithContext(() => useGameStore(test.pinia))
+  const saving = deferred<boolean>()
+  vi.spyOn(game, 'prepareBackup').mockReturnValueOnce(saving.promise)
+
+  const exporting = records.exportBackup()
+  for (const listener of listeners) {
+    listener({ kind: 'reset', epoch: 2 })
+  }
+  await vi.waitFor(() => expect(records.busy).toBe(false))
+  const readiness = deferred<void>()
+  vi.spyOn(test.runtime, 'ensureEngine').mockReturnValueOnce(readiness.promise)
+  const previewing = records.previewRestore('{}')
+  saving.resolve(false)
+  await exporting
+
+  expect(records.backupError).toBeNull()
+  expect(records.busy).toBe(true)
+  readiness.resolve()
+  await previewing
+
+  expect(records.backupError).toContain('备份文件无效')
+  expect(records.busy).toBe(false)
+  records.dispose()
+  game.dispose()
+  test.dispose()
+})

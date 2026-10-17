@@ -98,7 +98,7 @@ let referenceEngine: Promise<unknown> | null = null
 
 /** Compare transport with the frozen independent TS engine using its isolated v11 byte recipe. */
 export async function generateReference(input: import('@/sudoku/generationInput').GenerationInput) {
-  const { isRecord } = await import('@/sudoku/guards')
+  const { isRecord } = await import('@/sudoku/values')
   if (!referenceEngine) {
     referenceEngine = (async () => {
       const url = new URL('../migration/reference-loader.mjs', import.meta.url).href

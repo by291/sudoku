@@ -38,10 +38,20 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
     ['src/shared/components/Fixture.vue', '@/worker/client'],
     ['src/shared/components/Fixture.vue', '@/runtime'],
     ['src/features/game/model/fixture.ts', '@/ReadyApplication.vue'],
-    ['src/shared/components/Fixture.vue', '@/EngineBootstrapState.vue'],
+    ['src/shared/components/Fixture.vue', '@/ApplicationBootstrapState.vue'],
+    ['src/shared/components/Fixture.vue', 'idb'],
+    ['src/shared/model/fixture.ts', 'idb'],
     ['src/shared/components/Fixture.vue', '@/sudoku/mainEngine'],
     ['src/shared/model/fixture.ts', '@/sudoku/wasmModule'],
     ['src/shared/components/Fixture.vue', '@sudoku/wasm'],
+    ['src/features/records/model/fixture.ts', 'pinia'],
+    ['src/features/records/model/fixture.ts', '@/storage/readModels'],
+    ['src/features/records/model/fixture.ts', '@/storage/records'],
+    ...['game', 'learning', 'settings', 'records'].flatMap((feature) => [
+      [`src/features/${feature}/model/nested/fixture.ts`, 'vue'],
+      [`src/features/${feature}/model/nested/fixture.ts`, '@/storage/repository'],
+      [`src/features/${feature}/model/nested/fixture.ts`, '@/features/game/stores/useGameStore'],
+    ]),
     ['src/features/game/model/fixture.ts', 'pinia'],
     ['src/features/game/model/fixture.ts', '@/sudoku/mainEngine'],
     ['src/features/game/model/fixture.ts', '@/sudoku/workerEngine'],
@@ -70,6 +80,10 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
     ['src/features/game/model/fixture.ts', '@/sudoku/seed'],
     ['src/features/game/model/fixture.ts', '@/sudoku/ruleInput'],
     ['src/features/records/model/fixture.ts', '@/features/game/model/session'],
+    ...['game', 'learning', 'settings', 'records'].map((feature) => [
+      `src/features/${feature}/model/nested/fixture.ts`,
+      '@/sudoku/values',
+    ]),
     ['src/runtime.ts', '@/features/game/model/session'],
     ['src/runtime.ts', '@/storage/ownership'],
     ['src/runtime.ts', '@/worker/client'],
@@ -81,6 +95,33 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
   ])('allows %s importing %s', async (filePath, target) => {
     expect(await boundaryMessages(filePath, target, kind)).toEqual([])
   })
+})
+
+it.each(['game', 'learning', 'settings', 'records'])(
+  'allows explicit persisted type contracts in recursive %s models',
+  async (feature) => {
+    const [result] = await lint.lintText(
+      `import type { GameSummary } from '@/storage/readModels'
+       import type { SessionRecord } from '@/storage/records'
+       export type SummaryRecord = { summary: GameSummary; record: SessionRecord }`,
+      { filePath: `src/features/${feature}/model/nested/fixture.ts` },
+    )
+
+    expect(result.messages).toEqual([])
+  },
+)
+
+it('keeps arbitrary storage and reactive contracts outside pure models even when erased', async () => {
+  const [result] = await lint.lintText(
+    `import type { GameRepository } from '@/storage/repository'
+     import type { Ref } from 'vue'
+     export type InvalidDependency = { repository: GameRepository; state: Ref<number> }`,
+    { filePath: 'src/features/records/model/nested/fixture.ts' },
+  )
+
+  expect(
+    result.messages.filter((message) => message.ruleId === 'no-restricted-imports'),
+  ).toHaveLength(2)
 })
 
 it('keeps browser globals out of pure Sudoku contracts', async () => {

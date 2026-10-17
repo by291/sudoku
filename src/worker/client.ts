@@ -3,7 +3,8 @@ import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
 import type { AssessmentInput, LiveAssessmentOutcome } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
-import { BRIDGE_VERSION, isRecord } from '@/sudoku/guards'
+import { BRIDGE_VERSION } from '@/sudoku/guards'
+import { isRecord } from '@/sudoku/values'
 import { copyGenerationInput } from '@/sudoku/generationInput'
 import type { GenerationInput } from '@/sudoku/generationInput'
 import { copyRules } from '@/sudoku/ruleInput'
@@ -22,6 +23,7 @@ const GENERATION_TIMEOUT_MILLISECONDS = 3000
 const COMPUTATION_TIMEOUT_MILLISECONDS = 15000
 
 type StartupResult = { status: 'ready' } | { status: 'failed'; message: string }
+
 interface PreparedWorker {
   worker: Worker
   phase: 'initializing' | 'ready' | 'failed'
@@ -81,6 +83,7 @@ export function createSudokuWorkerClient(
         if (terminated) {
           return
         }
+
         terminated = true
         worker.removeEventListener('message', control)
         worker.removeEventListener('error', startupError)
@@ -96,19 +99,23 @@ export function createSudokuWorkerClient(
         settle(result)
       }
     }
+
     function failStartup(message: string) {
       prepared.phase = 'failed'
       prepared.failure = message
       finishStartup({ status: 'failed', message })
       prepared.terminate()
     }
+
     function startupError(event: ErrorEvent) {
       failStartup(event.message || 'Worker failed to start')
     }
+
     function control(event: MessageEvent<unknown>) {
       if (!isRecord(event.data)) {
         return
       }
+
       if (event.data.kind === 'initialization-failed' && typeof event.data.message === 'string') {
         failStartup(event.data.message)
       } else if (event.data.kind === 'ready') {
@@ -116,6 +123,7 @@ export function createSudokuWorkerClient(
           failStartup('Worker engine bridge mismatch')
           return
         }
+
         prepared.phase = 'ready'
         worker.removeEventListener('message', control)
         finishStartup({ status: 'ready' })
@@ -133,6 +141,7 @@ export function createSudokuWorkerClient(
     } catch (error: unknown) {
       failStartup(error instanceof Error ? error.message : 'Could not initialize worker')
     }
+
     return prepared
   }
 
@@ -140,6 +149,7 @@ export function createSudokuWorkerClient(
     if (disposed || preparedWorker || preparationFailure) {
       return
     }
+
     try {
       preparedWorker = createPreparedWorker()
     } catch (error: unknown) {
@@ -151,13 +161,16 @@ export function createSudokuWorkerClient(
     if (preparedWorker) {
       const prepared = preparedWorker
       preparedWorker = null
+
       return prepared
     }
+
     if (preparationFailure) {
       const message = preparationFailure
       preparationFailure = null
       throw new Error(message)
     }
+
     return createPreparedWorker()
   }
 
@@ -170,6 +183,7 @@ export function createSudokuWorkerClient(
     if (disposed || signal?.aborted) {
       return Promise.resolve({ status: 'cancelled' })
     }
+
     return new Promise((resolve) => {
       let prepared: PreparedWorker
       try {
@@ -182,6 +196,7 @@ export function createSudokuWorkerClient(
         prepareWorker()
         return
       }
+
       const worker = prepared.worker
       let settled = false
       // The original deadline includes initialization; readiness never resets this timer.
@@ -192,6 +207,7 @@ export function createSudokuWorkerClient(
         if (settled) {
           return
         }
+
         settled = true
         window.clearTimeout(timeout)
         signal?.removeEventListener('abort', cancel)
@@ -202,10 +218,12 @@ export function createSudokuWorkerClient(
         resolve(outcome)
         prepareWorker()
       }
+
       function receive(event: MessageEvent<unknown>) {
         if (!isRecord(event.data) || event.data.requestId !== request.requestId) {
           return
         }
+
         try {
           finish(
             decode(event.data) ?? { status: 'failed', message: 'Worker returned malformed data' },
@@ -217,9 +235,11 @@ export function createSudokuWorkerClient(
           })
         }
       }
+
       function fail(event: ErrorEvent) {
         finish({ status: 'failed', message: event.message || 'Worker failed' })
       }
+
       function send() {
         if (settled) {
           return
@@ -228,6 +248,7 @@ export function createSudokuWorkerClient(
           finish({ status: 'failed', message: prepared.failure })
           return
         }
+
         try {
           worker.postMessage(request)
         } catch (error: unknown) {
@@ -242,17 +263,21 @@ export function createSudokuWorkerClient(
       signal?.addEventListener('abort', cancel, { once: true })
       worker.addEventListener('message', receive)
       worker.addEventListener('error', fail)
+
       if (signal?.aborted) {
         cancel()
         return
       }
+
       if (prepared.phase === 'ready' || prepared.failure) {
         send()
       } else {
         void prepared.ready.then((result) => {
+          // Cancellation terminates this owner; a late ready reply must not send its job.
           if (settled) {
             return
           }
+
           if (result.status === 'ready') {
             send()
           } else {
@@ -269,6 +294,7 @@ export function createSudokuWorkerClient(
   return {
     conflicts(board, rules, signal) {
       const snapshot = { board: [...board], rules: copyRules(rules) }
+
       return run(
         { kind: 'conflicts', requestId: crypto.randomUUID(), ...snapshot },
         (value) => {
@@ -286,6 +312,7 @@ export function createSudokuWorkerClient(
         notes: [...input.notes],
         rules: copyRules(input.rules),
       }
+
       return run(
         { kind: 'generate-notes', requestId: crypto.randomUUID(), input: snapshot },
         (value) => {
@@ -299,6 +326,7 @@ export function createSudokuWorkerClient(
     },
     generate(input, signal) {
       const snapshot = copyGenerationInput(input)
+
       return run(
         { kind: 'generate', requestId: crypto.randomUUID(), input: snapshot },
         (value) => {
@@ -306,6 +334,7 @@ export function createSudokuWorkerClient(
           if (!parsed.valid || parsed.value.kind !== 'generate') {
             return null
           }
+
           const outcome = parsed.value.outcome
           if (
             outcome.status === 'completed' &&
@@ -316,6 +345,7 @@ export function createSudokuWorkerClient(
           ) {
             return null
           }
+
           return outcome
         },
         signal,
@@ -329,6 +359,7 @@ export function createSudokuWorkerClient(
         rules: copyRules(input.rules),
         limits: { ...input.limits },
       }
+
       return run(
         { kind: 'assess', requestId: crypto.randomUUID(), input: snapshot },
         (value) => {
@@ -336,6 +367,7 @@ export function createSudokuWorkerClient(
           if (!parsed.valid || parsed.value.kind !== 'assess') {
             return null
           }
+
           const outcome = parsed.value.outcome
           if (outcome.status === 'completed' && outcome.value.status !== 'invalid') {
             const identity =
@@ -347,6 +379,7 @@ export function createSudokuWorkerClient(
               return null
             }
           }
+
           return outcome
         },
         signal,
@@ -354,6 +387,7 @@ export function createSudokuWorkerClient(
     },
     hint(board, solution, rules, signal) {
       const snapshot = { board: [...board], solution: [...solution], rules: copyRules(rules) }
+
       return run(
         { kind: 'hint', requestId: crypto.randomUUID(), ...snapshot },
         (value) => {
@@ -361,10 +395,12 @@ export function createSudokuWorkerClient(
           if (!parsed.valid || parsed.value.kind !== 'hint') {
             return null
           }
+
           const outcome = parsed.value.outcome
           if (outcome.status !== 'completed') {
             return outcome
           }
+
           const hint = validateHintEvidence(outcome.value, snapshot.rules, snapshot.board, engine)
           return hint.valid ? { status: 'completed', value: hint.value } : null
         },
@@ -375,10 +411,12 @@ export function createSudokuWorkerClient(
       if (disposed) {
         return
       }
+
       disposed = true
       preparedWorker?.terminate()
       preparedWorker = null
       preparationFailure = null
+
       for (const cancel of [...cancellations]) {
         cancel()
       }

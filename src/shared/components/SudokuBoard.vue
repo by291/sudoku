@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, useTemplateRef, watch, nextTick } from 'vue'
-import type { Board, NoteMask } from '@/sudoku/contracts'
+import type { Board, Digit, NoteMask } from '@/sudoku/contracts'
 import { DIGITS } from '@/sudoku/values'
 import { digitsIn } from '@/shared/model/sudokuPresentation'
 import type { PuzzleRules } from '@/sudoku/contracts'
@@ -25,7 +25,6 @@ const props = withDefaults(
   { showSelectedRules: true },
 )
 const emit = defineEmits<{ select: [cell: number] }>()
-const root = useTemplateRef<HTMLDivElement>('root')
 const geometry = computed(() => getBoardGeometry(props.rules))
 const cageAnchors = computed(
   () =>
@@ -37,6 +36,103 @@ const notePositions = DIGITS.map((digit) => ({
 }))
 // Selection changes must not rebuild candidate lists or their fixed 3-by-3 positions.
 const noteDigits = computed(() => props.notes.map(digitsIn))
+
+type CellLabelInput = {
+  cell: number
+  value: number
+  given: boolean
+  notes: readonly Digit[]
+  conflicting: boolean
+  highlighted: boolean
+  obscured: boolean
+  rules: PuzzleRules
+}
+
+function cellLabel({
+  cell,
+  value,
+  given,
+  notes,
+  conflicting,
+  highlighted,
+  obscured,
+  rules,
+}: CellLabelInput): string {
+  const row = Math.floor(cell / 9)
+  const column = cell % 9
+  const descriptions = [`第${row + 1}行第${column + 1}列`]
+  if (obscured) {
+    descriptions.push('已暂停')
+  } else {
+    if (value) {
+      descriptions.push(`数字${value}`)
+      if (given) {
+        descriptions.push('题目给定')
+      }
+    } else {
+      descriptions.push('空格')
+      if (notes.length) {
+        descriptions.push(`笔记${notes.join('、')}`)
+      }
+    }
+
+    if (conflicting) {
+      descriptions.push('冲突，请检查')
+    }
+
+    if (highlighted) {
+      descriptions.push('提示位置')
+    }
+
+    const ruleContext = getCellRuleContext(cell, rules)
+    if (ruleContext) {
+      descriptions.push(ruleContext)
+    }
+  }
+
+  return descriptions.join('，')
+}
+
+const cells = computed(() =>
+  props.board.map((value, cell) => {
+    const given = props.givens[cell] !== 0
+    const row = Math.floor(cell / 9)
+    const column = cell % 9
+    const notes = noteDigits.value[cell]
+    const conflicting = props.conflicts.includes(cell)
+    const highlighted = props.hintCells.includes(cell)
+
+    return {
+      cell,
+      value,
+      given,
+      label: cellLabel({
+        cell,
+        value,
+        given,
+        notes,
+        conflicting,
+        highlighted,
+        obscured: props.obscured,
+        rules: props.rules,
+      }),
+      notes,
+      conflicting,
+      highlighted,
+      selected: cell === props.selectedCell,
+      peer: props.relatedCells.includes(cell),
+      matching:
+        props.selectedCell !== null &&
+        props.board[props.selectedCell] !== 0 &&
+        value === props.board[props.selectedCell],
+      boxRight: props.rules.kind !== 'jigsaw' && (column === 2 || column === 5),
+      boxBottom: props.rules.kind !== 'jigsaw' && (row === 2 || row === 5),
+      cageAnchor: cageAnchors.value.has(cell),
+    }
+  }),
+)
+
+const root = useTemplateRef<HTMLDivElement>('root')
 
 function navigate(event: KeyboardEvent, cell: number) {
   if (props.disabled || props.obscured || event.ctrlKey || event.metaKey || event.altKey) {
@@ -67,64 +163,6 @@ function navigate(event: KeyboardEvent, cell: number) {
   emit('select', next)
 }
 
-const cells = computed(() =>
-  props.board.map((value, cell) => {
-    const given = props.givens[cell] !== 0
-    const row = Math.floor(cell / 9)
-    const column = cell % 9
-    const notes = noteDigits.value[cell]
-    const conflicting = props.conflicts.includes(cell)
-    const highlighted = props.hintCells.includes(cell)
-    const descriptions = [`第${row + 1}行第${column + 1}列`]
-    if (props.obscured) {
-      descriptions.push('已暂停')
-    } else {
-      if (value) {
-        descriptions.push(`数字${value}`)
-        if (given) {
-          descriptions.push('题目给定')
-        }
-      } else {
-        descriptions.push('空格')
-        if (notes.length) {
-          descriptions.push(`笔记${notes.join('、')}`)
-        }
-      }
-
-      if (conflicting) {
-        descriptions.push('冲突，请检查')
-      }
-
-      if (highlighted) {
-        descriptions.push('提示位置')
-      }
-
-      const ruleContext = getCellRuleContext(cell, props.rules)
-      if (ruleContext) {
-        descriptions.push(ruleContext)
-      }
-    }
-
-    return {
-      cell,
-      value,
-      given,
-      label: descriptions.join('，'),
-      notes,
-      conflicting,
-      highlighted,
-      selected: cell === props.selectedCell,
-      peer: props.relatedCells.includes(cell),
-      matching:
-        props.selectedCell !== null &&
-        props.board[props.selectedCell] !== 0 &&
-        value === props.board[props.selectedCell],
-      boxRight: props.rules.kind !== 'jigsaw' && (column === 2 || column === 5),
-      boxBottom: props.rules.kind !== 'jigsaw' && (row === 2 || row === 5),
-      cageAnchor: cageAnchors.value.has(cell),
-    }
-  }),
-)
 watch(
   () => props.selectedCell,
   async () => {
@@ -135,6 +173,7 @@ watch(
   },
 )
 </script>
+
 <template>
   <div class="sudoku-widget">
     <div ref="root" class="sudoku-board" role="group" aria-label="数独棋盘">
@@ -182,6 +221,7 @@ watch(
     />
   </div>
 </template>
+
 <style scoped>
 .sudoku-board {
   position: relative;
