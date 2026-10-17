@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.yigeyinian.sudoku.design.InitialDialogFocus
+import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.difficultyLabel
 import dev.yigeyinian.sudoku.designsystem.formatElapsedTime
 import dev.yigeyinian.sudoku.designsystem.variantLabel
@@ -92,6 +93,7 @@ internal fun GameSetupSheet(
         it.session.mode == GameMode.FREE && it.session.puzzle.rules.variant == variant && it.session.completion == null
     }
     val ready = !state.loading && state.error == null
+    val showLoading = rememberDelayedProgress(state.loading)
     val dailyStatus = state.dailyStatus(variant)
     val startLabel = if (daily) {
         when (dailyStatus) {
@@ -240,7 +242,7 @@ internal fun GameSetupSheet(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 enabled = ready,
                 shape = RoundedCornerShape(14.dp)
-            ) { Text(if (state.loading) "读取中…" else startLabel) }
+            ) { Text(if (showLoading) "读取中…" else startLabel) }
         }
         InitialDialogFocus(closeFocus)
     }

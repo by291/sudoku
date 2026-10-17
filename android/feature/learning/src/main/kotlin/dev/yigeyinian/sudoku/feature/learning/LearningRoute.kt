@@ -28,6 +28,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.variantLabel
 import dev.yigeyinian.sudoku.model.Variant
 import dev.yigeyinian.sudoku.model.learning.Lesson
@@ -49,6 +50,7 @@ internal fun LearningScreen(
     onOpenLesson: (String) -> Unit,
     onRetry: () -> Unit
 ) {
+    val showLoading = rememberDelayedProgress(state.loading)
     val lessons = state.catalogue?.lessons.orEmpty()
     val completed = state.completedIds.intersect(lessons.map { it.id }.toSet())
     val course = lessons.filter { it.practiceVariant == state.selectedVariant }
@@ -79,7 +81,7 @@ internal fun LearningScreen(
             }
         }
         if (state.loading) {
-            item { CircularProgressIndicator() }
+            if (showLoading) item { CircularProgressIndicator() }
         } else if (state.error != null) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -73,6 +73,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.yigeyinian.sudoku.design.InitialDialogFocus
+import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.NumberPad
 import dev.yigeyinian.sudoku.designsystem.SudokuBoard
 import dev.yigeyinian.sudoku.designsystem.difficultyLabel
@@ -90,6 +91,7 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
     val model: GameViewModel = hiltViewModel()
     val state by model.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val showPreparation = rememberDelayedProgress(state.phase == GamePhase.PREPARING)
     var menuOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var restartOpen by remember { mutableStateOf(false) }
@@ -243,7 +245,7 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (state.phase == GamePhase.PREPARING) {
+                if (showPreparation) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -455,16 +457,21 @@ private fun BoardWorkspace(state: GameUiState, onSelect: (Int) -> Unit, onResume
 
 @Composable
 private fun BoardStatus(state: GameUiState) {
+    val showConflicts = rememberDelayedProgress(state.conflictPending)
+    val showNotes = rememberDelayedProgress(state.notesPending)
+    val showHint = rememberDelayedProgress(state.hintPending)
+
     Row(
         Modifier.fillMaxWidth().padding(bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val daily = state.session?.metadata as? SessionMetadata.Daily
-        // Conflict checks run after every edit; reuse this line so centered controls never shift.
-        val status = if (state.conflictPending) {
-            "正在检查当前棋盘规则…"
-        } else {
-            daily?.let { "${it.challengeDate} · ${if (it.formalAttempt) "正式挑战" else "每日练习"}" }.orEmpty()
+        // Reuse one line for analysis feedback so centered controls never shift.
+        val status = when {
+            showNotes -> "正在生成候选数；继续填写会取消本次计算。"
+            showHint -> "正在寻找可验证的逻辑推理…"
+            showConflicts -> "正在检查当前棋盘规则…"
+            else -> daily?.let { "${it.challengeDate} · ${if (it.formalAttempt) "正式挑战" else "每日练习"}" }.orEmpty()
         }
         Text(
             status,

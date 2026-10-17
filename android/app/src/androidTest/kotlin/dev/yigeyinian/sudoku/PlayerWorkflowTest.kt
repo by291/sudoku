@@ -151,6 +151,35 @@ class PlayerWorkflowTest {
     }
 
     @Test
+    fun doesNotFlashProgressForAQuickConflictCheck() {
+        compose.onNodeWithText("继续上次").performClick()
+        awaitText("继续对局")
+        compose.onNodeWithText("继续对局").performClick()
+        compose.onNodeWithTag("cell-0").performClick()
+        compose.waitUntil(20_000) {
+            compose.onAllNodesWithText("正在检查当前棋盘规则…").fetchSemanticsNodes().isEmpty()
+        }
+        val gate = CompletableDeferred<Unit>()
+        controlledEngine.conflictGate = gate
+        compose.mainClock.autoAdvance = false
+
+        try {
+            compose.onNodeWithContentDescription("填入数字2").performClick()
+            compose.waitUntil(20_000) { controlledEngine.conflictHeld }
+            compose.mainClock.advanceTimeBy(100)
+            awaitDescription("第1行第1列，数字2", substring = true)
+            compose.onNodeWithText("正在检查当前棋盘规则…").assertDoesNotExist()
+        } finally {
+            gate.complete(Unit)
+            controlledEngine.conflictGate = null
+            compose.mainClock.autoAdvance = true
+        }
+        awaitDescription("冲突", substring = true)
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithText("正在检查当前棋盘规则…").assertDoesNotExist()
+    }
+
+    @Test
     fun keepsBoardAndKeysStationaryWhileCheckingAnIncorrectEntry() {
         compose.onNodeWithText("继续上次").performClick()
         awaitText("继续对局")
@@ -396,12 +425,17 @@ class PlayerWorkflowTest {
 private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEngine()) : SudokuEngine by native {
     @Volatile var conflictGate: CompletableDeferred<Unit>? = null
 
+    @Volatile var conflictHeld: Boolean = false
+
     override suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle> =
         when (val result = native.prepare(rules)) {
             is EngineOutcome.Completed -> EngineOutcome.Completed(
                 object : PreparedPuzzle by result.value {
                     override suspend fun conflicts(board: List<Int>) = run {
-                        conflictGate?.await()
+                        conflictGate?.let {
+                            conflictHeld = true
+                            it.await()
+                        }
                         result.value.conflicts(board)
                     }
                 },

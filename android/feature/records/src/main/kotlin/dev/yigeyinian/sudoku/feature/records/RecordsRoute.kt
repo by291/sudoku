@@ -4,10 +4,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -38,10 +41,12 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.yigeyinian.sudoku.design.InitialDialogFocus
+import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.difficultyLabel
 import dev.yigeyinian.sudoku.designsystem.formatElapsedTime
 import dev.yigeyinian.sudoku.designsystem.variantLabel
@@ -157,6 +162,8 @@ internal fun RecordsScreen(
     var clearConfirmation by rememberSaveable { mutableStateOf(false) }
     var cleanupConfirmation by rememberSaveable { mutableStateOf(false) }
     val available = !state.loading && !state.busy && state.epoch != null
+    val showLoading = rememberDelayedProgress(state.loading)
+    val showBusy = rememberDelayedProgress(state.busy)
     val summary = state.summary
     val saved = state.sessions.filter { it.session.puzzle.rules.variant == state.variant }
     val completed = state.results.filter {
@@ -169,13 +176,31 @@ internal fun RecordsScreen(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 24.dp)
     ) {
         item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "我的记录",
+                    Modifier.weight(1f).semantics { heading() },
+                    style = MaterialTheme.typography.headlineLarge
+                )
+                Box(Modifier.size(24.dp)) {
+                    if (showLoading || showBusy) {
+                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
+                }
+            }
+        }
+        item {
             Text(
-                "我的记录",
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.semantics { heading() }
+                when {
+                    showLoading -> "正在读取记录…"
+                    showBusy -> "正在处理，请稍候…"
+                    else -> "每一次专注，都值得被记住。"
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        item { Text("每一次专注，都值得被记住。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item {
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
@@ -187,14 +212,6 @@ internal fun RecordsScreen(
                         onClick = { onVariant(variant) },
                         label = { Text(variantLabel(variant)) }
                     )
-                }
-            }
-        }
-        if (state.loading || state.busy) {
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CircularProgressIndicator()
-                    Text(if (state.loading) "正在读取记录…" else "正在处理，请稍候…")
                 }
             }
         }

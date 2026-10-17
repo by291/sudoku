@@ -26,6 +26,7 @@ import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.YigeTheme
 import dev.yigeyinian.sudoku.feature.learning.LearningRoute
 import dev.yigeyinian.sudoku.feature.learning.LessonRoute
@@ -74,6 +75,8 @@ internal fun SudokuApp(activity: MainActivity) {
         if (state.ready) model.reloadSettings()
     }
 
+    val showStartupProgress = rememberDelayedProgress(!state.ready && state.loading)
+
     YigeTheme(state.settings.theme) {
         val lightBackground = MaterialTheme.colorScheme.background.luminance() > 0.5f
         SideEffect { activity.setSystemBarAppearance(lightBackground) }
@@ -84,8 +87,10 @@ internal fun SudokuApp(activity: MainActivity) {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (state.loading) CircularProgressIndicator()
-                    Text(state.error ?: "正在准备数独计算组件…", Modifier.padding(vertical = 24.dp))
+                    if (showStartupProgress) CircularProgressIndicator()
+                    if (state.error != null || showStartupProgress) {
+                        Text(state.error ?: "正在准备数独计算组件…", Modifier.padding(vertical = 24.dp))
+                    }
                     if (!state.loading) Button(onClick = model::retry) { Text("重试") }
                 }
             } else {

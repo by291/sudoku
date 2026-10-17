@@ -51,6 +51,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.NumberPad
 import dev.yigeyinian.sudoku.designsystem.SudokuBoard
 import dev.yigeyinian.sudoku.designsystem.difficultyLabel
@@ -95,6 +96,7 @@ internal fun LessonScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit
 ) {
+    val showLoading = rememberDelayedProgress(state.loading)
     val lesson = state.lesson
     var zoomed by remember(state.lessonId) { mutableStateOf(false) }
     val stage = if (state.exerciseStarted) state.stage else lesson?.guided
@@ -136,7 +138,7 @@ internal fun LessonScreen(
     ) {
         TextButton(onClick = onBack, enabled = !state.busy) { Text("返回课程") }
         if (state.loading) {
-            CircularProgressIndicator()
+            if (showLoading) CircularProgressIndicator()
         } else if (lesson == null || stage == null) {
             Text(state.error ?: "找不到这节课程。", color = MaterialTheme.colorScheme.error)
             OutlinedButton(onClick = onRetry) { Text("重新读取课程") }
@@ -263,6 +265,7 @@ private fun LessonActions(
     onPractice: (GameLaunch.Practice) -> Unit
 ) {
     val lesson = state.lesson ?: return
+    val showSaving = rememberDelayedProgress(state.busy)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedButton(onClick = onZoom, modifier = Modifier.fillMaxWidth(), enabled = !state.busy) { Text("放大棋盘") }
         if (state.exerciseStarted) {
@@ -293,7 +296,7 @@ private fun LessonActions(
                         onClick = onSubmit,
                         enabled = !state.busy,
                         modifier = Modifier.weight(1f).testTag("submit-answer")
-                    ) { Text(if (state.busy) "正在保存…" else "提交答案") }
+                    ) { Text(if (showSaving) "正在保存…" else "提交答案") }
                 }
             }
             state.feedback?.let { feedback ->

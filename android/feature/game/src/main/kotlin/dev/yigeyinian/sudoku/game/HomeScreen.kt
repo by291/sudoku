@@ -42,8 +42,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 
 /** Home owns the entry hierarchy; setup, resume selection, and navigation stay in the route. */
 @Composable
@@ -117,6 +119,7 @@ private fun HomeHero(
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
+    val showLoading = rememberDelayedProgress(state.loading)
 
     Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = colors.primaryContainer) {
         Column(
@@ -170,14 +173,12 @@ private fun HomeHero(
             }
 
             when {
-                state.loading -> Row(
-                    Modifier.heightIn(min = 52.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text("正在读取存档…", style = MaterialTheme.typography.bodyMedium)
-                }
+                state.loading -> StartButton(
+                    onStart,
+                    Modifier.fillMaxWidth(),
+                    enabled = false,
+                    showLoading = showLoading
+                )
                 state.error != null -> Column {
                     Text(state.error, color = colors.error, style = MaterialTheme.typography.bodyMedium)
                     TextButton(onClick = onRetry) { Text("重新读取存档") }
@@ -200,16 +201,31 @@ private fun HomeHero(
 }
 
 @Composable
-private fun StartButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun StartButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    showLoading: Boolean = false
+) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.heightIn(min = 52.dp),
         shape = RoundedCornerShape(14.dp),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Text("开始数独", style = MaterialTheme.typography.titleSmall)
+        Text(
+            if (showLoading) "正在读取存档…" else "开始数独",
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
         Spacer(Modifier.width(8.dp))
-        Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
+        if (showLoading) {
+            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(18.dp))
+        }
     }
 }
 

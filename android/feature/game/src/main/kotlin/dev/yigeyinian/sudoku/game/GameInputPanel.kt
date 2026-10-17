@@ -125,8 +125,6 @@ internal fun GameInputPanel(
             onDigit = model::enterDigit,
             onNote = model::toggleNote
         )
-        if (state.notesPending) Text("正在生成候选数；继续填写会取消本次计算。", style = MaterialTheme.typography.bodySmall)
-        if (state.hintPending) Text("正在寻找可验证的逻辑推理…", style = MaterialTheme.typography.bodySmall)
         state.save.failure?.let { failure ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
