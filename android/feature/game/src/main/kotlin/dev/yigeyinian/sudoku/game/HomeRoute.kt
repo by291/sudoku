@@ -1,28 +1,14 @@
 package dev.yigeyinian.sudoku.game
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.yigeyinian.sudoku.designsystem.formatElapsedTime
-import dev.yigeyinian.sudoku.designsystem.variantLabel
 import dev.yigeyinian.sudoku.model.GameLaunch
-import dev.yigeyinian.sudoku.model.variant
 import kotlinx.coroutines.delay
 
 @Composable
@@ -78,29 +64,13 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
         })
     }
     if (continueOpen) {
-        AlertDialog(
-            onDismissRequest = { continueOpen = false },
-            title = { Text("继续存档") },
-            text = {
-                Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    saves.forEach { record ->
-                        OutlinedButton(onClick = {
-                            continueOpen = false
-                            onPlay(GameLaunch.Resume(record.session.id))
-                        }, Modifier.fillMaxWidth()) {
-                            Text(
-                                "${variantLabel(
-                                    record.session.puzzle.rules.variant
-                                )} · ${formatElapsedTime(record.session.elapsedMs)}"
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { continueOpen = false }) { Text("取消") } }
+        ContinueGameSheet(
+            saves = saves.map { it.session },
+            onDismiss = { continueOpen = false },
+            onResume = {
+                continueOpen = false
+                onPlay(GameLaunch.Resume(it))
+            }
         )
     }
 }

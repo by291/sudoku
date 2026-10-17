@@ -2,6 +2,7 @@ package dev.yigeyinian.sudoku
 
 import android.graphics.Bitmap
 import androidx.activity.BackEventCompat
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -9,8 +10,10 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -19,6 +22,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.platform.app.InstrumentationRegistry
@@ -39,7 +44,9 @@ import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.SudokuEngine
 import dev.yigeyinian.sudoku.model.Validation
+import dev.yigeyinian.sudoku.model.Variant
 import dev.yigeyinian.sudoku.model.createSession
+import dev.yigeyinian.sudoku.model.dailyFormalId
 import dev.yigeyinian.sudoku.runtime.EngineModule
 import java.io.File
 import javax.inject.Inject
@@ -579,6 +586,75 @@ class PlayerWorkflowTest {
 
         compose.onNodeWithTag("lesson-board").assertIsDisplayed()
         compose.onNodeWithTag("cell-0").assertExists()
+    }
+
+    @Test
+    fun multipleSavesExposeTheirIdentityAndResumeTheChosenGame() {
+        activity?.close()
+        runBlocking {
+            val original = (repository.listSessions() as StorageOutcome.Success).value.single().session
+            val daily = createSession(
+                original.puzzle.copy(difficulty = Difficulty.MEDIUM),
+                SessionMetadata.Daily("2026-10-15", true),
+                dailyFormalId("2026-10-15", Variant.CLASSIC),
+                "2026-10-15T06:20:00.000Z"
+            ).copy(elapsedMs = 512_000)
+            val lesson = createSession(
+                original.puzzle,
+                SessionMetadata.Learning("rules"),
+                "saved-lesson-practice",
+                "2026-10-14T07:00:00.000Z"
+            )
+            for (session in listOf(daily, lesson)) {
+                val token = (repository.claimEditor(session.id, "save-picker-fixture") as StorageOutcome.Success).value
+                assertTrue(repository.writeSession(session, 0, token) is StorageOutcome.Success)
+                assertTrue(repository.releaseEditor(token) is StorageOutcome.Success)
+            }
+        }
+        activity = ActivityScenario.launch(MainActivity::class.java)
+        awaitText("继续上次")
+        compose.onNodeWithText("继续上次").performScrollTo().performClick()
+
+        awaitText("普通对局")
+        compose.onNodeWithTag("continue-saves").performScrollToNode(hasText("2026-10-15 · 正式"))
+        compose.onNodeWithText("2026-10-15 · 正式").assertIsDisplayed()
+        compose.onNodeWithText("中等").assertIsDisplayed()
+        compose.onNodeWithText("已填 0 / 1 · 08:32").assertIsDisplayed()
+        compose.onNodeWithTag("continue-saves").performScrollToNode(hasText("课程练习"))
+        compose.onNodeWithText("课程练习").assertIsDisplayed()
+        captureSavePicker()
+        compose.onNodeWithContentDescription("关闭选择面板").performClick()
+        compose.onNodeWithText("继续存档").assertDoesNotExist()
+        compose.onNodeWithText("继续上次").performScrollTo().performClick()
+        awaitText("普通对局")
+        pressBack()
+        compose.onNodeWithText("继续存档").assertDoesNotExist()
+        compose.onNodeWithText("继续上次").performScrollTo().performClick()
+        awaitText("普通对局")
+        compose.onNodeWithTag("continue-saves").performScrollToNode(hasText("2026-10-15 · 正式"))
+        val dailyRow = compose.onNodeWithTag("continue-save-${dailyFormalId("2026-10-15", Variant.CLASSIC)}")
+        val listBounds = compose.onNodeWithTag("continue-saves").fetchSemanticsNode().boundsInRoot
+        val rowBounds = dailyRow.fetchSemanticsNode().boundsInRoot
+        assertEquals(listBounds.left, rowBounds.left)
+        assertEquals(listBounds.right, rowBounds.right)
+        dailyRow.performTouchInput { click(Offset(1f, center.y)) }
+        awaitText("继续对局")
+
+        compose.onNodeWithText("2026-10-15 · 正式挑战").assertIsDisplayed()
+        compose.onNodeWithText("08:32").assertIsDisplayed()
+    }
+
+    private fun captureSavePicker() {
+        if (InstrumentationRegistry.getArguments().getString("captureSavePicker") != "true") return
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(instrumentation.targetContext.getExternalFilesDir(null), "save-picker.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     @Test

@@ -1,6 +1,5 @@
 package dev.yigeyinian.sudoku.game
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,36 +17,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.yigeyinian.sudoku.design.InitialDialogFocus
 import dev.yigeyinian.sudoku.design.rememberDelayedProgress
 import dev.yigeyinian.sudoku.designsystem.difficultyLabel
 import dev.yigeyinian.sudoku.designsystem.formatElapsedTime
@@ -76,7 +65,6 @@ internal fun GameEntryUiState.dailyStatus(variant: Variant): DailyEntryStatus {
 }
 
 /** Mobile entry keeps choices close to the primary action without navigating away from Home. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GameSetupSheet(
     state: GameEntryUiState,
@@ -88,7 +76,6 @@ internal fun GameSetupSheet(
     var variant by rememberSaveable { mutableStateOf(Variant.CLASSIC) }
     var difficulty by rememberSaveable { mutableStateOf(Difficulty.EASY) }
     var rulesOpen by rememberSaveable { mutableStateOf(false) }
-    val closeFocus = remember { FocusRequester() }
     val saved = state.sessions.firstOrNull {
         it.session.mode == GameMode.FREE && it.session.puzzle.rules.variant == variant && it.session.completion == null
     }
@@ -107,47 +94,11 @@ internal fun GameSetupSheet(
         "开始游戏"
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        sheetMaxWidth = 480.dp,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = null
+    GameEntrySheet(
+        title = if (daily) "今日挑战" else "开始一局",
+        subtitle = if (daily) "${state.today} · 中等难度" else null,
+        onDismiss = onDismiss
     ) {
-        Box(
-            Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp, bottom = 4.dp)
-                .size(
-                    32.dp,
-                    4.dp
-                ).background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), RoundedCornerShape(2.dp))
-        )
-        Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    if (daily) "今日挑战" else "开始一局",
-                    Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (daily) {
-                    Text(
-                        "${state.today} · 中等难度",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            IconButton(onClick = onDismiss, modifier = Modifier.focusRequester(closeFocus)) {
-                Icon(
-                    Icons.Outlined.Close,
-                    contentDescription = "关闭选择面板",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
         Column(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
@@ -244,7 +195,6 @@ internal fun GameSetupSheet(
                 shape = RoundedCornerShape(14.dp)
             ) { Text(if (showLoading) "读取中…" else startLabel) }
         }
-        InitialDialogFocus(closeFocus)
     }
     if (rulesOpen) {
         AlertDialog(
