@@ -154,6 +154,9 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
             "arrow-rules", "arrow-equations", "arrow-combinations", "arrow-combined"
         )
 
+        /** Available without asset I/O; decoding verifies the bundled catalogue against these identities. */
+        val bundledLessonCount: Int get() = stableIds.size
+
         fun decode(source: String): LessonCatalogue {
             val document = json.decodeFromString<CatalogueDocument>(source)
             require(document.schemaVersion == 1) { "Unsupported lesson catalogue schema" }

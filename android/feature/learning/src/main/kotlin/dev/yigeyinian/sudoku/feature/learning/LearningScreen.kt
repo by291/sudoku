@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -69,7 +70,7 @@ internal fun LearningScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp)
         ) {
             item(key = "overview") {
-                LearningHeading(overview)
+                LearningHeading(overview, progressReady = state.catalogue != null)
                 Spacer(Modifier.height(22.dp))
                 CourseChoices(state.selectedVariant, onVariant)
                 Spacer(Modifier.height(18.dp))
@@ -139,7 +140,7 @@ internal fun LearningScreen(
 }
 
 @Composable
-private fun LearningHeading(overview: LearningOverview) {
+private fun LearningHeading(overview: LearningOverview, progressReady: Boolean) {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
@@ -154,7 +155,7 @@ private fun LearningHeading(overview: LearningOverview) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val courseCount = if (overview.totalCount > 0) "${overview.totalCount} 节互动课程" else "互动课程"
+            val courseCount = "${overview.totalCount} 节互动课程"
             val separator = if (LocalDensity.current.fontScale > 1.3f) "\n" else "，"
             Text(
                 "${courseCount}${separator}按自己的节奏来",
@@ -162,12 +163,21 @@ private fun LearningHeading(overview: LearningOverview) {
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.onSurfaceVariant
             )
-            if (overview.totalCount > 0) {
+            Box(contentAlignment = Alignment.CenterEnd) {
+                // Reserve the full counter width before personal progress arrives, including
+                // two-digit completion counts, without exposing a fictitious zero to the player.
                 Text(
-                    "${overview.completedCount} / ${overview.totalCount}",
-                    color = colors.primary,
+                    "${overview.totalCount} / ${overview.totalCount}",
+                    Modifier.alpha(0f).clearAndSetSemantics {},
                     style = MaterialTheme.typography.labelLarge
                 )
+                if (progressReady) {
+                    Text(
+                        "${overview.completedCount} / ${overview.totalCount}",
+                        color = colors.primary,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
         }
         LinearProgressIndicator(
@@ -180,7 +190,15 @@ private fun LearningHeading(overview: LearningOverview) {
                     overview.completedCount.toFloat() / overview.totalCount
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(4.dp).semantics { contentDescription = "全部课程学习进度" },
+            modifier = Modifier.fillMaxWidth().height(4.dp)
+                .alpha(if (progressReady) 1f else 0f)
+                .then(
+                    if (progressReady) {
+                        Modifier.semantics { contentDescription = "全部课程学习进度" }
+                    } else {
+                        Modifier.clearAndSetSemantics {}
+                    }
+                ),
             trackColor = colors.onSurface.copy(alpha = 0.08f),
             gapSize = 0.dp,
             drawStopIndicator = {}

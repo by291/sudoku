@@ -16,6 +16,14 @@ class LearningOverviewTest {
     )
 
     @Test
+    fun bundledCourseCountIsAvailableBeforeLoadingProgress() {
+        val pending = LearningUiState().overview()
+
+        assertEquals(32, pending.totalCount)
+        assertEquals(catalogue.lessons.size, pending.totalCount)
+    }
+
+    @Test
     fun newLearnerStartsWithFirstLessonInSelectedCourse() {
         val overview = LearningUiState(loading = false, catalogue = catalogue).overview()
 

@@ -1,6 +1,7 @@
 package dev.yigeyinian.sudoku.feature.learning
 
 import dev.yigeyinian.sudoku.model.learning.Lesson
+import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 
 internal data class LearningLessonEntry(
     val lesson: Lesson,
@@ -38,5 +39,13 @@ internal fun LearningUiState.overview(): LearningOverview {
         ?: unfinished.firstOrNull()
         ?: course.firstOrNull()
 
-    return LearningOverview(allLessons.size, completed.size, course.count { it.completed }, course, suggested)
+    return LearningOverview(
+        LessonCatalogue.bundledLessonCount,
+        completed.size,
+        course.count {
+            it.completed
+        },
+        course,
+        suggested
+    )
 }

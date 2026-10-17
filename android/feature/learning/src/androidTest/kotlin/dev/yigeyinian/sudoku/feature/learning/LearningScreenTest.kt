@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -32,6 +33,38 @@ class LearningScreenTest {
         InstrumentationRegistry.getInstrumentation().context.assets.open("lessons/catalogue.json")
             .bufferedReader().use { it.readText() }
     )
+
+    @Test
+    fun fixedCourseHeadingAppearsImmediatelyAndProgressDoesNotMoveIt() {
+        val catalogue = catalogue()
+        val state = mutableStateOf(LearningUiState())
+        compose.setContent {
+            YigeTheme(ThemePreference.SYSTEM) {
+                LearningScreen(state.value, {}, {}, {})
+            }
+        }
+
+        val subtitle = compose.onNodeWithText("32 节互动课程，按自己的节奏来").assertIsDisplayed()
+        val subtitleBounds = subtitle.getUnclippedBoundsInRoot()
+        val choicesBounds = compose.onNodeWithContentDescription("标准数独").assertIsDisplayed().getUnclippedBoundsInRoot()
+        compose.onNodeWithText("0 / 32").assertDoesNotExist()
+        compose.onNodeWithContentDescription("全部课程学习进度").assertDoesNotExist()
+        compose.onNodeWithTag("suggested-lesson-action").assertDoesNotExist()
+
+        compose.runOnIdle {
+            state.value = LearningUiState(
+                loading = false,
+                catalogue = catalogue,
+                progress = listOf(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
+            )
+        }
+
+        compose.onNodeWithText("32 节互动课程，按自己的节奏来").assertIsDisplayed()
+        compose.onNodeWithText("1 / 32").assertIsDisplayed()
+        assertEquals(subtitleBounds, subtitle.getUnclippedBoundsInRoot())
+        assertEquals(choicesBounds, compose.onNodeWithContentDescription("标准数独").getUnclippedBoundsInRoot())
+        compose.onNodeWithContentDescription("全部课程学习进度").assertIsDisplayed()
+    }
 
     @Test
     fun everyVariantIsSelectableAndOffersItsOwnFirstLesson() {
