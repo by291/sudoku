@@ -194,12 +194,13 @@ export function useGameEntry(options: GameEntryOptions) {
   }
 
   watch(
-    () => [
-      route.query.session,
-      route.query.variant,
-      options.practiceVariant(),
-      metadata.value.kind,
-      metadata.value.kind === 'learning' ? metadata.value.lessonId : '',
+    // Compare route identity fields, not the fresh metadata object from a parent render.
+    [
+      () => route.query.session,
+      () => route.query.variant,
+      () => options.practiceVariant(),
+      () => metadata.value.kind,
+      () => (metadata.value.kind === 'learning' ? metadata.value.lessonId : ''),
     ],
     () => {
       void initialize()

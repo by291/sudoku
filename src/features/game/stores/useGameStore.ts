@@ -452,6 +452,19 @@ export const useGameStore = defineStore('game', () => {
     await release()
   }
 
+  /** A player-requested departure keeps unsaved state attached so failure can be retried. */
+  async function prepareLeave(): Promise<boolean> {
+    const prepared = await transitions.prepareTransition()
+    if (prepared.status !== 'ready') {
+      return false
+    }
+
+    const checkpoint = persistence.capture()
+    const released = await persistence.release()
+    // A dataset reset or session replacement during release must not authorize an old navigation.
+    return persistence.isCurrent(checkpoint) && released.ok
+  }
+
   async function prepareBackup() {
     if (phase.value === 'generating') {
       cancelLoading()
@@ -550,6 +563,7 @@ export const useGameStore = defineStore('game', () => {
     periodicSave,
     renewLease,
     leaveGame,
+    prepareLeave,
     prepareBackup,
     dropSession,
     dispose,

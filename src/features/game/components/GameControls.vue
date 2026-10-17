@@ -3,15 +3,20 @@ import { computed, ref, useTemplateRef, useId, watch, nextTick, h } from 'vue'
 import { NButton, NDropdown } from 'naive-ui'
 import type { DropdownProps, DropdownMenuProps, DropdownOption } from 'naive-ui'
 import type { Digit } from '@/sudoku/contracts'
+import { DIGITS } from '@/sudoku/values'
+import { digitsIn } from '@/shared/model/sudokuPresentation'
+import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import NumberPad from '@/shared/components/NumberPad.vue'
 
 const props = withDefaults(
   defineProps<{
     editable: boolean
+    inactive?: boolean
     inputEditable: boolean
     selectionMessage: string
     announceSelection?: boolean
     noteMode: boolean
+    selectedNotes?: number
     canUndo: boolean
     canRedo: boolean
     hintLoading: boolean
@@ -20,10 +25,11 @@ const props = withDefaults(
     canStartNew: boolean
     newGameLabel: string
   }>(),
-  { announceSelection: true, notesLoading: false },
+  { announceSelection: true, notesLoading: false, selectedNotes: 0, inactive: false },
 )
 const emit = defineEmits<{
   digit: [digit: Digit]
+  quickNote: [digit: Digit]
   erase: []
   note: []
   undo: []
@@ -36,6 +42,17 @@ const emit = defineEmits<{
   new: []
 }>()
 const menuOpen = ref(false)
+watch(
+  () => props.inactive,
+  (inactive) => {
+    if (inactive) {
+      menuOpen.value = false
+    }
+  },
+  { flush: 'sync' },
+)
+const activeNotes = computed(() => digitsIn(props.selectedNotes))
+const showHintProgress = useDelayedProgress(() => props.hintLoading)
 const moreButton = useTemplateRef<InstanceType<typeof NButton>>('moreButton')
 
 type MenuAction = 'check' | 'candidates' | 'settings' | 'new' | 'restart'
@@ -173,6 +190,9 @@ watch(menuOpen, async (open) => {
 })
 
 function handleTriggerKey(event: KeyboardEvent) {
+  if (props.inactive) {
+    return
+  }
   if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
     return
   }
@@ -216,6 +236,9 @@ function handleMenuKey(event: KeyboardEvent) {
 
 function selectAction(key: string | number) {
   menuOpen.value = false
+  if (props.inactive) {
+    return
+  }
   // Keep a stable focus target when the selected action opens a modal.
   focusMore()
   switch (key) {
@@ -251,7 +274,7 @@ function selectAction(key: string | number) {
         :disabled="tool.disabled"
         :type="tool.active ? 'primary' : 'default'"
         :quaternary="!tool.active"
-        :loading="tool.key === 'hint' && hintLoading"
+        :loading="tool.key === 'hint' && showHintProgress"
         @click="tool.activate"
       >
         <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -302,6 +325,20 @@ function selectAction(key: string | number) {
     </div>
     <div class="touch-number-entry">
       <NumberPad layout="row" :disabled="!inputEditable" @digit="$emit('digit', $event)" />
+      <div class="quick-notes" role="group" aria-label="快速笔记">
+        <NButton
+          v-for="digit in DIGITS"
+          :key="digit"
+          quaternary
+          class="quick-note"
+          :disabled="!inputEditable"
+          :aria-label="`快捷笔记数字${digit}`"
+          :aria-pressed="activeNotes.includes(digit)"
+          @click="$emit('quickNote', digit)"
+        >
+          {{ digit }}
+        </NButton>
+      </div>
     </div>
     <div class="input-status">
       <p class="selection-message" :role="announceSelection ? 'status' : undefined">
@@ -344,6 +381,24 @@ function selectAction(key: string | number) {
 .touch-number-entry {
   display: none;
   margin-top: 6px;
+}
+.quick-notes {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 4px;
+}
+.quick-note {
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  color: var(--accent);
+  font-size: 16px;
+}
+.quick-note[aria-pressed='true'] :deep(.n-button__content) {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
 }
 .input-status {
   display: flex;

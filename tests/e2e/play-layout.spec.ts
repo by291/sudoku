@@ -9,6 +9,7 @@ test('uses physical keyboard input on desktop without showing a number pad', asy
   await seedSession(page, makeSession())
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   await expect(page.getByRole('group', { name: '数字输入' })).not.toBeVisible()
+  await expect(page.getByRole('group', { name: '快速笔记' })).not.toBeVisible()
   const cell = page.getByRole('button', { name: cellName(2) })
   await cell.click()
   await page.keyboard.press('4')
@@ -23,7 +24,7 @@ test('uses physical keyboard input on desktop without showing a number pad', asy
   })
 })
 
-test('keeps six tools and nine digits in two single rows inside the phone viewport', async ({
+test('keeps tools, digits and independent quick notes in aligned phone rows', async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 360, height: 800 })
@@ -31,10 +32,12 @@ test('keeps six tools and nine digits in two single rows inside the phone viewpo
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   const tools = page.getByRole('group', { name: '棋盘工具', exact: true }).getByRole('button')
   const digits = page.getByRole('group', { name: '数字输入', exact: true }).getByRole('button')
+  const notes = page.getByRole('group', { name: '快速笔记', exact: true }).getByRole('button')
   await expect(tools).toHaveCount(6)
   await expect(digits).toHaveCount(9)
+  await expect(notes).toHaveCount(9)
 
-  for (const row of [tools, digits]) {
+  for (const row of [tools, digits, notes]) {
     const boxes = await row.evaluateAll((elements) =>
       elements.map((element) => {
         const box = element.getBoundingClientRect()
@@ -62,6 +65,19 @@ test('keeps six tools and nine digits in two single rows inside the phone viewpo
   await page.getByRole('button', { name: cellName(2) }).click()
   await page.getByRole('button', { name: '输入数字4', exact: true }).click()
   await expect(page.getByRole('button', { name: cellName(2) })).toHaveAccessibleName(/数字4/)
+  await page.getByRole('button', { name: cellName(3) }).click()
+  const quickNote = page.getByRole('button', { name: '快捷笔记数字5', exact: true })
+  await quickNote.click()
+  await expect(quickNote).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '笔记', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
+  await expect(page.getByRole('button', { name: cellName(3) })).toHaveAccessibleName(/笔记5/)
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect(quickNote).toHaveAttribute('aria-pressed', 'false')
+  await page.getByRole('button', { name: '重做', exact: true }).click()
+  await expect(quickNote).toHaveAttribute('aria-pressed', 'true')
   await page.screenshot({
     path: `.superpowers/compact-play/phone-${testInfo.project.name}.png`,
     animations: 'disabled',
@@ -74,6 +90,9 @@ test('keeps settings and secondary actions in More without leaking keyboard inpu
   await seedSession(page, makeSession())
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   const cell = page.getByRole('button', { name: cellName(2) })
+  const boardBeforeSettings = await page
+    .getByRole('group', { name: '数独棋盘', exact: true })
+    .boundingBox()
   await cell.click()
   const more = page.getByRole('button', { name: '更多操作', exact: true })
   await more.focus()
@@ -94,6 +113,10 @@ test('keeps settings and secondary actions in More without leaking keyboard inpu
   await settings.getByRole('switch', { name: '显示计时', exact: true }).uncheck()
   await page.keyboard.press('Escape')
   await expect(more).toBeFocused()
+  await expect(page.getByLabel('游戏用时', { exact: true })).toBeHidden()
+  expect(await page.getByRole('group', { name: '数独棋盘', exact: true }).boundingBox()).toEqual(
+    boardBeforeSettings,
+  )
   await more.press('ArrowUp')
   await expect(page.getByRole('menuitem', { name: '重新开始本题', exact: true })).toBeFocused()
   await page.keyboard.press('Escape')

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { NAlert, NButton, NModal, NProgress } from 'naive-ui'
+import { NAlert, NButton, NProgress } from 'naive-ui'
+import ResponsiveDialog from '@/shared/components/ResponsiveDialog.vue'
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import GameView from '@/features/game/views/GameView.vue'
@@ -34,7 +35,7 @@ const challengeRules =
     :auto-restore="false"
     @choose-daily="openSetup()"
   >
-    <template #default="{ active }">
+    <template #default="{ active, departing }">
       <NAlert v-if="!queryVariant.valid" class="feedback-message" type="error" :show-icon="false">
         无法识别指定的玩法。
         <RouterLink v-slot="{ href, navigate }" to="/play/daily" custom>
@@ -90,7 +91,7 @@ const challengeRules =
         {{ localError }} <NButton @click="load">重试读取</NButton>
       </NAlert>
       <GameSetupDialog
-        v-if="setupOpen"
+        v-if="setupOpen && !departing"
         v-model:variant="selectedVariant"
         v-model:difficulty="difficulty"
         mode="daily"
@@ -101,20 +102,16 @@ const challengeRules =
         @cancel="setupOpen = false"
         @start="start()"
       />
-      <NModal
-        v-if="rulesOpen"
+      <ResponsiveDialog
+        v-if="rulesOpen && !departing"
         :show="true"
-        preset="card"
         title="每日挑战规则"
-        aria-label="每日挑战规则"
-        role="dialog"
-        aria-modal="true"
-        style="width: min(480px, calc(100vw - 32px)); margin: 24px auto"
+        :max-width="480"
         @update:show="rulesOpen = $event"
       >
         <p>{{ challengeRules }}</p>
         <template #footer><NButton @click="rulesOpen = false">关闭规则</NButton></template>
-      </NModal>
+      </ResponsiveDialog>
     </template>
     <template #settings>
       <h3 class="daily-rules-heading">每日挑战规则</h3>

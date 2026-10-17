@@ -24,6 +24,7 @@ import GameSettingsDialog from '@/features/game/components/GameSettingsDialog.vu
 import GenerationStatus from '@/features/game/components/GenerationStatus.vue'
 import { useGameEntry } from '@/features/game/composables/useGameEntry'
 import { useBoardSize } from '@/features/game/composables/useBoardSize'
+import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 
 const props = withDefaults(
   defineProps<{
@@ -96,10 +97,17 @@ const {
 
 const boardSpace = useTemplateRef<HTMLElement>('boardSpace')
 const boardSizeStyle = useBoardSize(boardSpace)
+const hasSession = computed(() => !!active.value && !!session.value)
+const displayedMetadata = computed(() =>
+  hasSession.value ? session.value?.metadata : props.metadata,
+)
+const showPlaySurface = computed(
+  () => hasSession.value || !ready.value || phase.value === 'generating' || !!error.value,
+)
 const fitViewport = computed(
   () =>
-    active.value &&
-    (phase.value === 'playing' || phase.value === 'paused') &&
+    showPlaySurface.value &&
+    phase.value !== 'completed' &&
     !readOnly.value &&
     !error.value &&
     !saveMessage.value,
@@ -107,19 +115,53 @@ const fitViewport = computed(
 
 const settingsOpen = ref(false)
 const generating = computed(() => phase.value === 'generating')
+const showPreparationProgress = useDelayedProgress(() => !ready.value || generating.value)
+const showConflictProgress = useDelayedProgress(
+  () => conflictAnalysisState.value === 'pending' && phase.value === 'playing',
+)
+const showNotesProgress = useDelayedProgress(notesLoading)
+const showHintProgress = useDelayedProgress(hintLoading)
+const analysisMessage = computed(() => {
+  if (!hasSession.value || phase.value !== 'playing') {
+    return ''
+  }
+
+  if (conflictAnalysisState.value === 'failed') {
+    return '线索检查暂时无法完成，仅显示已确认的冲突。'
+  }
+
+  if (showNotesProgress.value) {
+    return '正在生成候选数，修改局面会取消本次计算。'
+  }
+
+  if (showHintProgress.value) {
+    return '正在寻找逻辑提示…'
+  }
+
+  return showConflictProgress.value ? '正在检查线索，仅显示已确认的冲突。' : ''
+})
 const inputEditable = computed(
   () =>
+    hasSession.value &&
     editable.value &&
     selectedCell.value !== null &&
     session.value?.puzzle.givens[selectedCell.value] === 0,
 )
+const selectedNotes = computed(() =>
+  hasSession.value &&
+  phase.value !== 'paused' &&
+  phase.value !== 'generating' &&
+  selectedCell.value !== null
+    ? (session.value?.notes[selectedCell.value] ?? 0)
+    : 0,
+)
 const selectionMessage = computed(() => {
-  if (readOnly.value) {
-    return '当前为只读状态，请先取得编辑权。'
+  if (!hasSession.value || generating.value) {
+    return ''
   }
 
-  if (generating.value) {
-    return '正在生成题目，请稍候。'
+  if (readOnly.value) {
+    return '当前为只读状态，请先取得编辑权。'
   }
 
   if (phase.value === 'paused') {
@@ -211,7 +253,52 @@ const saveLabel = computed(
 )
 
 useGameKeyboard()
-useGameLifecycle()
+const { departing } = useGameLifecycle()
+watch(
+  departing,
+  (value) => {
+    if (value) {
+      // Library dialogs teleport outside the inert game surface and must relinquish input as well.
+      settingsOpen.value = false
+      setupOpen.value = false
+      confirmation.value = null
+    }
+  },
+  { flush: 'sync' },
+)
+const livePresentation = computed(() => ({
+  session: session.value,
+  board: board.value,
+  phase: phase.value,
+  editable: editable.value,
+  selectedCell: selectedCell.value,
+  noteMode: noteMode.value,
+  hint: hint.value,
+  hintLoading: hintLoading.value,
+  notesLoading: notesLoading.value,
+  conflictAnalysisState: conflictAnalysisState.value,
+  checkedCells: checkedCells.value,
+  checkIsCurrent: checkIsCurrent.value,
+  readOnly: readOnly.value,
+  elapsedMs: elapsedMs.value,
+  canUndo: canUndo.value,
+  canRedo: canRedo.value,
+  activeVariant: activeVariant.value,
+  conflictEvaluation: conflictEvaluation.value,
+  inputEditable: inputEditable.value,
+  selectedNotes: selectedNotes.value,
+  selectionMessage: selectionMessage.value,
+  analysisMessage: analysisMessage.value,
+  highlightedCells: highlightedCells.value,
+  displayedConflicts: displayedConflicts.value,
+  relatedCells: relatedCells.value,
+  saveLabel: saveLabel.value,
+  fitViewport: fitViewport.value,
+}))
+// Keep the last painted position while saving. The inert surface blocks input until failure or exit.
+const presentation = computed<typeof livePresentation.value>((previous) =>
+  departing.value && previous ? previous : livePresentation.value,
+)
 
 async function requestNew(event?: MouseEvent) {
   if (event?.currentTarget instanceof HTMLElement) {
@@ -268,6 +355,12 @@ function enterDigit(digit: Digit) {
   }
 }
 
+function toggleQuickNote(digit: Digit) {
+  if (inputEditable.value && selectedCell.value !== null) {
+    game.dispatch({ kind: 'toggle-note', cell: selectedCell.value, digit })
+  }
+}
+
 function erase() {
   if (selectedCell.value !== null) {
     game.dispatch({ kind: 'erase', cell: selectedCell.value })
@@ -277,14 +370,16 @@ function erase() {
 <template>
   <section
     class="game-page"
-    :data-viewport-fit="fitViewport ? '' : undefined"
+    :inert="departing || undefined"
+    :aria-busy="departing"
+    :data-viewport-fit="presentation.fitViewport ? '' : undefined"
     :style="boardSizeStyle"
   >
-    <div v-if="!active" class="page-heading">
+    <div v-if="!showPlaySurface" class="page-heading">
       <p class="eyebrow">一格一念 / {{ heading }}</p>
       <h1>{{ heading }}</h1>
     </div>
-    <slot :active="active" />
+    <slot :active="active" :departing="departing" />
     <NAlert
       v-if="!queryVariant.valid && metadata.kind !== 'daily'"
       class="feedback-message"
@@ -303,33 +398,13 @@ function erase() {
       {{ error }}
       <NButton v-if="canRetryGeneration" @click="retryGeneration">重试出题</NButton>
     </NAlert>
-    <p v-if="!ready" role="status">正在读取存档…</p>
-    <GenerationStatus v-if="generating && !setupOpen" class="generation-feedback">
-      <NButton @click="game.cancelLoading">取消出题</NButton>
-    </GenerationStatus>
-    <template v-if="active && session">
-      <p
-        v-if="conflictAnalysisState === 'pending' && phase === 'playing'"
-        role="status"
-        class="feedback-message"
-      >
-        正在检查线索，仅显示已确认的冲突。
-      </p>
-      <p
-        v-if="conflictAnalysisState === 'failed' && phase === 'playing'"
-        role="status"
-        class="feedback-message"
-      >
-        线索检查暂时无法完成，仅显示已确认的冲突。
-      </p>
-      <p v-if="notesLoading" role="status" class="feedback-message">
-        正在生成候选数，修改局面会取消本次计算。
-      </p>
+    <template v-if="showPlaySurface">
       <NAlert
         v-if="
-          conflictEvaluation.status === 'budget-exhausted' &&
-          conflictAnalysisState === 'ready' &&
-          phase === 'playing'
+          hasSession &&
+          presentation.conflictEvaluation.status === 'budget-exhausted' &&
+          presentation.conflictAnalysisState === 'ready' &&
+          presentation.phase === 'playing'
         "
         class="feedback-message"
         type="warning"
@@ -337,97 +412,161 @@ function erase() {
         >冲突检查超出预算，仅显示已确认的冲突，尚不能保证其他线索有效。</NAlert
       >
       <ul
-        v-if="highlightConflicts && conflictEvaluation.violations.length && phase === 'playing'"
+        v-if="
+          hasSession &&
+          highlightConflicts &&
+          presentation.conflictEvaluation.violations.length &&
+          presentation.phase === 'playing'
+        "
         class="rule-violations"
       >
-        <li v-for="violation in conflictEvaluation.violations" :key="violation.constraintId">
+        <li
+          v-for="violation in presentation.conflictEvaluation.violations"
+          :key="violation.constraintId"
+        >
           {{ violationMessage(violation) }}
         </li>
       </ul>
-      <NCard v-if="readOnly" class="feedback-message" size="small" role="status">
+      <NCard
+        v-if="hasSession && presentation.readOnly"
+        class="feedback-message"
+        size="small"
+        role="status"
+      >
         当前无法编辑：本局正在其他标签页编辑，或存档已变化。可重新载入最新存档；其他页面退出后，可重新取得编辑权。
         <NButton @click="requestReload">重新载入</NButton>
       </NCard>
-      <NAlert v-if="saveMessage" class="feedback-message" type="error" :show-icon="false">
-        {{ saveMessage }} <NButton v-if="!readOnly" @click="game.retrySave">重试保存</NButton>
+      <NAlert
+        v-if="hasSession && saveMessage"
+        class="feedback-message"
+        type="error"
+        :show-icon="false"
+      >
+        {{ saveMessage }}
+        <NButton v-if="!presentation.readOnly" @click="game.retrySave">重试保存</NButton>
       </NAlert>
       <div
         class="game-layout"
-        :class="{ 'has-feedback': hint || checkedCells.length || checkIsCurrent }"
+        :class="{
+          'has-feedback':
+            presentation.hint || presentation.checkedCells.length || presentation.checkIsCurrent,
+        }"
       >
         <div class="play-surface">
           <header class="session-heading">
-            <h1>{{ heading }} · {{ getVariantPresentation(activeVariant).label }}</h1>
-            <p v-if="session.metadata.kind === 'daily'" class="session-context">
-              {{ session.metadata.challengeDate }} ·
-              {{ session.metadata.formalAttempt ? '正式挑战' : '练习重玩' }}
+            <h1>
+              {{ heading }} ·
+              {{
+                getVariantPresentation(hasSession ? presentation.activeVariant : nextVariant).label
+              }}
+            </h1>
+            <p v-if="displayedMetadata?.kind === 'daily'" class="session-context">
+              {{ displayedMetadata.challengeDate }} ·
+              {{ displayedMetadata.formalAttempt ? '正式挑战' : '练习重玩' }}
             </p>
             <div class="session-bar">
-              <div class="session-summary">
+              <p
+                v-if="presentation.analysisMessage"
+                class="analysis-status"
+                role="status"
+                :title="presentation.analysisMessage"
+              >
+                {{ presentation.analysisMessage }}
+              </p>
+              <div v-else-if="hasSession && presentation.session" class="session-summary">
                 <span
-                  >{{ DIFFICULTY_NAMES[session.puzzle.difficulty] }}
+                  >{{ DIFFICULTY_NAMES[presentation.session.puzzle.difficulty] }}
                   <span class="badge">{{
-                    session.assistance.assisted ? '已使用辅助' : '独立思考'
+                    presentation.session.assistance.assisted ? '已使用辅助' : '独立思考'
                   }}</span>
                 </span>
-                <span class="save-status" role="status">{{ saveLabel }}</span>
+                <span class="save-status" role="status">{{ presentation.saveLabel }}</span>
               </div>
-              <span v-if="showTimer" class="session-timer" aria-label="游戏用时">
-                {{ formatDuration(elapsedMs) }}
+              <span v-else class="session-summary">{{ DIFFICULTY_NAMES[difficulty] }}</span>
+              <span
+                class="session-timer"
+                :class="{ 'timer-hidden': !showTimer || !hasSession }"
+                :aria-hidden="!showTimer || !hasSession"
+                aria-label="游戏用时"
+              >
+                {{ formatDuration(hasSession ? presentation.elapsedMs : 0) }}
               </span>
-              <NButton v-if="phase === 'playing'" @click="game.pause">暂停</NButton>
-              <NButton v-else-if="phase === 'paused'" @click="game.resume">
-                {{ readOnly ? '尝试接管' : '继续游戏' }}
+              <NButton v-if="hasSession && presentation.phase === 'playing'" @click="game.pause"
+                >暂停</NButton
+              >
+              <NButton
+                v-else-if="hasSession && presentation.phase === 'paused'"
+                @click="game.resume"
+              >
+                {{ presentation.readOnly ? '尝试接管' : '继续游戏' }}
               </NButton>
             </div>
           </header>
           <div ref="boardSpace" class="board-space">
             <div class="board-wrap">
               <SudokuBoard
-                :board="board"
-                :givens="session.puzzle.givens"
-                :notes="session.notes"
-                :rules="session.puzzle.rules"
+                v-if="hasSession && presentation.session"
+                :board="presentation.board"
+                :givens="presentation.session.puzzle.givens"
+                :notes="presentation.session.notes"
+                :rules="presentation.session.puzzle.rules"
                 :show-selected-rules="false"
-                :related-cells="relatedCells"
-                :selected-cell="selectedCell"
-                :conflicts="displayedConflicts"
-                :hint-cells="highlightedCells"
-                :disabled="phase === 'paused' || phase === 'generating'"
-                :obscured="phase === 'paused' || phase === 'generating'"
+                :related-cells="presentation.relatedCells"
+                :selected-cell="presentation.selectedCell"
+                :conflicts="presentation.displayedConflicts"
+                :hint-cells="presentation.highlightedCells"
+                :disabled="presentation.phase === 'paused' || presentation.phase === 'generating'"
+                :obscured="presentation.phase === 'paused' || presentation.phase === 'generating'"
                 @select="game.selectCell"
               />
-              <div v-if="phase === 'paused'" class="pause-cover">
+              <div v-else class="board-placeholder" aria-hidden="true" />
+              <div v-if="generating || !ready" class="preparation-cover">
+                <GenerationStatus
+                  v-if="showPreparationProgress && !setupOpen"
+                  :message="generating ? '正在生成题目…' : '正在读取存档…'"
+                  :description="
+                    generating ? '正在检查唯一解与难度，请稍候。' : '对局准备好后即可继续。'
+                  "
+                />
+                <NButton v-if="generating && !setupOpen" @click="game.cancelLoading"
+                  >取消出题</NButton
+                >
+              </div>
+              <div v-else-if="hasSession && presentation.phase === 'paused'" class="pause-cover">
                 <span>稍作停留</span
                 ><NButton type="primary" @click="game.resume">
-                  {{ readOnly ? '尝试接管' : '继续游戏' }}
+                  {{ presentation.readOnly ? '尝试接管' : '继续游戏' }}
                 </NButton>
               </div>
             </div>
           </div>
           <GameControls
-            :editable="editable"
-            :input-editable="inputEditable"
-            :selection-message="selectionMessage"
+            :inactive="departing"
+            :editable="hasSession && presentation.editable"
+            :input-editable="presentation.inputEditable"
+            :selection-message="presentation.selectionMessage"
             :announce-selection="!generating"
-            :note-mode="noteMode"
-            :can-undo="canUndo"
-            :can-redo="canRedo"
-            :hint-loading="hintLoading"
-            :notes-loading="notesLoading"
+            :note-mode="presentation.noteMode"
+            :selected-notes="presentation.selectedNotes"
+            :can-undo="hasSession && presentation.canUndo"
+            :can-redo="hasSession && presentation.canRedo"
+            :hint-loading="presentation.hintLoading"
+            :notes-loading="presentation.notesLoading"
             :can-restart="
-              !readOnly &&
-              phase !== 'generating' &&
-              !(metadata.kind === 'daily' && phase === 'completed')
+              hasSession &&
+              !presentation.readOnly &&
+              presentation.phase !== 'generating' &&
+              !(metadata.kind === 'daily' && presentation.phase === 'completed')
             "
             :can-start-new="
               ready &&
-              phase !== 'generating' &&
-              (metadata.kind === 'daily' || !readOnly) &&
+              presentation.phase !== 'generating' &&
+              (metadata.kind === 'daily' || !presentation.readOnly) &&
               queryVariant.valid
             "
             :new-game-label="metadata.kind === 'daily' ? '选择其他挑战' : '新开一局'"
             @digit="enterDigit"
+            @quick-note="toggleQuickNote"
             @erase="erase"
             @note="game.toggleNoteMode"
             @undo="game.dispatch({ kind: 'undo' })"
@@ -440,31 +579,43 @@ function erase() {
             @restart="requestRestart()"
           />
         </div>
-        <div class="game-feedback">
+        <div v-if="hasSession && presentation.session" class="game-feedback">
           <SelectedCellRules
             class="selected-context"
-            :rules="session.puzzle.rules"
-            :selected-cell="selectedCell"
-            :obscured="phase === 'paused' || phase === 'generating'"
+            :rules="presentation.session.puzzle.rules"
+            :selected-cell="presentation.selectedCell"
+            :obscured="presentation.phase === 'paused' || presentation.phase === 'generating'"
           />
           <HintPanel
-            v-if="hint"
-            :hint="hint"
+            v-if="presentation.hint"
+            :hint="presentation.hint"
             @highlight="displayedHintStep = $event"
             @apply="game.applyHint"
             @dismiss="game.dismissHint"
           />
-          <NCard v-if="checkedCells.length" class="feedback-message" size="small" role="status">
-            标有圆点的 {{ checkedCells.length }} 格需要重新检查。
+          <NCard
+            v-if="presentation.checkedCells.length"
+            class="feedback-message"
+            size="small"
+            role="status"
+          >
+            标有圆点的 {{ presentation.checkedCells.length }} 格需要重新检查。
           </NCard>
-          <p v-else-if="checkIsCurrent && !hint" class="muted">检查结果：当前没有发现错误填写。</p>
+          <p v-else-if="presentation.checkIsCurrent && !presentation.hint" class="muted">
+            检查结果：当前没有发现错误填写。
+          </p>
         </div>
       </div>
-      <div v-if="phase === 'completed'" class="panel completion" role="status">
+      <div
+        v-if="hasSession && presentation.session && presentation.phase === 'completed'"
+        class="panel completion"
+        role="status"
+      >
         <h2>解开了，做得很好。</h2>
         <p>
-          {{ DIFFICULTY_NAMES[session.puzzle.difficulty] }} · {{ formatDuration(elapsedMs) }} ·
-          {{ session.assistance.assisted ? '辅助完成' : '无辅助完成' }}
+          {{ DIFFICULTY_NAMES[presentation.session.puzzle.difficulty] }} ·
+          {{ formatDuration(presentation.elapsedMs) }} ·
+          {{ presentation.session.assistance.assisted ? '辅助完成' : '无辅助完成' }}
         </p>
         <p>{{ saveState === 'saved' ? '成绩已保存到本机。' : '本局已完成，成绩仍待保存。' }}</p>
         <RouterLink v-slot="{ href, navigate }" to="/records" custom>
@@ -475,7 +626,7 @@ function erase() {
       </div>
     </template>
     <div
-      v-else-if="ready && phase !== 'generating' && metadata.kind !== 'daily'"
+      v-else-if="ready && presentation.phase !== 'generating' && metadata.kind !== 'daily'"
       class="panel empty-game"
     >
       <span aria-hidden="true">▦</span>
@@ -484,13 +635,13 @@ function erase() {
       <NButton
         type="primary"
         size="large"
-        :disabled="!queryVariant.valid || readOnly"
+        :disabled="!queryVariant.valid || presentation.readOnly"
         @click="requestNew"
         >开始游戏</NButton
       >
     </div>
     <GameSetupDialog
-      v-if="setupOpen"
+      v-if="setupOpen && !departing"
       v-model:variant="nextVariant"
       v-model:difficulty="difficulty"
       :saved-session="targetSession?.session"
@@ -502,19 +653,19 @@ function erase() {
       @resume="resumeTarget"
     />
     <GameSettingsDialog
-      v-if="settingsOpen && active"
+      v-if="settingsOpen && active && !departing"
       v-model:show="settingsOpen"
       v-model:show-timer="showTimer"
       v-model:highlight-conflicts="highlightConflicts"
     >
       <h3 class="settings-heading">玩法规则</h3>
-      <p class="rule-summary">{{ getVariantPresentation(activeVariant).ruleText }}</p>
+      <p class="rule-summary">{{ getVariantPresentation(presentation.activeVariant).ruleText }}</p>
       <h3 class="settings-heading">辅助与成绩</h3>
       <p class="rule-summary">使用逻辑提示、检查填写或生成候选数，会将本局记为「辅助完成」。</p>
       <slot name="settings" />
     </GameSettingsDialog>
     <ConfirmationDialog
-      v-if="confirmation"
+      v-if="confirmation && !departing"
       :title="confirmationContent.title"
       :description="confirmationContent.description"
       :confirm-label="confirmationContent.confirmLabel"
@@ -527,10 +678,6 @@ function erase() {
 <style scoped>
 .game-page {
   padding-top: 16px;
-}
-.generation-feedback {
-  max-width: 640px;
-  margin: 16px auto;
 }
 .rule-summary {
   color: var(--muted);
@@ -563,6 +710,7 @@ function erase() {
   line-height: 1.3;
 }
 .session-bar {
+  min-height: 48px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -574,8 +722,22 @@ function erase() {
   display: grid;
   gap: 2px;
 }
+.analysis-status {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
 .session-timer {
+  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+.timer-hidden {
+  visibility: hidden;
 }
 .save-status {
   color: var(--muted);
@@ -622,6 +784,27 @@ function erase() {
 }
 .board-wrap {
   position: relative;
+  aspect-ratio: 1;
+}
+.board-placeholder {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--surface);
+}
+.preparation-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+}
+.preparation-cover :deep(.generation-status) {
+  max-width: 100%;
 }
 .board-space {
   min-width: 0;
@@ -695,6 +878,22 @@ function erase() {
   }
 }
 @media (max-width: 800px) {
+  .game-page[data-viewport-fit] {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  .game-page[data-viewport-fit]::before,
+  .game-page[data-viewport-fit]::after {
+    content: '';
+    flex: 2 0 0;
+  }
+  .game-page[data-viewport-fit]::after {
+    flex-grow: 3;
+  }
+  .game-page[data-viewport-fit] > * {
+    flex-shrink: 0;
+  }
   .game-layout,
   .game-layout.has-feedback,
   .game-layout:has(.selected-context) {
