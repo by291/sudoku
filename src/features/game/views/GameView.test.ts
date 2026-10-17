@@ -534,9 +534,12 @@ it('reserves the same board and controls while a saved session loads', async () 
   await game.startGame(generationInput('classic', 'easy', 'fixture'), { kind: 'free' })
   const sessionId = game.session?.id
   await game.clearActiveSession()
-  const saved = await test.runtime.repository.listSessions()
+  if (!sessionId) {
+    throw new Error('Missing saved fixture')
+  }
+  const saved = await test.runtime.repository.readSession(sessionId)
   const response = deferred<typeof saved>()
-  test.runtime.repository.listSessions = () => response.promise
+  test.runtime.repository.readSession = () => response.promise
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/game', component: GameView }],

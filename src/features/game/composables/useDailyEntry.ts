@@ -20,8 +20,20 @@ export function useDailyEntry() {
   const switching = ref(false)
   const statuses = ref<readonly DailyVariantStatus[]>([])
   const statusesLoading = ref(false)
-  const completedCount = computed(
-    () => statuses.value.filter((status) => status.state === 'completed').length,
+  const statusesPending = ref(false)
+  const statusError = ref<string | null>(null)
+  const statusDate = ref<string | null>(null)
+  const statusesReady = computed(
+    () =>
+      statusDate.value === today.value &&
+      !statusesLoading.value &&
+      !statusesPending.value &&
+      !statusError.value,
+  )
+  const completedCount = computed(() =>
+    statusDate.value === today.value
+      ? statuses.value.filter((status) => status.state === 'completed').length
+      : null,
   )
   const queryVariant = computed(() => parseVariantQuery(route.query.variant))
   const localError = ref<string | null>(null)
@@ -31,21 +43,52 @@ export function useDailyEntry() {
   let timer = 0
   let initialization = 0
   let statusLoad = 0
+  let startOperation = 0
+  let maintenance: AbortController | null = null
 
   async function refreshStatuses() {
+    maintenance?.abort()
+    maintenance = null
     const epoch = ++statusLoad
+    const date = today.value
     statusesLoading.value = true
-    const result = await game.loadDailyStatuses(today.value)
+    statusError.value = null
+    const result = await runtime.repository.readDailyStatuses(date)
     if (epoch !== statusLoad) {
       return
     }
 
     statusesLoading.value = false
-    if (result.ok) {
-      statuses.value = result.value
-    } else {
-      localError.value = '每日状态读取失败，请重试读取。'
+    if (!result.ok) {
+      statusError.value = '每日状态读取失败，请重试读取。'
+      return
     }
+    statusesPending.value = result.value.coverage === 'pending'
+    if (!statusesPending.value) {
+      statuses.value = result.value.statuses
+      statusDate.value = date
+    }
+  }
+
+  async function retryStatuses() {
+    if (statusesPending.value) {
+      maintenance?.abort()
+      const controller = new AbortController()
+      maintenance = controller
+      const epoch = ++statusLoad
+      statusesLoading.value = true
+      statusError.value = null
+      const result = await runtime.repository.maintainSummaries(controller.signal)
+      if (epoch !== statusLoad) {
+        return
+      }
+      statusesLoading.value = false
+      if (!result.ok) {
+        statusError.value = '旧存档整理暂时无法完成，请重试。原始数据仍然保留。'
+        return
+      }
+    }
+    await refreshStatuses()
   }
 
   async function load() {
@@ -66,21 +109,18 @@ export function useDailyEntry() {
       if (transition.status === 'ready') {
         selectedVariant.value = variant.value
         if (route.query.start === '1') {
-          await start()
+          // An explicit start URL already expresses intent; full validation remains in startDaily.
+          await startDailyAction(selectedVariant.value)
         }
       } else if (game.session?.mode === 'daily') {
         selectedVariant.value = game.activeVariant
       }
-
-      void refreshStatuses()
 
       return
     }
 
     if (game.session?.id === id) {
       selectedVariant.value = game.activeVariant
-      void refreshStatuses()
-
       return
     }
 
@@ -121,18 +161,27 @@ export function useDailyEntry() {
         localError.value = '找不到这份每日挑战存档，请开始今天的挑战。'
       }
     }
-
-    void refreshStatuses()
   }
 
   async function start(variant = selectedVariant.value) {
+    if (!statusesReady.value) {
+      return
+    }
+    await startDailyAction(variant)
+  }
+
+  async function startDailyAction(variant: SudokuVariant) {
     if (switching.value) {
       return
     }
 
+    const current = ++startOperation
     switching.value = true
     setupOpen.value = false
     const transition = await game.startDaily(today.value, variant)
+    if (current !== startOperation) {
+      return
+    }
     switching.value = false
     if (transition.status === 'ready' && game.session?.mode === 'daily') {
       selectedVariant.value = game.activeVariant
@@ -153,12 +202,22 @@ export function useDailyEntry() {
   }
 
   watch(
-    () => [route.query.session, route.query.variant],
+    () => [route.query.session, route.query.variant, route.query.start],
     () => {
       void load()
+      void refreshStatuses()
     },
     { immediate: true },
   )
+  watch(setupOpen, (open) => {
+    if (!open && maintenance) {
+      // Closing the selector cancels explicit repair without letting late work publish status.
+      statusLoad++
+      maintenance.abort()
+      maintenance = null
+      statusesLoading.value = false
+    }
+  })
   watch(
     () => game.saveState,
     (state) => {
@@ -175,9 +234,20 @@ export function useDailyEntry() {
       today.value = getChallengeDate(runtime.wallNow())
     }, 10000)
   })
+  const unsubscribe = runtime.ownership.subscribe((notice) => {
+    if (notice.kind === 'reset') {
+      statusDate.value = null
+      statuses.value = []
+      statusesPending.value = false
+      void refreshStatuses()
+    }
+  })
   onScopeDispose(() => {
+    startOperation++
     initialization++
     statusLoad++
+    maintenance?.abort()
+    unsubscribe()
     window.clearInterval(timer)
   })
 
@@ -190,11 +260,15 @@ export function useDailyEntry() {
     switching,
     statuses,
     statusesLoading,
+    statusesPending,
+    statusesReady,
+    statusError,
     completedCount,
     queryVariant,
     localError,
     currentDate,
     refreshStatuses,
+    retryStatuses,
     load,
     start,
     openSetup,

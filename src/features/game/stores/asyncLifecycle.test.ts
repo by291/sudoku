@@ -527,7 +527,7 @@ it('keeps unsaved conflicted edits when explicit recovery cannot read storage', 
   await test.database.put('sessions', { formatVersion: 2, revision: 2, session: makeSession() })
   test.game.dispatch({ kind: 'enter', cell: 2, digit: 4 })
   await test.game.periodicSave()
-  test.runtime.repository.listSessions = async () => ({
+  test.runtime.repository.readSession = async () => ({
     ok: false,
     error: { kind: 'unavailable', message: 'Injected read failure' },
   })
@@ -562,12 +562,12 @@ it('does not resume a game after leaving while its catalog read is pending', asy
   await test.game.leaveGame()
   const gate = deferred<void>()
   const entered = deferred<void>()
-  const read = test.runtime.repository.listSessions
-  test.runtime.repository.listSessions = async () => {
+  const read = test.runtime.repository.readSession
+  test.runtime.repository.readSession = async (id) => {
     entered.resolve()
     await gate.promise
 
-    return read()
+    return read(id)
   }
   const resuming = test.game.resume()
   await entered.promise
@@ -602,12 +602,12 @@ it('does not retry or recreate a game after reset while its catalog read is pend
   await test.game.leaveGame()
   const gate = deferred<void>()
   const entered = deferred<void>()
-  const read = test.runtime.repository.listSessions
-  test.runtime.repository.listSessions = async () => {
+  const read = test.runtime.repository.readSession
+  test.runtime.repository.readSession = async (id) => {
     entered.resolve()
     await gate.promise
 
-    return read()
+    return read(id)
   }
   const retrying = test.game.retrySave()
   await entered.promise
@@ -624,12 +624,12 @@ it('does not create a daily game after leaving and resetting a pending startup',
   const test = await setup()
   const gate = deferred<void>()
   const entered = deferred<void>()
-  const read = test.runtime.repository.listSessions
-  test.runtime.repository.listSessions = async () => {
+  const read = test.runtime.repository.readSession
+  test.runtime.repository.readSession = async (id) => {
     entered.resolve()
     await gate.promise
 
-    return read()
+    return read(id)
   }
   test.runtime.worker.generate = async () => ({
     status: 'completed',
@@ -662,12 +662,20 @@ for (const component of [GameView, DailyView]) {
     await router.push(component === GameView ? '/play/free' : '/play/daily')
     const gate = deferred<void>()
     const entered = deferred<void>()
-    const snapshot = await test.runtime.repository.listSessions()
-    test.runtime.repository.listSessions = async () => {
-      entered.resolve()
-      await gate.promise
-
-      return snapshot
+    if (component === GameView) {
+      const snapshot = await test.runtime.repository.readSlotSummary('free', 'classic')
+      test.runtime.repository.readSlotSummary = async () => {
+        entered.resolve()
+        await gate.promise
+        return snapshot
+      }
+    } else {
+      const snapshot = await test.runtime.repository.readDailyStatuses('2026-10-11')
+      test.runtime.repository.readDailyStatuses = async () => {
+        entered.resolve()
+        await gate.promise
+        return snapshot
+      }
     }
     const restore = vi.spyOn(test.game, 'restoreSession')
     const wrapper = mount(component, {
@@ -685,7 +693,7 @@ for (const component of [GameView, DailyView]) {
 }
 it('does not create or install a cancelled game while its catalog read is pending', async () => {
   const test = await createTestRuntime()
-  const original = test.runtime.repository.listSessions
+  const original = test.runtime.repository.readSlot
   let unblock: () => void = () => {
     throw new Error('Gate not initialized')
   }
@@ -698,11 +706,11 @@ it('does not create or install a cancelled game while its catalog read is pendin
   const reading = new Promise<void>((resolve) => {
     entered = resolve
   })
-  test.runtime.repository.listSessions = async () => {
+  test.runtime.repository.readSlot = async (mode, variant) => {
     entered()
     await gate
 
-    return original()
+    return original(mode, variant)
   }
   test.runtime.worker.generate = async () => ({ status: 'completed', value: makeSession().puzzle })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
@@ -741,4 +749,20 @@ it('captures_seed_bytes_before_save_preparation_and_retains_them_for_retry', asy
   await test.game.leaveGame()
   test.game.dispose()
   test.dispose()
+})
+
+it('restores the selected save without reading unrelated full records', async () => {
+  const test = await createTestRuntime()
+  runtimes.push(test)
+  const selected = makeSession()
+  await test.database.put('sessions', { formatVersion: 2, revision: 1, session: selected })
+  const sessions = vi.spyOn(test.runtime.repository, 'listSessions')
+  const results = vi.spyOn(test.runtime.repository, 'listResults')
+  const game = test.app.runWithContext(() => useGameStore(test.pinia))
+
+  expect(await game.restoreSession(selected.id)).toEqual({ status: 'ready' })
+
+  expect(game.session?.id).toBe(selected.id)
+  expect(sessions).not.toHaveBeenCalled()
+  expect(results).not.toHaveBeenCalled()
 })

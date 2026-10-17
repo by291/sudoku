@@ -27,64 +27,47 @@ beforeEach(() => {
   }))
 })
 
-it('failed_or_mismatched_module_blocks_semantic_actions', async () => {
-  mocks.load.mockRejectedValue(new Error('Missing WASM asset'))
+it('makes browsing available without requesting the computation module', async () => {
+  mocks.load.mockImplementation(() => new Promise(() => {}))
+  const dispose = vi.fn()
+  const ensureEngine = vi.fn()
+  mocks.createRuntime.mockReturnValue({ dispose, ensureEngine })
+  const install = vi.fn()
   const wrapper = mount(App, {
-    props: { installRuntime: vi.fn() },
+    props: { installRuntime: install },
     global: { plugins: [createBootstrapRouter()], stubs: { ReadyApplication: true } },
   })
 
   await flushPromises()
 
-  expect(wrapper.text()).toContain('数独引擎加载失败，请重试。')
-  expect(wrapper.find('button').text()).toBe('重试')
-  expect(mocks.createRuntime).not.toHaveBeenCalled()
+  expect(wrapper.findComponent({ name: 'ReadyApplication' }).exists()).toBe(true)
+  expect(install).toHaveBeenCalledOnce()
+  expect(mocks.load).not.toHaveBeenCalled()
+  expect(ensureEngine).not.toHaveBeenCalled()
   wrapper.unmount()
+  expect(dispose).toHaveBeenCalledOnce()
 })
 
-it('retries_after_failure_and_installs_only_a_ready_runtime', async () => {
-  mocks.load.mockRejectedValueOnce(new Error('Version mismatch')).mockResolvedValueOnce({})
+it('retries an application setup failure without starting computation', async () => {
   const dispose = vi.fn()
-  mocks.createEngine.mockResolvedValue({ dispose })
-  const disposeRuntime = vi.fn()
-  mocks.createRuntime.mockReturnValue({ dispose: disposeRuntime })
+  mocks.createRuntime
+    .mockImplementationOnce(() => {
+      throw new Error('Services unavailable')
+    })
+    .mockReturnValueOnce({ dispose })
   const wrapper = mount(App, {
     props: { installRuntime: vi.fn() },
     global: { plugins: [createBootstrapRouter()], stubs: { ReadyApplication: true } },
   })
   await flushPromises()
 
+  expect(wrapper.text()).toContain('加载失败，请重试')
   await wrapper.get('button').trigger('click')
   await flushPromises()
 
-  expect(mocks.createRuntime).toHaveBeenCalledTimes(1)
+  expect(mocks.createRuntime).toHaveBeenCalledTimes(2)
   expect(wrapper.findComponent({ name: 'ReadyApplication' }).exists()).toBe(true)
+  expect(mocks.load).not.toHaveBeenCalled()
   wrapper.unmount()
-  expect(disposeRuntime).toHaveBeenCalledOnce()
-})
-
-it('retry_cannot_publish_a_disposed_generation', async () => {
-  mocks.load.mockResolvedValue({})
-  let finish: (value: { dispose(): void }) => void = () => {
-    throw new Error('Missing init resolver')
-  }
-  mocks.createEngine.mockImplementation(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve
-      }),
-  )
-  const wrapper = mount(App, {
-    props: { installRuntime: vi.fn() },
-    global: { plugins: [createBootstrapRouter()] },
-  })
-  await flushPromises()
-  const dispose = vi.fn()
-
-  wrapper.unmount()
-  finish({ dispose })
-  await flushPromises()
-
   expect(dispose).toHaveBeenCalledOnce()
-  expect(mocks.createRuntime).not.toHaveBeenCalled()
 })

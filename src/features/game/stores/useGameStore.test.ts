@@ -38,6 +38,7 @@ function setup(heavy = false) {
   const token = { sessionId: saved.id, ownerId: 'test', fence: 1, epoch: 1 }
   const runtime: GameRuntime = {
     ready: true,
+    ensureEngine: async () => {},
     engine,
     createSeed: () => crypto.getRandomValues(new Uint8Array(32)),
     ownerId: 'test',

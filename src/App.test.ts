@@ -3,7 +3,6 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import RootApp from '@/App.vue'
 import * as moduleLoader from '@/sudoku/wasmModule'
 import * as runtimeComposition from '@/runtime'
-import { getTestModule } from '../tests/support/wasm'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
@@ -108,14 +107,7 @@ it('keeps_semantic_validation_alive_until_the_final_save_settles', async () => {
 })
 
 it('waits_for_the_initial_route_before_publishing_the_runtime_to_pinia', async () => {
-  vi.spyOn(moduleLoader, 'loadSudokuModule').mockResolvedValue(getTestModule())
-  const compose = vi
-    .spyOn(runtimeComposition, 'createGameRuntime')
-    .mockImplementation((engine) => ({
-      ...test.runtime,
-      engine,
-      dispose: () => engine.dispose(),
-    }))
+  const compose = vi.spyOn(runtimeComposition, 'createGameRuntime').mockReturnValue(test.runtime)
   let finishNavigation: () => void = () => {
     throw new Error('Missing navigation resolver')
   }
@@ -161,33 +153,23 @@ it('waits_for_the_initial_route_before_publishing_the_runtime_to_pinia', async (
   }
 })
 
-it('semantic_validation_awaits_ready_before_opening_transaction', async () => {
-  let resolveModule: (module: WebAssembly.Module) => void = () => {
-    throw new Error('Missing module resolver')
-  }
-  const pending = new Promise<WebAssembly.Module>((resolve) => {
-    resolveModule = resolve
-  })
-  vi.spyOn(moduleLoader, 'loadSudokuModule').mockReturnValue(pending)
-  const compose = vi
-    .spyOn(runtimeComposition, 'createGameRuntime')
-    .mockImplementation((engine) => ({ ...test.runtime, engine, dispose: () => engine.dispose() }))
-  const transactions = vi.spyOn(test.database, 'transaction')
+it('allows storage-backed browsing without requesting computation', async () => {
+  const load = vi.spyOn(moduleLoader, 'loadSudokuModule')
+  const initialize = vi.spyOn(test.runtime, 'ensureEngine')
+  const compose = vi.spyOn(runtimeComposition, 'createGameRuntime').mockReturnValue(test.runtime)
   const wrapper = mount(RootApp, {
     props: { installRuntime() {} },
-    global: { plugins: [test.pinia, router] },
+    global: {
+      plugins: [test.pinia, router],
+      provide: { [gameRuntimeKey]: test.runtime },
+    },
   })
 
   await flushPromises()
 
-  expect(compose).not.toHaveBeenCalled()
-  expect(transactions).not.toHaveBeenCalled()
-  expect(wrapper.text()).toContain('正在加载')
-  // Unmounting a pending bootstrap must release its late engine without touching storage.
+  expect(compose).toHaveBeenCalledOnce()
+  expect(wrapper.find('main[aria-label="数独游戏"]').exists()).toBe(true)
+  expect(load).not.toHaveBeenCalled()
+  expect(initialize).not.toHaveBeenCalled()
   wrapper.unmount()
-  resolveModule(getTestModule())
-  await flushPromises()
-
-  expect(compose).not.toHaveBeenCalled()
-  expect(transactions).not.toHaveBeenCalled()
 })

@@ -8,6 +8,7 @@ import type { SudokuVariant } from '@/sudoku/contracts'
 import { isDifficulty } from '@/sudoku/values'
 import { supportedDifficulties, supportsDifficulty } from '@/sudoku/catalogue'
 import type { Difficulty } from '@/sudoku/contracts'
+import type { GameSummary } from '@/storage/readModels'
 import type { GameSession } from '@/features/game/model/session'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
 import { getVariantPresentation, VARIANT_OPTIONS } from '@/features/game/model/variants'
@@ -18,6 +19,10 @@ const props = withDefaults(
   defineProps<{
     mode?: 'free' | 'daily'
     savedSession?: GameSession | null
+    savedSummary?: GameSummary | null
+    statusesReady?: boolean
+    blocked?: boolean
+    retryable?: boolean
     statuses?: readonly DailyVariantStatus[]
     busy?: boolean
     generating?: boolean
@@ -26,13 +31,29 @@ const props = withDefaults(
   {
     mode: 'free',
     savedSession: null,
+    savedSummary: null,
+    statusesReady: true,
+    blocked: false,
+    retryable: false,
     statuses: () => [],
     busy: false,
     generating: false,
     error: null,
   },
 )
-const processing = computed(() => props.busy || props.generating)
+const processing = computed(() => props.busy || props.generating || props.blocked)
+const unfinishedSave = computed(() => {
+  if (props.savedSummary && !props.savedSummary.completedAt) {
+    return { difficulty: props.savedSummary.difficulty, elapsedMs: props.savedSummary.elapsedMs }
+  }
+  if (props.savedSession && !props.savedSession.completion) {
+    return {
+      difficulty: props.savedSession.puzzle.difficulty,
+      elapsedMs: props.savedSession.elapsedMs,
+    }
+  }
+  return null
+})
 const showLoading = useDelayedProgress(() => props.busy)
 const showGenerating = useDelayedProgress(() => props.generating)
 const variant = defineModel<SudokuVariant>('variant', { required: true })
@@ -43,7 +64,7 @@ watch(variant, (value) => {
     difficulty.value = 'hard'
   }
 })
-defineEmits<{ start: []; resume: []; cancel: [] }>()
+defineEmits<{ start: []; resume: []; cancel: []; retry: [] }>()
 const title = computed(() => (props.mode === 'daily' ? '选择每日挑战' : '开始一局数独'))
 const dailyState = computed(
   () => props.statuses.find((status) => status.variant === variant.value)?.state,
@@ -69,6 +90,9 @@ const descriptions: Record<SudokuVariant, string> = {
 }
 
 function statusLabel(type: SudokuVariant) {
+  if (!props.statusesReady) {
+    return '—'
+  }
   const state = props.statuses.find((status) => status.variant === type)?.state
 
   if (state === 'completed') {
@@ -111,7 +135,10 @@ onUnmounted(async () => {
     :mask-closable="false"
     @update:show="!$event && $emit('cancel')"
   >
-    <NAlert v-if="error" type="error" :show-icon="false" class="setup-error">{{ error }}</NAlert>
+    <NAlert v-if="error" type="error" :show-icon="false" class="setup-error"
+      >{{ error }}
+      <NButton v-if="retryable" :disabled="busy" @click="$emit('retry')">重试读取</NButton></NAlert
+    >
     <div :aria-busy="processing">
       <p class="field-label">选择玩法</p>
       <NRadioGroup
@@ -155,15 +182,11 @@ onUnmounted(async () => {
       </template>
       <p v-else class="muted">每天每种玩法一道题 · 中等难度</p>
     </div>
-    <NAlert
-      v-if="mode === 'free' && savedSession && !savedSession.completion"
-      type="info"
-      :show-icon="false"
-    >
+    <NAlert v-if="mode === 'free' && unfinishedSave" type="info" :show-icon="false">
       {{ getVariantPresentation(variant).label }}有未完成的存档（{{
-        DIFFICULTY_NAMES[savedSession.puzzle.difficulty]
+        DIFFICULTY_NAMES[unfinishedSave.difficulty]
       }}
-      · {{ formatDuration(savedSession.elapsedMs) }}）。开始游戏将替换此玩法存档，其他玩法会保留。
+      · {{ formatDuration(unfinishedSave.elapsedMs) }}）。开始游戏将替换此玩法存档，其他玩法会保留。
     </NAlert>
     <p v-if="mode === 'daily' && dailyState === 'completed'" class="muted">
       今日正式成绩已保留，再次游玩记为练习。
@@ -179,7 +202,7 @@ onUnmounted(async () => {
       <div ref="actions" class="setup-actions">
         <NButton @click="$emit('cancel')">取消</NButton>
         <NButton
-          v-if="mode === 'free' && savedSession && !savedSession.completion"
+          v-if="mode === 'free' && unfinishedSave"
           type="info"
           :disabled="processing"
           @click="$emit('resume')"

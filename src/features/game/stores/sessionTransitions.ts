@@ -11,9 +11,7 @@ import {
   getDailyIdentity,
   getDailyFormalId,
   getDailySeedMaterial,
-  getDailyStatuses,
 } from '@/features/game/model/daily'
-import type { DailyVariantStatus } from '@/features/game/model/daily'
 import { createSession } from '@/features/game/model/session'
 import type { GameSession, SessionMetadata, SessionPhase } from '@/features/game/model/session'
 import type { GameTransition } from '@/features/game/model/variants'
@@ -132,18 +130,7 @@ export function createSessionTransitions(
   async function findFreeSession(
     variant: SudokuVariant,
   ): Promise<StorageOutcome<SessionRecord | null>> {
-    const records = await runtime.repository.listSessions()
-
-    return records.ok
-      ? {
-          ok: true,
-          value:
-            records.value.find(
-              (record) =>
-                record.session.mode === 'free' && record.session.puzzle.rules.kind === variant,
-            ) ?? null,
-        }
-      : records
+    return runtime.repository.readSlot('free', variant)
   }
 
   async function restoreSession(id: string): Promise<GameTransition> {
@@ -168,7 +155,26 @@ export function createSessionTransitions(
     return loadSavedSession(id, operationGeneration)
   }
 
+  async function prepareEngine(epoch: number): Promise<GameTransition> {
+    try {
+      await runtime.ensureEngine()
+    } catch {
+      if (epoch !== operationGeneration) {
+        return { status: 'cancelled' }
+      }
+      error.value = '游戏准备失败，请重试。'
+      phase.value = session.value ? 'paused' : 'failed'
+      return { status: 'blocked', reason: 'load' }
+    }
+    return epoch === operationGeneration ? { status: 'ready' } : { status: 'cancelled' }
+  }
+
   async function loadSavedSession(id: string, epoch: number): Promise<GameTransition> {
+    const computation = await prepareEngine(epoch)
+    if (computation.status !== 'ready') {
+      return computation
+    }
+
     await persistence.release()
     if (epoch !== operationGeneration) {
       return { status: 'cancelled' }
@@ -190,7 +196,7 @@ export function createSessionTransitions(
     }
 
     // Read after acquiring the lease so a peer's final write is included before editing resumes.
-    const records = await runtime.repository.listSessions()
+    const records = await runtime.repository.readSession(id)
     if (epoch !== operationGeneration) {
       if (lease.value) {
         await runtime.ownership.releaseOwnership(lease.value)
@@ -214,7 +220,7 @@ export function createSessionTransitions(
       return { status: 'blocked', reason: 'load' }
     }
 
-    const record = records.value.find((item) => item.session.id === id)
+    const record = records.value
     if (!record) {
       if (lease.value) {
         await runtime.ownership.releaseOwnership(lease.value)
@@ -240,40 +246,11 @@ export function createSessionTransitions(
   }
 
   async function findSession(id: string): Promise<StorageOutcome<SessionRecord | null>> {
-    const records = await runtime.repository.listSessions()
-
-    return records.ok
-      ? { ok: true, value: records.value.find((record) => record.session.id === id) ?? null }
-      : records
+    return runtime.repository.readSession(id)
   }
 
   async function findPracticeSession(): Promise<StorageOutcome<SessionRecord | null>> {
-    const records = await runtime.repository.listSessions()
-
-    return records.ok
-      ? {
-          ok: true,
-          value: records.value.find((record) => record.session.mode === 'learning') ?? null,
-        }
-      : records
-  }
-
-  async function loadDailyStatuses(
-    date: string,
-  ): Promise<StorageOutcome<readonly DailyVariantStatus[]>> {
-    const [sessions, results] = await Promise.all([
-      runtime.repository.listSessions(),
-      runtime.repository.listResults(),
-    ])
-    if (!sessions.ok) {
-      return sessions
-    }
-
-    if (!results.ok) {
-      return results
-    }
-
-    return { ok: true, value: getDailyStatuses(sessions.value, results.value, date) }
+    return runtime.repository.readSlot('learning')
   }
 
   async function clearActiveSession(): Promise<GameTransition> {
@@ -322,7 +299,7 @@ export function createSessionTransitions(
       }
 
       if (lease.ok && lease.value) {
-        const catalog = await runtime.repository.listSessions()
+        const catalog = await runtime.repository.readSession(id)
         if (epoch !== operationGeneration || session.value?.id !== id) {
           await runtime.ownership.releaseOwnership(lease.value)
 
@@ -340,7 +317,7 @@ export function createSessionTransitions(
           return
         }
 
-        const stored = catalog.value.find((record) => record.session.id === id)
+        const stored = catalog.value
         if (
           persistence.capture().dirty &&
           (stored?.revision ?? 0) !== persistence.capture().revision
@@ -424,6 +401,10 @@ export function createSessionTransitions(
       error.value = '本机数据已被替换，请重新选择游戏。'
       return { status: 'cancelled' }
     }
+    const computation = await prepareEngine(epoch)
+    if (computation.status !== 'ready') {
+      return computation
+    }
     const validated = validatePuzzleSnapshot(puzzle, runtime.engine)
     if (validated.status !== 'valid') {
       phase.value = session.value ? 'paused' : 'failed'
@@ -471,7 +452,10 @@ export function createSessionTransitions(
       error.value = '无法确认本机存档状态，请重试。'
       return { status: 'blocked', reason: 'load' }
     }
-    const catalog = await runtime.repository.listSessions()
+    const catalog =
+      metadata.kind === 'daily'
+        ? { ok: true as const, value: null }
+        : await runtime.repository.readSlot(metadata.kind, puzzle.rules.kind)
     if (epoch !== operationGeneration) {
       return { status: 'cancelled' }
     }
@@ -483,14 +467,7 @@ export function createSessionTransitions(
       return { status: 'blocked', reason: 'load' }
     }
 
-    const previous =
-      metadata.kind === 'daily'
-        ? null
-        : catalog.value.find(
-            (record) =>
-              record.session.mode === metadata.kind &&
-              (metadata.kind !== 'free' || record.session.puzzle.rules.kind === puzzle.rules.kind),
-          )
+    const previous = catalog.value
     let previousToken: OwnershipToken | null = null
     // The persistence owner releases its attached lease; this transition releases only leases it acquired.
     let ownsPreviousLease = false
@@ -798,7 +775,7 @@ export function createSessionTransitions(
     }
 
     if (!persistence.hasQueue) {
-      const catalog = await runtime.repository.listSessions()
+      const catalog = await runtime.repository.readSession(id)
       if (epoch !== operationGeneration || session.value?.id !== id) {
         return
       }
@@ -809,7 +786,7 @@ export function createSessionTransitions(
         return
       }
 
-      const current = catalog.value.find((record) => record.session.id === id)
+      const current = catalog.value
       if ((current?.revision ?? 0) !== persistence.capture().revision) {
         handleSave({
           ok: false,
@@ -819,21 +796,24 @@ export function createSessionTransitions(
         return
       }
 
-      if (
-        !current &&
-        session.value.mode !== 'daily' &&
-        catalog.value.some(
-          (record) =>
-            record.session.mode === session.value?.mode &&
-            (session.value?.mode !== 'free' ||
-              record.session.puzzle.rules.kind === session.value.puzzle.rules.kind),
+      if (!current && session.value.mode !== 'daily') {
+        const slot = await runtime.repository.readSlot(
+          session.value.mode,
+          session.value.puzzle.rules.kind,
         )
-      ) {
-        error.value = '已有其他存档，请重新载入后继续。'
-        readOnly.value = true
-        pause()
-
-        return
+        if (epoch !== operationGeneration || session.value?.id !== id) {
+          return
+        }
+        if (!slot.ok) {
+          handleSave(slot)
+          return
+        }
+        if (slot.value) {
+          error.value = '已有其他存档，请重新载入后继续。'
+          readOnly.value = true
+          pause()
+          return
+        }
       }
 
       const acquired = await runtime.ownership.acquireOwnership(id, runtime.ownerId)
@@ -910,8 +890,8 @@ export function createSessionTransitions(
     }
     const formalId = getDailyFormalId(date, variant)
     const [catalog, results] = await Promise.all([
-      runtime.repository.listSessions(),
-      runtime.repository.listResults(),
+      runtime.repository.readSession(formalId),
+      runtime.repository.readResult(formalId),
     ])
     if (epoch !== operationGeneration) {
       return { status: 'cancelled' }
@@ -923,7 +903,7 @@ export function createSessionTransitions(
       return { status: 'blocked', reason: 'load' }
     }
 
-    const existing = catalog.value.find((record) => record.session.id === formalId)
+    const existing = catalog.value
     if (existing && !existing.session.completion) {
       const restored = await restoreSession(formalId)
       if (restored.status === 'ready' && !readOnly.value) {
@@ -933,8 +913,11 @@ export function createSessionTransitions(
       return restored
     }
 
-    const formalAttempt =
-      !existing && !results.value.some((record) => record.session.id === formalId)
+    const formalAttempt = !existing && !results.value
+    const computation = await prepareEngine(epoch)
+    if (computation.status !== 'ready') {
+      return computation
+    }
 
     // Existing formal attempts win before any current-version seed derivation or construction.
     const seed = runtime.engine.deriveSeed(getDailySeedMaterial(date))
@@ -954,7 +937,6 @@ export function createSessionTransitions(
     reloadLatestSession,
     findSession,
     findPracticeSession,
-    loadDailyStatuses,
     clearActiveSession,
     resume,
     startGame,

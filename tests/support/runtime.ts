@@ -17,6 +17,7 @@ export async function createTestRuntime() {
   const repository = createGameRepository(provider, engine)
   const runtime: GameRuntime = {
     ready: true,
+    ensureEngine: async () => {},
     engine,
     createSeed: () => crypto.getRandomValues(new Uint8Array(32)),
     ownership,

@@ -8,7 +8,7 @@ import type { SudokuVariant } from '@/sudoku/contracts'
 import { createGenerationInput } from '@/sudoku/generationInput'
 import { parseVariantQuery } from '@/features/game/model/variants'
 import type { SessionMetadata } from '@/features/game/model/session'
-import type { SessionRecord } from '@/storage/records'
+import type { GameSummary } from '@/storage/readModels'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { useGameRuntime } from '@/runtime'
 
@@ -31,28 +31,58 @@ export function useGameEntry(options: GameEntryOptions) {
   const difficulty = ref<Difficulty>(options.practiceDifficulty())
   const setupOpen = ref(false)
   const targetLoading = ref(false)
+  const targetPending = ref(false)
+  const targetError = ref<string | null>(null)
   const nextVariant = ref<SudokuVariant>(options.practiceVariant())
   const queryVariant = computed(() => parseVariantQuery(route.query.variant))
-  const targetSession = ref<SessionRecord | null>(null)
+  const targetSummary = ref<GameSummary | null>(null)
   let targetLookup = 0
+  let targetMaintenance: AbortController | null = null
 
   async function refreshTarget() {
+    targetMaintenance?.abort()
+    targetMaintenance = null
     const epoch = ++targetLookup
     if (metadata.value.kind !== 'free') {
       return
     }
 
     targetLoading.value = true
-    const result = await game.findFreeSession(nextVariant.value)
+    const result = await runtime.repository.readSlotSummary('free', nextVariant.value)
     if (epoch !== targetLookup) {
       return
     }
 
     targetLoading.value = false
-    targetSession.value = result.ok ? result.value : null
+    targetSummary.value = result.ok ? result.value.summary : null
+    targetPending.value = result.ok && result.value.coverage === 'pending'
     if (!result.ok) {
-      initializationError.value = '目标玩法存档读取失败。新开一局可暂存在内存中，请保持页面打开。'
+      targetError.value = '目标玩法存档读取失败，请重试。'
+    } else if (targetPending.value) {
+      targetError.value = '旧存档尚待校验，请重新读取后继续。'
+    } else {
+      targetError.value = null
     }
+  }
+
+  async function retryTarget() {
+    if (targetPending.value) {
+      targetLoading.value = true
+      const epoch = ++targetLookup
+      targetMaintenance?.abort()
+      const controller = new AbortController()
+      targetMaintenance = controller
+      const result = await runtime.repository.maintainSummaries(controller.signal)
+      if (disposed || epoch !== targetLookup) {
+        return
+      }
+      if (!result.ok) {
+        targetLoading.value = false
+        targetError.value = '旧存档暂时无法校验，请重试。原有进度已保留。'
+        return
+      }
+    }
+    await refreshTarget()
   }
 
   watch(nextVariant, () => {
@@ -68,6 +98,7 @@ export function useGameEntry(options: GameEntryOptions) {
     disposed = true
     initialization++
     targetLookup++
+    targetMaintenance?.abort()
   })
   const active = computed(
     () =>
@@ -271,7 +302,7 @@ export function useGameEntry(options: GameEntryOptions) {
 
     await refreshTarget()
     if (
-      targetSession.value ||
+      targetSummary.value ||
       (metadata.value.kind === 'learning' && (active.value || replacementAvailable.value))
     ) {
       return true
@@ -281,17 +312,20 @@ export function useGameEntry(options: GameEntryOptions) {
   }
 
   function startSelected() {
+    if (targetLoading.value || targetPending.value || targetError.value) {
+      return
+    }
     setupOpen.value = false
     void start()
   }
 
   async function resumeTarget() {
-    if (!targetSession.value) {
+    if (!targetSummary.value) {
       return
     }
 
     setupOpen.value = false
-    const transition = await game.restoreSession(targetSession.value.session.id)
+    const transition = await game.restoreSession(targetSummary.value.id)
     if (transition.status === 'ready') {
       await game.resume()
       await syncSessionRoute()
@@ -306,8 +340,11 @@ export function useGameEntry(options: GameEntryOptions) {
     nextVariant,
     difficulty,
     setupOpen,
-    targetSession,
+    targetSummary,
     targetLoading,
+    targetPending,
+    targetError,
+    retryTarget,
     replacementAvailable,
     initialize,
     start,

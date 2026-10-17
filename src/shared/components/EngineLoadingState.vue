@@ -11,10 +11,10 @@ defineEmits<{ retry: [] }>()
       <h1>数独</h1>
       <div v-if="!failed" role="status" aria-atomic="true">
         <NSpin size="medium" aria-hidden="true" />
-        <p>正在加载数独引擎…</p>
+        <p>正在打开数独…</p>
       </div>
       <div v-else role="alert">
-        <p>数独引擎加载失败，请重试。</p>
+        <p>页面加载失败，请重试。</p>
         <NButton type="primary" @click="$emit('retry')">重试</NButton>
       </div>
     </section>

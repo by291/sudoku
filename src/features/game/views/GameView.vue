@@ -85,7 +85,10 @@ const {
   nextVariant,
   difficulty,
   setupOpen,
-  targetSession,
+  targetSummary,
+  targetPending,
+  targetError,
+  retryTarget,
   targetLoading,
   initialize,
   start,
@@ -644,10 +647,13 @@ function erase() {
       v-if="setupOpen && !departing"
       v-model:variant="nextVariant"
       v-model:difficulty="difficulty"
-      :saved-session="targetSession?.session"
+      :saved-summary="targetSummary"
+      :blocked="targetPending || !!targetError"
+      :retryable="true"
       :busy="targetLoading"
       :generating="generating"
-      :error="initializationError"
+      :error="targetError"
+      @retry="retryTarget"
       @cancel="setupOpen = false"
       @start="startSelected"
       @resume="resumeTarget"
