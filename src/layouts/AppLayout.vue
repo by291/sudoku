@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { computed, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { NAlert, NButton, NRadioButton, NRadioGroup } from 'naive-ui'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
 import type { ThemePreference } from '@/features/settings/model/preferences'
@@ -25,6 +25,9 @@ function focusMain() {
   mainContent.value?.scrollIntoView()
 }
 
+// WebKit can drop :focus-visible after native radio arrow navigation.
+const themeKeyboardFocus = ref(false)
+
 function updateTheme(value: string | number | boolean) {
   if (value === 'light' || value === 'dark' || value === 'system') {
     emit('theme', value)
@@ -48,10 +51,14 @@ const themes: { value: ThemePreference; label: string; name: string }[] = [
       </RouterLink>
       <NRadioGroup
         class="theme-switch"
+        :class="{ 'keyboard-focus': themeKeyboardFocus }"
         :value="preference"
+        :theme-overrides="{ buttonBoxShadowFocus: 'none' }"
         name="interface-theme"
         role="radiogroup"
         aria-label="界面主题"
+        @keydown="themeKeyboardFocus = true"
+        @pointerdown="themeKeyboardFocus = false"
         @update:value="updateTheme"
       >
         <NRadioButton
@@ -160,9 +167,11 @@ main {
   min-height: 44px;
   padding: 0 12px;
 }
-.theme-switch :deep(.n-radio-button:focus-within) {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
+/* Naive UI 2.45.3 focuses the hidden input; draw one keyboard-only ring on its label. */
+.theme-switch :deep(.n-radio-button:has(:focus-visible)),
+.theme-switch.keyboard-focus :deep(.n-radio-button:focus-within) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
   z-index: 1;
 }
 .site-footer {

@@ -9,6 +9,38 @@ import {
 } from './support'
 import { makeSession } from '../support/gameFixtures'
 
+test('reserves the theme focus ring for keyboard navigation', async ({ page }, testInfo) => {
+  await page.goto('/')
+  const themes = page.getByRole('radiogroup', { name: '界面主题', exact: true })
+
+  for (const theme of ['浅色', '深色']) {
+    const choice = themes.getByText(theme, { exact: true })
+    const radio = themes.getByRole('radio', { name: `${theme}主题`, exact: true })
+    const label = themes.locator('label').filter({ has: page.getByText(theme, { exact: true }) })
+    await choice.click()
+
+    await expect(radio).toBeChecked()
+    await expect(label).toHaveCSS('outline-style', 'none')
+    await expect(label.locator('.n-radio-button__state-border')).toHaveCSS(
+      'box-shadow',
+      /^(none|rgba\(0, 0, 0, 0\).*)$/,
+    )
+    await themes.screenshot({
+      path: `.superpowers/board-feedback/theme-${theme === '浅色' ? 'light' : 'dark'}-${testInfo.project.name}.png`,
+      animations: 'disabled',
+    })
+
+    // Mobile WebKit skips radios in Tab order; establish keyboard modality before focusing one.
+    await page.keyboard.press('Tab')
+    await radio.focus()
+    await radio.press('ArrowRight')
+    await page.keyboard.press('ArrowLeft')
+    await expect(radio).toBeFocused()
+    await expect(label).toHaveCSS('outline-style', 'solid')
+    await expect(label).toHaveCSS('outline-width', '2px')
+  }
+})
+
 test('explains protected selections while keeping whole-board helpers available', async ({
   page,
 }) => {

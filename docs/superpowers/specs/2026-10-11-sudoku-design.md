@@ -32,6 +32,8 @@ Use a calm, simple visual design: a light paper-like background, dark text, teal
 
 The board feedback refinement requested on 2026-10-17 keeps grid lines unchanged on pointer hover. Given and player-entered digits share the same size and 650 font weight, with color alone distinguishing their origin. Conflicting cells use the full soft-error background in both themes, without exclamation marks or a visible repeated violation list above the board; accessible conflict descriptions remain available. Pressing a conflicting cell preserves its error background.
 
+Theme choices retain their selected fill and show a single thin focus ring only for keyboard navigation, without the stacked pointer-focus outlines.
+
 Use Vue Router in hash mode so direct navigation and refresh work on static hosting. Routes are `/`, `/play/free`, `/learn`, `/learn/:lessonId`, `/play/daily`, and `/records`.
 
 The UI refinement approved on 2026-10-11 uses Naive UI for buttons, confirmation modals, single-choice groups, setting checkboxes with clickable labels, and error alerts. Its theme overrides read the shared CSS palette and follow light, dark, and system preferences. Keep the Sudoku board as a specialized CSS Grid component.
