@@ -13,7 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
@@ -130,17 +133,21 @@ internal fun SudokuApp(activity: MainActivity) {
                             }
                         }
                         entry<AppRoute.Records> {
+                            var backupOpen by rememberSaveable { mutableStateOf(false) }
                             DestinationShell(
                                 AppRoute.Records,
                                 state.settings.theme,
                                 state.error,
                                 ::back,
                                 model::setTheme,
-                                model::retry
+                                model::retry,
+                                onRecordsBackup = { backupOpen = true }
                             ) {
                                 RecordsRoute(
                                     onResume = { backStack.add(AppRoute.Game(it)) },
-                                    onDatasetReplaced = { scope.launch { model.reloadSettings() } }
+                                    onDatasetReplaced = { scope.launch { model.reloadSettings() } },
+                                    backupOpen = backupOpen,
+                                    onDismissBackup = { backupOpen = false }
                                 )
                             }
                         }

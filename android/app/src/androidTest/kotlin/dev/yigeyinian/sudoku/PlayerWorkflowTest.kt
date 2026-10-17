@@ -1,5 +1,6 @@
 package dev.yigeyinian.sudoku
 
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -36,6 +38,7 @@ import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.SudokuEngine
 import dev.yigeyinian.sudoku.model.createSession
 import dev.yigeyinian.sudoku.runtime.EngineModule
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
@@ -415,14 +418,33 @@ class PlayerWorkflowTest {
     @Test
     fun retainsTheRecordsFilterWhenReturningThroughHome() {
         compose.onNodeWithText("我的记录").performScrollTo().performClick()
-        awaitText("杀手数独")
-        compose.onNodeWithText("杀手数独").performScrollTo().performClick()
+        awaitDescription("杀手数独")
+        compose.onNodeWithContentDescription("杀手数独").performScrollTo().performClick()
+        compose.onNodeWithText("本地存档").performClick()
         compose.onNodeWithContentDescription("返回首页").performClick()
         awaitText("开始数独")
 
         compose.onNodeWithText("我的记录").performScrollTo().performClick()
-        awaitText("杀手数独")
-        compose.onNodeWithText("杀手数独").assertIsSelected()
+        awaitDescription("杀手数独")
+        compose.onNodeWithContentDescription("杀手数独").assertIsSelected()
+        compose.onNodeWithText("本地存档").assertIsSelected()
+    }
+
+    @Test
+    fun recordsBackupOpensFromTheToolbarAndBackDismissesOnlyTheSheet() {
+        compose.onNodeWithText("我的记录").performScrollTo().performClick()
+        awaitText("每一次专注，都算数。")
+        compose.onNodeWithContentDescription("界面主题").assertDoesNotExist()
+        captureRecords("records-overview")
+        compose.onNodeWithText("备份").performClick()
+        compose.onNodeWithText("本地数据与备份").assertIsDisplayed()
+        compose.onNodeWithText("导出备份").assertIsDisplayed()
+        captureRecords("records-backup")
+        pressBack()
+        compose.onNodeWithText("本地数据与备份").assertDoesNotExist()
+        compose.onNodeWithText("每一次专注，都算数。").assertIsDisplayed()
+        compose.onNodeWithContentDescription("返回首页").performClick()
+        awaitText("开始数独")
     }
 
     @Test
@@ -459,10 +481,24 @@ class PlayerWorkflowTest {
         awaitText("开始数独")
 
         compose.onNodeWithText("我的记录").performScrollTo().performClick()
-        awaitText("杀手数独")
+        awaitDescription("杀手数独")
         pressBack()
         awaitText("开始数独")
         compose.onNodeWithContentDescription("返回首页").assertDoesNotExist()
+    }
+
+    private fun captureRecords(name: String) {
+        if (InstrumentationRegistry.getArguments().getString("captureRecords") != "true") return
+        compose.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun awaitDescription(description: String, substring: Boolean = false) {

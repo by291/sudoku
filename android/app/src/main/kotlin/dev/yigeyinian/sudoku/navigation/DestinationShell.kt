@@ -44,6 +44,7 @@ internal fun DestinationShell(
     onBack: () -> Unit,
     onTheme: (ThemePreference) -> Unit,
     onRetry: () -> Unit,
+    onRecordsBackup: () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     var themeOpen by remember { mutableStateOf(false) }
@@ -86,6 +87,8 @@ internal fun DestinationShell(
                 actions = {
                     if (current == AppRoute.Home) {
                         IconButton(onClick = { themeOpen = true }) { Icon(Icons.Outlined.Palette, "界面主题") }
+                    } else if (current == AppRoute.Records) {
+                        TextButton(onClick = onRecordsBackup) { Text("备份") }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
