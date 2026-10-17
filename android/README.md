@@ -2,7 +2,7 @@
 
 A native, offline Chinese Sudoku client using Compose and the shared synchronous Rust core. Android-specific application and FFI sources live here; the portable computation remains in `../sudoku/core`.
 
-The Gradle project is named `sudoku`; the application ID and base Kotlin namespace are `dev.sudoku.app`. The player-facing Chinese name remains 一格一念. Builds with this application ID install separately from earlier package identities; transfer existing local progress through backup export and import.
+The Gradle project is named `sudoku-android`; the application ID and base Kotlin namespace are `dev.sudoku.app`. The player-facing Chinese name remains 一格一念. Builds with this application ID install separately from earlier package identities; transfer existing local progress through backup export and import.
 
 Debug builds use application ID `dev.sudoku.app.debug` and launcher name 一格一念 Debug, allowing installation alongside release builds. Both variants keep the Kotlin namespace `dev.sudoku.app` and have separate local data.
 

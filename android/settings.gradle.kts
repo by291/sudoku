@@ -15,6 +15,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "sudoku"
+rootProject.name = "sudoku-android"
 include(":app", ":core:domain", ":core:engine", ":core:data", ":core:design", ":core:ui")
 include(":feature:game", ":feature:learning", ":feature:records")
