@@ -3,7 +3,6 @@ package dev.yigeyinian.sudoku.feature.learning
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.GameRepository
 import dev.yigeyinian.sudoku.model.LessonProgress
 import dev.yigeyinian.sudoku.model.Placement
@@ -12,7 +11,6 @@ import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.Variant
 import dev.yigeyinian.sudoku.model.isoInstant
 import dev.yigeyinian.sudoku.model.learning.ExerciseAnswer
-import dev.yigeyinian.sudoku.model.learning.LearningContentRepository
 import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 import dev.yigeyinian.sudoku.model.learning.LessonCursor
 import java.time.Instant
@@ -55,55 +53,55 @@ internal data class LearningUiState(
 @HiltViewModel
 internal class LearningViewModel @Inject constructor(
     private val repository: GameRepository,
-    private val content: LearningContentRepository
+    private val loader: LearningSnapshotLoader
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(LearningUiState())
+    private val mutableState = MutableStateFlow(loader.snapshot)
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
     private var loading: Job? = null
     private var requestedLessonId: String? = null
+    private var opened = false
 
     fun open(lessonId: String? = null) {
         requestedLessonId = lessonId
         loading?.cancel()
         val operation = ++generation
-        mutableState.value = LearningUiState(selectedVariant = mutableState.value.selectedVariant, lessonId = lessonId)
+        val prepared = if (!opened && lessonId == null) loader.takePreparedDirectory() else null
+        opened = true
+        if (prepared != null) {
+            mutableState.value = prepared.copy(selectedVariant = mutableState.value.selectedVariant)
+            return
+        }
+
+        // Keep the directory mounted during return refreshes. Lessons still wait for a fresh
+        // durable cursor before permitting answers; the cached overview is not an exercise state.
+        mutableState.value = if (lessonId == null) {
+            mutableState.value.copy(error = null)
+        } else {
+            LearningUiState(selectedVariant = mutableState.value.selectedVariant, lessonId = lessonId)
+        }
         loading = viewModelScope.launch {
-            val epoch = repository.readDatasetEpoch()
-            val catalogue = content.load()
-            val settings = repository.readSettings()
-            val progress = repository.readLessonProgress()
-            val currentEpoch = repository.readDatasetEpoch()
+            val loaded = loader.read()
             if (operation != generation) {
                 return@launch
             }
-            if (epoch !is StorageOutcome.Success || currentEpoch !is StorageOutcome.Success ||
-                settings !is StorageOutcome.Success ||
-                progress !is StorageOutcome.Success
-            ) {
-                failLoad("学习进度暂时无法读取，请重试。")
+            val catalogue = loaded.catalogue
+            if (catalogue == null) {
+                failLoad(checkNotNull(loaded.error))
                 return@launch
             }
-            if (epoch.value != currentEpoch.value) {
-                failLoad("本地资料已更新，请重新读取课程。")
-                return@launch
-            }
-            if (catalogue !is EngineOutcome.Completed) {
-                failLoad(contentFailure(catalogue))
-                return@launch
-            }
-            val lesson = lessonId?.let(catalogue.value::lesson)
+            val lesson = lessonId?.let(catalogue::lesson)
             if (lessonId != null && lesson == null) {
                 failLoad("找不到这节课程，请返回学习列表。")
                 return@launch
             }
-            val cursor = lessonId?.let { catalogue.value.restoreCursor(it, settings.value.lessonStages?.get(it) ?: 0) }
+            val cursor = lessonId?.let { catalogue.restoreCursor(it, loaded.settings.lessonStages?.get(it) ?: 0) }
             mutableState.value = LearningUiState(
                 loading = false,
-                catalogue = catalogue.value,
-                progress = progress.value,
-                settings = settings.value,
-                epoch = epoch.value,
+                catalogue = catalogue,
+                progress = loaded.progress,
+                settings = loaded.settings,
+                epoch = loaded.epoch,
                 selectedVariant = lesson?.practiceVariant ?: mutableState.value.selectedVariant,
                 lessonId = lessonId,
                 cursor = cursor
@@ -311,12 +309,4 @@ internal class LearningViewModel @Inject constructor(
             saveFailed(operation)
         }
     }
-}
-
-private fun contentFailure(result: EngineOutcome<*>): String = when (result) {
-    is EngineOutcome.BudgetExhausted -> "课程校验尚未完成，请重试。"
-    EngineOutcome.Cancelled -> "课程加载已取消，可以重试。"
-    EngineOutcome.TimedOut -> "课程校验超时，请重试。"
-    is EngineOutcome.Failed -> "课程暂时无法校验，请重试。"
-    is EngineOutcome.Completed -> error("Completed catalogue is not a loading failure")
 }

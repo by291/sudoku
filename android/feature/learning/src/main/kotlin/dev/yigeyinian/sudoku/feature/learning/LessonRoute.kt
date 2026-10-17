@@ -17,7 +17,8 @@ fun LessonRoute(lessonId: String, onPractice: (GameLaunch.Practice) -> Unit, onB
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.checkDataset() }
 
     LessonScreen(
-        state = state,
+        // A shared preloaded directory must never appear as an initialized lesson interaction.
+        state = if (state.lessonId == lessonId) state else state.copy(loading = true),
         onCell = model::selectCell,
         onDigit = model::enterDigit,
         onSubmit = model::submit,

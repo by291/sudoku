@@ -18,6 +18,18 @@ The shared presentation helper in `core/design` uses composition-scoped cancella
 
 Applied to app readiness, Home save loading, setup loading, game preparation, conflict checks, candidate generation, hints, lesson loading/submission, and records loading/processing. Home retains the Start button during loading. Game analysis reuses the existing single-line board status region. Records reuses the heading and subtitle instead of inserting a progress row. This preserves the accepted game layout and avoids transient height changes.
 
+## Learning directory initial overview
+
+Course count is fixed by the catalogue's authored identity contract, so the heading and variant choices render immediately without waiting for asset or personal-progress reads. `LessonCatalogue.bundledLessonCount` derives that count from the same identities verified by catalogue decoding; no separate hard-coded total or runtime lesson computation is needed.
+
+Application bootstrap now prepares a feature-owned learning snapshot concurrently with Home. Within that preparation, the fixed catalogue, saved settings, and lesson progress load concurrently between dataset-epoch reads. First navigation uses the complete cached snapshot synchronously, including the recommendation and list; it does not clear the list or issue another initial read. Returning to the directory refreshes progress while retaining its existing content. Lesson interactions still read a fresh durable cursor before accepting answers, and never treat the directory snapshot as a loaded lesson.
+
+Failures remain retryable on the learning page and do not disable unrelated Home actions. Mixed dataset epochs and cancelled reads never publish partial snapshots. When no snapshot is available, the fixed heading remains visible, the counter and progress geometry stays reserved, and unknown progress is not announced as zero.
+
+Regressions cover the fixed count before asset loading, stable subtitle/category bounds, prepared list availability before navigation, one-time first-entry reuse, return refresh, and rejection/retry across dataset replacement. The original directory regression failed because its initial state was still loading despite a prepared snapshot. Full Android quality checks and debug/test assembly passed.
+
+Seven device checks passed on a disposable API 37.2 ARM emulator at 360 × 800 dp: initial Home geometry, startup feedback, predictive navigation, and opening a real bundled lesson without runtime mathematical validation. The temporary emulator was removed afterwards.
+
 ## Verification
 
 An instrumented native-entry regression failed before the fix: after 100 ms, the quick conflict-check caption was already visible. See [the pre-fix result](verification/2026-10-17-loading-feedback/progress-red-test.txt).

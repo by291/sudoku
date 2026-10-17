@@ -1,5 +1,6 @@
 package dev.yigeyinian.sudoku
 
+import dev.yigeyinian.sudoku.feature.learning.LearningSnapshotLoader
 import dev.yigeyinian.sudoku.game.GameEntryLoader
 import dev.yigeyinian.sudoku.model.EngineInformation
 import dev.yigeyinian.sudoku.model.EngineOutcome
@@ -11,6 +12,8 @@ import dev.yigeyinian.sudoku.model.StorageFailure
 import dev.yigeyinian.sudoku.model.StorageFailureKind
 import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.SudokuEngine
+import dev.yigeyinian.sudoku.model.learning.LearningContentRepository
+import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +35,8 @@ class AppViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = StartupRepository()
-            val model = AppViewModel(startupEngine(), repository, GameEntryLoader(repository))
+            val model =
+                AppViewModel(startupEngine(), repository, GameEntryLoader(repository), startupLearning(repository))
             runCurrent()
 
             assertTrue(repository.settingsStarted)
@@ -53,6 +57,36 @@ class AppViewModelTest {
     }
 
     @Test
+    fun preparesLearningConcurrentlyAndKeepsItsFailureLocalToLearning() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = StartupRepository()
+            val learningGate = CompletableDeferred<Unit>()
+            val model = AppViewModel(
+                startupEngine(),
+                repository,
+                GameEntryLoader(repository),
+                startupLearning(repository, learningGate)
+            )
+            runCurrent()
+            assertTrue(repository.settingsStarted)
+            assertTrue(repository.sessionsStarted)
+            repository.settingsGate.complete(Unit)
+            repository.savesGate.complete(Unit)
+            runCurrent()
+            assertFalse(model.uiState.value.ready)
+
+            learningGate.complete(Unit)
+            runCurrent()
+
+            assertTrue(model.uiState.value.ready)
+            assertFalse(model.uiState.value.loading)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun failedSaveReadKeepsHomeClosedAndCanBeRetried() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -60,7 +94,8 @@ class AppViewModelTest {
             repository.settingsGate.complete(Unit)
             repository.savesGate.complete(Unit)
             repository.sessions = StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Unavailable"))
-            val model = AppViewModel(startupEngine(), repository, GameEntryLoader(repository))
+            val model =
+                AppViewModel(startupEngine(), repository, GameEntryLoader(repository), startupLearning(repository))
             runCurrent()
 
             assertFalse(model.uiState.value.ready)
@@ -86,6 +121,11 @@ private class StartupRepository : GameRepository by startupStub(GameRepository::
     var sessionsStarted = false
     var resultsStarted = false
     var sessions: StorageOutcome<List<SessionRecord>> = StorageOutcome.Success(emptyList())
+
+    override suspend fun readDatasetEpoch() = StorageOutcome.Success(0L)
+
+    override suspend fun readLessonProgress() =
+        StorageOutcome.Success(emptyList<dev.yigeyinian.sudoku.model.LessonProgress>())
 
     override suspend fun readSettings(): StorageOutcome<Settings> {
         settingsStarted = true
@@ -117,3 +157,14 @@ private fun <T> startupStub(type: Class<T>): T = type.cast(
         throw UnsupportedOperationException(method.name)
     }
 )
+
+private fun startupLearning(repository: GameRepository, gate: CompletableDeferred<Unit>? = null) =
+    LearningSnapshotLoader(
+        repository,
+        object : LearningContentRepository {
+            override suspend fun load(): EngineOutcome<LessonCatalogue> {
+                gate?.await()
+                return EngineOutcome.Failed("Unavailable catalogue fixture")
+            }
+        }
+    )

@@ -3,6 +3,7 @@ package dev.yigeyinian.sudoku
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.yigeyinian.sudoku.feature.learning.LearningSnapshotLoader
 import dev.yigeyinian.sudoku.game.GameEntryLoader
 import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.GameRepository
@@ -31,7 +32,8 @@ internal data class AppUiState(
 internal class AppViewModel @Inject constructor(
     private val engine: SudokuEngine,
     private val repository: GameRepository,
-    private val gameEntryLoader: GameEntryLoader
+    private val gameEntryLoader: GameEntryLoader,
+    private val learningLoader: LearningSnapshotLoader
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(AppUiState())
     val uiState = mutableState.asStateFlow()
@@ -64,7 +66,9 @@ internal class AppViewModel @Inject constructor(
             val home = coroutineScope {
                 val settings = async { reloadSettings() }
                 val savedGames = async { gameEntryLoader.prepareHome() }
+                val learning = async { learningLoader.prepare() }
                 settings.await()
+                learning.await()
                 savedGames.await()
             }
             when (home) {

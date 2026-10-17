@@ -20,6 +20,7 @@ import dev.yigeyinian.sudoku.model.learning.LessonCatalogue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -44,10 +45,81 @@ class LearningViewModelTest {
         val courses = catalogue()
         return LearningViewModel(
             repository,
+            LearningSnapshotLoader(
+                repository,
+                object : LearningContentRepository {
+                    override suspend fun load() = EngineOutcome.Completed(courses)
+                }
+            )
+        )
+    }
+
+    @Test
+    fun `prepared directory is available before navigation and first open reuses it`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = LearningRepository()
+            val courses = catalogue()
+            var reads = 0
+            val loader = LearningSnapshotLoader(
+                repository,
+                object : LearningContentRepository {
+                    override suspend fun load(): EngineOutcome<LessonCatalogue> {
+                        reads++
+                        return EngineOutcome.Completed(courses)
+                    }
+                }
+            )
+            loader.prepare()
+            val model = LearningViewModel(repository, loader)
+
+            assertFalse(model.uiState.value.loading)
+            assertEquals(12, model.uiState.value.overview().lessons.size)
+            model.open()
+            runCurrent()
+
+            assertFalse(model.uiState.value.loading)
+            assertEquals(1, reads)
+            repository.progress.add(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
+            model.open()
+            assertEquals(12, model.uiState.value.overview().lessons.size)
+            advanceUntilIdle()
+            assertEquals(1, model.uiState.value.overview().completedCount)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `preparation rejects mixed datasets and can retry after replacement`() = runTest {
+        val repository = LearningRepository()
+        val progressGate = CompletableDeferred<Unit>()
+        val courses = catalogue()
+        val loader = LearningSnapshotLoader(
+            object : GameRepository by repository {
+                override suspend fun readLessonProgress(): StorageOutcome<List<LessonProgress>> {
+                    progressGate.await()
+                    return repository.readLessonProgress()
+                }
+            },
             object : LearningContentRepository {
                 override suspend fun load() = EngineOutcome.Completed(courses)
             }
         )
+        val preparation = launch { loader.prepare() }
+        runCurrent()
+        assertTrue(loader.snapshot.loading)
+        assertEquals(null, loader.snapshot.catalogue)
+
+        repository.epoch++
+        progressGate.complete(Unit)
+        preparation.join()
+
+        assertNotNull(loader.snapshot.error)
+        assertEquals(null, loader.snapshot.catalogue)
+        loader.prepare()
+        assertEquals(1L, loader.snapshot.epoch)
+        assertEquals(32, loader.snapshot.catalogue?.lessons?.size)
     }
 
     private fun answerCurrent(model: LearningViewModel) {
