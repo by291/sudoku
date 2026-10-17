@@ -177,11 +177,7 @@ private fun BoardCell(
         selected -> colors.accent
         else -> Color.Transparent
     }
-    val valueColor = when {
-        conflict -> colors.error
-        given > 0 -> colors.accent
-        else -> colors.text
-    }
+    val valueColor = if (given > 0) colors.accent else colors.text
 
     Box(
         modifier
@@ -244,10 +240,10 @@ private fun BoardCell(
                 modifier = Modifier.align(Alignment.TopStart).padding(start = 3.dp, top = 1.dp).clearAndSetSemantics {}
             )
         }
-        if (conflict || evidence) {
+        if (evidence && !conflict) {
             Text(
-                if (conflict) "!" else "•",
-                color = if (conflict) colors.error else colors.text,
+                "•",
+                color = colors.text,
                 fontSize = markerSize,
                 lineHeight = markerSize,
                 maxLines = 1,
