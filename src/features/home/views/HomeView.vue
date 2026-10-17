@@ -141,6 +141,7 @@ onMounted(home.load)
       v-model:show="resumeOpen"
       title="继续上次"
       class="resume-dialog"
+      :max-width="600"
       @after-leave="restoreResumeFocus"
     >
       <div class="resume-content" :aria-busy="sheetBusy">
@@ -154,25 +155,25 @@ onMounted(home.load)
         </NAlert>
         <p class="resume-intro muted">
           <span v-if="showSheetLoading" role="status">正在读取存档…</span>
-          <span v-else>选择一局继续，按开始时间从新到旧排列。</span>
+          <span v-else>选择一局，接着推理。最近开始的排在前面。</span>
         </p>
         <ul class="resume-list" aria-label="未完成的存档">
           <li v-for="{ session, summary } in resumeChoices" :key="session.id">
-            <RouterLink :to="sessionLink(session)" class="resume-card" @click="resumeOpen = false">
-              <div class="resume-details">
-                <strong class="resume-title">
-                  {{ getVariantPresentation(session.variant).label }}
+            <RouterLink :to="sessionLink(session)" class="resume-row" @click="resumeOpen = false">
+              <div class="resume-identity">
+                <div class="resume-title">
+                  <strong>{{ getVariantPresentation(session.variant).label }}</strong>
                   <span class="resume-difficulty">{{ DIFFICULTY_NAMES[session.difficulty] }}</span>
-                </strong>
+                </div>
                 <p class="resume-source">{{ modeName(session) }}</p>
-                <p class="resume-progress">
-                  <span>{{ summary.progressLabel }}</span>
-                  <span>已用时 {{ formatDuration(session.elapsedMs) }}</span>
-                </p>
-                <p class="resume-start muted">
-                  开始于 <time :datetime="session.startedAt">{{ summary.startedAtLabel }}</time>
-                </p>
               </div>
+              <div class="resume-progress">
+                <p>{{ summary.progressLabel }}</p>
+                <p class="resume-elapsed">已用时 {{ formatDuration(session.elapsedMs) }}</p>
+              </div>
+              <p class="resume-start muted">
+                开始于 <time :datetime="session.startedAt">{{ summary.startedAtLabel }}</time>
+              </p>
               <span class="resume-action">继续 <span aria-hidden="true">→</span></span>
             </RouterLink>
           </li>
@@ -443,39 +444,41 @@ h1 {
 .resume-intro {
   margin: 0;
   font-size: 13px;
+  line-height: 1.6;
 }
 .resume-list {
-  display: grid;
-  gap: 10px;
   padding: 0;
   margin: 0;
   list-style: none;
+  border-top: 1px solid var(--border);
 }
-.resume-card {
+.resume-list > li + li {
+  border-top: 1px solid var(--border);
+}
+.resume-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'identity progress action'
+    'start progress action';
   align-items: center;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
+  gap: 6px 24px;
+  padding: 20px 8px;
+  border-radius: 8px;
   text-decoration: none;
   color: var(--text);
-  transition:
-    background-color 0.18s,
-    border-color 0.18s;
+  transition: background-color 0.18s;
 }
-.resume-card:hover,
-.resume-card:active {
-  border-color: var(--accent);
+.resume-row:hover,
+.resume-row:active {
   background: var(--accent-soft);
 }
-.resume-card:focus-visible {
+.resume-row:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
-.resume-details {
+.resume-identity {
+  grid-area: identity;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -487,32 +490,38 @@ h1 {
   font-size: 16px;
 }
 .resume-difficulty {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1px 6px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--peer);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 500;
 }
-.resume-card p {
-  margin: 8px 0 0;
+.resume-row p {
+  margin: 0;
   font-size: 13px;
   line-height: 1.6;
 }
-.resume-source {
+.resume-row .resume-source {
+  margin-top: 6px;
   color: var(--muted);
 }
 .resume-progress {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
+  grid-area: progress;
+  display: grid;
+  gap: 4px;
   font-variant-numeric: tabular-nums;
 }
-.resume-card .resume-start {
-  margin-top: 4px;
+.resume-elapsed {
+  color: var(--muted);
+}
+.resume-row .resume-start {
+  grid-area: start;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .resume-action {
+  grid-area: action;
   font-size: 13px;
   color: var(--accent);
   white-space: nowrap;
@@ -572,9 +581,22 @@ h1 {
   }
 }
 @media (max-width: 600px) {
-  .resume-card {
-    gap: 12px;
-    padding: 16px 14px;
+  .resume-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'identity action'
+      'progress progress'
+      'start start';
+    gap: 8px 12px;
+    padding: 18px 4px;
+  }
+  .resume-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+  }
+  .resume-row .resume-start {
+    margin-top: -4px;
   }
 }
 </style>
