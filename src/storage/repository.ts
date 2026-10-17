@@ -1,11 +1,28 @@
 import type { IDBPDatabase, IDBPTransaction } from 'idb'
+import type { ProjectionTransaction } from '@/storage/projections'
 import type { DatabaseProvider, SudokuDatabase } from '@/storage/database'
 import { commitTransaction } from '@/storage/database'
 import { assertOwnership, StorageConflict } from '@/storage/ownership'
 import type { OwnershipToken } from '@/storage/ownership'
 import type { GameSession } from '@/features/game/model/session'
 import type { LessonProgress, ResultRecord, SessionRecord, StorageOutcome } from '@/storage/records'
-import type { ParseResult } from '@/sudoku/contracts'
+import type { ParseResult, SudokuVariant } from '@/sudoku/contracts'
+import type {
+  HomeRead,
+  DailyStatusesRead,
+  SummaryPage,
+  SummaryPageQuery,
+  OverviewRead,
+  SlotSummaryRead,
+  SummaryMaintenance,
+} from '@/storage/readModels'
+import * as reads from '@/storage/readRepository'
+import {
+  advanceSummaryGeneration,
+  initialSummaryState,
+  projectRecord,
+  summaryStore,
+} from '@/storage/projections'
 import {
   parseLessonProgress,
   parseResultRecord,
@@ -22,6 +39,21 @@ import type { SnapshotValidators } from '@/storage/records'
 import type { BackupExport } from '@/storage/backup'
 
 export interface GameRepository {
+  readSession(id: string): Promise<StorageOutcome<SessionRecord | null>>
+  readResult(id: string): Promise<StorageOutcome<ResultRecord | null>>
+  readSlot(
+    mode: 'free' | 'learning',
+    variant?: SudokuVariant,
+  ): Promise<StorageOutcome<SessionRecord | null>>
+  readSlotSummary(
+    mode: 'free' | 'learning',
+    variant?: SudokuVariant,
+  ): Promise<StorageOutcome<SlotSummaryRead>>
+  readHome(): Promise<StorageOutcome<HomeRead>>
+  readDailyStatuses(date: string): Promise<StorageOutcome<DailyStatusesRead>>
+  readSummaryPage(query: SummaryPageQuery): Promise<StorageOutcome<SummaryPage>>
+  readOverview(variant: SudokuVariant, today: string): Promise<StorageOutcome<OverviewRead>>
+  maintainSummaries(signal?: AbortSignal): Promise<StorageOutcome<SummaryMaintenance>>
   writeSession(
     session: GameSession,
     expectedRevision: number,
@@ -90,7 +122,11 @@ export function storageError(
 export function createGameRepository(
   database: DatabaseProvider,
   validators: SnapshotValidators,
-  options: { now?: () => number; onReset?: () => void } = {},
+  options: {
+    now?: () => number
+    onReset?: () => void
+    prepareValidation?: () => Promise<void>
+  } = {},
 ): GameRepository {
   function isMatchingPrevious(raw: unknown, previous: { id: string; revision: number }): boolean {
     const parsed = parseSessionRecord(raw, validators)
@@ -105,9 +141,14 @@ export function createGameRepository(
   async function access<T>(
     operation: (db: IDBPDatabase<SudokuDatabase>) => Promise<T>,
     write = false,
+    validate = false,
   ): Promise<StorageOutcome<T>> {
     let db: IDBPDatabase<SudokuDatabase>
     try {
+      // Finish asynchronous engine readiness before opening semantic-validation transactions.
+      if (validate) {
+        await options.prepareValidation?.()
+      }
       db = await database()
     } catch (error) {
       return storageError(error, 'unavailable')
@@ -129,41 +170,140 @@ export function createGameRepository(
     store: 'sessions' | 'results' | 'lessons',
     parse: (value: unknown) => ParseResult<T>,
   ): Promise<StorageOutcome<readonly T[]>> {
-    return access(async (db) => {
-      const transaction = db.transaction([store, 'quarantine'], 'readwrite')
+    return access(
+      async (db) => {
+        const transaction = db.transaction(
+          [store, 'sessionSummaries', 'resultSummaries', 'quarantine', 'meta'],
+          'readwrite',
+        )
 
-      return commitTransaction(transaction, async () => {
-        const objectStore = transaction.objectStore(store)
-        const records: T[] = []
-        let cursor = await objectStore.openCursor()
+        return commitTransaction(transaction, async () => {
+          const objectStore = transaction.objectStore(store)
+          const records: T[] = []
+          let cursor = await objectStore.openCursor()
 
-        while (cursor) {
-          const parsed = parse(cursor.value)
-          if (parsed.valid) {
-            records.push(parsed.value)
-          } else {
-            await transaction
-              .objectStore('quarantine')
-              .put(
-                { store, key: cursor.primaryKey, value: cursor.value, issues: parsed.issues },
-                `${store}:${String(cursor.primaryKey)}`,
-              )
-            await cursor.delete()
+          while (cursor) {
+            const parsed = parse(cursor.value)
+            if (parsed.valid) {
+              records.push(parsed.value)
+            } else {
+              await transaction
+                .objectStore('quarantine')
+                .put(
+                  { store, key: cursor.primaryKey, value: cursor.value, issues: parsed.issues },
+                  `${store}:${String(cursor.primaryKey)}`,
+                )
+              await cursor.delete()
+              if (store !== 'lessons') {
+                await transaction.objectStore(summaryStore(store)).delete(String(cursor.primaryKey))
+                await advanceSummaryGeneration(transaction)
+              }
+            }
+
+            cursor = await cursor.continue()
           }
 
-          cursor = await cursor.continue()
-        }
+          return records
+        })
+      },
+      false,
+      store !== 'lessons',
+    )
+  }
 
-        return records
-      })
-    })
+  async function readSelected<T extends SessionRecord | ResultRecord>(
+    kind: 'sessions' | 'results',
+    id: string,
+    parse: (value: unknown) => ParseResult<T>,
+  ): Promise<StorageOutcome<T | null>> {
+    return access(
+      async (db) => {
+        const transaction = db.transaction(
+          [kind, 'sessionSummaries', 'resultSummaries', 'quarantine', 'meta'],
+          'readwrite',
+        )
+        return commitTransaction(transaction, async () => {
+          const raw = await transaction.objectStore(kind).get(id)
+          if (raw === undefined) {
+            return null
+          }
+          const parsed = parse(raw)
+          if (parsed.valid) {
+            return parsed.value
+          }
+          await transaction
+            .objectStore('quarantine')
+            .put({ store: kind, key: id, value: raw, issues: parsed.issues }, `${kind}:${id}`)
+          await transaction.objectStore(kind).delete(id)
+          await transaction.objectStore(summaryStore(kind)).delete(id)
+          await advanceSummaryGeneration(transaction)
+          return null
+        })
+      },
+      false,
+      true,
+    )
+  }
+
+  async function readSlotRecords(
+    transaction: ProjectionTransaction,
+    mode: 'free' | 'learning',
+    variant: SudokuVariant = 'classic',
+  ): Promise<SessionRecord[]> {
+    const sessions = transaction.objectStore('sessions')
+    const rawRecords =
+      mode === 'free'
+        ? await sessions.index('by-slot').getAll([mode, variant], 2)
+        : await sessions.index('by-mode').getAll(mode, 2)
+    if (mode === 'free' && variant === 'classic') {
+      // Format-1 Classic saves may omit rules and therefore have no modern slot index entry.
+      rawRecords.push(...(await sessions.index('by-format-mode').getAll([1, mode], 2)))
+    }
+    const records = new Map<string, SessionRecord>()
+    for (const raw of rawRecords) {
+      const parsed = parseSessionRecord(raw, validators)
+      if (!parsed.valid) {
+        throw new StorageConflict(
+          'revision-conflict',
+          'The active slot contains invalid data; repair saved games',
+        )
+      }
+      records.set(parsed.value.session.id, parsed.value)
+    }
+    if (records.size > 1) {
+      throw new StorageConflict('revision-conflict', 'Multiple records occupy one active slot')
+    }
+    return [...records.values()]
   }
 
   return {
-    exportBackup: (exportedAt) => access((db) => readBackupSnapshot(db, exportedAt, validators)),
+    readSession: (id) => readSelected('sessions', id, (raw) => parseSessionRecord(raw, validators)),
+    readResult: (id) => readSelected('results', id, (raw) => parseResultRecord(raw, validators)),
+    readHome: () => access(reads.readHome),
+    readSlotSummary: (mode, variant) => access((db) => reads.readSlotSummary(db, mode, variant)),
+    readDailyStatuses: (date) => access((db) => reads.readDailyStatuses(db, date)),
+    readSummaryPage: (query) => access((db) => reads.readSummaryPage(db, query)),
+    readOverview: (variant, today) => access((db) => reads.readOverview(db, variant, today)),
+    maintainSummaries: (signal) =>
+      access((db) => reads.maintainSummaries(db, validators, options.prepareValidation, signal)),
+    readSlot: (mode, variant) =>
+      access(
+        async (db) => {
+          const transaction = db.transaction('sessions', 'readwrite')
+          return commitTransaction(transaction, async () => {
+            const records = await readSlotRecords(transaction, mode, variant)
+            return records[0] ?? null
+          })
+        },
+        false,
+        true,
+      ),
+    exportBackup: (exportedAt) =>
+      access((db) => readBackupSnapshot(db, exportedAt, validators), false, true),
     restoreBackup: async (text, expectedEpoch) => {
       let parsed
       try {
+        await options.prepareValidation?.()
         parsed = parseBackup(text, validators)
       } catch (error) {
         return storageError(error, 'unavailable')
@@ -181,117 +321,171 @@ export function createGameRepository(
       return result
     },
     writeSession: (session, expectedRevision, token, signal) =>
-      access(async (db) => {
-        const parsed = parseSession(session, validators)
-        if (!parsed.valid || token.sessionId !== session.id) {
-          throw new TypeError('Invalid session snapshot')
-        }
-
-        const transaction = db.transaction(['sessions', 'results', 'leases', 'meta'], 'readwrite')
-
-        return commitTransaction(transaction, async () => {
-          assertActive(signal)
-          await assertOwnership(transaction, token, (options.now ?? Date.now)())
-          const raw = await transaction.objectStore('sessions').get(session.id)
-          const current = raw === undefined ? null : parseSessionRecord(raw, validators)
-          if (
-            (raw !== undefined &&
-              (!current?.valid || current.value.revision !== expectedRevision)) ||
-            (raw === undefined && expectedRevision !== 0)
-          ) {
-            throw new StorageConflict('revision-conflict', 'The saved revision has changed')
+      access(
+        async (db) => {
+          const parsed = parseSession(session, validators)
+          if (!parsed.valid || token.sessionId !== session.id) {
+            throw new TypeError('Invalid session snapshot')
           }
 
-          const record: SessionRecord = {
-            formatVersion: 2,
-            revision: expectedRevision + 1,
-            session: parsed.value,
-          }
-          assertActive(signal)
-          await transaction.objectStore('sessions').put(record)
-          if (session.completion) {
-            const results = transaction.objectStore('results')
-            const existing = await results.get(session.id)
-            if (existing === undefined) {
-              await results.put({ formatVersion: 2, session: parsed.value })
-            } else {
-              // Upgrade the original result rather than replacing its first completion facts.
-              const original = parseResultRecord(existing, validators)
-              if (original.valid) {
-                await results.put(original.value)
-              }
-            }
-          }
+          const transaction = db.transaction(
+            [
+              'sessions',
+              'results',
+              'sessionSummaries',
+              'resultSummaries',
+              'quarantine',
+              'leases',
+              'meta',
+            ],
+            'readwrite',
+          )
 
-          assertActive(signal)
-
-          return record
-        })
-      }, true),
-    replaceActiveSession: (session, token, previous, signal) =>
-      access(async (db) => {
-        const parsed = parseSession(session, validators)
-        if (!parsed.valid || token.sessionId !== session.id || session.mode === 'daily') {
-          throw new TypeError('Invalid replacement')
-        }
-
-        const transaction = db.transaction(['sessions', 'results', 'leases', 'meta'], 'readwrite')
-
-        return commitTransaction(transaction, async () => {
-          assertActive(signal)
-          await assertOwnership(transaction, token, (options.now ?? Date.now)())
-          const records = await transaction
-            .objectStore('sessions')
-            .index('by-mode')
-            .getAll(session.mode)
-          const slot = records.filter((raw) => {
-            const current = parseSessionRecord(raw, validators)
-            if (!current.valid) {
-              throw new StorageConflict(
-                'revision-conflict',
-                'The active slot contains invalid data; reload saved games',
-              )
-            }
-
-            return belongsToSlot(current.value.session, session)
-          })
-          if (
-            (await transaction.objectStore('sessions').get(session.id)) ||
-            slot.length > 1 ||
-            (slot.length === 1 && (!previous || !isMatchingPrevious(slot[0], previous)))
-          ) {
-            throw new StorageConflict('revision-conflict', 'The active game slot has changed')
-          }
-
-          if (previous) {
-            await assertOwnership(transaction, previous.token, (options.now ?? Date.now)())
-            const raw = await transaction.objectStore('sessions').get(previous.id)
-            const previousRecord = parseSessionRecord(raw, validators)
+          return commitTransaction(transaction, async () => {
+            assertActive(signal)
+            await assertOwnership(transaction, token, (options.now ?? Date.now)())
+            const raw = await transaction.objectStore('sessions').get(session.id)
+            const current = raw === undefined ? null : parseSessionRecord(raw, validators)
             if (
-              !isMatchingPrevious(raw, previous) ||
-              !previousRecord.valid ||
-              !belongsToSlot(previousRecord.value.session, session) ||
-              previous.token.sessionId !== previous.id
+              (raw !== undefined &&
+                (!current?.valid || current.value.revision !== expectedRevision)) ||
+              (raw === undefined && expectedRevision !== 0)
             ) {
-              throw new StorageConflict('revision-conflict', 'Previous session changed')
+              throw new StorageConflict('revision-conflict', 'The saved revision has changed')
+            }
+
+            const record: SessionRecord = {
+              formatVersion: 2,
+              revision: expectedRevision + 1,
+              session: parsed.value,
+            }
+            assertActive(signal)
+            await transaction.objectStore('sessions').put(record)
+            await transaction
+              .objectStore('sessionSummaries')
+              .put(projectRecord(record.session, record.revision, 'sessions'))
+            await advanceSummaryGeneration(transaction)
+            if (session.completion) {
+              const results = transaction.objectStore('results')
+              const existing = await results.get(session.id)
+              if (existing === undefined) {
+                await results.put({ formatVersion: 2, session: parsed.value })
+                await transaction
+                  .objectStore('resultSummaries')
+                  .put(projectRecord(parsed.value, 0, 'results'))
+              } else {
+                // Upgrade the original result rather than replacing its first completion facts.
+                const original = parseResultRecord(existing, validators)
+                if (original.valid) {
+                  await results.put(original.value)
+                  await transaction
+                    .objectStore('resultSummaries')
+                    .put(projectRecord(original.value.session, 0, 'results'))
+                } else {
+                  await transaction.objectStore('quarantine').put(
+                    {
+                      store: 'results',
+                      key: session.id,
+                      value: existing,
+                      issues: original.issues,
+                    },
+                    `results:${session.id}`,
+                  )
+                  await results.delete(session.id)
+                  await transaction.objectStore('resultSummaries').delete(session.id)
+                }
+              }
             }
 
             assertActive(signal)
-            await transaction.objectStore('sessions').delete(previous.id)
+
+            return record
+          })
+        },
+        true,
+        true,
+      ),
+    replaceActiveSession: (session, token, previous, signal) =>
+      access(
+        async (db) => {
+          const parsed = parseSession(session, validators)
+          if (!parsed.valid || token.sessionId !== session.id || session.mode === 'daily') {
+            throw new TypeError('Invalid replacement')
           }
 
-          const record: SessionRecord = { formatVersion: 2, revision: 1, session: parsed.value }
-          assertActive(signal)
-          await transaction.objectStore('sessions').put(record)
-          assertActive(signal)
+          const mode = session.mode
+          const transaction = db.transaction(
+            [
+              'sessions',
+              'results',
+              'sessionSummaries',
+              'resultSummaries',
+              'quarantine',
+              'leases',
+              'meta',
+            ],
+            'readwrite',
+          )
 
-          return record
-        })
-      }, true),
+          return commitTransaction(transaction, async () => {
+            assertActive(signal)
+            await assertOwnership(transaction, token, (options.now ?? Date.now)())
+            const slot = await readSlotRecords(transaction, mode, session.puzzle.rules.kind)
+            if (
+              (await transaction.objectStore('sessions').get(session.id)) ||
+              slot.length > 1 ||
+              (slot.length === 1 && (!previous || !isMatchingPrevious(slot[0], previous)))
+            ) {
+              throw new StorageConflict('revision-conflict', 'The active game slot has changed')
+            }
+
+            if (previous) {
+              await assertOwnership(transaction, previous.token, (options.now ?? Date.now)())
+              const raw = await transaction.objectStore('sessions').get(previous.id)
+              const previousRecord = parseSessionRecord(raw, validators)
+              if (
+                !isMatchingPrevious(raw, previous) ||
+                !previousRecord.valid ||
+                !belongsToSlot(previousRecord.value.session, session) ||
+                previous.token.sessionId !== previous.id
+              ) {
+                throw new StorageConflict('revision-conflict', 'Previous session changed')
+              }
+
+              assertActive(signal)
+              await transaction.objectStore('sessions').delete(previous.id)
+              await transaction.objectStore('sessionSummaries').delete(previous.id)
+            }
+
+            const record: SessionRecord = { formatVersion: 2, revision: 1, session: parsed.value }
+            assertActive(signal)
+            await transaction.objectStore('sessions').put(record)
+            await transaction
+              .objectStore('sessionSummaries')
+              .put(projectRecord(record.session, record.revision, 'sessions'))
+            await advanceSummaryGeneration(transaction)
+            assertActive(signal)
+
+            return record
+          })
+        },
+        true,
+        true,
+      ),
     clearAll: async () => {
       const result = await access(async (db) => {
         const transaction = db.transaction(
-          ['sessions', 'results', 'lessons', 'settings', 'quarantine', 'leases', 'meta'],
+          [
+            'sessions',
+            'results',
+            'sessionSummaries',
+            'resultSummaries',
+            'lessons',
+            'settings',
+            'quarantine',
+            'leases',
+            'meta',
+          ],
           'readwrite',
         )
         await commitTransaction(transaction, async () => {
@@ -303,6 +497,8 @@ export function createGameRepository(
           for (const store of [
             'sessions',
             'results',
+            'sessionSummaries',
+            'resultSummaries',
             'lessons',
             'settings',
             'quarantine',
@@ -312,6 +508,7 @@ export function createGameRepository(
           }
 
           await transaction.objectStore('meta').put(epoch + 1, 'epoch')
+          await transaction.objectStore('meta').put(initialSummaryState(true), 'summaries')
         })
       }, true)
       if (result.ok) {

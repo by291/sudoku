@@ -82,7 +82,7 @@ function validDate(value: unknown): value is string {
   return isIsoInstant(timestamp)
 }
 
-function parseMetadata(value: unknown): SessionMetadata | null {
+export function parseSessionMetadata(value: unknown): SessionMetadata | null {
   if (!isRecord(value)) {
     return null
   }
@@ -214,7 +214,7 @@ export function parseSession(
   }
 
   const puzzle = parsePuzzle(value.puzzle, validators)
-  const metadata = parseMetadata(value.metadata)
+  const metadata = parseSessionMetadata(value.metadata)
   const assistance = parseAssistance(value.assistance)
   if (!puzzle.valid || !metadata || metadata.kind !== value.mode || !assistance) {
     return invalid('Invalid puzzle, mode metadata, or assistance')

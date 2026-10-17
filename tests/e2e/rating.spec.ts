@@ -172,7 +172,7 @@ for (const metadata of ['absent', 'unsupported'] as const) {
       .poll(() =>
         page.evaluate(async () => {
           const database = await new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open('sudoku-local', 1)
+            const request = indexedDB.open('sudoku-local')
             request.onsuccess = () => resolve(request.result)
             request.onerror = () => reject(request.error)
           })
@@ -198,7 +198,7 @@ for (const metadata of ['absent', 'unsupported'] as const) {
     if (metadata === 'unsupported') {
       await page.evaluate(async (session) => {
         const database = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = indexedDB.open('sudoku-local', 1)
+          const request = indexedDB.open('sudoku-local')
           request.onsuccess = () => resolve(request.result)
           request.onerror = () => reject(request.error)
         })

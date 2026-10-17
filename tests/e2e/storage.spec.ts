@@ -25,7 +25,7 @@ test('confirms explicit reload after a save conflict and resumes the latest reco
   }
   await page.evaluate(async (record) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sudoku-local', 1)
+      const request = indexedDB.open('sudoku-local')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
@@ -148,9 +148,8 @@ test('allows memory-only play when IndexedDB cannot open and saves after recover
     }
     window.addEventListener('restore-test-storage', restore)
   })
-  await page.goto('/#/play/free')
-  await page.getByRole('button', { name: '开始游戏', exact: true }).click()
-  await page.getByRole('dialog').getByRole('button', { name: '开始游戏', exact: true }).click()
+  // An explicit start retains the fenced memory-only path; setup cannot infer an empty save slot.
+  await page.goto('/#/play/free?start=1&difficulty=easy')
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
   await expect(
     page

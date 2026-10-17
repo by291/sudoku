@@ -64,6 +64,42 @@ function setup(heavy = false) {
       dispose() {},
     },
     repository: {
+      readSession: async (id) => ({
+        ok: true,
+        value: id === saved.id ? { formatVersion: 2, revision: 1, session: saved } : null,
+      }),
+      readResult: async () => ({ ok: true, value: null }),
+      readSlot: async (mode, variant) => ({
+        ok: true,
+        value:
+          saved.mode === mode && (mode !== 'free' || saved.puzzle.rules.kind === variant)
+            ? { formatVersion: 2, revision: 1, session: saved }
+            : null,
+      }),
+      readSlotSummary: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Unused summary fixture' },
+      }),
+      readHome: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Unused summary fixture' },
+      }),
+      readDailyStatuses: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Unused summary fixture' },
+      }),
+      readSummaryPage: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Unused summary fixture' },
+      }),
+      readOverview: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Unused summary fixture' },
+      }),
+      maintainSummaries: async () => ({
+        ok: false,
+        error: { kind: 'unavailable', message: 'Unused summary fixture' },
+      }),
       exportBackup: async () => ({
         ok: false,
         error: { kind: 'unavailable', message: 'No backup fixture configured' },

@@ -1,6 +1,7 @@
 import type { IDBPDatabase } from 'idb'
 import type { SudokuDatabase } from '@/storage/database'
 import { commitTransaction } from '@/storage/database'
+import { initialSummaryState, projectRecord } from '@/storage/projections'
 import { StorageConflict } from '@/storage/ownership'
 import { isRecord } from '@/sudoku/values'
 import type { ParseResult } from '@/sudoku/contracts'
@@ -297,7 +298,17 @@ export async function replaceBackupSnapshot(
   expectedEpoch: number,
 ): Promise<void> {
   const transaction = db.transaction(
-    ['sessions', 'results', 'lessons', 'settings', 'quarantine', 'leases', 'meta'],
+    [
+      'sessions',
+      'results',
+      'sessionSummaries',
+      'resultSummaries',
+      'lessons',
+      'settings',
+      'quarantine',
+      'leases',
+      'meta',
+    ],
     'readwrite',
   )
   await commitTransaction(transaction, async () => {
@@ -313,6 +324,8 @@ export async function replaceBackupSnapshot(
     for (const store of [
       'sessions',
       'results',
+      'sessionSummaries',
+      'resultSummaries',
       'lessons',
       'settings',
       'quarantine',
@@ -322,9 +335,15 @@ export async function replaceBackupSnapshot(
     }
     for (const record of backup.sessions) {
       await transaction.objectStore('sessions').put({ ...record, revision: 1 })
+      await transaction
+        .objectStore('sessionSummaries')
+        .put(projectRecord(record.session, 1, 'sessions'))
     }
     for (const record of backup.results) {
       await transaction.objectStore('results').put(record)
+      await transaction
+        .objectStore('resultSummaries')
+        .put(projectRecord(record.session, 0, 'results'))
     }
     for (const record of backup.lessons) {
       await transaction.objectStore('lessons').put({ formatVersion: 1, ...record })
@@ -333,5 +352,6 @@ export async function replaceBackupSnapshot(
       .objectStore('settings')
       .put({ formatVersion: 1, ...backup.settings }, 'preferences')
     await transaction.objectStore('meta').put(epoch + 1, 'epoch')
+    await transaction.objectStore('meta').put(initialSummaryState(true), 'summaries')
   })
 }

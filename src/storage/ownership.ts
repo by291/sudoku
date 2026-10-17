@@ -61,7 +61,15 @@ function parseLease(value: unknown): Lease | null {
 
 type OwnershipTransaction = IDBPTransaction<
   SudokuDatabase,
-  ('leases' | 'meta' | 'sessions' | 'results')[],
+  (
+    | 'leases'
+    | 'meta'
+    | 'sessions'
+    | 'results'
+    | 'sessionSummaries'
+    | 'resultSummaries'
+    | 'quarantine'
+  )[],
   'readwrite'
 >
 

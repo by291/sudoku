@@ -175,7 +175,7 @@ for (const store of ['settings', 'lessons'] as const) {
   })
 }
 
-it('replaces only the requested free variant slot and writes v2 without a schema upgrade', async () => {
+it('replaces only the requested free variant slot and maintains schema v2', async () => {
   const { database, repository } = await setup()
   const owner = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
 
@@ -249,7 +249,7 @@ it('replaces only the requested free variant slot and writes v2 without a schema
       'arrow-new',
       'classic-save',
     ])
-    expect(database.version).toBe(1)
+    expect(database.version).toBe(2)
   } finally {
     owner.dispose()
   }

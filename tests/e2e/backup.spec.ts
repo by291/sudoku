@@ -209,7 +209,7 @@ test('downloads a committed backup and restores notes, history and learning prog
   await seedSession(page, session)
   await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sudoku-local', 1)
+      const request = indexedDB.open('sudoku-local')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })

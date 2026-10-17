@@ -4,6 +4,7 @@ import { seedForTest } from '../support/generation'
 import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { GameSession } from '@/features/game/model/session'
+import { projectRecord } from '@/storage/projections'
 
 import { makeSession } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
@@ -133,6 +134,56 @@ export function cellName(cell: number): RegExp {
   return new RegExp(`^第${Math.floor(cell / 9) + 1}行第${(cell % 9) + 1}列，`)
 }
 
+/** Seed the same canonical/derived pair as a committed write, without testing projection math here. */
+export async function seedRecords(
+  page: Page,
+  kind: 'sessions' | 'results',
+  records: readonly { session: GameSession; revision?: number }[],
+) {
+  const values = records.map(({ session, revision = 1 }) => ({
+    record:
+      kind === 'sessions' ? { formatVersion: 2, revision, session } : { formatVersion: 2, session },
+    summary: projectRecord(session, kind === 'sessions' ? revision : 0, kind),
+  }))
+  await page.evaluate(
+    async ({ kind, values }) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sudoku-local')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      await new Promise<void>((resolve, reject) => {
+        const summaries = kind === 'sessions' ? 'sessionSummaries' : 'resultSummaries'
+        const transaction = database.transaction([kind, summaries, 'meta'], 'readwrite')
+        for (const { record, summary } of values) {
+          transaction.objectStore(kind).put(record)
+          transaction.objectStore(summaries).put(summary)
+        }
+        const state = transaction.objectStore('meta').get('summaries')
+        state.onsuccess = () => {
+          const value: unknown = state.result
+          if (
+            typeof value !== 'object' ||
+            value === null ||
+            !('generation' in value) ||
+            typeof value.generation !== 'number'
+          ) {
+            transaction.abort()
+            return
+          }
+          transaction
+            .objectStore('meta')
+            .put({ ...value, generation: value.generation + 1 }, 'summaries')
+        }
+        transaction.oncomplete = () => resolve()
+        transaction.onabort = () => reject(transaction.error)
+      })
+      database.close()
+    },
+    { kind, values },
+  )
+}
+
 export async function seedSession(
   page: Page,
   session: GameSession,
@@ -141,20 +192,7 @@ export async function seedSession(
 ) {
   await page.goto(`${base}#/`)
   await expect(page.getByRole('button', { name: /开始一局数独/ })).toBeVisible()
-  await page.evaluate(async (session) => {
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sudoku-local', 1)
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction('sessions', 'readwrite')
-      transaction.objectStore('sessions').put({ formatVersion: 2, revision: 1, session })
-      transaction.oncomplete = () => resolve()
-      transaction.onabort = () => reject(transaction.error)
-    })
-    database.close()
-  }, session)
+  await seedRecords(page, 'sessions', [{ session }])
   await page.goto(
     `${base}#${route}${route.includes('?') ? '&' : '?'}session=${encodeURIComponent(session.id)}`,
   )
@@ -164,7 +202,7 @@ export async function seedSession(
 export async function readSessions(page: Page) {
   const raw = await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sudoku-local', 1)
+      const request = indexedDB.open('sudoku-local')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
@@ -191,7 +229,7 @@ export async function readSessions(page: Page) {
 export async function countResults(page: Page) {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('sudoku-local', 1)
+      const request = indexedDB.open('sudoku-local')
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
