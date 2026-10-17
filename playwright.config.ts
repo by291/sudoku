@@ -37,8 +37,10 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
+      // CI downloads both deployments from the checks job; local runs still build the subpath.
       command:
-        'pnpm build:subpath && pnpm exec vite preview --outDir dist-subpath --base /sudoku/ --host 127.0.0.1 --port 4174 --strictPort',
+        (process.env.PLAYWRIGHT_USE_PREBUILT === '1' ? '' : 'pnpm build:subpath && ') +
+        'pnpm exec vite preview --outDir dist-subpath --base /sudoku/ --host 127.0.0.1 --port 4174 --strictPort',
       url: 'http://127.0.0.1:4174/sudoku/',
       reuseExistingServer: !process.env.CI,
     },

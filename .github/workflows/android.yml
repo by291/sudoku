@@ -32,6 +32,18 @@ jobs:
           packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0 ndk;29.0.14206865'
       - name: Set up repository-pinned Rust
         run: rustup show
+      - name: Cache Rust dependencies, native builds, and private tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+            target
+            .tools/wasm-bindgen
+            android/.native-tools
+          key: rust-android-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.toml', 'Cargo.lock', 'scripts/build-sudoku-wasm.mjs', 'android/scripts/build-native.sh') }}-${{ hashFiles('sudoku/**/*.rs', 'android/ffi/**/*.rs') }}
+          restore-keys: |
+            rust-android-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.toml', 'Cargo.lock', 'scripts/build-sudoku-wasm.mjs', 'android/scripts/build-native.sh') }}-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26'
