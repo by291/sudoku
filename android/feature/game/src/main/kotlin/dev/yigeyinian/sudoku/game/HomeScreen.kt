@@ -298,13 +298,7 @@ private fun HomeDestinations(
                 Icon(Icons.Outlined.BarChart, null, tint = MaterialTheme.colorScheme.primary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("我的记录", style = MaterialTheme.typography.titleSmall)
-                    val description = if ((state.loading && !state.hasLoadedSnapshot) || state.error != null) {
-                        "成绩统计 · 本地备份"
-                    } else if (state.results.isEmpty()) {
-                        "收藏每一次进步"
-                    } else {
-                        "已完成 ${state.results.size} 局 · 回顾与备份"
-                    }
+                    val description = "收藏每一次进步"
                     Text(
                         description,
                         style = MaterialTheme.typography.bodySmall,

@@ -5,6 +5,7 @@ import dev.yigeyinian.sudoku.model.Puzzle
 import dev.yigeyinian.sudoku.model.PuzzleRules
 import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.createSession
+import dev.yigeyinian.sudoku.model.variant
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -62,4 +63,16 @@ class SavedGameSummaryTest {
             assertEquals("10-16 17:20 开始", summary.startedAt)
         }
     }
+}
+
+private fun dev.yigeyinian.sudoku.model.GameSession.savedGameSummary(
+    zone: java.time.ZoneId,
+    year: Int
+): SavedGameSummary {
+    val cells = puzzle.givens.indices.filter { puzzle.givens[it] == 0 }
+    return dev.yigeyinian.sudoku.model.GameSummary(
+        id, 1, puzzle.rules.variant, puzzle.difficulty, metadata,
+        startedAt, elapsedMs, completion, assistance.assisted, cells.count { entries[it] != 0 }, cells.size
+    )
+        .savedGameSummary(zone, year)
 }

@@ -3,7 +3,7 @@ package dev.yigeyinian.sudoku.game
 import dev.yigeyinian.sudoku.designsystem.difficultyLabel
 import dev.yigeyinian.sudoku.designsystem.formatElapsedTime
 import dev.yigeyinian.sudoku.designsystem.variantLabel
-import dev.yigeyinian.sudoku.model.GameSession
+import dev.yigeyinian.sudoku.model.GameSummary
 import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.variant
 import java.time.Instant
@@ -20,10 +20,7 @@ internal data class SavedGameSummary(
     val startedAt: String
 )
 
-internal fun GameSession.savedGameSummary(zone: ZoneId, currentYear: Int): SavedGameSummary {
-    val emptyCells = puzzle.givens.indices.filter { puzzle.givens[it] == 0 }
-    // Filling progress is not a correctness check and does not include notes or puzzle givens.
-    val filled = emptyCells.count { entries[it] != 0 }
+internal fun GameSummary.savedGameSummary(zone: ZoneId, currentYear: Int): SavedGameSummary {
     val source = when (metadata) {
         SessionMetadata.Free -> "普通对局"
         is SessionMetadata.Learning -> "课程练习"
@@ -40,11 +37,11 @@ internal fun GameSession.savedGameSummary(zone: ZoneId, currentYear: Int): Saved
     // Retain the year for older saves so a compact date never confuses sessions across years.
     val timeFormat = if (started.year == currentYear) savedGameTimeFormat else savedGameFullTimeFormat
     return SavedGameSummary(
-        title = variantLabel(puzzle.rules.variant),
-        difficulty = difficultyLabel(puzzle.difficulty),
+        title = variantLabel(variant),
+        difficulty = difficultyLabel(difficulty),
         source = source,
         sourceDetail = sourceDetail,
-        progress = "已填 $filled / ${emptyCells.size} · ${formatElapsedTime(elapsedMs)}",
+        progress = "已填 $filled / $editable · ${formatElapsedTime(elapsedMs)}",
         startedAt = "${started.format(timeFormat)} 开始"
     )
 }

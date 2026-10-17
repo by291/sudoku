@@ -29,14 +29,23 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.yigeyinian.sudoku.model.GameSession
+import dev.yigeyinian.sudoku.model.SummaryItem
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
 @Composable
-internal fun ContinueGameSheet(saves: List<GameSession>, onDismiss: () -> Unit, onResume: (String) -> Unit) {
-    val sortedSaves = remember(saves) { saves.sortedByDescending { Instant.parse(it.startedAt) } }
+internal fun ContinueGameSheet(
+    saves: List<SummaryItem>,
+    onDismiss: () -> Unit,
+    onResume: (String) -> Unit,
+    loading: Boolean = false,
+    error: String? = null,
+    hasMore: Boolean = false,
+    onMore: () -> Unit = {},
+    onRetry: () -> Unit = {}
+) {
+    val sortedSaves = saves
     val zone = ZoneId.systemDefault()
     val currentYear = LocalDate.now(zone).year
     GameEntrySheet(
@@ -47,8 +56,17 @@ internal fun ContinueGameSheet(saves: List<GameSession>, onDismiss: () -> Unit, 
             Modifier.weight(1f, fill = false).fillMaxWidth().testTag("continue-saves"),
             contentPadding = PaddingValues(bottom = 20.dp)
         ) {
+            item {
+                if (error != null) androidx.compose.material3.TextButton(onClick = onRetry) { Text(error) }
+                if (dev.yigeyinian.sudoku.design.rememberDelayedProgress(loading)) {
+                    Text("正在读取存档…", Modifier.padding(20.dp))
+                }
+            }
             itemsIndexed(sortedSaves, key = { _, session -> session.id }) { index, session ->
-                val summary = remember(session, zone, currentYear) { session.savedGameSummary(zone, currentYear) }
+                val summary = remember(session, zone, currentYear) {
+                    session.summary?.savedGameSummary(zone, currentYear)
+                        ?: SavedGameSummary("待确认的存档", "", "本机存档", null, "点按读取对局", "")
+                }
                 if (index > 0) {
                     HorizontalDivider(
                         Modifier.padding(horizontal = 20.dp),
@@ -56,6 +74,11 @@ internal fun ContinueGameSheet(saves: List<GameSession>, onDismiss: () -> Unit, 
                     )
                 }
                 SavedGameRow(summary, session.id, first = index == 0, onResume = { onResume(session.id) })
+            }
+            if (hasMore) {
+                item {
+                    androidx.compose.material3.TextButton(onClick = onMore, enabled = !loading) { Text("加载更多") }
+                }
             }
         }
     }

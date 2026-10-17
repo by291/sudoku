@@ -13,10 +13,11 @@ import javax.inject.Inject
 internal class GameViewModel @Inject constructor(
     engine: SudokuEngine,
     repository: GameRepository,
+    reads: dev.yigeyinian.sudoku.model.GameReadRepository,
     savedState: SavedStateHandle
 ) : ViewModel() {
     private val controller =
-        GameController(engine, repository, viewModelScope, savedState["savedSessionId"], {
+        GameController(engine, repository, reads, viewModelScope, savedState["savedSessionId"], {
             savedState["savedSessionId"] =
                 it
         })

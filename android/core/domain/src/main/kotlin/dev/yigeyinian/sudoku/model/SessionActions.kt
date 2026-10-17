@@ -175,3 +175,10 @@ class SessionClock(initialElapsedMs: Long) {
         return elapsedMs
     }
 }
+
+/** Delay to the Beijing day boundary, capped to notice clock changes while a screen is visible. */
+fun challengeRefreshDelay(now: Instant): Long {
+    val local = now.atZone(ZoneId.of("Asia/Shanghai"))
+    val next = local.toLocalDate().plusDays(1).atStartOfDay(local.zone).toInstant()
+    return java.time.Duration.between(now, next).toMillis().coerceIn(1, 60_000)
+}

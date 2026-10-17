@@ -67,7 +67,7 @@ class StartupProgressTest {
     }
 
     @Test
-    fun preparesFreeAndDailySavesBeforeShowingHomeWithoutReadingTwice() {
+    fun homeAndDailySheetReadSummariesWhileNativeValidationIsBlocked() {
         hiltRule.inject()
         val today = challengeDate(Instant.now())
         runBlocking {
@@ -100,28 +100,21 @@ class StartupProgressTest {
         savedReadCount.set(0)
         val gate = CompletableDeferred<Unit>()
         savedReadGate = gate
-        readiness.complete(Unit)
         val activity = ActivityScenario.launch(MainActivity::class.java)
         try {
-            compose.waitUntil(20_000) { savedReadCount.get() > 0 }
-            compose.onNodeWithText("开始数独").assertDoesNotExist()
-            compose.onNodeWithText("继续上次").assertDoesNotExist()
-
-            gate.complete(Unit)
-            savedReadGate = null
             compose.waitUntil(20_000) {
                 compose.onAllNodesWithText("继续上次").fetchSemanticsNodes().isNotEmpty()
             }
             compose.onNodeWithText("开始数独").assertIsEnabled()
             compose.onNodeWithText("继续上次").assertIsEnabled()
-            assertEquals(2, savedReadCount.get())
+            assertEquals(0, savedReadCount.get())
 
             compose.onNodeWithText("每日挑战").performClick()
             compose.waitUntil(20_000) {
                 compose.onAllNodesWithText("继续今日挑战").fetchSemanticsNodes().isNotEmpty()
             }
             compose.onNodeWithText("继续今日挑战").assertIsEnabled()
-            assertEquals(2, savedReadCount.get())
+            assertEquals(0, savedReadCount.get())
         } finally {
             gate.complete(Unit)
             savedReadGate = null
@@ -130,26 +123,18 @@ class StartupProgressTest {
     }
 
     @Test
-    fun delaysStartupFeedbackWithoutDelayingReadiness() {
+    fun homeDoesNotWaitForNativeInformation() {
         hiltRule.inject()
-        compose.mainClock.autoAdvance = false
         val activity = ActivityScenario.launch(MainActivity::class.java)
         try {
-            compose.mainClock.advanceTimeBy(100)
-            compose.onNodeWithText("正在准备首页…").assertDoesNotExist()
-            compose.mainClock.advanceTimeBy(500)
-            compose.onNodeWithText("正在准备首页…").assertIsDisplayed()
-
-            readiness.complete(Unit)
-            compose.mainClock.autoAdvance = true
             compose.waitUntil(20_000) {
                 compose.onAllNodesWithText("开始数独").fetchSemanticsNodes().isNotEmpty()
             }
-
+            compose.onNodeWithText("开始数独").assertIsEnabled()
             compose.onNodeWithText("正在准备首页…").assertDoesNotExist()
+            assertTrue(!readiness.isCompleted)
         } finally {
             readiness.complete(Unit)
-            compose.mainClock.autoAdvance = true
             activity.close()
         }
     }

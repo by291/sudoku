@@ -1,62 +1,82 @@
 package dev.yigeyinian.sudoku.game
 
-import dev.yigeyinian.sudoku.model.GameRepository
+import dev.yigeyinian.sudoku.model.GameReadRepository
 import dev.yigeyinian.sudoku.model.StorageOutcome
-import dev.yigeyinian.sudoku.model.challengeDate
-import java.time.Instant
 import javax.inject.Inject
-import javax.inject.Singleton
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
-/** Shares the feature-owned home snapshot between application bootstrap and the home route. */
-@Singleton
-class GameEntryLoader @Inject constructor(private val repository: GameRepository) {
-    private val mutableState = MutableStateFlow(GameEntryUiState())
+/** Scoped to its ViewModel so a new activity uses the latest bootstrap rather than an older Home cache. */
+class GameEntryLoader @Inject constructor(
+    internal val reads: GameReadRepository,
+    internal val repository: dev.yigeyinian.sudoku.model.GameRepository
+) {
+    private val initial = reads.bootstrap.value
+    private val mutableState = MutableStateFlow(
+        GameEntryUiState(
+            epoch = initial?.epoch,
+            loading = initial == null,
+            hasLoadedSnapshot = initial != null,
+            singleSaveId = initial?.home?.singleSaveId,
+            hasSaves = initial?.home?.let { it.hasSaves || it.pending } ?: false
+        )
+    )
     internal val uiState = mutableState.asStateFlow()
-    private val reads = Mutex()
 
-    /** Reads all free/daily saves and completion records before publishing one complete UI snapshot. */
-    suspend fun prepareHome(): StorageOutcome<Unit> = reads.withLock {
-        mutableState.value = mutableState.value.copy(loading = true, error = null)
-        val today = challengeDate(Instant.now())
-        try {
-            coroutineScope {
-                // listSessions includes both free and daily saves; do not issue the same query twice.
-                val sessionsRead = async { repository.listSessions() }
-                val resultsRead = async { repository.listResults() }
-                val sessions = sessionsRead.await()
-                val results = resultsRead.await()
-                val failure = when {
-                    sessions is StorageOutcome.Failure -> sessions
-                    results is StorageOutcome.Failure -> results
-                    else -> null
-                }
-                if (failure != null) {
-                    mutableState.value = mutableState.value.copy(
-                        error = "存档暂时无法读取，请重试后再开始，避免覆盖原有进度。"
-                    )
-                    return@coroutineScope failure
-                }
+    internal fun update(transform: (GameEntryUiState) -> GameEntryUiState) {
+        mutableState.value = transform(mutableState.value)
+    }
 
-                if (sessions is StorageOutcome.Success && results is StorageOutcome.Success) {
-                    // A partial refresh could incorrectly offer a new daily attempt over an existing save.
-                    mutableState.value = mutableState.value.copy(
+    private var generation = 0L
+    private var observedEpoch = initial?.epoch
+
+    internal fun invalidate(epoch: Long) {
+        if (observedEpoch == null || epoch > checkNotNull(observedEpoch)) {
+            observedEpoch = epoch
+            generation++
+            mutableState.value = GameEntryUiState(epoch = epoch)
+        }
+    }
+
+    suspend fun prepareHome(): StorageOutcome<Unit> {
+        val operation = ++generation
+        val result = reads.readBootstrap()
+        // A completed query may have waited behind a newer refresh or dataset replacement.
+        if (operation != generation || (
+                result is StorageOutcome.Success &&
+                    observedEpoch?.let { result.value.epoch < it } == true
+                )
+        ) {
+            return StorageOutcome.Failure(
+                dev.yigeyinian.sudoku.model.StorageFailure(
+                    dev.yigeyinian.sudoku.model.StorageFailureKind.REVISION_CONFLICT,
+                    "Home snapshot changed"
+                )
+            )
+        }
+        return when (result) {
+            is StorageOutcome.Success -> {
+                val snapshot = result.value
+                if (observedEpoch != snapshot.epoch) {
+                    mutableState.value = GameEntryUiState(epoch = snapshot.epoch)
+                }
+                observedEpoch = snapshot.epoch
+                update {
+                    it.copy(
+                        epoch = snapshot.epoch,
                         loading = false,
                         hasLoadedSnapshot = true,
-                        sessions = sessions.value,
-                        results = results.value,
-                        today = today
+                        singleSaveId = snapshot.home.singleSaveId,
+                        hasSaves = snapshot.home.hasSaves || snapshot.home.pending,
+                        error = null
                     )
                 }
                 StorageOutcome.Success(Unit)
             }
-        } finally {
-            mutableState.value = mutableState.value.copy(loading = false)
+            is StorageOutcome.Failure -> {
+                update { it.copy(loading = false, error = "存档暂时无法读取，请重试。") }
+                result
+            }
         }
     }
 }

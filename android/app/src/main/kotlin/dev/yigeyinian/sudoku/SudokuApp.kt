@@ -79,8 +79,11 @@ internal fun SudokuApp(activity: MainActivity) {
         }
     }
 
-    LaunchedEffect(backStack.lastOrNull()) {
-        if (state.ready) model.reloadSettings()
+    LaunchedEffect(state.ready) {
+        if (state.ready) {
+            androidx.compose.runtime.withFrameNanos { }
+            model.maintainSummaries()
+        }
     }
 
     val showStartupProgress = rememberDelayedProgress(!state.ready && state.loading)

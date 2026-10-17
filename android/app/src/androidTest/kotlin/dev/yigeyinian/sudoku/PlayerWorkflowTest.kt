@@ -457,7 +457,7 @@ class PlayerWorkflowTest {
     }
 
     @Test
-    fun keepsHomeActionsStableWhileReturningRefreshesSavedGames() {
+    fun keepsHomeActionsStableWithoutValidatingSavesOnReturn() {
         // Establish the navigation target's scroll position before comparing action bounds.
         compose.onNodeWithText("学习数独").performScrollTo()
         val start = compose.onNodeWithText("开始数独")
@@ -477,10 +477,12 @@ class PlayerWorkflowTest {
             compose.onNodeWithText("学习数独").performScrollTo().performClick()
             awaitText("每一步，都有理由。")
             pressBack()
-            compose.waitUntil(20_000) { controlledEngine.validationHeld }
+            awaitText("开始数独")
+            compose.mainClock.advanceTimeBy(500)
+            assertFalse(controlledEngine.validationHeld)
 
-            start.assertIsNotEnabled()
-            resume.assertIsNotEnabled()
+            start.assertIsEnabled()
+            resume.assertIsEnabled()
             assertEquals(startBounds, start.fetchSemanticsNode().boundsInRoot)
             assertEquals(resumeBounds, resume.fetchSemanticsNode().boundsInRoot)
             val loadingStartPixels = start.captureToImage().toPixelMap()

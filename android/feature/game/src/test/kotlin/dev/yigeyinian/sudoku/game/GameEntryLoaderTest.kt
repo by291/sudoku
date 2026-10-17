@@ -1,164 +1,110 @@
 package dev.yigeyinian.sudoku.game
 
-import dev.yigeyinian.sudoku.model.Difficulty
-import dev.yigeyinian.sudoku.model.GameRepository
-import dev.yigeyinian.sudoku.model.Puzzle
-import dev.yigeyinian.sudoku.model.PuzzleRules
-import dev.yigeyinian.sudoku.model.ResultRecord
-import dev.yigeyinian.sudoku.model.SessionMetadata
-import dev.yigeyinian.sudoku.model.SessionRecord
+import dev.yigeyinian.sudoku.model.BootstrapSnapshot
+import dev.yigeyinian.sudoku.model.GameReadRepository
+import dev.yigeyinian.sudoku.model.HomePresence
+import dev.yigeyinian.sudoku.model.Settings
 import dev.yigeyinian.sudoku.model.StorageFailure
 import dev.yigeyinian.sudoku.model.StorageFailureKind
 import dev.yigeyinian.sudoku.model.StorageOutcome
-import dev.yigeyinian.sudoku.model.Variant
-import dev.yigeyinian.sudoku.model.createSession
-import dev.yigeyinian.sudoku.model.dailyFormalId
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.resetMain
+import java.lang.reflect.Proxy
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class GameEntryLoaderTest {
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
-    fun readsAllSavesAndCompletionRecordsConcurrentlyAndPublishesTogether() = runTest {
-        val repository = EntryRepository()
-        repository.sessionsGate = CompletableDeferred()
-        repository.resultsGate = CompletableDeferred()
-        val loader = GameEntryLoader(repository)
-
-        val load = async { loader.prepareHome() }
+    fun anOlderRefreshCannotRepublishAfterDatasetReplacement() = runTest {
+        val reads = EntryReads()
+        reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false, "old"))
+        val loader = GameEntryLoader(reads, unusedRepository())
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        reads.gate = release
+        val old = launch { loader.prepareHome() }
         runCurrent()
 
-        assertEquals(1, repository.sessionReads)
-        assertEquals(1, repository.resultReads)
-        assertFalse(loader.uiState.value.hasLoadedSnapshot)
-        repository.sessionsGate?.complete(Unit)
-        runCurrent()
-        assertFalse(loader.uiState.value.hasLoadedSnapshot)
-        repository.resultsGate?.complete(Unit)
-        assertTrue(load.await() is StorageOutcome.Success)
-        assertEquals(
-            listOf("free-save", dailyFormalId("2026-10-17", Variant.CLASSIC)),
-            loader.uiState.value.sessions.map { it.session.id }
-        )
-        assertFalse(loader.uiState.value.loading)
+        loader.invalidate(1)
+        reads.gate = null
+        reads.bootstrap.value = BootstrapSnapshot(1, Settings(), HomePresence(false, false))
+        loader.prepareHome()
+        release.complete(Unit)
+        old.join()
+
+        org.junit.Assert.assertEquals(1L, loader.uiState.value.epoch)
+        assertFalse(loader.uiState.value.hasSaves)
+        org.junit.Assert.assertNull(loader.uiState.value.singleSaveId)
     }
 
-    @Test
-    fun retainsThePreviousSnapshotWhenOneParallelReadFails() = runTest {
-        val repository = EntryRepository()
-        val loader = GameEntryLoader(repository)
+    @Test fun changedDatasetDropsOldPresenceEvenWhenTheRefreshFails() = runTest {
+        val reads = EntryReads()
+        reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false, "old-save"))
+        val loader = GameEntryLoader(reads, unusedRepository())
+
+        loader.invalidate(1)
+        reads.fail = true
         loader.prepareHome()
-        val saved = loader.uiState.value.sessions
-        repository.sessions = emptyList()
-        repository.results = StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Unavailable"))
 
-        assertTrue(loader.prepareHome() is StorageOutcome.Failure)
-
-        assertEquals(saved, loader.uiState.value.sessions)
-        assertTrue(loader.uiState.value.hasLoadedSnapshot)
-        assertFalse(loader.uiState.value.loading)
+        assertFalse(loader.uiState.value.hasSaves)
+        assertFalse(loader.uiState.value.hasLoadedSnapshot)
+        org.junit.Assert.assertNull(loader.uiState.value.singleSaveId)
         assertTrue(loader.uiState.value.error != null)
     }
 
-    @Test
-    fun cancellationDoesNotPublishPartialDataOrLeaveLoadingStuck() = runTest {
-        val repository = EntryRepository()
-        repository.resultsGate = CompletableDeferred()
-        val loader = GameEntryLoader(repository)
-        val load = async { loader.prepareHome() }
-        runCurrent()
+    @Test fun initialHomeReusesPresenceWithoutFetchingSheetsOrDetails() = runTest {
+        val reads = EntryReads()
+        reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false))
+        val loader = GameEntryLoader(reads, unusedRepository())
 
-        load.cancel()
-        load.join()
-
-        assertFalse(loader.uiState.value.hasLoadedSnapshot)
+        assertTrue(loader.uiState.value.hasSaves)
+        assertTrue(loader.uiState.value.hasLoadedSnapshot)
         assertFalse(loader.uiState.value.loading)
-        repository.resultsGate = null
-        assertTrue(loader.prepareHome() is StorageOutcome.Success)
+        assertTrue(loader.uiState.value.saves.isEmpty())
     }
 
-    @Test
-    fun firstHomeEntryReusesPreloadAndReturningRefreshesIt() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        try {
-            val repository = EntryRepository()
-            val loader = GameEntryLoader(repository)
-            loader.prepareHome()
-            val model = GameEntryViewModel(loader)
+    @Test fun pendingMigrationKeepsContinueAndRefreshFailureRetainsKnownPresence() = runTest {
+        val reads = EntryReads()
+        reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(false, true))
+        val loader = GameEntryLoader(reads, unusedRepository())
 
-            model.open()
-            runCurrent()
-            assertEquals(1, repository.sessionReads)
-            assertFalse(model.uiState.value.loading)
-            model.open()
-            runCurrent()
+        reads.fail = true
+        loader.prepareHome()
 
-            assertEquals(2, repository.sessionReads)
-            assertEquals(2, repository.resultReads)
-        } finally {
-            Dispatchers.resetMain()
-        }
+        assertTrue(loader.uiState.value.hasSaves)
+        assertTrue(loader.uiState.value.error != null)
     }
 }
 
-private class EntryRepository : GameRepository by unsupportedEntryRepository() {
-    var sessionReads = 0
-    var resultReads = 0
-    var sessionsGate: CompletableDeferred<Unit>? = null
-    var resultsGate: CompletableDeferred<Unit>? = null
-    var sessions = entryFixtures()
-    var results: StorageOutcome<List<ResultRecord>> = StorageOutcome.Success(emptyList())
-
-    override suspend fun listSessions(): StorageOutcome<List<SessionRecord>> {
-        sessionReads += 1
-        sessionsGate?.await()
-        return StorageOutcome.Success(sessions)
-    }
-
-    override suspend fun listResults(): StorageOutcome<List<ResultRecord>> {
-        resultReads += 1
-        resultsGate?.await()
-        return results
+private class EntryReads :
+    GameReadRepository by (
+        Proxy.newProxyInstance(
+            GameReadRepository::class.java.classLoader,
+            arrayOf(GameReadRepository::class.java)
+        ) { _, method, _ -> error("Unexpected entry read: ${method.name}") } as GameReadRepository
+        ) {
+    override val bootstrap = MutableStateFlow<BootstrapSnapshot?>(null)
+    var gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+    var fail = false
+    override suspend fun readBootstrap(): StorageOutcome<BootstrapSnapshot> = if (fail) {
+        StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Unavailable"))
+    } else {
+        val snapshot = checkNotNull(bootstrap.value)
+        gate?.await()
+        StorageOutcome.Success(snapshot)
     }
 }
 
-private fun entryFixtures(): List<SessionRecord> {
-    val solution = List(81) { ((it / 9) * 3 + (it / 9) / 3 + it % 9) % 9 + 1 }
-    val puzzle = Puzzle(
-        solution.mapIndexed { cell, digit -> if (cell == 0) 0 else digit },
-        solution,
-        PuzzleRules.Classic,
-        Difficulty.EASY,
-        "00".repeat(32),
-        "sudoku-v11"
-    )
-    val timestamp = "2026-10-17T00:00:00.000Z"
-    return listOf(
-        SessionRecord(revision = 0, session = createSession(puzzle, SessionMetadata.Free, "free-save", timestamp)),
-        SessionRecord(
-            revision = 0,
-            session = createSession(
-                puzzle,
-                SessionMetadata.Daily("2026-10-17", true),
-                dailyFormalId("2026-10-17", Variant.CLASSIC),
-                timestamp
-            )
-        )
-    )
-}
-
-private fun unsupportedEntryRepository(): GameRepository = java.lang.reflect.Proxy.newProxyInstance(
-    GameRepository::class.java.classLoader,
-    arrayOf(GameRepository::class.java)
-) { _, method, _ -> throw UnsupportedOperationException(method.name) } as GameRepository
+private fun unusedRepository() = Proxy.newProxyInstance(
+    dev.yigeyinian.sudoku.model.GameRepository::class.java.classLoader,
+    arrayOf(dev.yigeyinian.sudoku.model.GameRepository::class.java)
+) { _, method, _ ->
+    if (method.name == "getDatasetEpochs") {
+        kotlinx.coroutines.flow.emptyFlow<Long>()
+    } else {
+        error("Unexpected repository operation: ${method.name}")
+    }
+} as dev.yigeyinian.sudoku.model.GameRepository

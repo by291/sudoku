@@ -57,6 +57,7 @@ import kotlinx.coroutines.withContext
 internal class GameController(
     private val engine: SudokuEngine,
     private val repository: GameRepository,
+    private val reads: dev.yigeyinian.sudoku.model.GameReadRepository,
     private val scope: CoroutineScope,
     private val restoredSessionId: String?,
     private val rememberSession: (String?) -> Unit,
@@ -96,14 +97,14 @@ internal class GameController(
             val settings = storage(repository.readSettings())
             update { it.copy(settings = settings) }
             val intent = restoredSessionId?.let(GameLaunch::Resume) ?: launch
-            val records = storage(repository.listSessions())
+            val records = recordsFor(intent)
             when (intent) {
                 is GameLaunch.Resume -> {
                     val record = records.find { it.session.id == intent.sessionId }
                     if (record != null) {
                         load(record, epoch)
                     } else {
-                        val result = storage(repository.listResults()).find { it.session.id == intent.sessionId }
+                        val result = storage(reads.readResult(intent.sessionId))
                             ?: throw WorkflowFailure("找不到这局已保存的数独，请返回重新选择。")
                         load(SessionRecord(revision = 0, session = result.session), epoch, readOnly = true)
                     }
@@ -127,7 +128,7 @@ internal class GameController(
         beginTransition { generation ->
             val epoch = storage(repository.readDatasetEpoch())
             datasetEpoch = epoch
-            val records = storage(repository.listSessions())
+            val records = recordsFor(launch)
             if (launch is GameLaunch.Daily) {
                 openDaily(
                     launch,
@@ -211,6 +212,15 @@ internal class GameController(
         }
     }
 
+    private suspend fun recordsFor(launch: GameLaunch): List<SessionRecord> = listOfNotNull(
+        when (launch) {
+            is GameLaunch.Resume -> storage(reads.readSession(launch.sessionId))
+            is GameLaunch.Daily -> storage(reads.readSession(dailyFormalId(launch.date, launch.variant)))
+            is GameLaunch.Free -> storage(reads.readSlot(GameMode.FREE, launch.variant))
+            is GameLaunch.Practice -> storage(reads.readSlot(GameMode.LEARNING, launch.variant))
+        }
+    )
+
     private suspend fun openDaily(
         launch: GameLaunch.Daily,
         epoch: Long,
@@ -269,7 +279,7 @@ internal class GameController(
                     it.session.id == formalId &&
                         it.session.completion != null
                 } ||
-                    storage(repository.listResults()).any { it.session.id == formalId }
+                    (storage(reads.readResult(formalId)) != null)
                 SessionMetadata.Daily(launch.date, !completed)
             }
             is GameLaunch.Resume -> throw WorkflowFailure("对局参数无效。")
@@ -415,7 +425,7 @@ internal class GameController(
                             if (claimed.epoch != epoch) {
                                 throw WorkflowFailure("数据已更新，请重新打开对局。")
                             }
-                            val current = storage(repository.listSessions()).find { it.session.id == record.session.id }
+                            val current = storage(reads.readSession(record.session.id))
                             if (current?.revision != record.revision) {
                                 throw WorkflowFailure("保存版本已变化，请重新打开最新的对局。")
                             }
@@ -498,10 +508,10 @@ internal class GameController(
 
     private suspend fun recoverEditor(session: GameSession, revision: Long, epoch: Long): Boolean {
         val currentEpoch = repository.readDatasetEpoch()
-        val records = repository.listSessions()
+        val records = reads.readSession(session.id)
         val unchanged = currentEpoch is StorageOutcome.Success && currentEpoch.value == epoch &&
             records is StorageOutcome.Success &&
-            records.value.find { it.session.id == session.id }?.revision == revision
+            records.value?.revision == revision
         if (!unchanged) {
             loseEditor("保存版本或数据集已变化，当前未保存进度仍保留在页面中；请勿覆盖较新的记录。")
             return false
@@ -922,7 +932,11 @@ internal class GameController(
                 } else {
                     beginTransition { generation ->
                         val epoch = storage(repository.readDatasetEpoch())
-                        val records = storage(repository.listSessions())
+                        val records = if (session.mode == GameMode.DAILY) {
+                            emptyList()
+                        } else {
+                            listOfNotNull(storage(reads.readSlot(session.mode, session.puzzle.rules.variant)))
+                        }
                         val previousMetadata = session.metadata
                         val metadata = if (previousMetadata is SessionMetadata.Daily) {
                             previousMetadata.copy(formalAttempt = false)

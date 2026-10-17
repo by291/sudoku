@@ -51,17 +51,15 @@ import dev.yigeyinian.sudoku.model.variant
 internal enum class DailyEntryStatus(val label: String) {
     NOT_STARTED("待开始"),
     IN_PROGRESS("进行中"),
-    COMPLETED("已完成")
+    COMPLETED("已完成"),
+    PENDING("待确认")
 }
 
-internal fun GameEntryUiState.dailyStatus(variant: Variant): DailyEntryStatus {
-    val id = dailyFormalId(today, variant)
-    val saved = sessions.firstOrNull { it.session.id == id }
-    return when {
-        saved?.session?.completion != null || results.any { it.session.id == id } -> DailyEntryStatus.COMPLETED
-        saved != null -> DailyEntryStatus.IN_PROGRESS
-        else -> DailyEntryStatus.NOT_STARTED
-    }
+internal fun GameEntryUiState.dailyStatus(variant: Variant): DailyEntryStatus = when (daily[variant]) {
+    dev.yigeyinian.sudoku.model.DailyStatus.COMPLETED -> DailyEntryStatus.COMPLETED
+    dev.yigeyinian.sudoku.model.DailyStatus.IN_PROGRESS -> DailyEntryStatus.IN_PROGRESS
+    dev.yigeyinian.sudoku.model.DailyStatus.NOT_STARTED -> DailyEntryStatus.NOT_STARTED
+    else -> DailyEntryStatus.PENDING
 }
 
 /** Mobile entry keeps choices close to the primary action without navigating away from Home. */
@@ -71,22 +69,22 @@ internal fun GameSetupSheet(
     onDismiss: () -> Unit,
     onPlay: (GameLaunch) -> Unit,
     onRetry: () -> Unit,
+    onLoad: (Boolean, Variant) -> Unit = { _, _ -> },
     daily: Boolean = false
 ) {
     var variant by rememberSaveable { mutableStateOf(Variant.CLASSIC) }
     var difficulty by rememberSaveable { mutableStateOf(Difficulty.EASY) }
     var rulesOpen by rememberSaveable { mutableStateOf(false) }
-    val saved = state.sessions.firstOrNull {
-        it.session.mode == GameMode.FREE && it.session.puzzle.rules.variant == variant && it.session.completion == null
-    }
-    val ready = !state.loading && state.error == null
-    val showLoading = rememberDelayedProgress(state.loading)
+    androidx.compose.runtime.LaunchedEffect(daily, variant) { onLoad(daily, variant) }
+    val saved = state.freeSave?.takeIf { it.variant == variant && it.completion == null }
+    val ready = !state.sheetLoading && state.sheetError == null && (daily || !state.freePending)
+    val showLoading = rememberDelayedProgress(state.sheetLoading)
     val dailyStatus = state.dailyStatus(variant)
     val startLabel = if (daily) {
         when (dailyStatus) {
             DailyEntryStatus.COMPLETED -> "再次练习"
             DailyEntryStatus.IN_PROGRESS -> "继续今日挑战"
-            DailyEntryStatus.NOT_STARTED -> "开始今日挑战"
+            DailyEntryStatus.NOT_STARTED, DailyEntryStatus.PENDING -> "开始今日挑战"
         }
     } else if (saved != null) {
         "开始新局"
@@ -127,7 +125,13 @@ internal fun GameSetupSheet(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val completed = Variant.entries.count { state.dailyStatus(it) == DailyEntryStatus.COMPLETED }
                     Text(
-                        "今日已完成 $completed / 6",
+                        if (state.daily.size == Variant.entries.size &&
+                            state.daily.values.none { it == dev.yigeyinian.sudoku.model.DailyStatus.PENDING }
+                        ) {
+                            "今日已完成 $completed / 6"
+                        } else {
+                            "今日已完成 — / 6"
+                        },
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -142,14 +146,18 @@ internal fun GameSetupSheet(
                     )
                 }
             }
-            if (state.error != null) {
-                Text(state.error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = onRetry) { Text("重新读取") }
+            if (state.sheetError != null) {
+                Text(
+                    state.sheetError,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TextButton(onClick = { onLoad(daily, variant) }) { Text("重新读取") }
             }
             if (!daily && saved != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
-                        onClick = { onPlay(GameLaunch.Resume(saved.session.id)) },
+                        onClick = { onPlay(GameLaunch.Resume(saved.id)) },
                         enabled = ready,
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant
@@ -163,8 +171,8 @@ internal fun GameSetupSheet(
                                 Text(
                                     "${variantLabel(
                                         variant
-                                    )} · ${difficultyLabel(saved.session.puzzle.difficulty)} · " +
-                                        formatElapsedTime(saved.session.elapsedMs),
+                                    )} · ${difficultyLabel(saved.difficulty)} · " +
+                                        formatElapsedTime(saved.elapsedMs),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

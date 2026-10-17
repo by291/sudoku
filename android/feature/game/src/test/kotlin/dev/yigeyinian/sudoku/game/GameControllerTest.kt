@@ -46,6 +46,7 @@ class GameControllerTest {
             GameController(
                 ControllerEngine(),
                 repository,
+                repository.reads,
                 backgroundScope,
                 "saved",
                 {},
@@ -68,6 +69,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -95,6 +97,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -121,7 +124,7 @@ class GameControllerTest {
         val repository = ControllerRepository()
         val prepared = ControllerPrepared()
         val controller =
-            GameController(ControllerEngine(prepared), repository, backgroundScope, "saved", {
+            GameController(ControllerEngine(prepared), repository, repository.reads, backgroundScope, "saved", {
             }, { testScheduler.currentTime })
         controller.open(GameLaunch.Resume("saved"))
         runCurrent()
@@ -148,7 +151,7 @@ class GameControllerTest {
         val repository = ControllerRepository()
         val prepared = ControllerPrepared()
         val controller =
-            GameController(ControllerEngine(prepared), repository, backgroundScope, "saved", {
+            GameController(ControllerEngine(prepared), repository, repository.reads, backgroundScope, "saved", {
             }, { testScheduler.currentTime })
         controller.open(GameLaunch.Resume("saved"))
         runCurrent()
@@ -178,6 +181,7 @@ class GameControllerTest {
                 gate
             ),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -201,6 +205,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -230,6 +235,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -272,6 +278,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(),
             repository,
+            repository.reads,
             backgroundScope,
             null,
             {},
@@ -300,6 +307,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(generated = generated),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -343,6 +351,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(generated = generated),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -379,6 +388,7 @@ class GameControllerTest {
         val controller = GameController(
             ControllerEngine(),
             repository,
+            repository.reads,
             backgroundScope,
             "saved",
             {},
@@ -481,6 +491,21 @@ private class ControllerPrepared : dev.yigeyinian.sudoku.model.PreparedPuzzle {
 
 private class ControllerRepository(private val commitGate: CompletableDeferred<Unit>? = null) : GameRepository {
     override val datasetEpochs = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1)
+    val reads = object : dev.yigeyinian.sudoku.model.GameReadRepository by (
+        java.lang.reflect.Proxy.newProxyInstance(
+            dev.yigeyinian.sudoku.model.GameReadRepository::class.java.classLoader,
+            arrayOf(dev.yigeyinian.sudoku.model.GameReadRepository::class.java)
+        ) { _, method, _ ->
+            error("Unexpected controller query: ${method.name}")
+        } as dev.yigeyinian.sudoku.model.GameReadRepository
+        ) {
+        override suspend fun readSession(id: String) = StorageOutcome.Success(records.find { it.session.id == id })
+        override suspend fun readResult(id: String) = StorageOutcome.Success<ResultRecord?>(null)
+        override suspend fun readSlot(
+            mode: dev.yigeyinian.sudoku.model.GameMode,
+            variant: dev.yigeyinian.sudoku.model.Variant
+        ) = StorageOutcome.Success(records.singleOrNull { it.session.mode == mode })
+    }
     val commitStarted = CompletableDeferred<Unit>()
 
     val records =

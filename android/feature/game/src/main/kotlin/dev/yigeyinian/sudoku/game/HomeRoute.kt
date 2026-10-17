@@ -7,8 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.yigeyinian.sudoku.model.GameLaunch
+import dev.yigeyinian.sudoku.model.challengeDate
+import dev.yigeyinian.sudoku.model.challengeRefreshDelay
+import java.time.Instant
 import kotlinx.coroutines.delay
 
 @Composable
@@ -18,33 +23,39 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
     var setup by rememberSaveable { mutableStateOf(false) }
     var dailyOpen by rememberSaveable { mutableStateOf(false) }
     var continueOpen by rememberSaveable { mutableStateOf(false) }
-    val saves = state.sessions.filter { it.session.completion == null }
+    val saves = state.saves
 
     LaunchedEffect(model) { model.open() }
 
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (dailyOpen) model.loadSheet(true, dev.yigeyinian.sudoku.model.Variant.CLASSIC)
+    }
     LaunchedEffect(dailyOpen) {
         if (dailyOpen) {
             while (true) {
-                delay(60_000)
-                model.refresh()
+                delay(challengeRefreshDelay(Instant.now()))
+                if (model.uiState.value.today != challengeDate(Instant.now())) {
+                    model.loadSheet(true, dev.yigeyinian.sudoku.model.Variant.CLASSIC)
+                }
             }
         }
     }
 
     HomeScreen(
         state = state,
-        hasSaves = saves.isNotEmpty(),
+        hasSaves = state.hasSaves,
         onStart = { setup = true },
         onContinue = {
-            if (saves.size == 1) {
-                onPlay(GameLaunch.Resume(saves.first().session.id))
+            val single = state.singleSaveId
+            if (single != null) {
+                onPlay(GameLaunch.Resume(single))
             } else {
+                model.loadSaves()
                 continueOpen = true
             }
         },
         onLearning = onLearning,
         onDaily = {
-            model.refreshIfDateChanged()
             dailyOpen = true
         },
         onRecords = onRecords,
@@ -52,20 +63,34 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
     )
 
     if (setup) {
-        GameSetupSheet(state, onRetry = model::refresh, onDismiss = { setup = false }, onPlay = {
+        GameSetupSheet(state, onLoad = model::loadSheet, onRetry = model::refresh, onDismiss = {
+            setup = false
+        }, onPlay = {
             setup = false
             onPlay(it)
         })
     }
     if (dailyOpen) {
-        GameSetupSheet(state, daily = true, onRetry = model::refresh, onDismiss = { dailyOpen = false }, onPlay = {
-            dailyOpen = false
-            onPlay(it)
+        GameSetupSheet(state, daily = true, onLoad = model::loadSheet, onRetry = model::refresh, onDismiss = {
+            dailyOpen =
+                false
+        }, onPlay = {
+            if (it is GameLaunch.Daily && it.date != challengeDate(Instant.now())) {
+                model.loadSheet(true, it.variant)
+            } else {
+                dailyOpen = false
+                onPlay(it)
+            }
         })
     }
     if (continueOpen) {
         ContinueGameSheet(
-            saves = saves.map { it.session },
+            saves = saves,
+            loading = state.sheetLoading,
+            error = state.sheetError,
+            hasMore = state.next != null,
+            onMore = { model.loadSaves(true) },
+            onRetry = { model.loadSaves() },
             onDismiss = { continueOpen = false },
             onResume = {
                 continueOpen = false
