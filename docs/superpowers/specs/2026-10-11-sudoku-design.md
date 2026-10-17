@@ -191,6 +191,26 @@ Before delivery, run type checking, lint, engine and session tests, browser test
 
 ## 11. Default decisions and future scope
 
+### Web parity additions approved on 2026-10-17
+
+Extend the existing Web workflows with the Android player features below. Keep the current Web visual system and shared Rust engine. Board zoom is explicitly excluded from this work.
+
+- Touch play provides a separate nine-digit quick-note row. It reflects the selected cell's actual notes and uses the ordinary undoable note action without changing the main input mode. Protected, paused, completed, and read-only boards cannot be edited through it.
+- Records separates Overview, Local Saves, and Completion History. Variant-filtered saves feature the most recently started unfinished session, while all remaining saves stay accessible. History groups completed results by the display-local calendar date; daily eligibility still uses Beijing dates. Opening a historical result displays its validated stored board and completion facts on a read-only page without acquiring an editing lease, starting a clock, regenerating a puzzle, or writing a result.
+- Learning offers separate Guide and Exercise modes. Guide shows the authored guided board and evidence; Exercise preserves drafts across mode changes and requires explicit submission for placements and eliminations. Evidence appears in Guide or after a correct submission. Explicit Next and committed progress semantics remain unchanged. The directory distinguishes unfinished lessons in progress and displays the saved exercise stage on its recommendation.
+- Transient loading feedback waits for 350 ms of continuous pending work. Completion, cancellation, disposal, errors, and disabled controls remain immediate. Loading reserves the game board square and control positions. Hiding the timer preserves its layout slot.
+- Setup, resume, settings, daily rules, and backup use a responsive library-backed dialog: a bottom sheet on narrow screens and a centered card on wider screens. Content scrolls inside the available viewport, actions remain reachable, keyboard focus stays owned by the active dialog, and closing restores the trigger. Destructive confirmations retain their existing explicit safe action.
+
+These additions do not change puzzle identities, storage formats, assistance classification, lesson content, or statistical eligibility.
+
+### Android refinements approved on 2026-10-17
+
+- In-app departures, including browser history and returning from lesson practice, must save successfully before navigating. Failure retains the current game and retry action. Slow saves retain the outgoing board and control geometry with input disabled and menus closed. Concurrent navigation cancellation must not release a newer departure's presentation. Backgrounding immediately conceals the board; browser shutdown remains best effort.
+- Resume choices and local saves show filled editable cells, elapsed time, and a display-local start timestamp including the year. Progress excludes givens and notes and does not claim correctness. Sort by start instant descending, with a stable session-ID tie-breaker; each entire choice resumes its exact session.
+- Validate every bundled lesson's guided and exercise-stage mathematics with Rust/WASM during all production builds, including subpath builds. Invalid, exhausted, and failed validation block emission. Bundle the verified snapshot and retain runtime structural validation. Saved records and imported files retain their existing mathematical validation.
+- Candidate notes cache decoded masks independently of selection and render only present digits in fixed three-by-three positions. Conflicts retain a visible exclamation marker with a quieter background tint and normal digit colors.
+- On tall phone screens, Home and viewport-fitting Game layouts distribute spare space approximately 40 percent above and 60 percent below the content. Short screens retain ordinary scrolling and reachable controls. Existing desktop layout remains unchanged.
+
 Details not previously specified are resolved as these first-release defaults: Chinese interface copy; three logically rated difficulties; the six lessons above; Medium daily challenges that change in Beijing time; separate assisted results; resumable progress in each mode; and theme settings.
 
 Future development may deepen lessons, logical techniques, puzzle generation, and difficulty assessment, and may add puzzle import. The application remains browser-local and statically hosted. Accounts, cloud and cross-device synchronization, friends, global leaderboards, and PWA/offline installation are outside the product scope, rather than postponed work. Maintain clear boundaries between the engine, interface, and storage to support the retained scope.

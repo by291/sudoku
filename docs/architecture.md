@@ -14,7 +14,7 @@ src/
   sudoku/{contracts,values,catalogue,seed,generationInput,ruleInput,puzzleSnapshot}
   sudoku/{wasmModule,mainEngine,workerEngine}
   layouts/, router/, theme/, styles/
-  shared/{components,model,utils}/
+  shared/{components,composables,model,utils}/
   features/
     home/views/
     game/{views,components,composables,model,stores}/
@@ -41,11 +41,13 @@ src/
 | `features/game/model/`                                     | Session layers/history/assistance, clocks, daily policy, names and explanations                                  |
 | `features/game/stores/`                                    | Player actions, prepared-layout lifetime, persistence/save queue and fenced transitions                          |
 | `features/game/composables/`                               | Route entry, keyboard/touch ownership, lifecycle listeners and route-leave behavior                              |
-| `features/learning/`                                       | Authored 32-course data, explicit engine-backed construction/validation, exercise flow and progress              |
+| `features/learning/`                                       | Authored 32-course data, structural catalogue decoding, exercise flow and progress                               |
 | `features/records/`, `settings/`                           | Stored-fact aggregation, backups, confirmed local-data controls and preferences                                  |
 | `storage/`                                                 | Validated records, IndexedDB transactions, editing leases, revisions, epochs and broadcasts                      |
 
 Features compose their own workflows. Shared presentation cannot load an engine or import feature state, storage, workers or runtime. Pure models receive computation through narrow contracts rather than loading WASM. Browser services consume persisted models, never feature views/stores or application presentation. `runtime.ts` is the composition owner; there is no generic infrastructure container.
+
+Shared presentation composables own only generic UI lifetimes, such as cancellable delayed progress feedback. `ResponsiveDialog` retains Naive UI's modal ownership while adapting its card to a narrow-screen sheet. Records owns completed-result viewing and reads validated result snapshots; historical viewing does not enter the editable game-session workflow.
 
 Source imports use `@/`; Worker asset URLs stay literal and relative. Contracts come from their explicit owner, rather than an operation facade. ESLint checks static and dynamic imports, prohibits uninspectable dynamic paths and rejects production imports of retired/reference engines. Tests also check the browser engine's runtime import graph for cycles. The sealed TypeScript reference is test-only under `tests/reference`; only test configuration resolves `@reference/` and its original internal aliases. Normal production builds contain no TypeScript rule compiler, solver, rater or generator.
 
@@ -81,6 +83,8 @@ App loads, compiles and validates the module before constructing runtime/reposit
 
 Initial route resolution and WASM download run concurrently; runtime publication and application rendering wait for both. Retry restarts initial navigation before waiting again. Game leave guards identify the target navigation, and a scope-owned resolve guard pauses/saves only after that target's page is loaded. Cancelled targets cannot pause the current game while their page downloads finish.
 
+`useGameLifecycle` also guards session-changing route updates, including lesson-practice query exits, while excluding URL synchronization for an already installed session. `prepareLeave` uses the existing fenced transition and persistence contracts to block navigation on save failure. The view retains an inert outgoing presentation while saving; completion, cancellation, and route errors release it only for the relevant target. Hidden/pagehide events immediately clear this hold and conceal the board. Browser shutdown remains best effort.
+
 Main-engine prepared layouts return independent metadata/results and reject calls after disposal. The game store owns one layout per puzzle identity, reuses it through moves and releases it once on replacement/drop/disposal. The main facade exposes no exact search, generation, assessment or hint search. Heavy jobs use separate Worker instances/memory and share only compiled code.
 
 Bridge version 2 exposes summary-only assessment for production Workers. The core still computes the complete trace required for grading and workload, but the adapter omits trace conversion and serialization when the caller only needs the summary. Full assessment remains a separate named export with unchanged trace/work semantics. Rust adapters can borrow immutable prepared metadata to construct the final owned DTO directly; JavaScript never borrows the prepared layout's memory.
@@ -105,7 +109,7 @@ Shutdown keeps semantic validation alive until the final leave/save settles, the
 
 ## Teaching, presentation and verification
 
-The learning store constructs all 32 stable courses after readiness. Rust supplies base candidates, permitted rule transforms and candidate-relative evidence validation. Authored arrays, board/evidence drawing transforms, explanations, answers and course IDs remain teaching/presentation data. Prior candidate eliminations are an explicit precondition of an authored state; independent course proofs establish them. Teaching may choose any sound unit pattern; live hints retain ordered replay and direct advanced-proof validation. Progress cursors remain epoch-fenced settings facts; final committed lesson completions and full-board practice have independent lifetimes.
+The learning store structurally decodes all 32 stable courses without engine calls. `scripts/validate-lesson-catalogue.ts` is a mandatory Vite production-build plugin: Rust/WASM validates every guided and exercise stage, rejects invalid or incomplete outcomes, and Vite consumes the exact verified source snapshot. Runtime guards retain explicit DTO shapes, ranges, answer consistency, and owned copies. Rust remains responsible for candidate-relative evidence validation in the build and independent contract tests; storage and backup mathematical validators are unchanged. Authored arrays, explanations, answers and course IDs remain teaching/presentation data. Prior candidate eliminations are an explicit precondition of an authored state; independent course proofs establish them. Teaching may choose any sound unit pattern; live hints retain ordered replay and direct advanced-proof validation. Progress cursors remain epoch-fenced settings facts; final committed lesson completions and full-board practice have independent lifetimes.
 
 Chinese technique/violation text belongs to game presentation; shared board drawing consumes DTOs and owned metadata. Display-only digit/mask formatting cannot infer candidates or Sudoku validity. A new primitive must support candidates, conflicts, completion, exact counting, deductions/evidence, validation and accessible drawing together.
 
