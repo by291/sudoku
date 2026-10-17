@@ -215,7 +215,10 @@ fun GameRoute(launch: GameLaunch, onLeave: () -> Unit, onRecords: () -> Unit) {
 
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(state.session?.let { variantLabel(it.puzzle.rules.variant) } ?: "数独", fontSize = 18.sp)
+                        Text(
+                            state.session?.let { variantLabel(it.puzzle.rules.variant) } ?: "数独",
+                            style = MaterialTheme.typography.titleMedium
+                        )
                         state.session?.let {
                             Text(
                                 difficultyLabel(it.puzzle.difficulty),
