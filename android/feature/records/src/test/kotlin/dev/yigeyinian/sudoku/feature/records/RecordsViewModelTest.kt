@@ -78,6 +78,7 @@ class RecordsViewModelTest {
 }
 
 private class RecordsRepositoryFake : GameRepository {
+    override val datasetEpochs = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1)
     var epoch = 1L
     var failRestore = false
     private val backup =

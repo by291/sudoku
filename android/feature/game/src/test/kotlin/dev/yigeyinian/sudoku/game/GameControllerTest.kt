@@ -480,6 +480,7 @@ private class ControllerPrepared : dev.yigeyinian.sudoku.model.PreparedPuzzle {
 }
 
 private class ControllerRepository(private val commitGate: CompletableDeferred<Unit>? = null) : GameRepository {
+    override val datasetEpochs = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1)
     val commitStarted = CompletableDeferred<Unit>()
 
     val records =

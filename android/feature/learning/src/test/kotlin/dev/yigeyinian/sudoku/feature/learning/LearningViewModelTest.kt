@@ -303,6 +303,7 @@ class LearningViewModelTest {
 }
 
 private class LearningRepository : GameRepository {
+    override val datasetEpochs = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1)
     var epoch = 0L
     var settings = Settings()
     val progress = mutableListOf<LessonProgress>()

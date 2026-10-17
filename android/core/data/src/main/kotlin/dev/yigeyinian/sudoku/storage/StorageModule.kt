@@ -7,6 +7,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dev.yigeyinian.sudoku.model.GameReadRepository
 import dev.yigeyinian.sudoku.model.GameRepository
 import dev.yigeyinian.sudoku.model.SudokuEngine
 import dev.yigeyinian.sudoku.model.learning.LearningContentRepository
@@ -24,6 +25,11 @@ object StorageModule {
     @Singleton
     fun repository(database: SudokuDatabase, engine: SudokuEngine): GameRepository =
         RoomGameRepository(database, engine)
+
+    @Provides
+    @Singleton
+    fun readRepository(database: SudokuDatabase, engine: SudokuEngine): GameReadRepository =
+        RoomReadRepository(database, engine)
 
     @Provides
     @Singleton

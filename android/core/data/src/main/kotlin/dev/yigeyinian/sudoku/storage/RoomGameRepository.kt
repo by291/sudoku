@@ -25,6 +25,8 @@ import dev.yigeyinian.sudoku.model.StorageOutcome
 import dev.yigeyinian.sudoku.model.variant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -33,8 +35,12 @@ import kotlinx.serialization.encodeToString
 /** One application-scoped writer owns ordering; Room transactions provide cross-instance fencing. */
 class RoomGameRepository(private val database: SudokuDatabase, validator: MathematicalValidator) : GameRepository {
     private val codec = PortableCodec(validator)
+    override val datasetEpochs = database.invalidationTracker.createFlow("dataset")
+        .map { database.sudokuDao().dataset()?.epoch ?: 0L }.distinctUntilChanged()
+
     private val dao = database.sudokuDao()
     private val writes = Mutex()
+    private val summaries = database.summaryDao()
 
     override suspend fun claimEditor(sessionId: String, ownerId: String): StorageOutcome<EditorToken> = write {
         require(sessionId.isNotBlank() && sessionId.length <= 200 && ownerId.isNotBlank())
@@ -76,6 +82,14 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 StorageFailureKind.OWNERSHIP_LOST,
                 "Editor owns another session"
             )
+            // A formal ID may have an immutable result even when its active session is absent.
+            if (expectedRevision == 0L && (validated.metadata as? SessionMetadata.Daily)?.formalAttempt == true) {
+                checkConflict(
+                    dao.result(validated.id) == null,
+                    StorageFailureKind.REVISION_CONFLICT,
+                    "Formal attempt already completed"
+                )
+            }
             val current = dao.session(session.id)
             checkConflict(
                 (current?.revision ?: 0) == expectedRevision,
@@ -83,9 +97,12 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 "Saved revision changed"
             )
             dao.putSession(entity)
+            summaries.putSession(SessionSummaryEntity(record.session.id, record.revision, validated.summaryFields()))
             if (result != null) {
                 // INSERT IGNORE retains the first completion even when an old attempt is replayed.
-                dao.putOriginalResult(result)
+                if (dao.putOriginalResult(result) != -1L) {
+                    summaries.putResult(ResultSummaryEntity(validated.id, validated.summaryFields()))
+                }
             }
         }
         record
@@ -108,10 +125,8 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 StorageFailureKind.REVISION_CONFLICT,
                 "Replacement identity exists"
             )
-            val slots = dao.sessions().filter {
-                it.mode == validated.mode.name &&
-                    (validated.mode != GameMode.FREE || it.variant == validated.puzzle.rules.variant.wireName)
-            }
+            val slots = summaries.slotIds(validated.mode.name, validated.puzzle.rules.variant.wireName)
+                .map { checkNotNull(dao.session(it)) }
             checkConflict(slots.size <= 1, StorageFailureKind.REVISION_CONFLICT, "Multiple active slots")
             if (slots.isNotEmpty()) {
                 val current = slots.single()
@@ -123,6 +138,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                     "Previous active session changed"
                 )
                 dao.deleteSession(current.id, current.revision)
+                summaries.deleteSession(current.id)
             } else {
                 checkConflict(
                     previous == null,
@@ -131,7 +147,12 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 )
             }
             dao.putSession(entity)
-            validated.completion?.let { dao.putOriginalResult(resultEntity(ResultRecord(session = validated))) }
+            summaries.putSession(SessionSummaryEntity(record.session.id, record.revision, validated.summaryFields()))
+            validated.completion?.let {
+                if (dao.putOriginalResult(resultEntity(ResultRecord(session = validated))) != -1L) {
+                    summaries.putResult(ResultSummaryEntity(validated.id, validated.summaryFields()))
+                }
+            }
         }
         record
     }
@@ -168,6 +189,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 preserveUnavailable(error)
                 database.withTransaction {
                     if (dataset().epoch == snapshot.first && dao.deleteResult(entity.id, entity.payload) == 1) {
+                        summaries.deleteResult(entity.id)
                         dao.putQuarantine(
                             QuarantineEntity(
                                 "results:${entity.id}",
@@ -232,7 +254,15 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
             assertEpoch(state, preview.expectedEpoch)
             clearCollections()
             sessions.forEach { dao.putSession(it) }
+            backup.sessions.forEach {
+                summaries.putSession(SessionSummaryEntity(it.session.id, 1, it.session.summaryFields()))
+            }
             results.forEach { dao.putOriginalResult(it) }
+            backup.results.forEach {
+                summaries.putResult(ResultSummaryEntity(it.session.id, it.session.summaryFields()))
+            }
+            summaries.sessionCoverage(true)
+            summaries.resultCoverage(true)
             lessons.forEach { dao.putLesson(it) }
             dao.putSettings(settings)
             dao.putDataset(
@@ -307,6 +337,8 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
             val state = dataset()
             assertEpoch(state, expectedEpoch)
             clearCollections()
+            summaries.sessionCoverage(true)
+            summaries.resultCoverage(true)
             dao.putDataset(
                 DatasetEntity(epoch = increment(state.epoch), editorGeneration = increment(state.editorGeneration))
             )
@@ -319,6 +351,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
     private suspend fun quarantineSession(epoch: Long, entity: SessionEntity, reason: String) {
         database.withTransaction {
             if (dataset().epoch == epoch && dao.deleteSession(entity.id, entity.revision) == 1) {
+                summaries.deleteSession(entity.id)
                 dao.putQuarantine(QuarantineEntity("sessions:${entity.id}", "sessions", entity.payload, reason))
             }
         }
@@ -333,6 +366,8 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
     }
 
     private suspend fun clearCollections() {
+        summaries.clearSessions()
+        summaries.clearResults()
         dao.clearSessions()
         dao.clearResults()
         dao.clearLessons()

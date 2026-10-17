@@ -1,5 +1,6 @@
 package dev.yigeyinian.sudoku.storage
 
+import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -77,7 +78,7 @@ interface SudokuDao {
     suspend fun putSession(value: SessionEntity)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun putOriginalResult(value: ResultEntity)
+    suspend fun putOriginalResult(value: ResultEntity): Long
 
     // Repeated completion saves retain the original timestamp; restore inserts only after clearing.
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -120,15 +121,20 @@ interface SudokuDao {
 @Database(
     entities = [
         SessionEntity::class,
+        SessionSummaryEntity::class,
+        ResultSummaryEntity::class,
+        SummaryVersionEntity::class,
         ResultEntity::class,
         LessonEntity::class,
         SettingsEntity::class,
         DatasetEntity::class,
         QuarantineEntity::class
     ],
-    version = 1,
+    version = 2,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
     exportSchema = true
 )
 abstract class SudokuDatabase : RoomDatabase() {
     abstract fun sudokuDao(): SudokuDao
+    abstract fun summaryDao(): SummaryDao
 }

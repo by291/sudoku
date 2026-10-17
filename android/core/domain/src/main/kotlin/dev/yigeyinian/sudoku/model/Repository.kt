@@ -51,6 +51,8 @@ data class BackupExport(val backup: LocalBackup, val text: String, val excluded:
 
 /** Application scoped; all effective writes are ordered and fenced by dataset epoch and editor. */
 interface GameRepository {
+    val datasetEpochs: kotlinx.coroutines.flow.Flow<Long>
+
     suspend fun claimEditor(sessionId: String, ownerId: String): StorageOutcome<EditorToken>
     suspend fun releaseEditor(token: EditorToken): StorageOutcome<Unit>
     suspend fun writeSession(

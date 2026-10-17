@@ -11,6 +11,7 @@ android {
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 androidComponents.onVariants { variant ->
+    variant.androidTest?.sources?.assets?.addStaticSourceDirectory(file("schemas").absolutePath)
     variant.sources.assets?.addStaticSourceDirectory(file("../../../content").absolutePath)
 }
 
