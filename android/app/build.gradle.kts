@@ -6,6 +6,9 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// AGP resource shrinking requires ABI APK splits to be disabled for app bundles.
+val splitApksByAbi = providers.gradleProperty("splitApksByAbi").map(String::toBooleanStrict).orElse(true).get()
+
 android {
     namespace = "dev.yigeyinian.sudoku"
     compileSdk = 37
@@ -16,7 +19,17 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "dev.yigeyinian.sudoku.SudokuTestRunner"
-        ndk { abiFilters.addAll(listOf("arm64-v8a", "x86_64")) }
+        if (!splitApksByAbi) {
+            ndk { abiFilters.addAll(listOf("arm64-v8a", "x86_64")) }
+        }
+    }
+    splits {
+        abi {
+            isEnable = splitApksByAbi
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21

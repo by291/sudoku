@@ -14,6 +14,7 @@ import zipfile
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk", type=Path)
+    parser.add_argument("--abi", required=True, choices=("arm64-v8a", "x86_64"))
     parser.add_argument("--sdk", type=Path, default=os.environ.get("ANDROID_HOME"))
     arguments = parser.parse_args()
     if arguments.sdk is None:
@@ -32,8 +33,8 @@ def main() -> None:
         if not libraries:
             raise RuntimeError("APK contains no native libraries")
         abis = {entry.split("/")[1] for entry in libraries}
-        if abis != {"arm64-v8a", "x86_64"}:
-            raise RuntimeError(f"Unexpected packaged ABI set: {sorted(abis)}")
+        if abis != {arguments.abi}:
+            raise RuntimeError(f"Expected only {arguments.abi}, found packaged ABIs: {sorted(abis)}")
         for entry in libraries:
             local = Path(temporary) / entry
             local.parent.mkdir(parents=True, exist_ok=True)

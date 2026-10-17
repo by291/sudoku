@@ -16,10 +16,16 @@ Run from this directory:
 ./gradlew :app:assembleRelease
 ./gradlew :app:connectedDebugAndroidTest :core:data:connectedDebugAndroidTest :core:engine:connectedDebugAndroidTest
 ./gradlew :core:ui:connectedDebugAndroidTest :feature:learning:connectedDebugAndroidTest :feature:records:connectedDebugAndroidTest
-python3 scripts/check-native-alignment.py app/build/outputs/apk/release/app-release-unsigned.apk
+for abi in arm64-v8a x86_64; do
+  python3 scripts/check-native-alignment.py "app/build/outputs/apk/release/app-${abi}-release-unsigned.apk" --abi "$abi"
+done
 ```
 
-The engine build installs pinned cargo-ndk `4.1.2` into the ignored `.native-tools` directory when necessary, installs the two Rust Android targets, builds the host library and matching UniFFI generator, generates Kotlin bindings, and packages arm64-v8a and x86_64 libraries. Normal builds need no manual copying of native binaries. The first build needs network access; subsequent builds reuse Gradle and Cargo caches. Generated sources and binaries are not committed.
+The engine build installs pinned cargo-ndk `4.1.2` into the ignored `.native-tools` directory when necessary, installs the two Rust Android targets, builds the host library and matching UniFFI generator, generates Kotlin bindings, and produces arm64-v8a and x86_64 libraries. Normal builds need no manual copying of native binaries. The first build needs network access; subsequent builds reuse Gradle and Cargo caches. Generated sources and binaries are not committed.
+
+The app uses Gradle ABI splits: each debug and release build produces one self-contained APK per supported ABI, with no universal APK. Each APK includes only its matching Rust, JNA, and other native libraries.
+
+For an Android App Bundle, run `./gradlew :app:bundleRelease -PsplitApksByAbi=false` separately: AGP resource shrinking cannot build a bundle with ABI APK splits enabled. That mode retains ABI filtering to exclude dependency libraries for unsupported architectures.
 
 `./gradlew spotlessApply` formats authored Kotlin and Gradle sources; generated bindings are excluded. `qualityCheck` checks module directions, formatting, JVM tests, and Android lint. Instrumented tests require a functioning Android emulator or device and are separate from JVM checks. Use a disposable emulator rather than modifying a personal emulator.
 
@@ -47,7 +53,7 @@ Room stores player collections locally. Import and export use the system documen
 
 The approved [design](../docs/superpowers/specs/2026-10-16-android-client-design.md) and [implementation plan](../docs/superpowers/plans/2026-10-16-android-client.md) describe parity and verification requirements. Release evidence belongs in `docs/` here, with unavailable device or ABI checks reported explicitly.
 
-The [verification report](docs/verification.md) records actual tests, release runtime checks, native timings, screenshots, and remaining physical-device coverage. The directly installable debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Release assembly produces an unsigned APK; production distribution requires your own signing configuration. A temporary locally signed verification copy is not a production release identity.
+The [verification report](docs/verification.md) records actual tests, release runtime checks, native timings, screenshots, and remaining physical-device coverage. The directly installable debug APKs are `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` and `app/build/outputs/apk/debug/app-x86_64-debug.apk`. Install the one matching the device ABI (`adb shell getprop ro.product.cpu.abi`). Release assembly produces `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` and `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk`; production distribution requires your own signing configuration. A temporary locally signed verification copy is not a production release identity.
 
 The repository Android workflow runs quality checks, debug and release assembly, and complete native-library/APK alignment checks. Release assembly is a separate Gradle invocation from debug/lint checks. Instrumented device coverage remains a separate gate.
 
