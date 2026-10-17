@@ -179,6 +179,10 @@ Extract authored course IDs, Chinese explanations, example inputs, candidate-sta
 
 Use Rust through each adapter for base candidates, permitted rule transforms, teaching-step validation, and mathematical evidence. Do not evaluate TypeScript in Android or construct an unrelated second set of 32 lessons. Keep platform-specific explanation formatting focused on rendering structured facts.
 
+Android packages a fixed authored catalogue. Validate its structural contracts and every stage's mathematical evidence through the native adapter during host tests, and gate asset packaging on those tests. Runtime asset loading retains structural decoding, error handling, and caching, but performs no native teaching-step validation. A changed catalogue invalidates the build check. Persisted and imported player data retain their existing runtime validation.
+
+Render candidate notes with cached Compose text measurement and drawing instead of nested layouts for each miniature digit. Preserve the original third-cell placement, integer weight rounding, padding, typography, theme colors, and right-to-left behavior. Keep cell focus, touch, keyboard, and accessibility semantics on the existing cell nodes. Rendering optimization must not change page layout or Sudoku behavior.
+
 Content extraction is a behavior-preserving Web change with its existing course-path, stage-answer, evidence, and independent course-proof checks. Authored prior eliminations remain explicit preconditions. Runtime-computed snapshots are not new independent mathematical oracles, and the sealed reference under `tests/reference` stays unchanged and test-only.
 
 ## Build and delivery boundaries

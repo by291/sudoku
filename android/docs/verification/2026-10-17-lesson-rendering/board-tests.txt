@@ -1,0 +1,7 @@
+
+dev.yigeyinian.sudoku.designsystem.CandidateNotesTest:.
+dev.yigeyinian.sudoku.designsystem.ControlledBoardTest:....
+
+Time: 8.174
+
+OK (5 tests)

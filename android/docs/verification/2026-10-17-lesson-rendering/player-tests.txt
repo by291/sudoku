@@ -1,0 +1,6 @@
+
+dev.yigeyinian.sudoku.PlayerWorkflowTest:.....................
+
+Time: 43.863
+
+OK (21 tests)
