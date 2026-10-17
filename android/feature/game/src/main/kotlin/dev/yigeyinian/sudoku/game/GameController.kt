@@ -541,13 +541,17 @@ internal class GameController(
         }
     }
 
-    fun enterDigit(digit: Int) {
+    fun enterDigit(digit: Int) = editDigit(digit, mutableState.value.noteMode)
+
+    fun toggleNote(digit: Int) = editDigit(digit, asNote = true)
+
+    private fun editDigit(digit: Int, asNote: Boolean) {
         val state = mutableState.value
         val cell = state.selectedCell ?: return
         if (digit !in 1..9 || !state.inputEditable) {
             return
         }
-        queueEdit(if (state.noteMode) BoardEdit.ToggleNote(cell, digit) else BoardEdit.Enter(cell, digit))
+        queueEdit(if (asNote) BoardEdit.ToggleNote(cell, digit) else BoardEdit.Enter(cell, digit))
     }
 
     fun erase() {

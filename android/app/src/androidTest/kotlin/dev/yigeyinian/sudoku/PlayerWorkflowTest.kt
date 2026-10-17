@@ -1,8 +1,11 @@
 package dev.yigeyinian.sudoku
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -13,16 +16,24 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.pressBack
+import dagger.hilt.android.testing.BindValue
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import dagger.hilt.android.testing.UninstallModules
+import dev.yigeyinian.sudoku.engine.RustSudokuEngine
 import dev.yigeyinian.sudoku.model.Difficulty
+import dev.yigeyinian.sudoku.model.EngineOutcome
 import dev.yigeyinian.sudoku.model.GameRepository
+import dev.yigeyinian.sudoku.model.PreparedPuzzle
 import dev.yigeyinian.sudoku.model.Puzzle
 import dev.yigeyinian.sudoku.model.PuzzleRules
 import dev.yigeyinian.sudoku.model.SessionMetadata
 import dev.yigeyinian.sudoku.model.StorageOutcome
+import dev.yigeyinian.sudoku.model.SudokuEngine
 import dev.yigeyinian.sudoku.model.createSession
+import dev.yigeyinian.sudoku.runtime.EngineModule
 import javax.inject.Inject
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,12 +44,18 @@ import org.junit.Test
 
 /** Uses the packaged ARM library and Room through the same application composition as the player. */
 @HiltAndroidTest
+@UninstallModules(EngineModule::class)
 class PlayerWorkflowTest {
     @get:Rule(order = 0)
     val hiltRule = HiltAndroidRule(this)
 
     @get:Rule(order = 1)
     val compose = createEmptyComposeRule()
+
+    private val controlledEngine = ConflictGateEngine()
+
+    @BindValue @JvmField
+    val engine: SudokuEngine = controlledEngine
 
     @Inject lateinit var repository: GameRepository
     private var activity: ActivityScenario<MainActivity>? = null
@@ -126,7 +143,117 @@ class PlayerWorkflowTest {
         val lastCell = compose.onNodeWithTag("cell-80").fetchSemanticsNode().boundsInRoot
         // Clipped bounds must retain a complete cell even in the side-by-side landscape layout.
         assertTrue("The last row must be fully visible", lastCell.height >= firstCell.height - 1f)
-        compose.onNodeWithContentDescription("放大检查棋盘").assertIsDisplayed()
+        compose.onNodeWithContentDescription("查看规则").assertDoesNotExist()
+        compose.onNodeWithContentDescription("放大检查棋盘").assertDoesNotExist()
+        compose.onNodeWithContentDescription("更多").performScrollTo().performClick()
+        compose.onNodeWithText("放大检查棋盘").performClick()
+        compose.onNodeWithText("检查棋盘").assertIsDisplayed()
+    }
+
+    @Test
+    fun keepsBoardAndKeysStationaryWhileCheckingAnIncorrectEntry() {
+        compose.onNodeWithText("继续上次").performClick()
+        awaitText("继续对局")
+        compose.onNodeWithText("继续对局").performClick()
+        compose.onNodeWithTag("cell-0").performClick()
+        compose.waitUntil(20_000) {
+            compose.onAllNodesWithText("正在检查当前棋盘规则…").fetchSemanticsNodes().isEmpty()
+        }
+        val boardBefore = compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot
+        val keyBefore = compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot
+        val gate = CompletableDeferred<Unit>()
+        controlledEngine.conflictGate = gate
+
+        try {
+            // The first cell is 1; entering 2 duplicates the fixed second cell.
+            compose.onNodeWithContentDescription("填入数字2").performClick()
+            awaitText("正在检查当前棋盘规则…")
+
+            assertEquals(boardBefore, compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot)
+            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot)
+        } finally {
+            gate.complete(Unit)
+            controlledEngine.conflictGate = null
+        }
+        awaitDescription("冲突", substring = true)
+        assertEquals(boardBefore, compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot)
+        assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot)
+
+        compose.onNodeWithContentDescription("擦除").performClick()
+        awaitDescription("第1行第1列，空格", substring = true)
+        assertEquals(boardBefore, compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test
+    fun keepsGameToolsAndAllDigitsVisibleOnPhone() {
+        compose.onNodeWithText("继续上次").performClick()
+        awaitText("继续对局")
+        compose.onNodeWithText("继续对局").performClick()
+        compose.onNodeWithTag("cell-0").performClick()
+        val viewport = compose.onRoot().getUnclippedBoundsInRoot()
+
+        val controls = listOf("撤销", "重做", "擦除", "笔记", "提示", "更多") + (1..9).map { "填入数字$it" }
+        controls.forEach { label ->
+            val control = compose.onNodeWithContentDescription(label)
+            control.assertIsDisplayed()
+            val bounds = control.getUnclippedBoundsInRoot()
+            assertTrue(
+                "$label must fit without scrolling",
+                bounds.top >= viewport.top && bounds.bottom <= viewport.bottom
+            )
+        }
+        val firstDigit = compose.onNodeWithContentDescription("填入数字1").getUnclippedBoundsInRoot()
+        val lastDigit = compose.onNodeWithContentDescription("填入数字9").getUnclippedBoundsInRoot()
+        assertEquals("All digits should share one row when they fit", firstDigit.top, lastDigit.top)
+        compose.onNodeWithText("填写数字").assertDoesNotExist()
+        compose.onNodeWithText("进度已保存到本机").assertDoesNotExist()
+    }
+
+    @Test
+    fun switchesNotesAndPreservesUndoRedoAndEraseActions() {
+        compose.onNodeWithText("继续上次").performClick()
+        awaitText("继续对局")
+        compose.onNodeWithText("继续对局").performClick()
+        compose.onNodeWithTag("cell-0").performClick()
+        compose.onNodeWithContentDescription("笔记").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("笔记").assertIsSelected()
+        compose.onNodeWithContentDescription("笔记数字2").performScrollTo().performClick()
+        awaitDescription("第1行第1列，空格，笔记2")
+
+        compose.onNodeWithContentDescription("撤销").performScrollTo().performClick()
+        awaitDescription("第1行第1列，空格")
+        compose.onNodeWithContentDescription("重做").performScrollTo().performClick()
+        awaitDescription("第1行第1列，空格，笔记2")
+        compose.onNodeWithContentDescription("笔记").performClick()
+        compose.onNodeWithContentDescription("笔记").assertIsNotSelected()
+        compose.onNodeWithContentDescription("填入数字2").performScrollTo().performClick()
+        awaitDescription("第1行第1列，数字2", substring = true)
+        compose.onNodeWithContentDescription("擦除").performScrollTo().performClick()
+        awaitDescription("第1行第1列，空格")
+    }
+
+    @Test
+    fun entersQuickNotesWithoutChangingTheMainInputMode() {
+        compose.onNodeWithText("继续上次").performClick()
+        awaitText("继续对局")
+        compose.onNodeWithText("继续对局").performClick()
+        compose.onNodeWithTag("cell-0").performClick()
+
+        compose.onNodeWithContentDescription("快捷笔记数字2").performScrollTo().performClick()
+        awaitDescription("第1行第1列，空格，笔记2")
+        compose.onNodeWithContentDescription("快捷笔记数字2").assertIsSelected()
+        compose.onNodeWithContentDescription("笔记").assertIsNotSelected()
+        compose.onNodeWithContentDescription("填入数字2").assertExists()
+
+        compose.onNodeWithContentDescription("快捷笔记数字2").performClick()
+        awaitDescription("第1行第1列，空格")
+        compose.onNodeWithContentDescription("快捷笔记数字3").performClick()
+        awaitDescription("第1行第1列，空格，笔记3")
+        compose.onNodeWithContentDescription("撤销").performScrollTo().performClick()
+        awaitDescription("第1行第1列，空格")
+
+        compose.onNodeWithTag("cell-1").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("快捷笔记数字2").assertIsNotEnabled()
     }
 
     @Test
@@ -252,7 +379,34 @@ class PlayerWorkflowTest {
         compose.onNodeWithContentDescription("返回首页").assertDoesNotExist()
     }
 
+    private fun awaitDescription(description: String, substring: Boolean = false) {
+        compose.waitUntil(20_000) {
+            compose.onAllNodes(
+                hasContentDescription(description, substring = substring)
+            ).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun awaitText(text: String) {
         compose.waitUntil(20_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
     }
+}
+
+/** Holds only conflict delivery so the real pending UI can be measured deterministically. */
+private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEngine()) : SudokuEngine by native {
+    @Volatile var conflictGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle> =
+        when (val result = native.prepare(rules)) {
+            is EngineOutcome.Completed -> EngineOutcome.Completed(
+                object : PreparedPuzzle by result.value {
+                    override suspend fun conflicts(board: List<Int>) = run {
+                        conflictGate?.await()
+                        result.value.conflicts(board)
+                    }
+                },
+                result.workUsed
+            )
+            else -> result
+        }
 }

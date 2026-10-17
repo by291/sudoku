@@ -27,6 +27,7 @@ internal class GameViewModel @Inject constructor(
     fun cancelPracticeReplacement() = controller.cancelPracticeReplacement()
     fun selectCell(cell: Int) = controller.selectCell(cell)
     fun enterDigit(digit: Int) = controller.enterDigit(digit)
+    fun toggleNote(digit: Int) = controller.toggleNote(digit)
     fun erase() = controller.erase()
     fun toggleNotes() = controller.toggleNotes()
     fun undo() = controller.undo()

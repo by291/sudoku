@@ -158,7 +158,7 @@ private fun BoardCell(
     val density = LocalDensity.current
     // Convert each geometric size separately: Android font scaling is nonlinear.
     // Zoom enlarges the board; surrounding copy still follows the system font scale.
-    val digitSize = with(density) { (cellSize * 0.50f).toSp() }
+    val digitSize = with(density) { (cellSize * 0.54f).toSp() }
     val noteSize = with(density) { (cellSize * 0.22f).toSp() }
     val markerSize = with(density) { (cellSize * 0.27f).toSp() }
     var focused by remember { mutableStateOf(false) }
@@ -175,8 +175,8 @@ private fun BoardCell(
     }
     val valueColor = when {
         conflict -> colors.error
-        given > 0 -> colors.text
-        else -> colors.accent
+        given > 0 -> colors.accent
+        else -> colors.text
     }
 
     Box(
@@ -223,7 +223,7 @@ private fun BoardCell(
                 fontSize = digitSize,
                 lineHeight = digitSize,
                 maxLines = 1,
-                fontWeight = if (given > 0) FontWeight.SemiBold else FontWeight.Medium,
+                fontWeight = if (given > 0) FontWeight.Normal else FontWeight.Medium,
                 modifier = Modifier.clearAndSetSemantics {}
             )
         } else {

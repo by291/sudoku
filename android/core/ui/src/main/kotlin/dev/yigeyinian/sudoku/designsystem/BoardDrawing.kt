@@ -50,8 +50,8 @@ internal fun DrawScope.drawBoardGrid(rules: PuzzleRules, colors: BoardColors) {
     val side = size.width / 9
     for (line in 1 until 9) {
         val heavy = rules !is PuzzleRules.Jigsaw && line % 3 == 0
-        val width = if (heavy) 2.dp.toPx() else 0.6.dp.toPx()
-        val color = if (heavy) colors.text else colors.border.copy(alpha = 0.65f)
+        val width = if (heavy) 1.dp.toPx() else 0.5.dp.toPx()
+        val color = if (heavy) colors.accent else colors.accent.copy(alpha = 0.28f)
         drawLine(color, Offset(line * side, 0f), Offset(line * side, size.height), width)
         drawLine(color, Offset(0f, line * side), Offset(size.width, line * side), width)
     }
@@ -62,14 +62,14 @@ internal fun DrawScope.drawBoardGrid(rules: PuzzleRules, colors: BoardColors) {
             val x = cell % 9 * side
             val y = cell / 9 * side
             if (cell % 9 < 8 && regions[cell] != regions[cell + 1]) {
-                drawLine(colors.text, Offset(x + side, y), Offset(x + side, y + side), 2.dp.toPx())
+                drawLine(colors.accent, Offset(x + side, y), Offset(x + side, y + side), 1.dp.toPx())
             }
             if (cell < 72 && regions[cell] != regions[cell + 9]) {
-                drawLine(colors.text, Offset(x, y + side), Offset(x + side, y + side), 2.dp.toPx())
+                drawLine(colors.accent, Offset(x, y + side), Offset(x + side, y + side), 1.dp.toPx())
             }
         }
     }
-    drawRect(colors.text, style = Stroke(2.dp.toPx()))
+    drawRect(colors.accent, style = Stroke(1.dp.toPx()))
 }
 
 /** Only geometry is drawn here; mathematical support and constraints remain supplied by Rust. */
