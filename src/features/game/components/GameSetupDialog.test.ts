@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import GameSetupDialog from '@/features/game/components/GameSetupDialog.vue'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 
@@ -11,6 +11,7 @@ afterEach(async () => {
   }
 
   await flushPromises()
+  vi.useRealTimers()
 })
 
 function action(label: string) {
@@ -27,12 +28,17 @@ function action(label: string) {
 it.each(['free', 'daily'] as const)(
   'announces saved-record loading in the %s setup without suggesting generation has started',
   async (mode) => {
+    vi.useFakeTimers()
     const wrapper = mount(GameSetupDialog, {
       attachTo: document.body,
       props: { mode, variant: 'classic', difficulty: 'easy', busy: true },
     })
     cleanups.push(() => wrapper.unmount())
     await flushPromises()
+
+    expect(document.querySelector('[role="status"]')).toBeNull()
+    expect(action(mode === 'free' ? '开始游戏' : '开始今日挑战').disabled).toBe(true)
+    await vi.advanceTimersByTimeAsync(350)
 
     const status = document.querySelector('[role="status"]')
     expect(status).not.toBeNull()
@@ -51,6 +57,7 @@ it.each(['free', 'daily'] as const)(
 )
 
 it('announces generation once and prevents restarting or changing its pending selection', async () => {
+  vi.useFakeTimers()
   const wrapper = mount(GameSetupDialog, {
     attachTo: document.body,
     props: {
@@ -62,6 +69,9 @@ it('announces generation once and prevents restarting or changing its pending se
   })
   cleanups.push(() => wrapper.unmount())
   await flushPromises()
+
+  expect(document.querySelectorAll('[role="status"]')).toHaveLength(0)
+  await vi.advanceTimersByTimeAsync(350)
 
   const statuses = document.querySelectorAll('[role="status"]')
   expect(statuses).toHaveLength(1)

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, useTemplateRef, watch } from 'vue'
-import { NAlert, NButton, NModal, NRadio, NRadioButton, NRadioGroup } from 'naive-ui'
+import { NAlert, NButton, NRadio, NRadioButton, NRadioGroup } from 'naive-ui'
+import ResponsiveDialog from '@/shared/components/ResponsiveDialog.vue'
+import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 import { isSudokuVariant } from '@/sudoku/catalogue'
 import type { SudokuVariant } from '@/sudoku/contracts'
 import { isDifficulty } from '@/sudoku/values'
@@ -31,6 +33,8 @@ const props = withDefaults(
   },
 )
 const processing = computed(() => props.busy || props.generating)
+const showLoading = useDelayedProgress(() => props.busy)
+const showGenerating = useDelayedProgress(() => props.generating)
 const variant = defineModel<SudokuVariant>('variant', { required: true })
 const difficulty = defineModel<Difficulty>('difficulty', { required: true })
 const difficultyChoices = computed(() => supportedDifficulties(variant.value))
@@ -98,19 +102,14 @@ onUnmounted(async () => {
 </script>
 
 <template>
-  <NModal
-    preset="card"
+  <ResponsiveDialog
     class="game-setup-dialog"
-    style="width: min(640px, calc(100vw - 32px)); margin: 24px auto"
     :show="true"
     :title="title"
-    :aria-label="title"
-    role="dialog"
-    aria-modal="true"
     :auto-focus="false"
     :closable="false"
     :mask-closable="false"
-    @esc="$emit('cancel')"
+    @update:show="!$event && $emit('cancel')"
   >
     <NAlert v-if="error" type="error" :show-icon="false" class="setup-error">{{ error }}</NAlert>
     <div :aria-busy="processing">
@@ -170,9 +169,9 @@ onUnmounted(async () => {
       今日正式成绩已保留，再次游玩记为练习。
     </p>
     <template #footer>
-      <GenerationStatus v-if="generating" class="setup-status" />
+      <GenerationStatus v-if="showGenerating" class="setup-status" />
       <GenerationStatus
-        v-else-if="busy"
+        v-else-if="showLoading && !generating"
         class="setup-status"
         message="正在读取存档…"
         description="读取完成后即可选择并开始。"
@@ -191,7 +190,7 @@ onUnmounted(async () => {
         </NButton>
       </div>
     </template>
-  </NModal>
+  </ResponsiveDialog>
 </template>
 
 <style scoped>

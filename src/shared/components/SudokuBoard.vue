@@ -2,7 +2,7 @@
 import { computed, useTemplateRef, watch, nextTick } from 'vue'
 import type { Board, NoteMask } from '@/sudoku/contracts'
 import { DIGITS } from '@/sudoku/values'
-import { digitsIn, maskOf } from '@/shared/model/sudokuPresentation'
+import { digitsIn } from '@/shared/model/sudokuPresentation'
 import type { PuzzleRules } from '@/sudoku/contracts'
 import { getBoardGeometry, getCellRuleContext } from '@/shared/model/boardGeometry'
 import SudokuClues from '@/shared/components/SudokuClues.vue'
@@ -31,6 +31,12 @@ const cageAnchors = computed(
   () =>
     new Set(geometry.value.clues.flatMap((clue) => (clue.kind === 'cage' ? [clue.anchor] : []))),
 )
+const notePositions = DIGITS.map((digit) => ({
+  gridRow: Math.floor((digit - 1) / 3) + 1,
+  gridColumn: ((digit - 1) % 3) + 1,
+}))
+// Selection changes must not rebuild candidate lists or their fixed 3-by-3 positions.
+const noteDigits = computed(() => props.notes.map(digitsIn))
 
 function navigate(event: KeyboardEvent, cell: number) {
   if (props.disabled || props.obscured || event.ctrlKey || event.metaKey || event.altKey) {
@@ -66,7 +72,7 @@ const cells = computed(() =>
     const given = props.givens[cell] !== 0
     const row = Math.floor(cell / 9)
     const column = cell % 9
-    const notes = digitsIn(props.notes[cell])
+    const notes = noteDigits.value[cell]
     const conflicting = props.conflicts.includes(cell)
     const highlighted = props.hintCells.includes(cell)
     const descriptions = [`第${row + 1}行第${column + 1}列`]
@@ -104,7 +110,7 @@ const cells = computed(() =>
       value,
       given,
       label: descriptions.join('，'),
-      notes: DIGITS.map((digit) => ({ digit, visible: !!(props.notes[cell] & maskOf(digit)) })),
+      notes,
       conflicting,
       highlighted,
       selected: cell === props.selectedCell,
@@ -156,11 +162,11 @@ watch(
       >
         <template v-if="!obscured">
           <span v-if="item.value" class="value">{{ item.value }}</span>
-          <span v-else class="notes" aria-hidden="true"
-            ><span v-for="note in item.notes" :key="note.digit">{{
-              note.visible ? note.digit : ''
-            }}</span></span
-          >
+          <span v-else-if="item.notes.length" class="notes" aria-hidden="true">
+            <span v-for="digit in item.notes" :key="digit" :style="notePositions[digit - 1]">
+              {{ digit }}
+            </span>
+          </span>
           <span v-if="item.conflicting" class="marker" aria-hidden="true">!</span
           ><span v-else-if="item.highlighted" class="marker" aria-hidden="true">•</span>
         </template>
@@ -233,8 +239,10 @@ watch(
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 .cell.conflict {
+  background: color-mix(in srgb, var(--error-soft) 45%, var(--surface));
+}
+.cell.conflict .marker {
   color: var(--error);
-  text-decoration: underline wavy;
 }
 .cell.hinted {
   box-shadow: inset 0 0 0 2px var(--accent);

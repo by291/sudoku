@@ -1,7 +1,9 @@
 import { test, expect, seedSession, makeVariantHintSession } from './support'
 import { makeSession } from '../support/gameFixtures'
 
-test('keeps setup inside the phone viewport and restores keyboard focus', async ({ page }) => {
+test('keeps setup inside the phone viewport and restores keyboard focus', async ({
+  page,
+}, testInfo) => {
   await page.setViewportSize({ width: 360, height: 800 })
   await page.goto('/#/')
   const trigger = page.getByRole('button', { name: '开始一局数独', exact: true })
@@ -13,8 +15,13 @@ test('keeps setup inside the phone viewport and restores keyboard focus', async 
     throw new Error('Missing visible setup dialog')
   }
 
-  expect(bounds.x).toBeGreaterThanOrEqual(15)
-  expect(bounds.x + bounds.width).toBeLessThanOrEqual(345)
+  expect(bounds.x).toBeGreaterThanOrEqual(0)
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(360)
+  expect(Math.abs(bounds.y + bounds.height - 800)).toBeLessThan(2)
+  await page.screenshot({
+    path: `.superpowers/web-parity/setup-${testInfo.project.name}.png`,
+    animations: 'disabled',
+  })
   await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeFocused()
   await expect(dialog.getByRole('button', { name: '开始游戏', exact: true })).toBeEnabled()
   await page.keyboard.press('Tab')

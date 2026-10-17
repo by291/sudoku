@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { NButton, NModal, NSwitch } from 'naive-ui'
+import { NButton, NSwitch } from 'naive-ui'
+import ResponsiveDialog from '@/shared/components/ResponsiveDialog.vue'
 
 const props = defineProps<{ show: boolean; showTimer: boolean; highlightConflicts: boolean }>()
 const emit = defineEmits<{
@@ -10,14 +11,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <NModal
+  <ResponsiveDialog
     :show="show"
-    preset="card"
     title="对局设置"
-    aria-label="对局设置"
-    role="dialog"
-    aria-modal="true"
-    style="width: min(480px, calc(100vw - 32px)); margin: 24px auto"
+    :max-width="480"
     @update:show="emit('update:show', $event)"
   >
     <div class="preferences-row">
@@ -42,7 +39,7 @@ const emit = defineEmits<{
     </div>
     <slot />
     <template #footer><NButton @click="emit('update:show', false)">关闭设置</NButton></template>
-  </NModal>
+  </ResponsiveDialog>
 </template>
 
 <style scoped>

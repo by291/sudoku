@@ -5,8 +5,50 @@ import {
   cellName,
   makeVariantHintSession,
   selectGameMenuAction,
+  enterGameDigit,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
+
+test('retains conflict markers and fixed sparse note positions in both themes', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 850 })
+  const notes = Array<number>(81).fill(0)
+  notes[3] = 511
+  notes[5] = 273 // Digits 1, 5, and 9 occupy the diagonal of the three-by-three note grid.
+  await seedSession(page, makeSession({ notes }))
+  await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
+  await page.getByRole('button', { name: cellName(2) }).click()
+  await enterGameDigit(page, 5)
+  const conflict = page.getByRole('button', { name: cellName(0) })
+  const sparse = page.getByRole('button', { name: cellName(5) })
+  // Entering 5 removes that peer note; the remaining 1 and 9 must keep their original positions.
+  await expect(sparse).toHaveAccessibleName(/笔记1、9/)
+  const positions = await sparse.locator('.notes span').evaluateAll((elements) =>
+    elements.map((element) => {
+      const style = getComputedStyle(element)
+      return [element.textContent?.trim(), style.gridRowStart, style.gridColumnStart]
+    }),
+  )
+  expect(positions).toEqual([
+    ['1', '1', '1'],
+    ['9', '3', '3'],
+  ])
+
+  for (const theme of ['浅色', '深色']) {
+    await page
+      .getByRole('radiogroup', { name: '界面主题' })
+      .getByText(theme, { exact: true })
+      .click()
+    await expect(conflict).toHaveAccessibleName(/冲突/)
+    await expect(conflict.locator('.marker')).toHaveText('!')
+    if (testInfo.project.name === 'desktop') {
+      await page.getByRole('group', { name: '数独棋盘' }).screenshot({
+        path: `.superpowers/web-parity/conflict-${theme === '浅色' ? 'light' : 'dark'}.png`,
+      })
+    }
+  }
+})
 
 for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
   test(`keeps ${variant} clues aligned and tappable with notes at 360px in both themes`, async ({

@@ -5,13 +5,28 @@ import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { getVariantPresentation } from '@/features/game/model/variants'
 import { BACKUP_LIMITS } from '@/storage/backup'
 import ConfirmationDialog from '@/shared/components/ConfirmationDialog.vue'
+import ResponsiveDialog from '@/shared/components/ResponsiveDialog.vue'
+import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 
 const records = useRecordsStore()
+const backupButton = useTemplateRef<InstanceType<typeof NButton>>('backupButton')
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 const reading = ref(false)
 const confirming = ref(false)
+const open = ref(false)
+const showReading = useDelayedProgress(reading)
+const showBusy = useDelayedProgress(() => records.busy)
 let fileGeneration = 0
 onScopeDispose(() => fileGeneration++)
+
+function openBackupDialog() {
+  const trigger: unknown = backupButton.value?.$el
+  if (trigger instanceof HTMLElement) {
+    // The retry link disappears on opening; capture the persistent trigger for focus restoration.
+    trigger.focus()
+  }
+  open.value = true
+}
 
 async function downloadBackup() {
   const text = await records.exportBackup()
@@ -70,6 +85,9 @@ function requestRestore(event: MouseEvent) {
 async function confirmRestore() {
   confirming.value = false
   await records.restoreBackup()
+  if (!records.backupError && !records.backupPreview) {
+    open.value = false
+  }
 }
 </script>
 
@@ -77,6 +95,19 @@ async function confirmRestore() {
   <section class="panel backup-panel" aria-labelledby="backup-heading">
     <h2 id="backup-heading">本地备份与恢复</h2>
     <p class="muted">把存档、成绩、课程进度和设置保存为文件，留作浏览器数据丢失后的恢复副本。</p>
+    <NButton ref="backupButton" @click="openBackupDialog">备份与恢复</NButton>
+    <NAlert
+      v-if="!open && records.backupError"
+      class="backup-feedback"
+      type="error"
+      :show-icon="false"
+    >
+      <p>{{ records.backupError }}</p>
+      <NButton @click="openBackupDialog">查看并重试</NButton>
+    </NAlert>
+  </section>
+  <ResponsiveDialog v-model:show="open" title="本地备份与恢复">
+    <p class="muted">导出文件留存副本，或选择备份文件预览后恢复。</p>
     <div class="backup-actions">
       <NButton :disabled="records.busy || reading" @click="downloadBackup">导出备份</NButton>
       <NButton :disabled="records.busy || reading" @click="fileInput?.click()"
@@ -92,7 +123,9 @@ async function confirmRestore() {
         @change="readBackupFile"
       />
     </div>
-    <p v-if="reading" role="status">正在读取备份文件…</p>
+    <p v-if="showReading" role="status">正在读取备份文件…</p>
+    <p v-else-if="showBusy" role="status">正在处理备份…</p>
+    <p v-if="records.notice" class="muted">{{ records.notice }}</p>
     <NAlert v-if="records.backupError" class="backup-feedback" type="error" :show-icon="false">
       {{ records.backupError }}
     </NAlert>
@@ -139,16 +172,17 @@ async function confirmRestore() {
         >
       </div>
     </NCard>
-    <ConfirmationDialog
-      v-if="confirming"
-      destructive
-      title="恢复备份并替换本机数据？"
-      description="将用预览中的备份替换全部本机数据，其他标签页会停止旧游戏。现有数据无法自动撤销，请确认已保留需要的副本。"
-      confirm-label="确认恢复"
-      @cancel="confirming = false"
-      @confirm="confirmRestore"
-    />
-  </section>
+    <template #footer><NButton @click="open = false">关闭备份</NButton></template>
+  </ResponsiveDialog>
+  <ConfirmationDialog
+    v-if="confirming"
+    destructive
+    title="恢复备份并替换本机数据？"
+    description="将用预览中的备份替换全部本机数据，其他标签页会停止旧游戏。现有数据无法自动撤销，请确认已保留需要的副本。"
+    confirm-label="确认恢复"
+    @cancel="confirming = false"
+    @confirm="confirmRestore"
+  />
 </template>
 
 <style scoped>
