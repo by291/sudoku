@@ -3,7 +3,8 @@ use super::values::{BoardDto, DigitDto, SearchOptionsDto, WorkOptionsDto};
 use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 
-/// Numeric budget consumption is explicit and never shared as mutable JS state across an operation.
+/// An owned result with deterministic core work units, including any initial charge.
+/// Work units are algorithm operations, not elapsed time; exhaustion remains explicit in the result.
 #[derive(Serialize, Deserialize, Tsify)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[tsify(hashmap_as_object, missing_as_null)]
@@ -29,6 +30,7 @@ pub struct CountInputDto {
     pub work: Option<SearchOptionsDto>,
 }
 
+/// An exhausted search is incomplete and establishes neither a solution count nor uniqueness.
 #[derive(Serialize, Tsify)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 #[tsify(hashmap_as_object, missing_as_null)]
@@ -49,6 +51,7 @@ pub enum SearchResultDto {
     },
 }
 
+/// Exhaustion returns no candidate grid; it must not be interpreted as an empty candidate set.
 #[derive(Serialize, Tsify)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum CandidateResultDto {
@@ -73,6 +76,7 @@ pub struct ViolationDto {
     pub code: ViolationCodeDto,
 }
 
+/// Exhaustion may retain sound violations, but their absence does not establish validity.
 #[derive(Serialize, Deserialize, Tsify)]
 #[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ConflictResultDto {
@@ -100,6 +104,7 @@ pub struct EditInputDto {
     pub work: Option<WorkOptionsDto>,
 }
 
+/// Complete edits return independent layers; exhaustion has no layers to commit.
 #[derive(Serialize, Deserialize, Tsify)]
 #[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum EditResultDto {
@@ -139,7 +144,7 @@ work_response!(HintWorkDto, super::logic::HintResultDto);
 work_response!(AssessmentWorkDto, super::rating::AssessmentResultDto);
 work_response!(
     AssessmentSummaryWorkDto,
-    super::rating::AssessmentOutcomeDto
+    super::rating::LiveAssessmentOutcomeDto
 );
 
 #[derive(Deserialize, Tsify)]

@@ -158,80 +158,101 @@ impl SearchState<'_> {
 
         while !queues.cells.is_empty() || !queues.units.is_empty() || !queues.constraints.is_empty()
         {
+            // Exhaust the LIFO cell stack, then one FIFO unit; arithmetic runs only after both.
             while let Some(cell) = queues.cells.pop() {
-                if !self.charge() {
+                if !self.propagate_cell(cell, queues) {
                     return false;
-                }
-                let mask = self.domains[cell].bits();
-                if mask == 0 {
-                    return false;
-                }
-                if mask & (mask - 1) != 0 {
-                    continue;
-                }
-                for &peer in &context.duplicate_peers[cell] {
-                    if !self.reduce(peer, self.domains[peer].bits() & !mask, queues) {
-                        return false;
-                    }
                 }
             }
 
             if let Some(index) = queues.units.pop() {
-                // Only full nine-digit units require every digit; arithmetic clues use their own queue.
-                if !self.charge() {
+                if !self.propagate_unit(index, queues) {
                     return false;
-                }
-                for digit in 1..=UNIT_SIZE {
-                    let bit = 1 << (digit - 1);
-                    let mut positions = DigitPositions::Missing;
-                    for &cell in &context.units[index].cells {
-                        if self.domains[cell].bits() & bit != 0 {
-                            positions = match positions {
-                                DigitPositions::Missing => DigitPositions::One(cell),
-                                DigitPositions::One(_) | DigitPositions::Multiple => {
-                                    DigitPositions::Multiple
-                                }
-                            };
-                            if matches!(positions, DigitPositions::Multiple) {
-                                break;
-                            }
-                        }
-                    }
-                    match positions {
-                        DigitPositions::Missing => return false,
-                        DigitPositions::One(cell) => {
-                            if !self.reduce(cell, bit, queues) {
-                                return false;
-                            }
-                        }
-                        DigitPositions::Multiple => {}
-                    }
                 }
                 continue;
             }
 
-            let Some(index) = queues.constraints.pop() else {
-                continue;
-            };
-            if !self.charge() {
+            if let Some(index) = queues.constraints.pop()
+                && !self.propagate_constraint(index, queues)
+            {
                 return false;
             }
-            let result =
-                computation
-                    .support
-                    .query_at(&self.unassigned, &self.domains, index, self.budget);
-            let Bounded::Complete(support) = result else {
-                self.exhausted = true;
+        }
+        true
+    }
+
+    fn propagate_cell(&mut self, cell: usize, queues: &mut Queues) -> bool {
+        if !self.charge() {
+            return false;
+        }
+        let mask = self.domains[cell].bits();
+        if mask == 0 {
+            return false;
+        }
+        if mask & (mask - 1) != 0 {
+            return true;
+        }
+        for &peer in &self.computation.rules.context().duplicate_peers[cell] {
+            if !self.reduce(peer, self.domains[peer].bits() & !mask, queues) {
                 return false;
-            };
-            for (&cell, mask) in context.constraints[index]
-                .cells()
-                .iter()
-                .zip(support.as_slice())
-            {
-                if !self.reduce(cell, self.domains[cell].bits() & mask, queues) {
-                    return false;
+            }
+        }
+        true
+    }
+
+    fn propagate_unit(&mut self, index: usize, queues: &mut Queues) -> bool {
+        // Only full nine-digit units require every digit; arithmetic clues use their own queue.
+        if !self.charge() {
+            return false;
+        }
+        for digit in 1..=UNIT_SIZE {
+            let bit = 1 << (digit - 1);
+            let mut positions = DigitPositions::Missing;
+            for &cell in &self.computation.rules.context().units[index].cells {
+                if self.domains[cell].bits() & bit != 0 {
+                    positions = match positions {
+                        DigitPositions::Missing => DigitPositions::One(cell),
+                        DigitPositions::One(_) | DigitPositions::Multiple => {
+                            DigitPositions::Multiple
+                        }
+                    };
+                    if matches!(positions, DigitPositions::Multiple) {
+                        break;
+                    }
                 }
+            }
+            match positions {
+                DigitPositions::Missing => return false,
+                DigitPositions::One(cell) => {
+                    if !self.reduce(cell, bit, queues) {
+                        return false;
+                    }
+                }
+                DigitPositions::Multiple => {}
+            }
+        }
+        true
+    }
+
+    fn propagate_constraint(&mut self, index: usize, queues: &mut Queues) -> bool {
+        if !self.charge() {
+            return false;
+        }
+        let result =
+            self.computation
+                .support
+                .query_at(&self.unassigned, &self.domains, index, self.budget);
+        let Bounded::Complete(support) = result else {
+            self.exhausted = true;
+            return false;
+        };
+        for (&cell, mask) in self.computation.rules.context().constraints[index]
+            .cells()
+            .iter()
+            .zip(support.as_slice())
+        {
+            if !self.reduce(cell, self.domains[cell].bits() & mask, queues) {
+                return false;
             }
         }
         true

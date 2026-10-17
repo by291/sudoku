@@ -180,6 +180,8 @@ impl PreparedRules {
         &self.data.rules
     }
 
+    /// Test shared prepared-instance identity, not structural rule equality.
+    /// Clones share an instance; independently compiled equal rules do not.
     pub fn same_layout(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.data, &other.data)
     }

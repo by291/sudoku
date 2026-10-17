@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { createServer } from 'vite'
 import { chromium, firefox, webkit } from '@playwright/test'
 import { loadEngine } from './reference-loader.mjs'
@@ -6,6 +7,7 @@ export async function createWasmAdapter(browserName) {
   const server = await createServer({
     configFile: false,
     root: process.cwd(),
+    resolve: { alias: { '@': resolve(process.cwd(), 'src') } },
     server: { host: '127.0.0.1', port: 0, hmr: false },
     logLevel: 'error',
     optimizeDeps: { entries: ['tests/migration/wasm-smoke.html'] },

@@ -28,7 +28,7 @@ it('retry_compiles_fresh_code_after_a_failed_download', async () => {
 
 it('rejects_every_incompatible_algorithm_identity', () => {
   const valid = {
-    bridgeVersion: 2,
+    bridgeVersion: 3,
     puzzleVersion: 'sudoku-v11',
     variantPuzzleVersion: 'sudoku-variants-v11',
     ratingVersion: 'sudoku-rating-v2',
@@ -38,6 +38,7 @@ it('rejects_every_incompatible_algorithm_identity', () => {
   for (const change of [
     { bridgeVersion: 0 },
     { bridgeVersion: 1 },
+    { bridgeVersion: 2 },
     { puzzleVersion: 'sudoku-v10' },
     { variantPuzzleVersion: 'sudoku-variants-v10' },
     { ratingVersion: 'unknown' },

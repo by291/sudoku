@@ -1,7 +1,7 @@
-import type { RuleViolation } from '@/sudoku/contracts'
+import type { ReadonlyContract, RuleViolation } from '@/sudoku/contracts'
 
 /** Rust reports constraint facts; player-facing language belongs to the game presentation. */
-export function violationMessage(violation: RuleViolation): string {
+export function violationMessage(violation: ReadonlyContract<RuleViolation>): string {
   const code = violation.code
   switch (code.kind) {
     case 'duplicate':

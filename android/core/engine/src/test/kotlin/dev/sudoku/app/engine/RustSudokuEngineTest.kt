@@ -1,15 +1,100 @@
 package dev.sudoku.app.engine
 
+import dev.sudoku.app.model.ArrowClue
+import dev.sudoku.app.model.AssessmentIssue
+import dev.sudoku.app.model.AssessmentResult
 import dev.sudoku.app.model.BoardEdit
 import dev.sudoku.app.model.BoardLayers
+import dev.sudoku.app.model.Cage
 import dev.sudoku.app.model.EngineOutcome
 import dev.sudoku.app.model.PuzzleRules
+import dev.sudoku.app.model.RuleViolation
+import dev.sudoku.app.model.ViolationCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlinx.coroutines.runBlocking
 
 class RustSudokuEngineTest {
+    @Test
+    fun historicalUnavailableStringsRemainUnchanged() = runBlocking<Unit> {
+        val value = dev.sudoku.app.model.PuzzleAssessment.Unavailable(
+            "invalid-input",
+            listOf("原始历史文本", "  keep whitespace  ")
+        )
+
+        val response = RustSudokuEngine().validateAssessment(
+            value,
+            dev.sudoku.app.model.Variant.CLASSIC,
+            dev.sudoku.app.model.Difficulty.EASY
+        )
+
+        assertEquals(value, assertIs<EngineOutcome.Completed<dev.sudoku.app.model.PuzzleAssessment?>>(response).value)
+    }
+
+    @Test
+    fun immediatelyPreviousNativeBridgeIsRejected() {
+        val current = dev.sudoku.app.ffi.engineInfo()
+
+        assertEquals(2u, compatibleInformation(current).bridgeVersion)
+        assertFailsWith<IllegalStateException> {
+            compatibleInformation(current.copy(bridgeVersion = 1u))
+        }
+    }
+
+    @Test
+    fun actualAssessmentRetainsTypedClueFactsAndCellOrdering() = runBlocking<Unit> {
+        val engine = RustSudokuEngine()
+        val duplicate = List(81) { cell -> if (cell == 0 || cell == 1) 1 else 0 }
+        val cages = listOf(Cage(listOf(1, 0), 3)) + (2..80).map { Cage(listOf(it), 1) }
+        val cases = listOf(
+            Triple(PuzzleRules.Classic, duplicate, RuleViolation("row:0", listOf(0, 1), ViolationCode.Duplicate)),
+            Triple(
+                PuzzleRules.Killer(cages),
+                List(81) { cell ->
+                    when (cell) {
+                        0 -> 8
+                        1 -> 9
+                        else -> 0
+                    }
+                },
+                RuleViolation("cage:0", listOf(1, 0), ViolationCode.CageTotal(0, 3))
+            ),
+            Triple(
+                PuzzleRules.Thermo(listOf(listOf(10, 1, 0))),
+                List(81) { cell ->
+                    when (cell) {
+                        10 -> 3
+                        1 -> 2
+                        0 -> 1
+                        else -> 0
+                    }
+                },
+                RuleViolation("thermo:0", listOf(10, 1, 0), ViolationCode.ThermoOrder(0))
+            ),
+            Triple(
+                PuzzleRules.Arrow(listOf(ArrowClue(10, listOf(1, 0)))),
+                List(81) { cell ->
+                    when (cell) {
+                        10 -> 5
+                        1 -> 2
+                        0 -> 1
+                        else -> 0
+                    }
+                },
+                RuleViolation("arrow:0", listOf(10, 1, 0), ViolationCode.ArrowTotal(0))
+            )
+        )
+
+        for ((rules, board, violation) in cases) {
+            val outcome = assertIs<EngineOutcome.Completed<AssessmentResult>>(engine.assess(board, rules))
+            val invalid = assertIs<AssessmentResult.Invalid>(outcome.value)
+
+            kotlin.test.assertTrue(AssessmentIssue.Violation(violation) in invalid.issues)
+        }
+    }
+
     @Test
     fun actualNativeLibraryReportsVersionsAndRejectsMalformedBoards() = runBlocking<Unit> {
         val engine = RustSudokuEngine()

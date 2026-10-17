@@ -3,7 +3,7 @@ use super::basic_techniques::find_basic_step;
 use super::techniques::{ALL_CLASSIC_TECHNIQUES, Technique};
 use super::types::{LogicResult, LogicStatus, LogicalStep, LogicalWorkspace, StepOutcome};
 use super::variant_techniques::find_variant_step;
-use super::workspace::{apply_step, create_workspace};
+use super::workspace::{apply_established_step, create_workspace};
 use crate::board::is_complete;
 use crate::budget::{WorkBudget, WorkStage};
 use crate::rules::types::{PreparedRules, PuzzleRules};
@@ -93,7 +93,7 @@ pub(crate) fn analyze_workspace_owned(
             Bounded::Complete(None) => break LogicStatus::Stalled,
             Bounded::Complete(Some(step)) => step,
         };
-        apply_step(state, &step);
+        apply_established_step(state, &step);
         steps.push(*step);
     };
     LogicResult {

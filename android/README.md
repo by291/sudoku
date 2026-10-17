@@ -27,6 +27,10 @@ done
 
 The engine build installs pinned cargo-ndk `4.1.2` into the ignored `.native-tools` directory when necessary, installs the two Rust Android targets, builds the host library and matching UniFFI generator, generates Kotlin bindings, and produces arm64-v8a and x86_64 libraries. Normal builds need no manual copying of native binaries. The first build needs network access; subsequent builds reuse Gradle and Cargo caches. Generated sources and binaries are not committed.
 
+Native bridge version 2 transports live assessment issues as diagnostic messages or structured rule violations. `core/domain` owns the live result contract, `core/engine` converts generated bindings, and `feature/game` renders Chinese explanations or explicitly produces persisted issue strings. Stored `PuzzleAssessment` values and backup formats retain their historical string representation. Generation and rating identities remain unchanged.
+
+The Rust adapter keeps metadata and edit conversion separate from exported operation dispatch. Prepared handles own immutable layouts, and returned results own their data. Cancellation tokens are sticky: after cancellation, use a fresh token for another operation, and retain the native handle until its in-flight call returns. Budget exhaustion is inconclusive, not an invalid puzzle or an empty solution set.
+
 The app uses Gradle ABI splits: each debug and release build produces one self-contained APK per supported ABI, with no universal APK. Each APK includes only its matching Rust, JNA, and other native libraries.
 
 For an Android App Bundle, run `./gradlew :app:bundleRelease -PsplitApksByAbi=false` separately: AGP resource shrinking cannot build a bundle with ABI APK splits enabled. That mode retains ABI filtering to exclude dependency libraries for unsupported architectures.

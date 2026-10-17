@@ -4,6 +4,13 @@ use crate::rules::topology::cells_touch;
 use crate::rules::types::{Arrow, PuzzleRules};
 use crate::types::{BOARD_SIZE, Board};
 
+// These v11 geometry bounds fix recursive visit and random-draw order.
+const GEOMETRY_ATTEMPTS: usize = 12;
+const MAX_GENERATED_ARROWS: usize = 4;
+const MIN_SHAFT_LENGTH: usize = 2;
+const MAX_SHAFT_LENGTH: usize = 5;
+const MIN_CIRCLE_DIGIT: u8 = 3;
+
 fn shaft(
     circle: usize,
     path: &mut Vec<usize>,
@@ -16,13 +23,13 @@ fn shaft(
         return None;
     }
     if total == u16::from(solution.values()[circle]) {
-        return if path.len() >= 2 {
+        return if path.len() >= MIN_SHAFT_LENGTH {
             Some(path.to_vec())
         } else {
             None
         };
     }
-    if path.len() >= 5 {
+    if path.len() >= MAX_SHAFT_LENGTH {
         return None;
     }
 
@@ -65,19 +72,19 @@ pub fn create_geometry(
     budget: &mut WorkBudget,
 ) -> Option<PuzzleRules> {
     let mut arrows = arrows.to_vec();
-    for _ in 0..12 {
-        if arrows.len() >= 4 {
+    for _ in 0..GEOMETRY_ATTEMPTS {
+        if arrows.len() >= MAX_GENERATED_ARROWS {
             break;
         }
 
         let circle = (random.next_f64() * BOARD_SIZE as f64) as usize;
-        if solution.values()[circle] < 3 {
+        if solution.values()[circle] < MIN_CIRCLE_DIGIT {
             continue;
         }
 
         let path = shaft(
             circle,
-            &mut Vec::with_capacity(5),
+            &mut Vec::with_capacity(MAX_SHAFT_LENGTH),
             0,
             solution,
             random,

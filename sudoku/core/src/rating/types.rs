@@ -35,6 +35,7 @@ impl TechniqueCounts {
     pub fn count(&self, technique: Technique) -> u64 {
         self.0[technique as usize]
     }
+
     pub(crate) fn increment(&mut self, technique: Technique) {
         self.0[technique as usize] += 1;
     }

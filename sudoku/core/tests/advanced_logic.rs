@@ -9,8 +9,8 @@ use sudoku_core::budget::WorkBudget;
 use sudoku_core::logic::advanced_evidence::validate_advanced_step;
 use sudoku_core::logic::advanced_techniques::find_advanced_step;
 use sudoku_core::logic::techniques::Technique;
+use sudoku_core::logic::types::LogicalWorkspace;
 use sudoku_core::logic::types::{AdvancedEvidenceKind, Evidence, LogicalAction, Removal};
-use sudoku_core::logic::workspace::create_workspace;
 use sudoku_core::rules::context::compile_rules;
 use sudoku_core::rules::types::{PuzzleRules, Unit, UnitKind};
 use sudoku_core::types::{Board, Bounded, CandidateMask};
@@ -79,11 +79,13 @@ fn rejects_forged_fish_wing_and_coloring_premises() {
     ];
     let rules = compile_rules(&PuzzleRules::Classic).unwrap();
     for (technique, base, entries, cell, digit) in cases {
-        let mut state = create_workspace(&Board::EMPTY, &rules);
-        state.candidates = [CandidateMask::try_from(base).unwrap(); 81];
+        let mut candidates = [CandidateMask::try_from(base).unwrap(); 81];
         for (cell, bits) in entries {
-            state.candidates[cell] = CandidateMask::try_from(bits).unwrap();
+            candidates[cell] = CandidateMask::try_from(bits).unwrap();
         }
+
+        let state =
+            LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap();
 
         let Bounded::Complete(Some(step)) =
             find_advanced_step(&state, technique, &mut WorkBudget::new(100000))

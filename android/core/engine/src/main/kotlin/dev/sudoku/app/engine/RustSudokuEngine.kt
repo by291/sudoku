@@ -147,8 +147,8 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
             val response = assess(input, token)
             when (val result = response.result) {
                 is AssessmentResultDto.Rated -> EngineOutcome.Completed(
-                    AssessmentResult(
-                        PuzzleAssessment.Rated(result.summary.player()),
+                    AssessmentResult.Rated(
+                        result.summary.player(),
                         result.trace.map {
                             it.player()
                         }
@@ -157,14 +157,11 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
                 )
                 is AssessmentResultDto.BudgetExhausted -> EngineOutcome.BudgetExhausted(response.workUsed.toLong())
                 is AssessmentResultDto.Ungraded -> EngineOutcome.Completed(
-                    AssessmentResult(PuzzleAssessment.Unavailable("ungraded", emptyList()), emptyList()),
+                    AssessmentResult.Ungraded(result.variant.player()),
                     response.workUsed.toLong()
                 )
                 is AssessmentResultDto.Invalid -> EngineOutcome.Completed(
-                    AssessmentResult(
-                        PuzzleAssessment.Unavailable("invalid-input", result.issues.toList()),
-                        emptyList()
-                    ),
+                    AssessmentResult.Invalid(result.issues.map { it.player() }),
                     response.workUsed.toLong()
                 )
             }
@@ -255,10 +252,11 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
     }
 }
 
-private fun compatibleInformation(): dev.sudoku.app.ffi.EngineInfo {
-    val information = engineInfo()
+internal fun compatibleInformation(
+    information: dev.sudoku.app.ffi.EngineInfo = engineInfo()
+): dev.sudoku.app.ffi.EngineInfo {
     check(
-        information.bridgeVersion == 1u && information.puzzleVersion == "sudoku-v11" &&
+        information.bridgeVersion == 2u && information.puzzleVersion == "sudoku-v11" &&
             information.variantPuzzleVersion == "sudoku-variants-v11" &&
             information.ratingVersion == "sudoku-rating-v2"
     ) { "Native engine version mismatch" }

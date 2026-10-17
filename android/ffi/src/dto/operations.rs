@@ -2,7 +2,8 @@ use super::rules::RulesDto;
 use super::values::{BoardDto, DigitDto, SearchOptionsDto, WorkOptionsDto};
 use serde::{Deserialize, Serialize};
 
-/// Numeric budget consumption is explicit and never shared as mutable JS state across an operation.
+/// An owned result with deterministic core work units, including any initial charge.
+/// Work units are algorithm operations, not elapsed time; exhaustion remains explicit in the result.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct WorkResultDto<T> {
@@ -27,6 +28,7 @@ pub struct CountInputDto {
     pub work: Option<SearchOptionsDto>,
 }
 
+/// An exhausted search is incomplete and establishes neither a solution count nor uniqueness.
 #[derive(Serialize, uniffi::Enum)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum SearchResultDto {
@@ -46,6 +48,7 @@ pub enum SearchResultDto {
     },
 }
 
+/// Exhaustion returns no candidate grid; it must not be interpreted as an empty candidate set.
 #[derive(Serialize, uniffi::Enum)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum CandidateResultDto {
@@ -70,6 +73,7 @@ pub struct ViolationDto {
     pub code: ViolationCodeDto,
 }
 
+/// Exhaustion may retain sound violations, but their absence does not establish validity.
 #[derive(Serialize, Deserialize, uniffi::Enum)]
 #[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ConflictResultDto {
@@ -97,6 +101,7 @@ pub struct EditInputDto {
     pub work: Option<WorkOptionsDto>,
 }
 
+/// Complete edits return independent layers; exhaustion has no layers to commit.
 #[derive(Serialize, Deserialize, uniffi::Enum)]
 #[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum EditResultDto {
@@ -150,5 +155,5 @@ work_record!(LogicWorkDto, super::logic::LogicResultDto);
 work_record!(AssessmentWorkDto, super::rating::AssessmentResultDto);
 work_record!(
     AssessmentSummaryWorkDto,
-    super::rating::AssessmentOutcomeDto
+    super::rating::LiveAssessmentOutcomeDto
 );

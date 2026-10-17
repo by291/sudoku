@@ -2,7 +2,7 @@ import type { ConflictWorkDto, EditWorkDto, Board, ParseResult } from '@/sudoku/
 import type { Puzzle } from '@/sudoku/contracts'
 import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
-import type { AssessmentInput, AssessmentOutcome, PuzzleAssessment } from '@/sudoku/contracts'
+import type { AssessmentInput, LiveAssessmentOutcome, PuzzleAssessment } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
 import { isBoard } from '@/sudoku/values'
 import { isRecord, isRulesShape, RATING_VERSION } from '@/sudoku/guards'
@@ -49,7 +49,7 @@ export type WorkerResponse =
       outcome: WorkerOutcome<LiveComputation<EditWorkDto>>
     }
   | { kind: 'generate'; requestId: string; outcome: GenerateOutcome }
-  | { kind: 'assess'; requestId: string; outcome: WorkerOutcome<AssessmentOutcome> }
+  | { kind: 'assess'; requestId: string; outcome: WorkerOutcome<LiveAssessmentOutcome> }
   | { kind: 'hint'; requestId: string; outcome: WorkerOutcome<HintResult> }
 
 export type WorkerInitialize = {
@@ -67,7 +67,7 @@ type ResponseValidator = Pick<
   MainSudokuEngine,
   | 'validatePuzzle'
   | 'validateAssessment'
-  | 'validateAssessmentOutcome'
+  | 'validateLiveAssessmentOutcome'
   | 'parseHint'
   | 'parseConflicts'
   | 'parseEdit'
@@ -282,7 +282,7 @@ export function parseWorkerResponse(
     }
   }
   if (kind === 'assess') {
-    const parsed = validator.validateAssessmentOutcome(outcome.value)
+    const parsed = validator.validateLiveAssessmentOutcome(outcome.value)
     return parsed.valid
       ? {
           valid: true,

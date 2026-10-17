@@ -1,20 +1,18 @@
+use crate::conversion::editing::PreparedEditInput;
+use crate::conversion::violations::violation_to_dto;
 use crate::conversion::{
     rules::metadata_to_dto,
-    values::{counter, index as index_to_dto, indices},
+    values::{counter, indices},
 };
 use crate::{
     control::{self, CancellationToken, NativeError},
     dto::{operations::*, rules::*, values::*},
 };
 use std::sync::Arc;
-use sudoku_core::constraints::types::{
-    ConflictStatus, PreparedComputation, RuleViolation, ViolationCode,
-};
-use sudoku_core::editing::{BoardEdit, BoardLayers, EditOutcome};
+use sudoku_core::constraints::types::{ConflictStatus, PreparedComputation};
+use sudoku_core::editing::EditOutcome;
 use sudoku_core::search::types::SearchResult;
-use sudoku_core::types::{
-    BOARD_SIZE, Board, Bounded, CandidateMask, CellIndex, CoreResult, Digit, EngineError,
-};
+use sudoku_core::types::{Board, Bounded, CoreResult};
 
 pub fn search_to_dto(result: SearchResult) -> CoreResult<SearchResultDto> {
     Ok(match result {
@@ -39,33 +37,8 @@ pub fn search_to_dto(result: SearchResult) -> CoreResult<SearchResultDto> {
     })
 }
 
-fn violations_to_dto(violations: Vec<RuleViolation>) -> CoreResult<Vec<ViolationDto>> {
-    violations
-        .into_iter()
-        .map(|violation| {
-            let code = match violation.code {
-                ViolationCode::Duplicate => ViolationCodeDto::Duplicate,
-                ViolationCode::CageTotal { index, sum } => ViolationCodeDto::CageTotal {
-                    index: index_to_dto(index)?,
-                    sum,
-                },
-                ViolationCode::ThermoOrder { index } => ViolationCodeDto::ThermoOrder {
-                    index: index_to_dto(index)?,
-                },
-                ViolationCode::ArrowTotal { index } => ViolationCodeDto::ArrowTotal {
-                    index: index_to_dto(index)?,
-                },
-            };
-            Ok(ViolationDto {
-                constraint_id: violation.constraint_id,
-                cells: indices(violation.cells)?,
-                code,
-            })
-        })
-        .collect()
-}
-
-/// Own one immutable layout. Live operations retain raw-support work; exact queries reuse charged preparation.
+/// Own one immutable compiled layout and return independent metadata and operation results.
+/// Live operations retain raw-support work; exact queries reuse charged preparation.
 #[derive(uniffi::Object)]
 pub struct PreparedPuzzle {
     computation: PreparedComputation,
@@ -74,6 +47,7 @@ pub struct PreparedPuzzle {
 
 #[uniffi::export]
 impl PreparedPuzzle {
+    /// Deterministic core work units spent compiling this layout, not elapsed time.
     pub fn preparation_work(&self) -> u32 {
         self.preparation_work
     }
@@ -126,6 +100,7 @@ impl PreparedPuzzle {
         let board: Board = input.board.try_into()?;
         let options = input.work.unwrap_or_default();
         let mut work = control::budget(options.max_work, options.initial_work, token)?;
+
         let result = match sudoku_core::constraints::candidates::evaluate_candidates(
             &board,
             self.computation.rules(),
@@ -137,6 +112,7 @@ impl PreparedPuzzle {
             Bounded::BudgetExhausted => CandidateResultDto::BudgetExhausted,
         };
         control::check(&work)?;
+
         Ok(crate::dto::operations::CandidateWorkDto {
             result,
             work_used: counter(work.used())?,
@@ -151,17 +127,23 @@ impl PreparedPuzzle {
         let board: Board = input.board.try_into()?;
         let options = input.work.unwrap_or_default();
         let mut work = control::budget(options.max_work, options.initial_work, token)?;
+
         let conflicts = sudoku_core::constraints::conflicts::evaluate_conflicts(
             &board,
             self.computation.rules(),
             &mut work,
         );
-        let violations = violations_to_dto(conflicts.violations)?;
+        let violations = conflicts
+            .violations
+            .iter()
+            .map(violation_to_dto)
+            .collect::<CoreResult<_>>()?;
         let result = match conflicts.status {
             ConflictStatus::Complete => ConflictResultDto::Complete { violations },
             ConflictStatus::BudgetExhausted => ConflictResultDto::BudgetExhausted { violations },
         };
         control::check(&work)?;
+
         Ok(crate::dto::operations::ConflictWorkDto {
             result,
             work_used: counter(work.used())?,
@@ -180,6 +162,7 @@ impl PreparedPuzzle {
             .node_limit
             .map(u64::from)
             .unwrap_or(work.remaining());
+
         let result = sudoku_core::search::exact::count_solutions(
             &board,
             &self.computation,
@@ -187,6 +170,7 @@ impl PreparedPuzzle {
             nodes,
         );
         control::check(&work)?;
+
         Ok(crate::dto::operations::SearchWorkDto {
             result: search_to_dto(result)?,
             work_used: counter(work.used())?,
@@ -198,42 +182,15 @@ impl PreparedPuzzle {
         input: EditInputDto,
         token: Arc<CancellationToken>,
     ) -> Result<crate::dto::operations::EditWorkDto, NativeError> {
-        use crate::dto::operations::BoardEditDto;
-        let givens: Board = input.givens.try_into()?;
-        let entries: Board = input.entries.try_into()?;
-        let note_count = input.notes.len();
-        let mut notes = [CandidateMask::EMPTY; BOARD_SIZE];
-        // Retain mask-validation precedence even when the input has the wrong length.
-        for (index, bits) in input.notes.into_iter().enumerate() {
-            let mask = CandidateMask::try_from(bits)?;
-            if let Some(destination) = notes.get_mut(index) {
-                *destination = mask;
-            }
-        }
-        if note_count != BOARD_SIZE {
-            return Err(EngineError::invalid("Notes require exactly 81 masks").into());
-        }
-        let before = BoardLayers { entries, notes };
-        let cell = |value: u32| {
-            CellIndex::try_from(
-                usize::try_from(value)
-                    .map_err(|_| EngineError::invalid("Edit cell exceeds platform bounds"))?,
-            )
-        };
-        let action = match input.action {
-            BoardEditDto::Enter { cell: index, digit } => BoardEdit::Enter {
-                cell: cell(index)?,
-                digit: Digit::try_from(digit.0)?,
-            },
-            BoardEditDto::Erase { cell: index } => BoardEdit::Erase { cell: cell(index)? },
-            BoardEditDto::ToggleNote { cell: index, digit } => BoardEdit::ToggleNote {
-                cell: cell(index)?,
-                digit: Digit::try_from(digit.0)?,
-            },
-            BoardEditDto::GenerateNotes => BoardEdit::GenerateNotes,
-        };
-        let options = input.work.unwrap_or_default();
+        let PreparedEditInput {
+            givens,
+            before,
+            action,
+            work: options,
+        } = input.try_into()?;
+
         let mut work = control::budget(options.max_work, options.initial_work, token)?;
+
         let result = match sudoku_core::editing::edit_board(
             &givens,
             &before,
@@ -250,6 +207,7 @@ impl PreparedPuzzle {
             EditOutcome::BudgetExhausted => EditResultDto::BudgetExhausted,
         };
         control::check(&work)?;
+
         Ok(crate::dto::operations::EditWorkDto {
             result,
             work_used: counter(work.used())?,
@@ -273,6 +231,7 @@ impl PreparedPuzzle {
             });
         };
         control::check(&work)?;
+
         Ok(Self {
             computation,
             preparation_work: counter(work.used())?,

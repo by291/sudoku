@@ -9,6 +9,9 @@ import type {
   AssessmentResultDto,
   PuzzleAssessmentDto,
   AssessmentOutcomeDto,
+  AssessmentIssueDto,
+  LiveAssessmentOutcomeDto,
+  ParsedLiveOutcomeDto as GeneratedParsedLiveOutcomeDto,
   EvidenceDto,
   RuleEvidenceDto,
   UnitDto,
@@ -57,6 +60,9 @@ export type LogicalStep = ReadonlyContract<LogicalStepDto>
 export type HintResult = ReadonlyContract<HintResultDto>
 export type DifficultyAssessment = ReadonlyContract<AssessmentSummaryDto>
 export type AssessmentResult = ReadonlyContract<AssessmentResultDto>
+export type AssessmentIssue = ReadonlyContract<AssessmentIssueDto>
+export type LiveAssessmentOutcome = ReadonlyContract<LiveAssessmentOutcomeDto>
+export type ParsedLiveOutcomeDto = ReadonlyContract<GeneratedParsedLiveOutcomeDto>
 export type AssessmentOutcome = ReadonlyContract<AssessmentOutcomeDto>
 export type PuzzleAssessment = ReadonlyContract<PuzzleAssessmentDto>
 export type Unit = ReadonlyContract<UnitDto>

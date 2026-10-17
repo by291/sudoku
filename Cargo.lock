@@ -647,6 +647,7 @@ dependencies = [
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "sudoku-core",
  "tsify",
  "wasm-bindgen",

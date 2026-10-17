@@ -12,4 +12,8 @@ Generation/derivation accept checked `Uint8Array` inputs; array-like values and 
 
 The main-thread facade exposes bounded live operations and semantic validation. Heavy generation, exact search, rating and hints belong in isolated Workers. An arithmetic operation's finite work limit does not establish a frame-time bound; the release audit and any approved asynchronous dispatch policy are part of frontend integration.
 
-Bridge version 2 adds `assess_summary`: it runs the same assessment and work accounting as `assess`, then returns the existing summary-only outcome before converting any trace to JavaScript. Production Workers use this export; the full `assess` export retains its owned trace for proof consumers. Both exports share input validation and failure mapping.
+Bridge version 3 retains `assess_summary`: it runs the same assessment and work accounting as `assess`, then returns the summary-only outcome before converting any trace to JavaScript. Production Workers use this export; the full `assess` export retains its owned trace for proof consumers. Both exports share input validation and failure mapping.
+
+Live assessment issues distinguish diagnostic messages from structured rule violations. Violation facts carry their constraint identity, affected cells and typed details; Chinese rendering belongs to client game presentation. Live outcomes have a separate checked parser from historical string-shaped assessment metadata. Existing stored unavailable-assessment strings are preserved, and the rating/generation versions do not change with this bridge revision.
+
+Conversion modules own typed input assembly and metadata decoding. Prepared handles own immutable computation and operation dispatch. Edit conversion validates every supplied note mask before rejecting a wrong array length; preserve that failure precedence when changing the boundary.

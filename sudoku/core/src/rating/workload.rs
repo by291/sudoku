@@ -4,7 +4,7 @@ use super::policies::{policy, technique_tier};
 use super::types::{ReasoningWorkload, TechniqueCounts};
 use crate::logic::pattern_facts::mask_of;
 use crate::logic::types::{Evidence, LogicalAction, LogicalStep};
-use crate::logic::workspace::{apply_step, create_workspace};
+use crate::logic::workspace::{apply_established_step, create_workspace};
 use crate::rules::types::{PreparedRules, UnitKind};
 use crate::types::{BOARD_SIZE, Board, CoreResult, Difficulty, EngineError};
 
@@ -89,7 +89,7 @@ pub fn summarize_trace(
                 result.candidate_removals += removed.len() as u64;
             }
         }
-        apply_step(&mut state, step);
+        apply_established_step(&mut state, step);
         result.technique_counts.increment(step.technique);
         if has_variant_evidence(step) {
             result.variant_steps += 1;

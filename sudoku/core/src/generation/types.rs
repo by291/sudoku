@@ -21,6 +21,7 @@ impl GenerationVersion {
             Self::VariantsV11 => VARIANT_PUZZLE_VERSION,
         }
     }
+
     pub fn parse(value: &str) -> CoreResult<Self> {
         match value {
             PUZZLE_VERSION => Ok(Self::ClassicV11),
@@ -30,6 +31,7 @@ impl GenerationVersion {
             )),
         }
     }
+
     pub(crate) fn for_variant(variant: SudokuVariant) -> Self {
         if variant == SudokuVariant::Classic {
             Self::ClassicV11
@@ -57,6 +59,7 @@ impl GenerationInput {
             GenerationVersion::for_variant(variant).as_str(),
         )
     }
+
     pub fn from_version(
         variant: SudokuVariant,
         difficulty: Difficulty,
@@ -75,6 +78,7 @@ impl GenerationInput {
                 "Unsupported generation version for this type",
             ));
         }
+
         Ok(Self {
             variant,
             difficulty,
@@ -82,15 +86,19 @@ impl GenerationInput {
             puzzle_version,
         })
     }
+
     pub fn variant(&self) -> SudokuVariant {
         self.variant
     }
+
     pub fn difficulty(&self) -> Difficulty {
         self.difficulty
     }
+
     pub fn seed(&self) -> &Seed {
         &self.seed
     }
+
     pub fn puzzle_version(&self) -> GenerationVersion {
         self.puzzle_version
     }
@@ -107,7 +115,7 @@ impl Default for GenerationLimits {
     fn default() -> Self {
         Self {
             max_layouts: 40,
-            max_work: 4000000,
+            max_work: 4_000_000,
             max_steps: 500,
         }
     }

@@ -1,11 +1,12 @@
 use super::input::MAX_ASSESSMENT_STEPS;
 use super::policies::{policy, supports_difficulty, technique_tier};
 use super::types::{
-    AssessmentIdentity, DifficultyAssessment, PuzzleAssessment, RATING_VERSION, StoredAssessment,
-    TechniqueCounts, UnavailableReason,
+    AssessmentIdentity, DifficultyAssessment, PuzzleAssessment, RATING_VERSION, ReasoningWorkload,
+    StoredAssessment, TechniqueCounts, UnavailableReason,
 };
 use crate::logic::techniques::{ALL_TECHNIQUES, Technique, TechniqueAction};
-use crate::types::{BOARD_SIZE, CoreResult, Difficulty, EngineError};
+use crate::rules::types::SudokuVariant;
+use crate::types::{BOARD_SIZE, CoreResult, Difficulty, EngineError, UNIT_SIZE};
 
 const MAX_SAFE_INTEGER: u64 = 9007199254740991;
 
@@ -29,16 +30,20 @@ impl TechniqueCounts {
             seen[technique as usize] = true;
             counts.0[technique as usize] = count;
         }
+
         Ok(counts)
     }
 }
 
-pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<DifficultyAssessment> {
-    if !supports_difficulty(summary.variant, summary.difficulty) {
-        return Err(EngineError::invalid("Invalid assessment summary identity"));
-    }
+struct TechniqueAccounting {
+    total: u128,
+    required_placements: u128,
+    required_eliminations: u128,
+    required_variant_steps: u128,
+    highest: Option<Technique>,
+}
 
-    let workload = &summary.workload;
+fn validate_count_bounds(workload: &ReasoningWorkload) -> CoreResult<()> {
     if [
         workload.steps,
         workload.placements,
@@ -52,6 +57,11 @@ pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<Difficulty
         return Err(EngineError::invalid("Invalid assessment workload counts"));
     }
 
+    Ok(())
+}
+
+fn summarize_technique_counts(summary: &DifficultyAssessment) -> CoreResult<TechniqueAccounting> {
+    let workload = &summary.workload;
     let allowed = policy(summary.variant, summary.difficulty);
     let order = policy(summary.variant, Difficulty::Expert);
     let mut total = 0_u128;
@@ -59,6 +69,7 @@ pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<Difficulty
     let mut required_eliminations = 0_u128;
     let mut required_variant_steps = 0_u128;
     let mut highest = None;
+
     for technique in ALL_TECHNIQUES {
         let count = workload.technique_counts.count(technique);
         if count > MAX_SAFE_INTEGER || (count > 0 && !allowed.contains(&technique)) {
@@ -66,6 +77,7 @@ pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<Difficulty
                 "Invalid or inapplicable assessment technique count",
             ));
         }
+
         total += u128::from(count);
         match technique.action() {
             TechniqueAction::Placement => required_placements += u128::from(count),
@@ -85,32 +97,73 @@ pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<Difficulty
         }
     }
 
+    Ok(TechniqueAccounting {
+        total,
+        required_placements,
+        required_eliminations,
+        required_variant_steps,
+        highest,
+    })
+}
+
+fn validate_action_accounting(
+    workload: &ReasoningWorkload,
+    variant: SudokuVariant,
+    accounting: &TechniqueAccounting,
+) -> CoreResult<()> {
+    // Replay never adds candidates, so actions and candidate removals have finite board bounds.
+    if workload.steps > u64::from(MAX_ASSESSMENT_STEPS)
+        || workload.placements > BOARD_SIZE as u64
+        || workload.candidate_removals > (BOARD_SIZE * UNIT_SIZE) as u64
+        || u128::from(workload.placements) < accounting.required_placements
+        || u128::from(workload.eliminations) < accounting.required_eliminations
+        || u128::from(workload.variant_steps) < accounting.required_variant_steps
+        || (variant == SudokuVariant::Classic && workload.variant_steps != 0)
+        || workload.steps != workload.placements + workload.eliminations
+        || u128::from(workload.steps) != accounting.total
+        || workload.candidate_removals < workload.eliminations
+        || (workload.eliminations == 0 && workload.candidate_removals != 0)
+        || workload.variant_steps > workload.steps
+    {
+        return Err(EngineError::invalid("Contradictory assessment workload"));
+    }
+
+    Ok(())
+}
+
+fn validate_technique_consistency(
+    summary: &DifficultyAssessment,
+    highest: Option<Technique>,
+) -> CoreResult<()> {
+    let workload = &summary.workload;
     let highest_tier = highest.map(technique_tier);
     let difficulty_matches_highest = match highest_tier {
         Some(tier) => tier == summary.difficulty,
         None => summary.difficulty == Difficulty::Easy,
     };
 
-    // Replay never adds candidates, so actions and candidate removals have finite board bounds.
-    if workload.steps > u64::from(MAX_ASSESSMENT_STEPS)
-        || workload.placements > BOARD_SIZE as u64
-        || workload.candidate_removals > (BOARD_SIZE * 9) as u64
-        || u128::from(workload.placements) < required_placements
-        || u128::from(workload.eliminations) < required_eliminations
-        || u128::from(workload.variant_steps) < required_variant_steps
-        || (summary.variant == crate::rules::types::SudokuVariant::Classic
-            && workload.variant_steps != 0)
-        || workload.steps != workload.placements + workload.eliminations
-        || u128::from(workload.steps) != total
-        || workload.candidate_removals < workload.eliminations
-        || (workload.eliminations == 0 && workload.candidate_removals != 0)
-        || workload.variant_steps > workload.steps
-        || workload.highest_technique != highest
+    if workload.highest_technique != highest
         || workload.highest_tier != highest_tier
         || !difficulty_matches_highest
     {
         return Err(EngineError::invalid("Contradictory assessment workload"));
     }
+
+    Ok(())
+}
+
+/// Validate an untrusted summary and return an owned copy without regrading its puzzle.
+pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<DifficultyAssessment> {
+    if !supports_difficulty(summary.variant, summary.difficulty) {
+        return Err(EngineError::invalid("Invalid assessment summary identity"));
+    }
+
+    // Keep boundary error precedence: identity, safe counts, applicable techniques, then contradictions.
+    validate_count_bounds(&summary.workload)?;
+    let accounting = summarize_technique_counts(summary)?;
+    validate_action_accounting(&summary.workload, summary.variant, &accounting)?;
+    validate_technique_consistency(summary, accounting.highest)?;
+
     Ok(summary.clone())
 }
 

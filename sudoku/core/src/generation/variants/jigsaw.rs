@@ -2,7 +2,10 @@ use crate::budget::WorkBudget;
 use crate::random::SeededRandom;
 use crate::rules::context::validate_rules;
 use crate::rules::types::PuzzleRules;
-use crate::types::Board;
+use crate::types::{BOARD_SIZE, Board, UNIT_SIZE};
+
+// Each v11 swap attempt charges once and draws two cells, including rejected swaps.
+const REGION_SWAP_ATTEMPTS: usize = 20;
 
 // Canonical geometry from the independently sealed geometry.json; no teaching board is used to generate puzzles.
 pub const REGION_PRESET: [[usize; 9]; 9] = [
@@ -22,15 +25,15 @@ pub fn irregular_regions(regions: &[Vec<usize>]) -> bool {
         let Some(&first) = region.first() else {
             return false;
         };
-        let mut top = first / 9;
+        let mut top = first / UNIT_SIZE;
         let mut bottom = top;
-        let mut left = first % 9;
+        let mut left = first % UNIT_SIZE;
         let mut right = left;
         for &cell in region {
-            top = top.min(cell / 9);
-            bottom = bottom.max(cell / 9);
-            left = left.min(cell % 9);
-            right = right.max(cell % 9);
+            top = top.min(cell / UNIT_SIZE);
+            bottom = bottom.max(cell / UNIT_SIZE);
+            left = left.min(cell % UNIT_SIZE);
+            right = right.max(cell % UNIT_SIZE);
         }
         (bottom - top + 1) * (right - left + 1) != region.len()
     })
@@ -43,13 +46,13 @@ pub fn create_geometry(
     budget: &mut WorkBudget,
 ) -> Option<PuzzleRules> {
     let mut regions = regions.to_vec();
-    for _ in 0..20 {
+    for _ in 0..REGION_SWAP_ATTEMPTS {
         if !budget.consume(1) {
             return None;
         }
 
-        let first = (random.next_f64() * 81.0) as usize;
-        let second = (random.next_f64() * 81.0) as usize;
+        let first = (random.next_f64() * BOARD_SIZE as f64) as usize;
+        let second = (random.next_f64() * BOARD_SIZE as f64) as usize;
         if first == second || solution.values()[first] != solution.values()[second] {
             continue;
         }

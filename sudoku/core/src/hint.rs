@@ -1,8 +1,10 @@
+pub mod validation;
+
 use crate::board::is_complete;
 use crate::budget::WorkBudget;
 use crate::logic::solver::find_step;
 use crate::logic::types::{LogicalAction, LogicalStep};
-use crate::logic::workspace::{apply_step, create_workspace};
+use crate::logic::workspace::{apply_established_step, create_workspace};
 use crate::rating::policies::hint_techniques_slice;
 use crate::rules::types::PreparedRules;
 use crate::types::{Board, Bounded};
@@ -71,7 +73,7 @@ pub fn analyze_hint(
             None
         };
         if placement.is_none() {
-            apply_step(&mut state, &step);
+            apply_established_step(&mut state, &step);
         }
         steps.push(step);
         if let Some(placement) = placement {

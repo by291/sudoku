@@ -16,6 +16,7 @@ import type {
   HintValidationDto,
   TransformInputDto,
   ParsedOutcomeDto,
+  ParsedLiveOutcomeDto,
 } from '@/sudoku/contracts'
 
 type Bindings = ReturnType<typeof createBindings>
@@ -46,6 +47,7 @@ export interface MainSudokuEngine {
   parseEdit(value: unknown): EditWorkDto
   parseHint(value: unknown): HintValidationDto
   validateAssessment(input: AssessmentValidationInputDto): AssessmentValidationDto
+  validateLiveAssessmentOutcome(value: unknown): ParsedLiveOutcomeDto
   validateAssessmentOutcome(value: unknown): ParsedOutcomeDto
   validateHint(input: unknown): HintValidationDto
   transformRules(input: TransformInputDto): PuzzleRules
@@ -129,6 +131,7 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
     parseEdit: (value) => active().parse_edit(value),
     parseHint: (value) => active().parse_hint(value),
     validateAssessment: (input) => active().validate_assessment(input),
+    validateLiveAssessmentOutcome: (value) => active().parse_live_assessment_outcome(value),
     validateAssessmentOutcome: (value) => active().parse_assessment_outcome(value),
     validateHint: (input) => active().validate_hint_evidence(input),
     transformRules: (input) => active().transform_rules(input),

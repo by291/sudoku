@@ -306,3 +306,33 @@ it('rejects malformed evidence masks and out-of-range placements', () => {
     }).valid,
   ).toBe(false)
 })
+
+it('accepts owned structured assessment issues and rejects historical issue strings', () => {
+  const value = {
+    status: 'invalid',
+    issues: [
+      { kind: 'message', message: 'diagnostic' },
+      {
+        kind: 'violation',
+        violation: {
+          constraintId: 'thermo:4',
+          cells: [20, 11, 2],
+          code: { kind: 'thermo-order', index: 4 },
+        },
+      },
+    ],
+  }
+  const response = {
+    kind: 'assess',
+    requestId: 'structured',
+    outcome: { status: 'completed', value },
+  }
+
+  expect(parseWorkerResponse(response)).toEqual({ valid: true, value: response })
+  expect(
+    parseWorkerResponse({
+      ...response,
+      outcome: { status: 'completed', value: { status: 'invalid', issues: ['old text'] } },
+    }).valid,
+  ).toBe(false)
+})

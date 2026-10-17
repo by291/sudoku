@@ -30,6 +30,8 @@ pub enum VariantDto {
     Arrow,
 }
 
+/// Finite deterministic core work limits, measured in algorithm operations rather than milliseconds.
+/// `initial_work` includes a caller-supplied prior charge in the returned total.
 #[derive(Default, Serialize, Deserialize, uniffi::Record)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct WorkOptionsDto {

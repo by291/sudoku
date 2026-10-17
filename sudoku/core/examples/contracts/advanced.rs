@@ -6,7 +6,7 @@ use sudoku_core::budget::WorkBudget;
 use sudoku_core::logic::advanced_evidence::validate_advanced_step;
 use sudoku_core::logic::advanced_techniques::find_advanced_step;
 use sudoku_core::logic::techniques::Technique;
-use sudoku_core::logic::workspace::create_workspace;
+use sudoku_core::logic::types::LogicalWorkspace;
 use sudoku_core::rules::context::compile_rules;
 use sudoku_core::types::{Board, Bounded, CandidateMask};
 
@@ -23,15 +23,15 @@ pub struct AdvancedInput {
 pub fn evaluate(input: AdvancedInput) -> Result<Value, Box<dyn std::error::Error>> {
     let board = Board::try_from(input.board.as_slice())?;
     let rules = compile_rules(&decode_rules(&input.rules)?)?;
-    let mut state = create_workspace(&board, &rules);
     let domains: Vec<CandidateMask> = input
         .domains
         .into_iter()
         .map(CandidateMask::try_from)
         .collect::<Result<_, _>>()?;
-    state.candidates = domains
+    let candidates = domains
         .try_into()
         .map_err(|_| "Expected 81 fixture domains")?;
+    let state = LogicalWorkspace::from_authored_candidates(&board, candidates, &rules)?;
     let technique = Technique::parse(&input.technique).ok_or("Unknown fixture technique")?;
     let mut budget = WorkBudget::new(input.limit);
     let result = find_advanced_step(&state, technique, &mut budget);

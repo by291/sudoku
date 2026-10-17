@@ -306,3 +306,37 @@ fn failed_edit_charges_do_not_publish_partial_proposals() {
     assert_eq!(proposal.mask.clue_count(), 80);
     assert_eq!(owner.seen_count(), 2);
 }
+
+#[test]
+fn removal_child_inherits_the_sweep_when_its_parent_closes() {
+    let mut owner = CandidateFrontier::new(0, &terminal(), Difficulty::Hard).unwrap();
+    owner
+        .retain(checkpoint(GivenMask::FULL.bits(), true))
+        .unwrap();
+    let mut random = SeededRandom::new(&Seed::from_bytes([0; 32]));
+    let mut removed_cells = 0_u128;
+    let mut last_proposal = None;
+    for _ in 0..32 {
+        let proposal = owner.next(&mut random, &mut WorkBudget::new(1000)).unwrap();
+        removed_cells |= GivenMask::FULL.bits() ^ proposal.mask.bits();
+        last_proposal = Some(proposal);
+    }
+    let child_mask = last_proposal.unwrap().mask;
+    let mut unchanged_random = random.clone();
+
+    // Retaining this child evicts its parent at the 32-proposal cap. The pending owner must survive.
+    owner.retain(checkpoint(child_mask.bits(), true)).unwrap();
+    let mut budget = WorkBudget::new(2);
+    let continued = owner.next(&mut random, &mut budget).unwrap();
+
+    assert_eq!(owner.checkpoint_count(), 1);
+    assert_eq!(continued.mask.clue_count(), 79);
+    assert_eq!(
+        continued.mask.bits() & child_mask.bits(),
+        continued.mask.bits()
+    );
+    let removed_from_child = child_mask.bits() ^ continued.mask.bits();
+    assert_eq!(removed_from_child & removed_cells, 0);
+    assert_eq!(budget.used(), 2);
+    assert_eq!(random.next_u32(), unchanged_random.next_u32());
+}

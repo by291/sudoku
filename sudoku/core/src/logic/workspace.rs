@@ -3,7 +3,7 @@ use super::types::{Evidence, LogicalAction, LogicalStep, LogicalWorkspace};
 use crate::board::base_candidates;
 use crate::constraints::types::PreparedComputation;
 use crate::rules::types::{PreparedRules, PuzzleRules};
-use crate::types::{Board, CandidateMask};
+use crate::types::{BOARD_SIZE, Board, CandidateMask, CoreResult, EngineError};
 
 /// Copies the board; no domains, premises or memo entries carry over from another clue mask.
 pub fn create_workspace(board: &Board, rules: &PreparedRules) -> LogicalWorkspace {
@@ -27,6 +27,7 @@ pub fn create_workspace(board: &Board, rules: &PreparedRules) -> LogicalWorkspac
     } else {
         base_candidates(board, rules)
     };
+
     LogicalWorkspace {
         board: board.clone(),
         candidates,
@@ -49,8 +50,69 @@ pub fn create_prepared_workspace(
     state
 }
 
-/// Apply an engine-produced or validated step for this workspace. Premises survive until a placement.
-pub fn apply_step(state: &mut LogicalWorkspace, step: &LogicalStep) {
+impl LogicalWorkspace {
+    /// Own an authored board/domain snapshot with fresh premises and caches.
+    /// Earlier eliminations must be independently sound; this does not prove them.
+    /// Empty domains are allowed for contradiction exercises. Filled cells require empty masks,
+    /// and other domains must be subsets of the initial logical candidates for these rules.
+    ///
+    /// # Errors
+    /// Returns an error for candidates on filled cells or reintroduced initial exclusions.
+    pub fn from_authored_candidates(
+        board: &Board,
+        candidates: [CandidateMask; BOARD_SIZE],
+        rules: &PreparedRules,
+    ) -> CoreResult<Self> {
+        let mut state = create_workspace(board, rules);
+        if candidates
+            .iter()
+            .zip(&state.candidates)
+            .any(|(authored, initial)| authored.bits() & !initial.bits() != 0)
+        {
+            return Err(EngineError::invalid(
+                "Authored candidates exceed initial logical domains",
+            ));
+        }
+
+        state.candidates = candidates;
+        Ok(state)
+    }
+}
+
+/// Apply an engine-produced or independently proved step for this exact workspace state.
+/// This checks action shape/applicability, not mathematical evidence. Premises survive until placement.
+///
+/// # Errors
+/// Returns an error without mutation if any action cell, digit or domain is inapplicable.
+pub fn apply_step(state: &mut LogicalWorkspace, step: &LogicalStep) -> CoreResult<()> {
+    let applicable = |cell: usize, digit: u8| {
+        cell < BOARD_SIZE
+            && (1..=9).contains(&digit)
+            && state.board.values()[cell] == 0
+            && state.candidates[cell].bits() & mask_of(digit) != 0
+    };
+    let valid = match &step.action {
+        LogicalAction::Placement { cell, digit } => applicable(*cell, *digit),
+        LogicalAction::Elimination { removals } => {
+            !removals.is_empty()
+                && removals
+                    .iter()
+                    .all(|removal| applicable(removal.cell, removal.digit))
+        }
+    };
+    if !valid {
+        return Err(EngineError::invalid(
+            "Logical action is not applicable to this workspace",
+        ));
+    }
+
+    // Validate the entire batch before any removal or premise can change the workspace.
+    apply_established_step(state, step);
+    Ok(())
+}
+
+/// The detector or proof validator has already established this step for the current state.
+pub(crate) fn apply_established_step(state: &mut LogicalWorkspace, step: &LogicalStep) {
     match &step.action {
         LogicalAction::Elimination { removals } => {
             for removal in removals {

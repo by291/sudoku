@@ -23,7 +23,11 @@ impl From<EngineError> for NativeError {
     }
 }
 
-/// An independent object: cancel never waits on a prepared handle or a computation lock.
+/// A sticky cancellation signal shared by the operations that receive this token.
+///
+/// Cancellation never waits on a prepared handle or computation lock. Once cancelled,
+/// the token stays cancelled for its entire lifetime; use a fresh token for a new job.
+/// Computation observes the signal at work checks and unwinds before returning an error.
 #[derive(Debug, Default, uniffi::Object)]
 pub struct CancellationToken {
     cancelled: AtomicBool,
@@ -35,9 +39,11 @@ impl CancellationToken {
     pub fn new() -> Self {
         Self::default()
     }
+
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Relaxed);
     }
+
     pub fn is_cancelled(&self) -> bool {
         self.cancelled.load(Ordering::Relaxed)
     }
@@ -58,10 +64,12 @@ pub fn budget(
     if maximum > 4_000_000 || initial.unwrap_or(0) > maximum {
         return Err(EngineError::invalid("Work limits may only lower the fixed bounds").into());
     }
+
     let mut budget = WorkBudget::with_cancellation(u64::from(maximum), token);
     check(&budget)?;
     budget.consume(u64::from(initial.unwrap_or(0)));
     check(&budget)?;
+
     Ok(budget)
 }
 
@@ -71,5 +79,6 @@ pub fn check(budget: &WorkBudget) -> Result<(), NativeError> {
             work_used: budget.used(),
         });
     }
+
     Ok(())
 }

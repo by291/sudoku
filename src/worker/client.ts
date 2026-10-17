@@ -1,7 +1,7 @@
 import type { ConflictWorkDto, EditWorkDto, Board } from '@/sudoku/contracts'
 import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
-import type { AssessmentInput, AssessmentOutcome } from '@/sudoku/contracts'
+import type { AssessmentInput, LiveAssessmentOutcome } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
 import { BRIDGE_VERSION, isRecord } from '@/sudoku/guards'
 import { copyGenerationInput } from '@/sudoku/generationInput'
@@ -42,7 +42,10 @@ export interface SudokuWorkerClient {
   ): Promise<WorkerOutcome<LiveComputation<EditWorkDto>>>
 
   generate(input: GenerationInput, signal?: AbortSignal): Promise<GenerateOutcome>
-  assess(input: AssessmentInput, signal?: AbortSignal): Promise<WorkerOutcome<AssessmentOutcome>>
+  assess(
+    input: AssessmentInput,
+    signal?: AbortSignal,
+  ): Promise<WorkerOutcome<LiveAssessmentOutcome>>
   hint(
     board: Board,
     solution: Board,

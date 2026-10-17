@@ -132,3 +132,41 @@ fn retains_version_and_identity_failure_precedence_without_changing_absence() {
         })
     ));
 }
+
+#[test]
+fn unsafe_counts_precede_inapplicable_techniques_and_action_contradictions() {
+    use sudoku_core::logic::techniques::{ALL_TECHNIQUES, Technique};
+    use sudoku_core::rating::decoding::validate_summary;
+    use sudoku_core::rating::types::TechniqueCounts;
+    use sudoku_core::types::EngineError;
+
+    let mut summary = one_step_summary();
+    let counts: Vec<_> = ALL_TECHNIQUES
+        .into_iter()
+        .map(|technique| (technique, u64::from(technique == Technique::XWing)))
+        .collect();
+    summary.workload.technique_counts = TechniqueCounts::from_entries(&counts).unwrap();
+    summary.workload.steps = u64::MAX;
+    summary.workload.placements = 82;
+
+    let unsafe_counts = validate_summary(&summary);
+    summary.workload.steps = 1;
+    let inapplicable_technique = validate_summary(&summary);
+    summary.workload.technique_counts = one_step_summary().workload.technique_counts;
+    let contradictory_actions = validate_summary(&summary);
+
+    assert_eq!(
+        unsafe_counts,
+        Err(EngineError::invalid("Invalid assessment workload counts"))
+    );
+    assert_eq!(
+        inapplicable_technique,
+        Err(EngineError::invalid(
+            "Invalid or inapplicable assessment technique count"
+        ))
+    );
+    assert_eq!(
+        contradictory_actions,
+        Err(EngineError::invalid("Contradictory assessment workload"))
+    );
+}

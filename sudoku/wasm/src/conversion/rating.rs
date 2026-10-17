@@ -1,9 +1,10 @@
 use super::logic::step_to_dto;
 use super::values::counter;
 use crate::dto::rating::{
-    AssessmentOutcomeDto, AssessmentResultDto, AssessmentStageDto, AssessmentSummaryDto,
-    WorkloadDto,
+    AssessmentIssueDto, AssessmentResultDto, AssessmentStageDto, AssessmentSummaryDto,
+    LiveAssessmentOutcomeDto, WorkloadDto,
 };
+#[cfg(test)]
 use sudoku_core::constraints::types::{RuleViolation, ViolationCode};
 use sudoku_core::logic::techniques::ALL_TECHNIQUES;
 use sudoku_core::rating::types::{
@@ -11,31 +12,16 @@ use sudoku_core::rating::types::{
 };
 use sudoku_core::types::CoreResult;
 
-pub fn violation_message(violation: &RuleViolation) -> String {
-    match violation.code {
-        ViolationCode::Duplicate => "同一行、列、宫、区域、对角线或笼中的数字不能重复。".to_owned(),
-        ViolationCode::CageTotal { index, sum } => {
-            format!("第{}个笼内数字不能重复，总和必须为{}。", index + 1, sum)
-        }
-        ViolationCode::ThermoOrder { index } => {
-            format!("第{}支温度计的数字必须从圆头开始严格递增。", index + 1)
-        }
-        ViolationCode::ArrowTotal { index } => {
-            format!("第{}条箭头上的数字总和必须等于圆圈内数字。", index + 1)
-        }
-    }
-}
-
-pub fn issue_messages(issues: &[AssessmentIssue]) -> Vec<String> {
+fn issues_to_dto(issues: &[AssessmentIssue]) -> CoreResult<Vec<AssessmentIssueDto>> {
     issues
         .iter()
         .map(|issue| match issue {
-            AssessmentIssue::Message(message) => message.clone(),
-            AssessmentIssue::Violation(violation) => format!(
-                "{}: {}",
-                violation.constraint_id,
-                violation_message(violation)
-            ),
+            AssessmentIssue::Message(message) => Ok(AssessmentIssueDto::Message {
+                message: message.clone(),
+            }),
+            AssessmentIssue::Violation(violation) => Ok(AssessmentIssueDto::Violation {
+                violation: super::violations::violation_to_dto(violation)?,
+            }),
         })
         .collect()
 }
@@ -79,15 +65,17 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
         AssessmentResult::Unrated(_) => Vec::new(),
     };
     Ok(match outcome {
-        AssessmentOutcomeDto::Rated { summary } => AssessmentResultDto::Rated { summary, trace },
-        AssessmentOutcomeDto::Ungraded {
+        LiveAssessmentOutcomeDto::Rated { summary } => {
+            AssessmentResultDto::Rated { summary, trace }
+        }
+        LiveAssessmentOutcomeDto::Ungraded {
             rating_version,
             variant,
         } => AssessmentResultDto::Ungraded {
             rating_version,
             variant,
         },
-        AssessmentOutcomeDto::BudgetExhausted {
+        LiveAssessmentOutcomeDto::BudgetExhausted {
             rating_version,
             variant,
             stage,
@@ -98,17 +86,19 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
             stage,
             difficulty,
         },
-        AssessmentOutcomeDto::Invalid { issues } => AssessmentResultDto::Invalid { issues },
+        LiveAssessmentOutcomeDto::Invalid { issues } => AssessmentResultDto::Invalid { issues },
     })
 }
 
-pub fn assessment_summary_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentOutcomeDto> {
+pub fn assessment_summary_to_dto(
+    result: &AssessmentResult,
+) -> CoreResult<LiveAssessmentOutcomeDto> {
     Ok(match result {
-        AssessmentResult::Rated(rated) => AssessmentOutcomeDto::Rated {
+        AssessmentResult::Rated(rated) => LiveAssessmentOutcomeDto::Rated {
             summary: summary_to_dto(&rated.summary)?,
         },
         AssessmentResult::Unrated(AssessmentFailure::Ungraded { variant }) => {
-            AssessmentOutcomeDto::Ungraded {
+            LiveAssessmentOutcomeDto::Ungraded {
                 rating_version: crate::dto::rating::RatingVersionDto::V2,
                 variant: (*variant).into(),
             }
@@ -117,7 +107,7 @@ pub fn assessment_summary_to_dto(result: &AssessmentResult) -> CoreResult<Assess
             variant,
             stage,
             difficulty,
-        }) => AssessmentOutcomeDto::BudgetExhausted {
+        }) => LiveAssessmentOutcomeDto::BudgetExhausted {
             rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: (*variant).into(),
             stage: match stage {
@@ -127,9 +117,56 @@ pub fn assessment_summary_to_dto(result: &AssessmentResult) -> CoreResult<Assess
             difficulty: difficulty.map(Into::into),
         },
         AssessmentResult::Unrated(AssessmentFailure::Invalid { issues }) => {
-            AssessmentOutcomeDto::Invalid {
-                issues: issue_messages(issues),
+            LiveAssessmentOutcomeDto::Invalid {
+                issues: issues_to_dto(issues)?,
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_assessments_preserve_order_and_literal_violation_facts() {
+        let issues = vec![
+            AssessmentIssue::Message("  diagnostic  ".into()),
+            AssessmentIssue::Violation(RuleViolation {
+                constraint_id: "row:0".into(),
+                cells: vec![0, 1],
+                code: ViolationCode::Duplicate,
+            }),
+            AssessmentIssue::Violation(RuleViolation {
+                constraint_id: "cage:2".into(),
+                cells: vec![12, 3],
+                code: ViolationCode::CageTotal { index: 2, sum: 11 },
+            }),
+            AssessmentIssue::Violation(RuleViolation {
+                constraint_id: "thermo:4".into(),
+                cells: vec![20, 11, 2],
+                code: ViolationCode::ThermoOrder { index: 4 },
+            }),
+            AssessmentIssue::Violation(RuleViolation {
+                constraint_id: "arrow:6".into(),
+                cells: vec![30, 21, 12],
+                code: ViolationCode::ArrowTotal { index: 6 },
+            }),
+        ];
+        let result = AssessmentResult::Unrated(AssessmentFailure::Invalid { issues });
+
+        let dto = assessment_to_dto(&result).unwrap();
+        let json = serde_json::to_value(dto).unwrap();
+
+        assert_eq!(
+            json,
+            serde_json::json!({ "status": "invalid", "issues": [
+            { "kind": "message", "message": "  diagnostic  " },
+            { "kind": "violation", "violation": { "constraintId": "row:0", "cells": [0, 1], "code": { "kind": "duplicate" } } },
+            { "kind": "violation", "violation": { "constraintId": "cage:2", "cells": [12, 3], "code": { "kind": "cage-total", "index": 2, "sum": 11 } } },
+            { "kind": "violation", "violation": { "constraintId": "thermo:4", "cells": [20, 11, 2], "code": { "kind": "thermo-order", "index": 4 } } },
+            { "kind": "violation", "violation": { "constraintId": "arrow:6", "cells": [30, 21, 12], "code": { "kind": "arrow-total", "index": 6 } } }
+        ] })
+        );
+    }
 }

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use super::logic::{LogicalStepDto, TechniqueDto};
+use super::operations::ViolationDto;
 use super::rules::RulesDto;
 use super::values::{AssessmentLimitsDto, BoardDto, DifficultyDto, VariantDto};
 use serde::{Deserialize, Serialize};
@@ -48,6 +49,14 @@ pub enum AssessmentStageDto {
     Logic,
 }
 
+/// Owned newly computed diagnostics; clients own player-facing rendering.
+#[derive(Serialize, uniffi::Enum)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum AssessmentIssueDto {
+    Message { message: String },
+    Violation { violation: ViolationDto },
+}
+
 #[derive(Serialize, uniffi::Enum)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum AssessmentResultDto {
@@ -68,7 +77,7 @@ pub enum AssessmentResultDto {
         difficulty: Option<DifficultyDto>,
     },
     Invalid {
-        issues: Vec<String>,
+        issues: Vec<AssessmentIssueDto>,
     },
 }
 
@@ -87,6 +96,7 @@ pub struct AssessmentInputDto {
     pub initial_work: Option<u32>,
 }
 
+/// Expected variant and difficulty for stored metadata; this does not identify a board or seed.
 #[derive(Serialize, Deserialize, uniffi::Record)]
 #[serde(deny_unknown_fields)]
 pub struct AssessmentIdentityDto {
@@ -124,7 +134,31 @@ pub enum AssessmentValidationDto {
     Present { value: PuzzleAssessmentDto },
 }
 
-/// Stored outcomes omit the transient deduction trace.
+/// Newly computed summary-only outcomes retain structured invalid-input facts.
+#[derive(Serialize, uniffi::Enum)]
+#[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum LiveAssessmentOutcomeDto {
+    Rated {
+        summary: AssessmentSummaryDto,
+    },
+    Ungraded {
+        #[serde(rename = "ratingVersion")]
+        rating_version: RatingVersionDto,
+        variant: VariantDto,
+    },
+    BudgetExhausted {
+        #[serde(rename = "ratingVersion")]
+        rating_version: RatingVersionDto,
+        variant: VariantDto,
+        stage: AssessmentStageDto,
+        difficulty: Option<DifficultyDto>,
+    },
+    Invalid {
+        issues: Vec<AssessmentIssueDto>,
+    },
+}
+
+/// Historical string-shaped compatibility outcome; live computation uses LiveAssessmentOutcomeDto.
 #[derive(Serialize, uniffi::Enum)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum AssessmentOutcomeDto {

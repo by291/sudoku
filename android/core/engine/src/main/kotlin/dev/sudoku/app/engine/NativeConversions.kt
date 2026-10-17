@@ -2,6 +2,7 @@ package dev.sudoku.app.engine
 
 import dev.sudoku.app.ffi.AdvancedEvidenceDto
 import dev.sudoku.app.ffi.ArrowDto
+import dev.sudoku.app.ffi.AssessmentIssueDto
 import dev.sudoku.app.ffi.AssessmentSummaryDto
 import dev.sudoku.app.ffi.BoundDto
 import dev.sudoku.app.ffi.CageDto
@@ -33,6 +34,7 @@ import dev.sudoku.app.ffi.ViolationCodeDto
 import dev.sudoku.app.ffi.ViolationDto
 import dev.sudoku.app.ffi.WorkloadDto
 import dev.sudoku.app.model.ArrowClue
+import dev.sudoku.app.model.AssessmentIssue
 import dev.sudoku.app.model.AssessmentSummary
 import dev.sudoku.app.model.AssessmentWorkload
 import dev.sudoku.app.model.BoundFact
@@ -52,6 +54,7 @@ import dev.sudoku.app.model.RuleUnit
 import dev.sudoku.app.model.RuleViolation
 import dev.sudoku.app.model.UnitReference
 import dev.sudoku.app.model.Variant
+import dev.sudoku.app.model.ViolationCode
 
 // Conversions own collections on both sides; generated handles never enter player state.
 internal fun List<Int>.nativeBoard(): ByteArray {
@@ -164,27 +167,20 @@ internal fun MetadataDto.player(): RuleMetadata = RuleMetadata(
     relatedCells.map { it.playerCells() }
 )
 
-internal fun ViolationDto.player(): RuleViolation = when (val value = code) {
-    ViolationCodeDto.Duplicate -> RuleViolation(constraintId, cells.playerCells(), "duplicate")
-    is ViolationCodeDto.CageTotal -> RuleViolation(
-        constraintId,
-        cells.playerCells(),
-        "cage-total",
-        value.index.toInt(),
-        value.sum.toInt()
-    )
-    is ViolationCodeDto.ThermoOrder -> RuleViolation(
-        constraintId,
-        cells.playerCells(),
-        "thermo-order",
-        value.index.toInt()
-    )
-    is ViolationCodeDto.ArrowTotal -> RuleViolation(
-        constraintId,
-        cells.playerCells(),
-        "arrow-total",
-        value.index.toInt()
-    )
+internal fun ViolationDto.player(): RuleViolation = RuleViolation(
+    constraintId,
+    cells.playerCells(),
+    when (val value = code) {
+        ViolationCodeDto.Duplicate -> ViolationCode.Duplicate
+        is ViolationCodeDto.CageTotal -> ViolationCode.CageTotal(value.index.toLong(), value.sum.toInt())
+        is ViolationCodeDto.ThermoOrder -> ViolationCode.ThermoOrder(value.index.toLong())
+        is ViolationCodeDto.ArrowTotal -> ViolationCode.ArrowTotal(value.index.toLong())
+    }
+)
+
+internal fun AssessmentIssueDto.player(): AssessmentIssue = when (this) {
+    is AssessmentIssueDto.Message -> AssessmentIssue.Message(message)
+    is AssessmentIssueDto.Violation -> AssessmentIssue.Violation(violation.player())
 }
 
 internal fun TechniqueDto.wire(): String = when (this) {

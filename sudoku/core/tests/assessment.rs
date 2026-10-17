@@ -106,6 +106,6 @@ fn borrowed_continuation_returns_an_independent_trace_snapshot() {
         resumed.steps[0].action,
         LogicalAction::Placement { cell: 0, digit: 1 }
     );
-    assert_eq!(state.board, resumed.board);
+    assert_eq!(state.board(), &resumed.board);
     assert_eq!(budget.used(), 2);
 }

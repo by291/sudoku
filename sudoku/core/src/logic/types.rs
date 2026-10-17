@@ -122,10 +122,12 @@ pub(crate) struct CageMemo {
     pub supports: crate::constraints::types::SupportMasks,
 }
 
-/// Fresh mutable board state; only immutable preparation may be shared between trial boards.
+/// Owns a board, candidate domains, premises and caches for one logical replay.
+/// Only immutable preparation may be shared between workspaces. Use checked construction and
+/// step application to preserve their coupled invariants; returned evidence owns its snapshots.
 pub struct LogicalWorkspace {
-    pub board: Board,
-    pub candidates: [CandidateMask; BOARD_SIZE],
+    pub(crate) board: Board,
+    pub(crate) candidates: [CandidateMask; BOARD_SIZE],
     pub(crate) rules: PreparedRules,
     pub(crate) premises: Vec<RuleEvidence>,
     pub(crate) support: Option<PreparedConstraintSupport>,
@@ -133,9 +135,20 @@ pub struct LogicalWorkspace {
 }
 
 impl LogicalWorkspace {
+    /// Borrow the current board; mutations must preserve candidate and premise invariants.
+    pub fn board(&self) -> &Board {
+        &self.board
+    }
+
+    /// Borrow the current domains. Filled cells have empty masks.
+    pub fn candidates(&self) -> &[CandidateMask; BOARD_SIZE] {
+        &self.candidates
+    }
+
     pub fn rules(&self) -> &PreparedRules {
         &self.rules
     }
+
     pub fn premises(&self) -> &[RuleEvidence] {
         &self.premises
     }

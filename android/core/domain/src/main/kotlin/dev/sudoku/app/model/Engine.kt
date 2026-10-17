@@ -44,13 +44,14 @@ data class RuleMetadata(
     val duplicatePeers: List<List<Int>>,
     val relatedCells: List<List<Int>>
 )
-data class RuleViolation(
-    val constraintId: String,
-    val cells: List<Int>,
-    val code: String,
-    val index: Int? = null,
-    val sum: Int? = null
-)
+sealed interface ViolationCode {
+    data object Duplicate : ViolationCode
+    data class CageTotal(val index: Long, val sum: Int) : ViolationCode
+    data class ThermoOrder(val index: Long) : ViolationCode
+    data class ArrowTotal(val index: Long) : ViolationCode
+}
+
+data class RuleViolation(val constraintId: String, val cells: List<Int>, val code: ViolationCode)
 
 @Serializable
 data class DomainFact(val cell: Int, val mask: Int)
@@ -188,7 +189,17 @@ sealed interface HintResult {
     data class Unavailable(val reason: String) : HintResult
 }
 
-data class AssessmentResult(val assessment: PuzzleAssessment, val trace: List<LogicalStep>)
+/** Newly computed diagnostics retain facts until a feature chooses player-facing rendering. */
+sealed interface AssessmentIssue {
+    data class Message(val message: String) : AssessmentIssue
+    data class Violation(val violation: RuleViolation) : AssessmentIssue
+}
+
+sealed interface AssessmentResult {
+    data class Rated(val summary: AssessmentSummary, val trace: List<LogicalStep>) : AssessmentResult
+    data class Ungraded(val variant: Variant) : AssessmentResult
+    data class Invalid(val issues: List<AssessmentIssue>) : AssessmentResult
+}
 
 /** Main-safe calls own input snapshots. Close waits for executing native calls to release ownership. */
 interface PreparedPuzzle {

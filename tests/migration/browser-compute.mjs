@@ -1,3 +1,4 @@
+import { assessmentIssueMessage } from '/src/features/game/model/assessmentPresentation.ts'
 import { violationMessage } from '/src/features/game/model/violationPresentation.ts'
 // Test-only transport projection. Every mathematical operation runs in the emitted WASM.
 import { createBindings } from '/packages/sudoku-wasm/pkg/factory.js'
@@ -6,12 +7,19 @@ const wasm = createBindings()
 const init = wasm.default
 await init()
 
+// Test-only presentation projection preserves historical fixture strings, not a new mathematical oracle.
+function projectAssessment(result) {
+  return result.status === 'invalid'
+    ? { ...result, issues: result.issues.map(assessmentIssueMessage) }
+    : result
+}
+
 export function computeCase(suite, input, policies) {
   const limit = input.limit ?? 4000000
   const prepare = (rules) => new wasm.PreparedPuzzle({ rules, maxWork: 4000000 })
   const assessment = (board, rules) => ({
-    result: wasm.assess({ board, rules }).result,
-    budgeted: wasm.assess({ board, rules, maxWork: limit }).result,
+    result: projectAssessment(wasm.assess({ board, rules }).result),
+    budgeted: projectAssessment(wasm.assess({ board, rules, maxWork: limit }).result),
   })
   switch (suite) {
     case 'rules': {
@@ -108,8 +116,8 @@ export function computeCase(suite, input, policies) {
     case 'assessment': {
       const budgeted = wasm.assess({ board: input.board, rules: input.rules, maxWork: limit })
       return {
-        result: wasm.assess({ board: input.board, rules: input.rules }).result,
-        budgeted: budgeted.result,
+        result: projectAssessment(wasm.assess({ board: input.board, rules: input.rules }).result),
+        budgeted: projectAssessment(budgeted.result),
         workUsed: budgeted.workUsed,
       }
     }

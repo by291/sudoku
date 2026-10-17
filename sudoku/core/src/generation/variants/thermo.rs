@@ -4,6 +4,11 @@ use crate::rules::topology::cells_touch;
 use crate::rules::types::PuzzleRules;
 use crate::types::{BOARD_SIZE, Board};
 
+// These v11 geometry bounds fix path-extension visits and random-draw order.
+const GEOMETRY_ATTEMPTS: usize = 8;
+const MIN_PATH_LENGTH: usize = 2;
+const MAX_PATH_LENGTH: usize = 5;
+
 pub fn create_geometry(
     paths: &[Vec<usize>],
     solution: &Board,
@@ -11,9 +16,9 @@ pub fn create_geometry(
     budget: &mut WorkBudget,
 ) -> Option<PuzzleRules> {
     let mut paths = paths.to_vec();
-    for _ in 0..8 {
+    for _ in 0..GEOMETRY_ATTEMPTS {
         let mut path = vec![(random.next_f64() * BOARD_SIZE as f64) as usize];
-        while path.len() < 5 {
+        while path.len() < MAX_PATH_LENGTH {
             if !budget.consume(1) {
                 return None;
             }
@@ -31,7 +36,7 @@ pub fn create_geometry(
             }
             path.push(choices[(random.next_f64() * choices.len() as f64) as usize]);
         }
-        if path.len() >= 2 && !paths.contains(&path) {
+        if path.len() >= MIN_PATH_LENGTH && !paths.contains(&path) {
             paths.push(path);
         }
     }

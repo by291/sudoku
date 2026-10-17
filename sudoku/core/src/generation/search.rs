@@ -17,8 +17,8 @@ use crate::constraints::types::PreparedComputation;
 use crate::puzzle::Puzzle;
 use crate::rating::assessment::prepare_assessment_with_computation;
 use crate::rating::types::{
-    AssessmentIssue, AssessmentLimits, ExhaustionCause, PreparedAssessment, RatedTrial,
-    TargetScreenResult,
+    AssessmentIssue, AssessmentLimits, DifficultyAssessment, ExhaustionCause, PreparedAssessment,
+    RatedTrial, TargetScreenResult,
 };
 use crate::rules::types::SudokuVariant;
 use crate::search::exact::count_solutions;
@@ -38,20 +38,41 @@ struct ActiveLayout {
     best_progress: usize,
 }
 
+enum ScreeningOutcome {
+    NotScreened,
+    Completed,
+    StepLimited,
+}
+
+struct AcceptedCandidate {
+    puzzle: Box<GeneratedPuzzle>,
+    assessment: Box<DifficultyAssessment>,
+}
+
 enum CandidateEvaluation {
     Continue {
         improved: bool,
-        step_limited: bool,
-        screened: bool,
+        screening: ScreeningOutcome,
     },
-    Finished(GenerationOutcome),
+    Accepted(AcceptedCandidate),
+    Failed {
+        reason: String,
+    },
     WorkLimit,
 }
 
 enum Acceptance {
-    Accepted(GenerationOutcome),
+    Accepted(AcceptedCandidate),
+    Failed { reason: String },
     Rejected,
     WorkLimit,
+}
+
+enum LayoutPreparation {
+    Ready(Box<ActiveLayout>),
+    AttemptExhausted,
+    WorkLimit,
+    Failed { reason: String },
 }
 
 fn clue_target(difficulty: Difficulty) -> usize {
@@ -73,13 +94,7 @@ fn meets_clue_policy(input: &GenerationInput, board: &Board) -> bool {
             <= clue_target(input.difficulty)
 }
 
-fn failed(reason: &str) -> CandidateEvaluation {
-    CandidateEvaluation::Finished(GenerationOutcome::Failed {
-        reason: reason.to_string(),
-    })
-}
-
-fn accepted_candidate(
+fn try_accept_candidate(
     layout: &ActiveLayout,
     board: Board,
     trial: RatedTrial,
@@ -97,18 +112,18 @@ fn accepted_candidate(
             .any(|(&digit, &terminal)| digit != 0 && digit != terminal)
         || !is_complete(&layout.terminal, layout.computation.rules())
     {
-        return Ok(Acceptance::Accepted(GenerationOutcome::Failed {
+        return Ok(Acceptance::Failed {
             reason: "Invalid constructed puzzle identity or terminal".to_string(),
-        }));
+        });
     }
 
     let completed = trial.complete()?;
     if completed.summary.variant != input.variant
         || completed.summary.difficulty != input.difficulty
     {
-        return Ok(Acceptance::Accepted(GenerationOutcome::Failed {
+        return Ok(Acceptance::Failed {
             reason: "Accepted assessment identity does not match the request".to_string(),
-        }));
+        });
     }
 
     let exact = count_solutions(&board, &layout.computation, budget, budget.remaining());
@@ -119,9 +134,9 @@ fn accepted_candidate(
         return Ok(Acceptance::WorkLimit);
     };
     if count == 0 || (count == 1 && solution.as_ref() != Some(&layout.terminal)) {
-        return Ok(Acceptance::Accepted(GenerationOutcome::Failed {
+        return Ok(Acceptance::Failed {
             reason: "Constructed terminal lost its known solution".to_string(),
-        }));
+        });
     }
     if count != 1 {
         return Ok(Acceptance::Rejected);
@@ -141,7 +156,8 @@ fn accepted_candidate(
             return Ok(Acceptance::Rejected);
         }
     }
-    Ok(Acceptance::Accepted(GenerationOutcome::Ready {
+
+    Ok(Acceptance::Accepted(AcceptedCandidate {
         puzzle: Box::new(GeneratedPuzzle {
             content,
             seed: input.seed,
@@ -166,13 +182,14 @@ fn evaluate_candidate(
             return Ok(CandidateEvaluation::WorkLimit);
         };
         if count == 0 {
-            return Ok(failed("Constructed terminal lost its known solution"));
+            return Ok(CandidateEvaluation::Failed {
+                reason: "Constructed terminal lost its known solution".to_string(),
+            });
         }
         if count != 1 {
             return Ok(CandidateEvaluation::Continue {
                 improved: false,
-                step_limited: false,
-                screened: false,
+                screening: ScreeningOutcome::NotScreened,
             });
         }
         exact = SolvedExact::Unique;
@@ -193,9 +210,7 @@ fn evaluate_candidate(
                 })
                 .collect::<Vec<_>>()
                 .join("; ");
-            return Ok(CandidateEvaluation::Finished(GenerationOutcome::Failed {
-                reason,
-            }));
+            return Ok(CandidateEvaluation::Failed { reason });
         }
         TargetScreenResult::BudgetExhausted {
             cause: ExhaustionCause::WorkLimit,
@@ -205,8 +220,7 @@ fn evaluate_candidate(
         } => {
             return Ok(CandidateEvaluation::Continue {
                 improved: false,
-                step_limited: true,
-                screened: true,
+                screening: ScreeningOutcome::StepLimited,
             });
         }
         TargetScreenResult::TargetStalled { feedback } => {
@@ -222,13 +236,13 @@ fn evaluate_candidate(
             })?;
             return Ok(CandidateEvaluation::Continue {
                 improved,
-                step_limited: false,
-                screened: true,
+                screening: ScreeningOutcome::Completed,
             });
         }
         TargetScreenResult::BelowTarget { trial, feedback } => (trial, feedback, false),
         TargetScreenResult::MatchingTarget { trial, feedback } => (trial, feedback, true),
     };
+
     let difficulty = trial.difficulty();
     let improved = layout.frontier.retain(CandidateCheckpoint {
         layout_id: layout.id,
@@ -236,24 +250,121 @@ fn evaluate_candidate(
         feedback,
         status: CheckpointStatus::Solved { difficulty, exact },
     })?;
+
     let tier = difficulty.rank();
     let progress = board.values().iter().filter(|&&digit| digit == 0).count();
     if tier > layout.best_tier || (tier == layout.best_tier && progress > layout.best_progress) {
         layout.best_tier = tier;
         layout.best_progress = progress;
     }
+
     if matching && meets_clue_policy(input, &board) {
-        match accepted_candidate(layout, board, trial, input, budget)? {
-            Acceptance::Accepted(result) => return Ok(CandidateEvaluation::Finished(result)),
+        match try_accept_candidate(layout, board, trial, input, budget)? {
+            Acceptance::Accepted(candidate) => return Ok(CandidateEvaluation::Accepted(candidate)),
+            Acceptance::Failed { reason } => return Ok(CandidateEvaluation::Failed { reason }),
             Acceptance::WorkLimit => return Ok(CandidateEvaluation::WorkLimit),
             Acceptance::Rejected => {}
         }
     }
+
     Ok(CandidateEvaluation::Continue {
         improved,
-        step_limited: false,
-        screened: true,
+        screening: ScreeningOutcome::Completed,
     })
+}
+
+fn prepare_layout(
+    id: u32,
+    input: &GenerationInput,
+    limits: &GenerationLimits,
+    budget: &mut WorkBudget,
+) -> CoreResult<LayoutPreparation> {
+    let layout_started = budget.used();
+    let mut terminal_random = for_phase(input, RandomPhase::Terminal, id, 0);
+    let mut geometry_random = for_phase(input, RandomPhase::Geometry, id, 0);
+    let constructed = budget.with_stage(WorkStage::Preparation, |budget| {
+        construct_generation_layout(input, &mut terminal_random, &mut geometry_random, budget)
+    })?;
+    let (terminal, rules) = match constructed {
+        LayoutConstructionResult::BudgetExhausted => {
+            return Ok(LayoutPreparation::WorkLimit);
+        }
+        LayoutConstructionResult::Failed { reason } => {
+            return Ok(LayoutPreparation::Failed { reason });
+        }
+        LayoutConstructionResult::AttemptExhausted => {
+            return Ok(LayoutPreparation::AttemptExhausted);
+        }
+        LayoutConstructionResult::Ready { terminal, rules } => (terminal, rules),
+    };
+
+    let Bounded::Complete(computation) = prepare_computation(&rules, budget)? else {
+        return Ok(LayoutPreparation::WorkLimit);
+    };
+    if rules.variant() != input.variant || !is_complete(&terminal, computation.rules()) {
+        return Ok(LayoutPreparation::Failed {
+            reason: "Constructed layout has an invalid terminal".to_string(),
+        });
+    }
+
+    let mut frontier = CandidateFrontier::new(id, &terminal, input.difficulty)?;
+    frontier.retain(CandidateCheckpoint {
+        layout_id: id,
+        mask: GivenMask::from_board(&terminal),
+        status: CheckpointStatus::Solved {
+            difficulty: Difficulty::Easy,
+            exact: SolvedExact::Unchecked,
+        },
+        feedback: crate::rating::types::TargetFeedback {
+            remaining_cells: 0,
+            deductions: 0,
+        },
+    })?;
+    let assessor = prepare_assessment_with_computation(
+        &computation,
+        AssessmentLimits {
+            max_steps: limits.max_steps,
+            max_work: limits.max_work,
+        },
+    )?;
+    let layout = ActiveLayout {
+        id,
+        terminal,
+        computation,
+        assessor,
+        frontier,
+        visits: 0,
+        expanded_at: 0,
+        work_used: budget.used() - layout_started,
+        best_tier: 0,
+        best_progress: 0,
+    };
+
+    Ok(LayoutPreparation::Ready(Box::new(layout)))
+}
+
+// Keep selection and evaluation in the owner's scheduled work, including abandoned edits.
+fn execute_proposal(
+    layout: &mut ActiveLayout,
+    input: &GenerationInput,
+    metrics: &mut GenerationMetrics,
+    budget: &mut WorkBudget,
+) -> CoreResult<Option<CandidateEvaluation>> {
+    let proposal_started = budget.used();
+    let mut random = for_phase(input, RandomPhase::Candidate, layout.id, layout.visits);
+    let proposal = layout.frontier.next(&mut random, budget);
+    layout.work_used += budget.used() - proposal_started;
+    let Some(proposal) = proposal else {
+        return Ok(None);
+    };
+
+    layout.visits += 1;
+    metrics.candidate_visits += 1;
+    let evaluation_started = budget.used();
+    let result = evaluate_candidate(layout, proposal.mask, input, budget)?;
+    layout.work_used += budget.used() - evaluation_started;
+
+    Ok(Some(result))
 }
 
 pub(super) fn search_generation(
@@ -263,16 +374,19 @@ pub(super) fn search_generation(
     budget: &mut WorkBudget,
 ) -> CoreResult<GenerationOutcome> {
     let mut active: Vec<ActiveLayout> = vec![];
+
     // Stable owner IDs survive sorting and removal without sharing mutable layout state.
     let mut expansion_requested_by = None;
     let mut logical_screens = 0;
     let mut step_limited_screens = 0;
     let mut work_exhausted = false;
+
     while budget.remaining() > 0 && !budget.is_cancelled() {
         active.retain(|layout| !layout.frontier.exhausted());
         if expansion_requested_by.is_some_and(|id| !active.iter().any(|layout| layout.id == id)) {
             expansion_requested_by = None;
         }
+
         // Expansion eligibility must not preempt an owner that is still improving.
         let can_expand = expansion_requested_by.is_some()
             && (active.len() < ACTIVE_LAYOUTS
@@ -290,72 +404,20 @@ pub(super) fn search_generation(
                     expansion_requested_by = None;
                 }
             }
+
             // Failed terminal/geometry attempts consume a layout slot; candidate edits do not.
-            let layout_started = budget.used();
             let id = metrics.layouts;
             metrics.layouts += 1;
-            let mut terminal_random = for_phase(input, RandomPhase::Terminal, id, 0);
-            let mut geometry_random = for_phase(input, RandomPhase::Geometry, id, 0);
-            let constructed = budget.with_stage(WorkStage::Preparation, |budget| {
-                construct_generation_layout(
-                    input,
-                    &mut terminal_random,
-                    &mut geometry_random,
-                    budget,
-                )
-            })?;
-            let (terminal, rules) = match constructed {
-                LayoutConstructionResult::BudgetExhausted => {
+            let layout = match prepare_layout(id, input, limits, budget)? {
+                LayoutPreparation::Ready(layout) => *layout,
+                LayoutPreparation::AttemptExhausted => continue,
+                LayoutPreparation::WorkLimit => {
                     work_exhausted = true;
                     break;
                 }
-                LayoutConstructionResult::Failed { reason } => {
+                LayoutPreparation::Failed { reason } => {
                     return Ok(GenerationOutcome::Failed { reason });
                 }
-                LayoutConstructionResult::AttemptExhausted => continue,
-                LayoutConstructionResult::Ready { terminal, rules } => (terminal, rules),
-            };
-            let Bounded::Complete(computation) = prepare_computation(&rules, budget)? else {
-                work_exhausted = true;
-                break;
-            };
-            if rules.variant() != input.variant || !is_complete(&terminal, computation.rules()) {
-                return Ok(GenerationOutcome::Failed {
-                    reason: "Constructed layout has an invalid terminal".to_string(),
-                });
-            }
-
-            let mut frontier = CandidateFrontier::new(id, &terminal, input.difficulty)?;
-            frontier.retain(CandidateCheckpoint {
-                layout_id: id,
-                mask: GivenMask::from_board(&terminal),
-                status: CheckpointStatus::Solved {
-                    difficulty: Difficulty::Easy,
-                    exact: SolvedExact::Unchecked,
-                },
-                feedback: crate::rating::types::TargetFeedback {
-                    remaining_cells: 0,
-                    deductions: 0,
-                },
-            })?;
-            let assessor = prepare_assessment_with_computation(
-                &computation,
-                AssessmentLimits {
-                    max_steps: limits.max_steps,
-                    max_work: limits.max_work,
-                },
-            )?;
-            let layout = ActiveLayout {
-                id,
-                terminal,
-                computation,
-                assessor,
-                frontier,
-                visits: 0,
-                expanded_at: 0,
-                work_used: budget.used() - layout_started,
-                best_tier: 0,
-                best_progress: 0,
             };
             metrics.completed_layouts += 1;
             if let Some(requested) = expansion_requested_by {
@@ -366,6 +428,7 @@ pub(super) fn search_generation(
             }
             active.push(layout);
         }
+
         if active.is_empty() {
             break;
         }
@@ -377,36 +440,38 @@ pub(super) fn search_generation(
                 .then_with(|| left.id.cmp(&right.id))
         });
         let layout = &mut active[0];
-        let proposal_started = budget.used();
-        let mut random = for_phase(input, RandomPhase::Candidate, layout.id, layout.visits);
-        let proposal = layout.frontier.next(&mut random, budget);
-        layout.work_used += budget.used() - proposal_started;
-        let Some(proposal) = proposal else {
+        let Some(result) = execute_proposal(layout, input, metrics, budget)? else {
             if budget.remaining() == 0 {
                 break;
             }
             continue;
         };
-        layout.visits += 1;
-        metrics.candidate_visits += 1;
-        let evaluation_started = budget.used();
-        let result = evaluate_candidate(layout, proposal.mask, input, budget)?;
-        layout.work_used += budget.used() - evaluation_started;
-        let (improved, step_limited, screened) = match result {
-            CandidateEvaluation::Finished(result) => return Ok(result),
+
+        let (improved, screening) = match result {
+            CandidateEvaluation::Accepted(candidate) => {
+                return Ok(GenerationOutcome::Ready {
+                    puzzle: candidate.puzzle,
+                    assessment: candidate.assessment,
+                });
+            }
+            CandidateEvaluation::Failed { reason } => {
+                return Ok(GenerationOutcome::Failed { reason });
+            }
             CandidateEvaluation::WorkLimit => {
                 work_exhausted = true;
                 break;
             }
             CandidateEvaluation::Continue {
                 improved,
-                step_limited,
-                screened,
-            } => (improved, step_limited, screened),
+                screening,
+            } => (improved, screening),
         };
-        if screened {
-            logical_screens += 1;
-            if step_limited {
+
+        match screening {
+            ScreeningOutcome::NotScreened => {}
+            ScreeningOutcome::Completed => logical_screens += 1,
+            ScreeningOutcome::StepLimited => {
+                logical_screens += 1;
                 step_limited_screens += 1;
             }
         }

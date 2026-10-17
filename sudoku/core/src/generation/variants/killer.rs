@@ -6,6 +6,7 @@ use crate::rules::topology::cells_touch;
 use crate::rules::types::{Cage, PuzzleRules};
 use crate::types::{BOARD_SIZE, Board};
 
+// These v11 cage sizes fix growth choices and random draws; larger cages use different support costs.
 const MIN_GENERATED_CAGE_SIZE: usize = 2;
 const MAX_GENERATED_CAGE_SIZE: usize = 4;
 

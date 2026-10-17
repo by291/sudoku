@@ -25,7 +25,7 @@ pub struct EngineInfo {
 #[uniffi::export]
 pub fn engine_info() -> EngineInfo {
     EngineInfo {
-        bridge_version: 1,
+        bridge_version: 2,
         puzzle_version: sudoku_core::generation::types::PUZZLE_VERSION.into(),
         variant_puzzle_version: sudoku_core::generation::types::VARIANT_PUZZLE_VERSION.into(),
         rating_version: sudoku_core::rating::types::RATING_VERSION.into(),
@@ -195,7 +195,7 @@ pub fn validate_hint_evidence(
     let rules = input.rules.try_into()?;
     let board: Option<Board> = input.board.map(TryInto::try_into).transpose()?;
     let mut work = control::budget(None, None, token)?;
-    let result = sudoku_core::logic::hint_validation::validate_hint_evidence_with_budget(
+    let result = sudoku_core::hint::validation::validate_hint_evidence_with_budget(
         &hint,
         &rules,
         board.as_ref(),
@@ -242,7 +242,7 @@ pub fn validate_teaching_step(
         .map_err(|_| EngineError::invalid("Teaching state requires 81 masks"))?;
     let step = conversion::logic::step_to_core(input.step)?;
     let mut work = control::budget(None, None, token)?;
-    let result = sudoku_core::logic::hint_validation::validate_teaching_step_with_budget(
+    let result = sudoku_core::logic::teaching::validate_teaching_step_with_budget(
         &board, candidates, &rules, &step, &mut work,
     );
     control::check(&work)?;
@@ -262,72 +262,7 @@ pub fn validate_assessment(
     value: Option<StoredAssessmentDto>,
     identity: AssessmentIdentityDto,
 ) -> Result<AssessmentValidationDto, NativeError> {
-    use sudoku_core::rating::types::{
-        AssessmentIdentity, DifficultyAssessment, PuzzleAssessment, ReasoningWorkload,
-        StoredAssessment, TechniqueCounts,
-    };
-    let summary = |value: AssessmentSummaryDto| -> Result<DifficultyAssessment, EngineError> {
-        let source = value.workload;
-        let entries: Vec<_> = source
-            .technique_counts
-            .into_iter()
-            .map(|(technique, count)| (technique.into(), u64::from(count)))
-            .collect();
-        Ok(DifficultyAssessment {
-            variant: value.variant.into(),
-            difficulty: value.difficulty.into(),
-            workload: ReasoningWorkload {
-                steps: u64::from(source.steps),
-                placements: u64::from(source.placements),
-                eliminations: u64::from(source.eliminations),
-                candidate_removals: u64::from(source.candidate_removals),
-                technique_counts: TechniqueCounts::from_entries(&entries)?,
-                highest_tier: source.highest_tier.map(Into::into),
-                highest_technique: source.highest_technique.map(Into::into),
-                variant_steps: u64::from(source.variant_steps),
-            },
-        })
-    };
-    let stored = value.map(|value| match value {
-        StoredAssessmentDto::Rated {
-            rating_version,
-            summary: value,
-        } => StoredAssessment::Rated {
-            rating_version,
-            summary: value
-                .ok_or_else(|| vec!["Invalid assessment summary".into()])
-                .and_then(|value| summary(value).map_err(|error| vec![error.to_string()])),
-        },
-        StoredAssessmentDto::Unavailable { reason, issues } => StoredAssessment::Unavailable {
-            reason: reason.into(),
-            issues,
-        },
-        StoredAssessmentDto::Malformed { issues } => StoredAssessment::Malformed { issues },
-    });
-    Ok(
-        match sudoku_core::rating::decoding::decode_puzzle_assessment(
-            stored.as_ref(),
-            AssessmentIdentity {
-                variant: identity.variant.into(),
-                difficulty: identity.difficulty.into(),
-            },
-        ) {
-            None => AssessmentValidationDto::Absent,
-            Some(PuzzleAssessment::Rated(summary)) => AssessmentValidationDto::Present {
-                value: PuzzleAssessmentDto::Rated {
-                    summary: conversion::rating::summary_to_dto(&summary)?,
-                },
-            },
-            Some(PuzzleAssessment::Unavailable { reason, issues }) => {
-                AssessmentValidationDto::Present {
-                    value: PuzzleAssessmentDto::Unavailable {
-                        reason: reason.into(),
-                        issues,
-                    },
-                }
-            }
-        },
-    )
+    Ok(conversion::metadata::decode(value, identity)?)
 }
 
 #[uniffi::export]

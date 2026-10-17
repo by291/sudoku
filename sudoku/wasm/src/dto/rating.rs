@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::logic::{LogicalStepDto, TechniqueDto};
+use super::operations::ViolationDto;
 use super::rules::RulesDto;
 use super::values::{AssessmentLimitsDto, BoardDto, DifficultyDto, VariantDto};
 use serde::{Deserialize, Serialize};
@@ -52,6 +53,14 @@ pub enum AssessmentStageDto {
     Logic,
 }
 
+/// Owned newly computed diagnostics; clients own player-facing rendering.
+#[derive(Serialize, Tsify)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum AssessmentIssueDto {
+    Message { message: String },
+    Violation { violation: ViolationDto },
+}
+
 #[derive(Serialize, Tsify)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 #[tsify(hashmap_as_object, missing_as_null)]
@@ -73,7 +82,7 @@ pub enum AssessmentResultDto {
         difficulty: Option<DifficultyDto>,
     },
     Invalid {
-        issues: Vec<String>,
+        issues: Vec<AssessmentIssueDto>,
     },
 }
 
@@ -92,6 +101,7 @@ pub struct AssessmentInputDto {
     pub initial_work: Option<u32>,
 }
 
+/// Expected variant and difficulty for stored metadata; this does not identify a board or seed.
 #[derive(Serialize, Deserialize, Tsify)]
 #[serde(deny_unknown_fields)]
 pub struct AssessmentIdentityDto {
@@ -141,7 +151,32 @@ pub enum AssessmentValidationDto {
     Present { value: PuzzleAssessmentDto },
 }
 
-/// Stored outcomes omit the transient deduction trace.
+/// Newly computed summary-only outcomes retain structured invalid-input facts.
+#[derive(Serialize, Tsify)]
+#[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
+#[tsify(hashmap_as_object, missing_as_null)]
+pub enum LiveAssessmentOutcomeDto {
+    Rated {
+        summary: AssessmentSummaryDto,
+    },
+    Ungraded {
+        #[serde(rename = "ratingVersion")]
+        rating_version: RatingVersionDto,
+        variant: VariantDto,
+    },
+    BudgetExhausted {
+        #[serde(rename = "ratingVersion")]
+        rating_version: RatingVersionDto,
+        variant: VariantDto,
+        stage: AssessmentStageDto,
+        difficulty: Option<DifficultyDto>,
+    },
+    Invalid {
+        issues: Vec<AssessmentIssueDto>,
+    },
+}
+
+/// Historical string-shaped compatibility outcome; live computation uses LiveAssessmentOutcomeDto.
 #[derive(Serialize, Tsify)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 #[tsify(hashmap_as_object, missing_as_null)]
@@ -191,3 +226,8 @@ pub struct ParsedSummaryDto(pub ParsedAssessmentDto<AssessmentSummaryDto>);
 #[serde(transparent)]
 #[tsify(hashmap_as_object, missing_as_null)]
 pub struct ParsedOutcomeDto(pub ParsedAssessmentDto<AssessmentOutcomeDto>);
+
+#[derive(Serialize, Tsify)]
+#[serde(transparent)]
+#[tsify(hashmap_as_object, missing_as_null)]
+pub struct ParsedLiveOutcomeDto(pub ParsedAssessmentDto<LiveAssessmentOutcomeDto>);

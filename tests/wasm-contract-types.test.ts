@@ -11,6 +11,9 @@ import type {
   WorkResultDto,
   AssessmentResultDto,
   AssessmentOutcomeDto,
+  LiveAssessmentOutcomeDto,
+  parse_live_assessment_outcome,
+  parse_assessment_outcome,
   SearchResultDto,
   CandidateResultDto,
   HintResultDto,
@@ -26,11 +29,17 @@ test('generated_exports_preserve_concrete_result_types', () => {
   expectTypeOf<Parameters<typeof parse_assessment_summary>[0]>().toBeUnknown()
   expectTypeOf<ReturnType<typeof assess>>().toEqualTypeOf<WorkResultDto<AssessmentResultDto>>()
   expectTypeOf<ReturnType<typeof assess_summary>>().toEqualTypeOf<
-    WorkResultDto<AssessmentOutcomeDto>
+    WorkResultDto<LiveAssessmentOutcomeDto>
   >()
   expectTypeOf<
     Extract<ReturnType<typeof assess_summary>['result'], { status: 'rated' }>
   >().not.toHaveProperty('trace')
+  expectTypeOf<ReturnType<typeof parse_live_assessment_outcome>>().toEqualTypeOf<
+    ParsedAssessmentDto<LiveAssessmentOutcomeDto>
+  >()
+  expectTypeOf<ReturnType<typeof parse_assessment_outcome>>().toEqualTypeOf<
+    ParsedAssessmentDto<AssessmentOutcomeDto>
+  >()
   expectTypeOf<ReturnType<typeof hint>>().toEqualTypeOf<WorkResultDto<HintResultDto>>()
   expectTypeOf<ReturnType<typeof count_solutions>>().toEqualTypeOf<WorkResultDto<SearchResultDto>>()
   expectTypeOf<ReturnType<PreparedPuzzle['candidates']>>().toEqualTypeOf<

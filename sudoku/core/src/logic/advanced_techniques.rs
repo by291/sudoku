@@ -106,95 +106,102 @@ fn elimination_action(
     }
 }
 
-fn find_triples(state: &LogicalWorkspace, hidden: bool, budget: &mut WorkBudget) -> StepOutcome {
+fn find_naked_triple(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
     for unit in &state.rules.context().units {
-        let mut empty = [0; UNIT_SIZE];
+        let mut empty_cells = [0; UNIT_SIZE];
         let mut empty_count = 0;
-        let mut choices = [0; UNIT_SIZE];
-        let mut choice_count = 0;
+        let mut eligible_cells = [0; UNIT_SIZE];
+        let mut eligible_count = 0;
         for &cell in &unit.cells {
             if state.board.values()[cell] == 0 {
-                empty[empty_count] = cell;
+                empty_cells[empty_count] = cell;
                 empty_count += 1;
                 if (2..=3).contains(&state.candidates[cell].count()) {
-                    choices[choice_count] = cell;
-                    choice_count += 1;
+                    eligible_cells[eligible_count] = cell;
+                    eligible_count += 1;
                 }
             }
         }
-        if hidden {
-            choices = std::array::from_fn(|index| index + 1);
-            choice_count = UNIT_SIZE;
-        }
-        for choice in combinations::<_, 3>(&choices[..choice_count]) {
+
+        // Charge each lexicographic cell combination, including rejected patterns.
+        for cells in combinations::<_, 3>(&eligible_cells[..eligible_count]) {
             if !budget.consume(1) {
                 return Bounded::BudgetExhausted;
             }
-            let digits = choice.iter().fold(0, |bits, &value| {
-                bits | if hidden {
-                    mask_of(value as u8)
-                } else {
-                    state.candidates[value].bits()
-                }
-            });
+            let digits = cells
+                .iter()
+                .fold(0, |bits, &cell| bits | state.candidates[cell].bits());
             if digits.count_ones() != 3 {
                 continue;
             }
 
-            let mut cells = choice;
-            if hidden {
-                let mut selected = [false; BOARD_SIZE];
-                let mut possible = true;
-                for digit in CandidateMask::from_computed_bits(digits).digits() {
-                    let positions = candidate_position_iter(state, &unit.cells, digit.value());
-                    if positions.clone().count() < 2 {
-                        possible = false;
-                    }
-                    for cell in positions {
-                        selected[cell] = true;
-                    }
-                }
-                if !possible || selected.iter().filter(|&&present| present).count() != 3 {
-                    continue;
-                }
-                for (position, cell) in selected
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(cell, &present)| present.then_some(cell))
-                    .enumerate()
-                {
-                    cells[position] = cell;
-                }
-            }
-
-            let (technique, action) = if hidden {
-                (
-                    Technique::HiddenTriple,
-                    elimination_action(state, cells, ALL_DIGITS_MASK & !digits),
-                )
-            } else {
-                (
-                    Technique::NakedTriple,
-                    elimination_action(
-                        state,
-                        empty[..empty_count]
-                            .iter()
-                            .copied()
-                            .filter(|cell| !cells.contains(cell)),
-                        digits,
-                    ),
-                )
-            };
-            if let Some(action) = action {
+            let targets = empty_cells[..empty_count]
+                .iter()
+                .copied()
+                .filter(|cell| !cells.contains(cell));
+            if let Some(action) = elimination_action(state, targets, digits) {
                 return selected_step(
                     state,
-                    technique,
+                    Technique::NakedTriple,
                     action,
                     &cells,
                     digits,
                     AdvancedEvidenceKind::Subset {
                         unit: unit_identity(unit),
-                        hidden,
+                        hidden: false,
+                    },
+                );
+            }
+        }
+    }
+    Bounded::Complete(None)
+}
+
+fn find_hidden_triple(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
+    let all_digits: [u8; UNIT_SIZE] = std::array::from_fn(|index| (index + 1) as u8);
+    for unit in &state.rules.context().units {
+        // Hidden triples visit all lexicographic digit triples, even in sparse/contradictory states.
+        for selected_digits in combinations::<_, 3>(&all_digits) {
+            if !budget.consume(1) {
+                return Bounded::BudgetExhausted;
+            }
+            let digits = selected_digits
+                .iter()
+                .fold(0, |bits, &digit| bits | mask_of(digit));
+            let mut selected_cells = [false; BOARD_SIZE];
+            let mut possible = true;
+            for digit in selected_digits {
+                let positions = candidate_position_iter(state, &unit.cells, digit);
+                if positions.clone().count() < 2 {
+                    possible = false;
+                }
+                for cell in positions {
+                    selected_cells[cell] = true;
+                }
+            }
+            if !possible || selected_cells.iter().filter(|&&present| present).count() != 3 {
+                continue;
+            }
+
+            let mut cells = [0; 3];
+            for (position, cell) in selected_cells
+                .iter()
+                .enumerate()
+                .filter_map(|(cell, &present)| present.then_some(cell))
+                .enumerate()
+            {
+                cells[position] = cell;
+            }
+            if let Some(action) = elimination_action(state, cells, ALL_DIGITS_MASK & !digits) {
+                return selected_step(
+                    state,
+                    Technique::HiddenTriple,
+                    action,
+                    &cells,
+                    digits,
+                    AdvancedEvidenceKind::Subset {
+                        unit: unit_identity(unit),
+                        hidden: true,
                     },
                 );
             }
@@ -352,132 +359,209 @@ struct StrongLink<'a> {
     cells: [usize; 2],
 }
 
-fn find_simple_coloring(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
-    // Advanced detection is Classic-only: at most one strong link per each of its 27 units.
-    const CLASSIC_UNIT_COUNT: usize = UNIT_SIZE * 3;
-    for digit in 1..=9 {
-        let mut links = [None; CLASSIC_UNIT_COUNT];
-        let mut link_count = 0;
-        for unit in &state.rules.context().units {
+// Advanced detection is Classic-only: one strong link at most per each of its 27 units.
+const CLASSIC_UNIT_COUNT: usize = UNIT_SIZE * 3;
+
+struct ColoringGraph<'a> {
+    links: [Option<StrongLink<'a>>; CLASSIC_UNIT_COUNT],
+    link_count: usize,
+}
+
+fn build_coloring_graph<'a>(
+    state: &'a LogicalWorkspace,
+    digit: u8,
+    budget: &mut WorkBudget,
+) -> Bounded<ColoringGraph<'a>> {
+    let mut links = [None; CLASSIC_UNIT_COUNT];
+    let mut link_count = 0;
+    for unit in &state.rules.context().units {
+        if !budget.consume(1) {
+            return Bounded::BudgetExhausted;
+        }
+        let mut positions = candidate_position_iter(state, &unit.cells, digit);
+        if let (Some(first), Some(second), None) =
+            (positions.next(), positions.next(), positions.next())
+            && !unit
+                .cells
+                .iter()
+                .any(|&cell| state.board.values()[cell] == digit)
+        {
+            links[link_count] = Some(StrongLink {
+                unit,
+                cells: [first, second],
+            });
+            link_count += 1;
+        }
+    }
+
+    Bounded::Complete(ColoringGraph { links, link_count })
+}
+
+struct ColoringComponent {
+    assignments: [Option<usize>; BOARD_SIZE],
+    queue: [usize; BOARD_SIZE],
+    queue_count: usize,
+    colors: [[usize; BOARD_SIZE]; 2],
+    color_counts: [usize; 2],
+    contradictory: bool,
+}
+
+fn color_component(
+    links: &[Option<StrongLink<'_>>],
+    start: usize,
+    visited: &mut [bool; BOARD_SIZE],
+    budget: &mut WorkBudget,
+) -> Bounded<ColoringComponent> {
+    let mut assignments = [None; BOARD_SIZE];
+    assignments[start] = Some(0_usize);
+    let mut queue = [0; BOARD_SIZE];
+    queue[0] = start;
+    let mut queue_count = 1;
+    let mut contradictory = false;
+    let mut index = 0;
+    while index < queue_count {
+        let cell = queue[index];
+        visited[cell] = true;
+        for link in links
+            .iter()
+            .flatten()
+            .filter(|link| link.cells.contains(&cell))
+        {
             if !budget.consume(1) {
                 return Bounded::BudgetExhausted;
             }
-            let mut positions = candidate_position_iter(state, &unit.cells, digit);
-            if let (Some(first), Some(second), None) =
-                (positions.next(), positions.next(), positions.next())
-                && !unit
-                    .cells
-                    .iter()
-                    .any(|&cell| state.board.values()[cell] == digit)
-            {
-                links[link_count] = Some(StrongLink {
-                    unit,
-                    cells: [first, second],
-                });
-                link_count += 1;
+            let other = if link.cells[0] == cell {
+                link.cells[1]
+            } else {
+                link.cells[0]
+            };
+            let opposite = if assignments[cell] == Some(0) { 1 } else { 0 };
+            if let Some(existing) = assignments[other] {
+                contradictory |= existing != opposite;
+            } else {
+                assignments[other] = Some(opposite);
+                queue[queue_count] = other;
+                queue_count += 1;
             }
         }
-        let links = &links[..link_count];
+        index += 1;
+    }
+
+    let queued_cells = &queue[..queue_count];
+    let mut colors = [[0; BOARD_SIZE]; 2];
+    let mut color_counts = [0; 2];
+    for &cell in queued_cells {
+        let color = if assignments[cell] == Some(0) { 0 } else { 1 };
+        colors[color][color_counts[color]] = cell;
+        color_counts[color] += 1;
+    }
+    for (color, &count) in colors.iter_mut().zip(&color_counts) {
+        color[..count].sort_unstable();
+    }
+
+    Bounded::Complete(ColoringComponent {
+        assignments,
+        queue,
+        queue_count,
+        colors,
+        color_counts,
+        contradictory,
+    })
+}
+
+fn coloring_action(
+    state: &LogicalWorkspace,
+    digit: u8,
+    component: &ColoringComponent,
+) -> Option<(ColoringMode, LogicalAction)> {
+    let colors = [
+        &component.colors[0][..component.color_counts[0]],
+        &component.colors[1][..component.color_counts[1]],
+    ];
+    let conflicts = [has_peer_collision(colors[0]), has_peer_collision(colors[1])];
+    // Odd strong-link cycles and two impossible colors describe contradiction, never a hint.
+    if component.contradictory || conflicts.iter().all(|&conflict| conflict) {
+        return None;
+    }
+
+    let mode = if conflicts.iter().any(|&conflict| conflict) {
+        ColoringMode::Wrap
+    } else {
+        ColoringMode::Trap
+    };
+    let action = if mode == ColoringMode::Wrap {
+        elimination_action(
+            state,
+            colors[if conflicts[0] { 0 } else { 1 }].iter().copied(),
+            mask_of(digit),
+        )
+    } else {
+        let targets = (0..BOARD_SIZE).filter(|&cell| {
+            state.board.values()[cell] == 0
+                && state.candidates[cell].bits() & mask_of(digit) != 0
+                && component.assignments[cell].is_none()
+                && colors
+                    .iter()
+                    .all(|group| group.iter().any(|&other| are_classic_peers(cell, other)))
+        });
+        elimination_action(state, targets, mask_of(digit))
+    };
+
+    action.map(|action| (mode, action))
+}
+
+fn coloring_evidence(
+    links: &[Option<StrongLink<'_>>],
+    component: &ColoringComponent,
+    mode: ColoringMode,
+) -> AdvancedEvidenceKind {
+    let colors = [
+        &component.colors[0][..component.color_counts[0]],
+        &component.colors[1][..component.color_counts[1]],
+    ];
+    AdvancedEvidenceKind::Coloring {
+        mode,
+        colors: colors.map(<[usize]>::to_vec),
+        links: links
+            .iter()
+            .flatten()
+            .filter(|link| {
+                link.cells
+                    .iter()
+                    .all(|&cell| component.assignments[cell].is_some())
+            })
+            .map(|link| ColoringLink {
+                unit: unit_identity(link.unit),
+                cells: link.cells,
+            })
+            .collect(),
+    }
+}
+
+fn find_simple_coloring(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
+    for digit in 1..=9 {
+        let Bounded::Complete(graph) = build_coloring_graph(state, digit, budget) else {
+            return Bounded::BudgetExhausted;
+        };
+        let links = &graph.links[..graph.link_count];
         let mut visited = [false; BOARD_SIZE];
+        // Link order, BFS insertion order and per-edge charges determine the v11 first witness.
         for start in links.iter().flatten().flat_map(|link| link.cells) {
             if visited[start] {
                 continue;
             }
-            let mut assignments = [None; BOARD_SIZE];
-            assignments[start] = Some(0_usize);
-            let mut queue = [0; BOARD_SIZE];
-            queue[0] = start;
-            let mut queue_count = 1;
-            let mut contradictory = false;
-            let mut index = 0;
-            while index < queue_count {
-                let cell = queue[index];
-                visited[cell] = true;
-                for link in links
-                    .iter()
-                    .flatten()
-                    .filter(|link| link.cells.contains(&cell))
-                {
-                    if !budget.consume(1) {
-                        return Bounded::BudgetExhausted;
-                    }
-                    let other = if link.cells[0] == cell {
-                        link.cells[1]
-                    } else {
-                        link.cells[0]
-                    };
-                    let opposite = if assignments[cell] == Some(0) { 1 } else { 0 };
-                    if let Some(existing) = assignments[other] {
-                        contradictory |= existing != opposite;
-                    } else {
-                        assignments[other] = Some(opposite);
-                        queue[queue_count] = other;
-                        queue_count += 1;
-                    }
-                }
-                index += 1;
-            }
-            let queue = &queue[..queue_count];
-            let mut colors = [[0; BOARD_SIZE]; 2];
-            let mut color_counts = [0; 2];
-            for &cell in queue {
-                let color = if assignments[cell] == Some(0) { 0 } else { 1 };
-                colors[color][color_counts[color]] = cell;
-                color_counts[color] += 1;
-            }
-            for (color, &count) in colors.iter_mut().zip(&color_counts) {
-                color[..count].sort_unstable();
-            }
-            let colors = [&colors[0][..color_counts[0]], &colors[1][..color_counts[1]]];
-            let conflicts = [has_peer_collision(colors[0]), has_peer_collision(colors[1])];
-            // Odd strong-link cycles and two impossible colors describe contradiction, never a hint.
-            if contradictory || conflicts.iter().all(|&conflict| conflict) {
-                continue;
-            }
-            let mode = if conflicts.iter().any(|&conflict| conflict) {
-                ColoringMode::Wrap
-            } else {
-                ColoringMode::Trap
+            let Bounded::Complete(component) = color_component(links, start, &mut visited, budget)
+            else {
+                return Bounded::BudgetExhausted;
             };
-            let action = if mode == ColoringMode::Wrap {
-                elimination_action(
-                    state,
-                    colors[if conflicts[0] { 0 } else { 1 }].iter().copied(),
-                    mask_of(digit),
-                )
-            } else {
-                let targets = (0..BOARD_SIZE).filter(|&cell| {
-                    state.board.values()[cell] == 0
-                        && state.candidates[cell].bits() & mask_of(digit) != 0
-                        && assignments[cell].is_none()
-                        && colors
-                            .iter()
-                            .all(|group| group.iter().any(|&other| are_classic_peers(cell, other)))
-                });
-                elimination_action(state, targets, mask_of(digit))
-            };
-            if let Some(action) = action {
+            if let Some((mode, action)) = coloring_action(state, digit, &component) {
                 return selected_step(
                     state,
                     Technique::SimpleColoring,
                     action,
-                    queue,
+                    &component.queue[..component.queue_count],
                     mask_of(digit),
-                    AdvancedEvidenceKind::Coloring {
-                        mode,
-                        colors: colors.map(<[usize]>::to_vec),
-                        links: links
-                            .iter()
-                            .flatten()
-                            .filter(|link| {
-                                link.cells.iter().all(|&cell| assignments[cell].is_some())
-                            })
-                            .map(|link| ColoringLink {
-                                unit: unit_identity(link.unit),
-                                cells: link.cells,
-                            })
-                            .collect(),
-                    },
+                    coloring_evidence(links, &component, mode),
                 );
             }
         }
@@ -497,8 +581,8 @@ pub fn find_advanced_step(
         return Bounded::Complete(None);
     }
     match technique {
-        Technique::NakedTriple => find_triples(state, false, budget),
-        Technique::HiddenTriple => find_triples(state, true, budget),
+        Technique::NakedTriple => find_naked_triple(state, budget),
+        Technique::HiddenTriple => find_hidden_triple(state, budget),
         Technique::XWing => find_fish::<2>(state, budget),
         Technique::Swordfish => find_fish::<3>(state, budget),
         Technique::XYWing => find_xy_wing(state, budget),

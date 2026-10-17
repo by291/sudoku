@@ -131,6 +131,7 @@ impl PreparedComputation {
     pub fn rules(&self) -> &PreparedRules {
         &self.rules
     }
+
     pub fn support(&self) -> &PreparedConstraintSupport {
         &self.support
     }

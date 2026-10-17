@@ -9,6 +9,7 @@ use crate::random::SeededRandom;
 use crate::rating::types::TargetFeedback;
 use crate::types::{BOARD_SIZE, Board, CoreResult, Difficulty, EngineError};
 
+// These v11 exploration bounds fix selection/draw order; they are not extra work allowances.
 pub const ACTIVE_LAYOUTS: usize = 2;
 pub const MAX_CHECKPOINTS: usize = 8;
 pub const MAX_SEEN_MASKS: usize = 4096;
@@ -22,12 +23,15 @@ pub struct GivenMask(u128);
 
 impl GivenMask {
     pub const FULL: Self = Self((1_u128 << BOARD_SIZE) - 1);
+
     pub fn bits(self) -> u128 {
         self.0
     }
+
     pub fn clue_count(self) -> u32 {
         self.0.count_ones()
     }
+
     pub fn from_board(board: &Board) -> Self {
         Self(
             board
@@ -48,6 +52,7 @@ impl GivenMask {
         if terminal.values().contains(&0) {
             return Err(EngineError::invalid("Candidate terminal must be complete"));
         }
+
         Ok(Board::from_computed_values(std::array::from_fn(|cell| {
             if self.contains(cell) {
                 terminal.values()[cell]
@@ -60,6 +65,7 @@ impl GivenMask {
     fn contains(self, cell: usize) -> bool {
         self.0 & (1_u128 << cell) != 0
     }
+
     fn edit(self, cell: usize, restore: bool) -> Self {
         let bit = 1_u128 << cell;
         Self(if restore { self.0 | bit } else { self.0 & !bit })
@@ -68,6 +74,7 @@ impl GivenMask {
 
 impl TryFrom<u128> for GivenMask {
     type Error = EngineError;
+
     fn try_from(value: u128) -> CoreResult<Self> {
         if value <= Self::FULL.0 {
             Ok(Self(value))
@@ -84,11 +91,13 @@ pub enum SolvedExact {
     Unchecked,
     Unique,
 }
+
 #[derive(Clone, Copy, Debug)]
 pub enum StalledExact {
     Unknown,
     Unique,
 }
+
 #[derive(Clone, Copy, Debug)]
 pub enum CheckpointStatus {
     Solved {
@@ -128,21 +137,74 @@ pub struct CandidateProposal {
     pub intermediates: Vec<GivenMask>,
 }
 
-struct CluePartition {
+// The partition must always describe the same immutable checkpoint mask as the ordered cells.
+struct PreparedEditOrder {
+    cells: [usize; BOARD_SIZE],
     present: Vec<usize>,
     missing: Vec<usize>,
+}
+
+enum EditOrder {
+    Fresh,
+    Inherited([usize; BOARD_SIZE]),
+    Prepared(PreparedEditOrder),
+}
+
+impl EditOrder {
+    fn prepare(&mut self, mask: GivenMask, random: &mut SeededRandom) -> &PreparedEditOrder {
+        let cells = match self {
+            Self::Fresh => {
+                let mut cells = std::array::from_fn(|cell| cell);
+                random.shuffle(&mut cells);
+                cells
+            }
+            Self::Inherited(cells) => *cells,
+            Self::Prepared(prepared) => return prepared,
+        };
+
+        *self = Self::Prepared(PreparedEditOrder {
+            cells,
+            present: cells
+                .iter()
+                .copied()
+                .filter(|&cell| mask.contains(cell))
+                .collect(),
+            missing: cells
+                .iter()
+                .copied()
+                .filter(|&cell| !mask.contains(cell))
+                .collect(),
+        });
+        let Self::Prepared(prepared) = self else {
+            unreachable!("Edit order was prepared above");
+        };
+        prepared
+    }
+
+    fn inherited(&self) -> Self {
+        match self {
+            Self::Fresh => Self::Fresh,
+            Self::Inherited(cells) => Self::Inherited(*cells),
+            Self::Prepared(prepared) => Self::Inherited(prepared.cells),
+        }
+    }
 }
 
 struct FrontierEntry {
     checkpoint: CandidateCheckpoint,
     cursor: usize,
-    order: Option<[usize; BOARD_SIZE]>,
-    partition: Option<CluePartition>,
+    edit_order: EditOrder,
     sweep_cursor: usize,
 }
 
 // Pool, pending parent and continued sweep refer to the same small owner. Entries contain no back-references.
 type Entry = Rc<RefCell<FrontierEntry>>;
+
+struct PendingProposal {
+    mask: GivenMask,
+    parent: Entry,
+    kind: ProposalKind,
+}
 
 pub struct CandidateFrontier {
     layout_id: u32,
@@ -150,9 +212,7 @@ pub struct CandidateFrontier {
     seen: BTreeSet<GivenMask>,
     entries: Vec<Entry>,
     sweep_entry: Option<Entry>,
-    pending_mask: Option<GivenMask>,
-    pending_parent: Option<Entry>,
-    pending_kind: Option<ProposalKind>,
+    pending: Option<PendingProposal>,
     non_improving: usize,
     selections: usize,
 }
@@ -202,37 +262,17 @@ fn compare(
 }
 
 impl FrontierEntry {
-    fn prepare_order(&mut self, random: &mut SeededRandom) {
-        let order = self.order.get_or_insert_with(|| {
-            let mut cells = std::array::from_fn(|cell| cell);
-            random.shuffle(&mut cells);
-            cells
-        });
-        if self.partition.is_none() {
-            self.partition = Some(CluePartition {
-                present: order
-                    .iter()
-                    .copied()
-                    .filter(|&cell| self.checkpoint.mask.contains(cell))
-                    .collect(),
-                missing: order
-                    .iter()
-                    .copied()
-                    .filter(|&cell| !self.checkpoint.mask.contains(cell))
-                    .collect(),
-            });
-        }
-    }
+    fn neighboring_proposal(
+        &mut self,
+        random: &mut SeededRandom,
+        budget: &mut WorkBudget,
+    ) -> Option<CandidateProposal> {
+        // Partition only after choosing the inherited/shuffled order; inheritance consumes no draws.
+        let prepared = self.edit_order.prepare(self.checkpoint.mask, random);
+        let order = &prepared.cells;
+        let present = &prepared.present;
+        let missing = &prepared.missing;
 
-    fn neighboring_proposal(&mut self, budget: &mut WorkBudget) -> Option<CandidateProposal> {
-        let Some(order) = &self.order else {
-            panic!("Candidate edit order must be prepared before proposing");
-        };
-        let Some(partition) = &self.partition else {
-            panic!("Candidate clue partition must be prepared before proposing");
-        };
-        let present = &partition.present;
-        let missing = &partition.missing;
         let mut intermediate_masks = vec![];
         let mut mask = self.checkpoint.mask;
         let mut edit = |cell, restore| {
@@ -243,6 +283,7 @@ impl FrontierEntry {
             mask = mask.edit(cell, restore);
             true
         };
+
         let mut sweep_cell = None;
         if self.checkpoint.status.solved()
             && (self.cursor < INITIAL_SWEEP_PROPOSALS || missing.is_empty())
@@ -296,6 +337,7 @@ impl FrontierEntry {
         } else {
             return None;
         }
+
         // These are executed edit masks, not logical proofs; the evaluator decides which masks to screen.
         Some(CandidateProposal {
             kind,
@@ -314,9 +356,7 @@ impl CandidateFrontier {
             seen: BTreeSet::new(),
             entries: vec![],
             sweep_entry: None,
-            pending_mask: None,
-            pending_parent: None,
-            pending_kind: None,
+            pending: None,
             non_improving: 0,
             selections: 0,
         })
@@ -328,8 +368,13 @@ impl CandidateFrontier {
                 "Checkpoint belongs to a different layout",
             ));
         }
+
         if self.seen.len() >= MAX_SEEN_MASKS
-            || (self.seen.contains(&checkpoint.mask) && Some(checkpoint.mask) != self.pending_mask)
+            || (self.seen.contains(&checkpoint.mask)
+                && !self
+                    .pending
+                    .as_ref()
+                    .is_some_and(|pending| pending.mask == checkpoint.mask))
             || self
                 .entries
                 .iter()
@@ -337,17 +382,15 @@ impl CandidateFrontier {
         {
             return Ok(false);
         }
+
         // Removal children inherit the remaining sweep; restoring/exchanging clues starts another order.
-        let inherited = if Some(checkpoint.mask) == self.pending_mask
-            && self.pending_kind == Some(ProposalKind::Remove)
-        {
-            self.pending_parent.clone()
-        } else {
-            None
-        };
-        self.pending_mask = None;
-        self.pending_parent = None;
-        self.pending_kind = None;
+        let inherited = self.pending.take().and_then(|pending| {
+            if pending.mask == checkpoint.mask && pending.kind == ProposalKind::Remove {
+                Some(pending.parent)
+            } else {
+                None
+            }
+        });
         self.seen.insert(checkpoint.mask);
         // Novelty survives eviction; closed entries must not crowd out viable children.
         self.entries
@@ -366,15 +409,16 @@ impl CandidateFrontier {
         let improved = previous_best.is_none_or(|entry| {
             compare(&checkpoint, &entry.borrow().checkpoint, self.target) == Ordering::Less
         });
-        let (order, sweep_cursor) = inherited.as_ref().map_or((None, 0), |parent| {
-            let parent = parent.borrow();
-            (parent.order, parent.sweep_cursor)
-        });
+
+        let (edit_order, sweep_cursor) =
+            inherited.as_ref().map_or((EditOrder::Fresh, 0), |parent| {
+                let parent = parent.borrow();
+                (parent.edit_order.inherited(), parent.sweep_cursor)
+            });
         let retained = Rc::new(RefCell::new(FrontierEntry {
             checkpoint,
             cursor: 0,
-            order,
-            partition: None,
+            edit_order,
             sweep_cursor,
         }));
         self.entries.push(retained.clone());
@@ -456,6 +500,7 @@ impl CandidateFrontier {
                 if eligible.clone().next().is_none() || !budget.consume(1) {
                     return None;
                 }
+
                 let desired_solved = self.selections.is_multiple_of(2);
                 self.selections += 1;
                 let has_desired = eligible
@@ -486,6 +531,7 @@ impl CandidateFrontier {
                 }) {
                     self.sweep_entry = None;
                 }
+
                 // Continuing sweeps skip the tie-selection draw; every other choice consumes one draw.
                 let selected = if let Some(sweep) = &self.sweep_entry {
                     sweep.clone()
@@ -496,10 +542,10 @@ impl CandidateFrontier {
                     };
                     selected.clone()
                 };
+
                 let proposal = {
                     let mut entry = selected.borrow_mut();
-                    entry.prepare_order(random);
-                    let proposal = entry.neighboring_proposal(budget);
+                    let proposal = entry.neighboring_proposal(random, budget);
                     entry.cursor += 1;
                     proposal
                 };
@@ -515,9 +561,12 @@ impl CandidateFrontier {
                     }
                     continue;
                 }
-                self.pending_mask = Some(proposal.mask);
-                self.pending_parent = Some(selected);
-                self.pending_kind = Some(proposal.kind);
+
+                self.pending = Some(PendingProposal {
+                    mask: proposal.mask,
+                    parent: selected,
+                    kind: proposal.kind,
+                });
                 self.seen.insert(proposal.mask);
                 return Some(proposal);
             }
@@ -532,15 +581,19 @@ impl CandidateFrontier {
             self.non_improving.saturating_add(1)
         };
     }
+
     pub fn seen_count(&self) -> usize {
         self.seen.len()
     }
+
     pub fn checkpoint_count(&self) -> usize {
         self.entries.len()
     }
+
     pub fn stagnant(&self) -> bool {
         self.non_improving >= STAGNATION_LIMIT
     }
+
     pub fn exhausted(&self) -> bool {
         self.seen.len() >= MAX_SEEN_MASKS
             || self

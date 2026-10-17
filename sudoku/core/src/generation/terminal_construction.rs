@@ -4,6 +4,7 @@ use crate::random::SeededRandom;
 use crate::rules::types::{PreparedRules, PuzzleRules};
 use crate::types::{ALL_DIGITS_MASK, BOARD_SIZE, Board, UNIT_SIZE};
 
+// The v11 regional attempt cap is 6,561 visits; exhausting it retires the layout without refunding work.
 const REGIONAL_TERMINAL_NODE_LIMIT: u64 = (BOARD_SIZE * BOARD_SIZE) as u64;
 
 pub enum TerminalConstructionResult {

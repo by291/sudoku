@@ -41,6 +41,9 @@ Primary references:
 - [typescript-eslint](https://typescript-eslint.io/)
 - [ESLint control-flow braces](https://eslint.org/docs/latest/rules/curly) and [individual declarations](https://eslint.org/docs/latest/rules/one-var)
 - [Prettier configuration](https://prettier.io/docs/configuration)
+- [Rust Style Guide](https://doc.rust-lang.org/style-guide/)
+- [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/), especially type safety, documentation, and private state invariants
+- [Rustdoc](https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html) and [Clippy](https://doc.rust-lang.org/clippy/usage.html)
 
 ## Readability comes first
 
@@ -135,6 +138,21 @@ Primary references:
 - Run the relevant checks for the change. Documentation-only edits require content and formatting review, not unrelated application test runs.
 
 ## Sudoku core organization
+
+### Rust readability and public contracts
+
+- Use rustfmt for mechanical layout and review logical paragraph breaks separately. Separate adjacent functions and distinct validation, preparation, computation, mutation, and result-construction stages with one blank line; keep a tightly related calculation together.
+- Group fields that become present or absent together into one optional record. Use enums for mutually exclusive outcomes and meaningful modes; do not make callers reconstruct an outcome from correlated booleans or a misleading success-named variant.
+- Keep a variable's domain meaning stable. Distinguish digits, cell indices, masks, and counters through checked types or explicit private structures when the same underlying integer could mean different things.
+- Keep orchestration with its domain owner and extract coherent private operations. Judge a split by coupled state, dependencies, and reasons to change, not a function/file line limit. Simple transformations may use iterators; search and accounting workflows should remain straightforward to trace.
+- Prefer private or `pub(crate)` implementation details. Public fields are appropriate for passive data; a workspace that maintains coupled board, candidate, premise, or cache invariants needs read-only access and explicit validated mutation/construction operations. Review native callers before tightening an existing public API.
+- Rustdoc must explain non-obvious ownership, borrowing, mutation, preconditions, identity comparisons, units, cancellation lifetime, and incomplete outcomes. Document relevant `Errors` and `Panics`; link closely related contracts instead of repeating them on every accessor.
+- Internal assertions must follow an established invariant. Untrusted values require fallible validation before mutation; an error must not leave a partially applied action. A structurally checked deduction is not automatically a mathematical proof.
+- Name version-owned exploration limits and explain deterministic ordering, budget charges, abandoned work, queue priority, and restoration beside the relevant operation. Preserve explanatory comments when moving code and remove misleading copied documentation.
+- Keep platform conversions explicit and exhaustive. Derive collection completeness from the owning catalogue instead of duplicating its count. Preserve boundary validation order and owned outputs; do not move ABI workarounds into the portable core.
+- Preserve independent proof validators and sealed fixtures. Public-boundary regressions should exercise malformed input and observable atomicity; private helper extraction and formatting alone do not require new tests.
+
+### Computation and compatibility boundaries
 
 - Keep reusable computation in `sudoku/core`, typed browser conversion in `sudoku/wasm`, and browser ownership/dispatch in `src/sudoku` and `src/worker`. Core must not depend on Vue, JS/WASM bindings, browser APIs, storage, clocks, OS entropy or an async runtime.
 - Import native contracts from their explicit owner (`types.rs` or subsystem `types.rs`); import frontend DTO contracts from `src/sudoku/contracts.ts`. Do not reintroduce a production TypeScript solver or a facade hiding dependency cycles.

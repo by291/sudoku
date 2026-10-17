@@ -1,6 +1,6 @@
 import { createBindings } from '@sudoku/wasm/factory'
 import type { Board, PuzzleRules } from '@/sudoku/contracts'
-import type { AssessmentInput, AssessmentOutcome } from '@/sudoku/contracts'
+import type { AssessmentInput, LiveAssessmentOutcome } from '@/sudoku/contracts'
 import type { GenerationInput } from '@/sudoku/generationInput'
 import { validateEngineInfo, validateModuleExports } from '@/sudoku/guards'
 import { copyRules } from '@/sudoku/ruleInput'
@@ -56,7 +56,7 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
         puzzleVersion: input.puzzleVersion,
       })
     },
-    assess(input: AssessmentInput): AssessmentOutcome {
+    assess(input: AssessmentInput): LiveAssessmentOutcome {
       const result = bindings.assess_summary({
         board: [...input.board],
         rules: copyRules(input.rules),

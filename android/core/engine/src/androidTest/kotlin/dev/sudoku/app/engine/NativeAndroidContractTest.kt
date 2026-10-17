@@ -7,6 +7,8 @@ import dev.sudoku.app.ffi.PrepareInputDto
 import dev.sudoku.app.ffi.RulesDto
 import dev.sudoku.app.ffi.preparePuzzle
 import dev.sudoku.app.model.ArrowClue
+import dev.sudoku.app.model.AssessmentIssue
+import dev.sudoku.app.model.AssessmentResult
 import dev.sudoku.app.model.BoardEdit
 import dev.sudoku.app.model.BoardLayers
 import dev.sudoku.app.model.Cage
@@ -17,7 +19,9 @@ import dev.sudoku.app.model.GeneratedPuzzle
 import dev.sudoku.app.model.GenerationRequest
 import dev.sudoku.app.model.PreparedPuzzle
 import dev.sudoku.app.model.PuzzleRules
+import dev.sudoku.app.model.RuleViolation
 import dev.sudoku.app.model.Variant
+import dev.sudoku.app.model.ViolationCode
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -27,10 +31,29 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NativeAndroidContractTest {
     @Test
+    fun packagedNativeAssessmentRetainsStructuredDuplicateFacts() = runBlocking<Unit> {
+        val board = List(81) { cell -> if (cell == 0 || cell == 1) 1 else 0 }
+
+        val response = RustSudokuEngine().assess(board, PuzzleRules.Classic)
+        assertTrue(response is EngineOutcome.Completed)
+        val result = (response as EngineOutcome.Completed<AssessmentResult>).value
+
+        assertEquals(
+            AssessmentResult.Invalid(
+                listOf(
+                    AssessmentIssue.Violation(RuleViolation("row:0", listOf(0, 1), ViolationCode.Duplicate)),
+                    AssessmentIssue.Violation(RuleViolation("box:0", listOf(0, 1), ViolationCode.Duplicate))
+                )
+            ),
+            result
+        )
+    }
+
+    @Test
     fun packagedNativeLibraryLoadsAndOwnsSixPreparedVariants() = runBlocking<Unit> {
         val engine = RustSudokuEngine()
         val information = (engine.information() as EngineOutcome.Completed<EngineInformation>).value
-        assertEquals("1", information.bridgeVersion)
+        assertEquals("2", information.bridgeVersion)
         assertEquals("sudoku-v11", information.puzzleVersion)
         val rules = listOf(
             PuzzleRules.Classic,

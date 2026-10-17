@@ -8,7 +8,7 @@ mod logical_projection;
 use sudoku_core::budget::WorkBudget;
 use sudoku_core::logic::solver::{analyze_workspace, find_step};
 use sudoku_core::logic::techniques::Technique;
-use sudoku_core::logic::types::{Evidence, LogicStatus, LogicalAction, Removal};
+use sudoku_core::logic::types::{Evidence, LogicStatus, LogicalAction, LogicalWorkspace, Removal};
 use sudoku_core::logic::variant_techniques::find_variant_step;
 use sudoku_core::logic::workspace::{apply_step, create_workspace};
 use sudoku_core::rules::context::compile_rules;
@@ -25,21 +25,21 @@ fn sum_three_workspace() -> sudoku_core::logic::types::LogicalWorkspace {
         sum: 1,
     }));
     let rules = compile_rules(&PuzzleRules::Killer { cages }).unwrap();
-    let mut state = create_workspace(&Board::EMPTY, &rules);
-    state.candidates[0] = CandidateMask::try_from(7).unwrap();
-    state.candidates[1] = CandidateMask::try_from(7).unwrap();
-    state
+    let mut candidates = *create_workspace(&Board::EMPTY, &rules).candidates();
+    candidates[0] = CandidateMask::try_from(7).unwrap();
+    candidates[1] = CandidateMask::try_from(7).unwrap();
+    LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap()
 }
 
 #[test]
 fn basic_and_variant_steps_match_ordered_evidence() {
     let rules = compile_rules(&PuzzleRules::Classic).unwrap();
-    let mut state = create_workspace(&Board::EMPTY, &rules);
-    state.candidates[0] = CandidateMask::try_from(7).unwrap();
-    state.candidates[1] = CandidateMask::try_from(11).unwrap();
-    for cell in 2..9 {
-        state.candidates[cell] = CandidateMask::try_from(508).unwrap();
-    }
+    let mut candidates = *create_workspace(&Board::EMPTY, &rules).candidates();
+    candidates[0] = CandidateMask::try_from(7).unwrap();
+    candidates[1] = CandidateMask::try_from(11).unwrap();
+    candidates[2..9].fill(CandidateMask::try_from(508).unwrap());
+    let mut state =
+        LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap();
     let mut budget = WorkBudget::new(1);
 
     let Bounded::Complete(Some(step)) =
@@ -95,8 +95,8 @@ fn basic_and_variant_steps_match_ordered_evidence() {
     );
     assert_eq!(repeated, Bounded::Complete(Some(original.clone())));
 
-    apply_step(&mut state, &original);
-    assert_eq!(state.candidates[0].bits(), 3);
+    apply_step(&mut state, &original).unwrap();
+    assert_eq!(state.candidates()[0].bits(), 3);
     assert_eq!(state.premises().len(), 1);
 }
 
@@ -120,21 +120,32 @@ fn incomplete_support_is_never_memoized() {
         ),
         Bounded::BudgetExhausted
     );
-    let Bounded::Complete(Some(_)) = find_variant_step(
+    let Bounded::Complete(Some(step)) = find_variant_step(
         &mut state,
         &[Technique::CageCombination],
         &mut WorkBudget::new(100),
     ) else {
         panic!("Expected complete support");
     };
-    state.candidates[0] = CandidateMask::try_from(5).unwrap();
+    // The sum-three cage independently excludes 3. Applying one supported removal must
+    // invalidate the memo by its domain key, without discarding prior explained premises.
+    let mut narrowed = (*step).clone();
+    narrowed.action = LogicalAction::Elimination {
+        removals: vec![Removal { cell: 0, digit: 3 }],
+    };
+    apply_step(&mut state, &narrowed).unwrap();
     let mut budget = WorkBudget::new(100);
     let Bounded::Complete(Some(step)) =
         find_variant_step(&mut state, &[Technique::CageCombination], &mut budget)
     else {
         panic!("Expected recomputed support");
     };
-    assert_eq!(step.action, LogicalAction::Placement { cell: 0, digit: 1 });
+    assert_eq!(
+        step.action,
+        LogicalAction::Elimination {
+            removals: vec![Removal { cell: 1, digit: 3 }]
+        }
+    );
     assert!(budget.used() > 1);
 }
 
@@ -148,10 +159,14 @@ fn new_clue_masks_never_reuse_reduced_domains() {
     ) else {
         panic!("Expected complete support");
     };
-    apply_step(&mut first, &step);
-    let mut second = create_workspace(&Board::EMPTY, first.rules());
-    second.candidates[0] = CandidateMask::try_from(7).unwrap();
-    second.candidates[1] = CandidateMask::try_from(7).unwrap();
+    apply_step(&mut first, &step).unwrap();
+    let mut candidates = *create_workspace(&Board::EMPTY, first.rules()).candidates();
+    candidates[0] = CandidateMask::try_from(7).unwrap();
+    candidates[1] = CandidateMask::try_from(7).unwrap();
+
+    let mut second =
+        LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, first.rules())
+            .unwrap();
 
     assert_eq!(
         find_variant_step(

@@ -59,7 +59,7 @@ fn owned_bytes(value: &Uint8Array) -> Result<Vec<u8>, JsError> {
 #[wasm_bindgen]
 pub fn engine_info() -> Result<Ts<EngineInfo>, JsError> {
     Ok(EngineInfo {
-        bridge_version: 2,
+        bridge_version: 3,
         puzzle_version: PUZZLE_VERSION,
         variant_puzzle_version: VARIANT_PUZZLE_VERSION,
         rating_version: RATING_VERSION,
@@ -249,7 +249,7 @@ pub fn validate_hint_evidence(
         let hint = hint_to_core(input.hint)?;
         let rules = input.rules.try_into()?;
         let board: Option<Board> = input.board.map(TryInto::try_into).transpose()?;
-        sudoku_core::logic::hint_validation::validate_hint_evidence(&hint, &rules, board.as_ref())
+        sudoku_core::hint::validation::validate_hint_evidence(&hint, &rules, board.as_ref())
     });
     let result = match outcome {
         Ok(hint) => HintValidationDto::Valid {
@@ -314,6 +314,20 @@ pub fn parse_assessment_outcome(
 }
 
 #[wasm_bindgen]
+pub fn parse_live_assessment_outcome(
+    value: Ts<dto::values::UntrustedValueDto>,
+) -> Result<Ts<dto::rating::ParsedLiveOutcomeDto>, JsError> {
+    let result = match conversion::live_assessment::parse(&value.to_rust()?.0) {
+        Ok(value) => dto::rating::ParsedAssessmentDto::Valid { valid: true, value },
+        Err(error) => dto::rating::ParsedAssessmentDto::Invalid {
+            valid: false,
+            issues: issues(error),
+        },
+    };
+    Ok(dto::rating::ParsedLiveOutcomeDto(result).into_ts()?)
+}
+
+#[wasm_bindgen]
 pub fn parse_hint(
     input: Ts<dto::values::UntrustedValueDto>,
 ) -> Result<Ts<HintValidationDto>, JsError> {
@@ -324,7 +338,7 @@ pub fn parse_hint(
             })
         })
         .and_then(hint_to_core)
-        .and_then(|hint| sudoku_core::logic::hint_validation::validate_hint_shape(&hint));
+        .and_then(|hint| sudoku_core::hint::validation::validate_hint_shape(&hint));
     let result = match parsed {
         Ok(hint) => HintValidationDto::Valid {
             hint: hint_to_dto(&hint).map_err(js_error)?,
@@ -374,9 +388,7 @@ pub fn validate_teaching_step(
             .try_into()
             .map_err(|_| EngineError::invalid("Teaching candidate state must contain 81 masks"))?;
         let step = conversion::logic::step_to_core(input.step)?;
-        sudoku_core::logic::hint_validation::validate_teaching_step(
-            &board, candidates, &rules, &step,
-        )
+        sudoku_core::logic::teaching::validate_teaching_step(&board, candidates, &rules, &step)
     });
     Ok(match outcome {
         Ok(()) => ValidationDto::Valid,
