@@ -7,7 +7,7 @@ test-results/
 *.tsbuildinfo
 
 target/
-packages/sudoku-wasm/pkg/
+sudoku/wasm/pkg/
 .tools/
 
 # Local IDE and operating-system metadata.

@@ -1,8 +1,6 @@
 import { readdirSync } from 'node:fs'
 import type { Page } from '@playwright/test'
-import type { Board } from '@reference/core/sudoku/types'
-import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
-import type { HintResult } from '@reference/core/sudoku/hint'
+import type { Board, PuzzleRules, HintResult } from '@/sudoku/contracts'
 import {
   parseWorkerResponse as decodeResponse,
   validateHintEvidence as validateEvidence,
@@ -92,61 +90,4 @@ export async function runWorker(page: Page, request: WorkerRequest, base: '/' | 
     },
     { url: `${base}assets/${asset}`, binaryUrl: `${base}assets/${binary}`, request: payload },
   )
-}
-
-let referenceEngine: Promise<unknown> | null = null
-
-/** Compare transport with the frozen independent TS engine using its isolated v11 byte recipe. */
-export async function generateReference(input: import('@/sudoku/generationInput').GenerationInput) {
-  const { isRecord } = await import('@/sudoku/values')
-  if (!referenceEngine) {
-    referenceEngine = (async () => {
-      const url = new URL('../migration/reference-loader.mjs', import.meta.url).href
-      const loader: unknown = await import(url)
-      if (!isRecord(loader) || typeof loader.loadEngine !== 'function') {
-        throw new Error('Missing frozen reference loader')
-      }
-      const loaded: unknown = await loader.loadEngine({ v11: true })
-      return loaded
-    })()
-  }
-  const reference = await referenceEngine
-  if (
-    !isRecord(reference) ||
-    typeof reference.createGenerationInput !== 'function' ||
-    typeof reference.generatePuzzle !== 'function'
-  ) {
-    throw new Error('Missing frozen generation functions')
-  }
-  const request: unknown = reference.createGenerationInput(
-    input.variant,
-    input.difficulty,
-    Buffer.from(input.seed).toString('hex'),
-  )
-  const generated: unknown = reference.generatePuzzle(request)
-  if (!isRecord(generated) || generated.status !== 'ready') {
-    throw new Error('Independent v11 reference did not construct this fixed fixture')
-  }
-  const parsed = parseWorkerResponse({
-    kind: 'generate',
-    requestId: 'reference',
-    outcome: {
-      status: 'completed',
-      value: generated.puzzle,
-      assessment: { status: 'rated', summary: generated.assessment },
-    },
-  })
-  if (
-    !parsed.valid ||
-    parsed.value.kind !== 'generate' ||
-    parsed.value.outcome.status !== 'completed' ||
-    parsed.value.outcome.assessment?.status !== 'rated'
-  ) {
-    throw new Error('Malformed frozen reference result')
-  }
-  return {
-    status: 'ready' as const,
-    puzzle: parsed.value.outcome.value,
-    assessment: parsed.value.outcome.assessment.summary,
-  }
 }

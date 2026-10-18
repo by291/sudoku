@@ -62,17 +62,20 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
     animations: 'disabled',
   })
 })
-test('teaches all thirty-two units with every required stage, retry and durable progress', async ({
-  page,
-}) => {
-  test.setTimeout(300000)
-  for (const lesson of LESSONS) {
+
+// Isolate each course so long elimination exercises do not share one suite-wide deadline.
+for (const lesson of LESSONS) {
+  test(`teaches ${lesson.id} with every required stage, retry and durable progress`, async ({
+    page,
+  }) => {
     await page.goto(`/#/learn/${lesson.id}`)
     await expect(page.getByRole('heading', { name: lesson.title, exact: true })).toBeVisible()
     await selectLessonMode(page, '动手练习')
     const stages = lessonStages(lesson)
+
     for (const [index, stage] of stages.entries()) {
       const exercise = stageAnswer(stage)
+
       if (exercise.kind === 'placement') {
         const { cell, digit } = exercise.expected
         await page.getByRole('button', { name: cellName(cell) }).click()
@@ -97,13 +100,46 @@ test('teaches all thirty-two units with every required stage, retry and durable 
         await page.getByRole('button', { name: '下一阶段', exact: true }).click()
       }
     }
+
     await expect(page.getByRole('status')).toContainText('本课全部练习已完成，进度已保存。')
     await page.getByRole('link', { name: /返回课程列表/ }).click()
+    await expect(page.getByRole('list', { name: '课程路径' })).toBeVisible()
+    await page.reload()
     await expect(
       page.getByRole('link').filter({ hasText: lesson.title }).filter({ hasText: '已完成' }),
     ).toBeVisible()
-  }
+  })
+}
 
+test('shows a completed catalogue and review actions for every course type', async ({ page }) => {
+  await page.goto('/#/learn')
+  await expect(page.getByRole('progressbar', { name: '全部课程学习进度' })).toBeVisible()
+  // Completion writes are exercised per lesson above; seed only this aggregate presentation state.
+  await page.evaluate(
+    async (lessonIds) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sudoku-local')
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const transaction = database.transaction('lessons', 'readwrite')
+          for (const lessonId of lessonIds) {
+            transaction.objectStore('lessons').put({
+              lessonId,
+              completedAt: '2026-01-01T00:00:00.000Z',
+            })
+          }
+          transaction.oncomplete = () => resolve()
+          transaction.onabort = () => reject(transaction.error)
+        })
+      } finally {
+        database.close()
+      }
+    },
+    LESSONS.map((lesson) => lesson.id),
+  )
   await page.reload()
   await expect(page.getByRole('progressbar', { name: '全部课程学习进度' })).toHaveAttribute(
     'aria-valuetext',
@@ -121,6 +157,7 @@ test('teaches all thirty-two units with every required stage, retry and durable 
     await expect(page.getByRole('link', { name: '复习课程', exact: true })).toBeVisible()
   }
 })
+
 test('starts learning practice and confirms replacing a different lesson game', async ({
   page,
 }) => {

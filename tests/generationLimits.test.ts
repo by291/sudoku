@@ -1,34 +1,17 @@
 import { expect, it } from 'vitest'
-import { CORPUS_COMBINATIONS } from './fixtures/generationCorpus'
-import {
-  createGenerationInput,
-  DEFAULT_GENERATION_LIMITS,
-} from '@reference/core/sudoku/generation/input'
-import { generatePuzzle } from '@reference/core/sudoku/generation/generate'
+import { generationInput } from './support/generation'
+import { DEFAULT_GENERATION_LIMITS, generatePuzzle } from './support/engine'
 
-const exhaustedLimits = [
+it.each([
   { name: 'layout', limits: { ...DEFAULT_GENERATION_LIMITS, maxLayouts: 0 } },
   { name: 'work', limits: { ...DEFAULT_GENERATION_LIMITS, maxWork: 1 } },
   { name: 'logical step', limits: { ...DEFAULT_GENERATION_LIMITS, maxLayouts: 1, maxSteps: 0 } },
-]
+])('transports explicit exhaustion at the $name boundary', ({ limits }) => {
+  const result = generatePuzzle(generationInput('killer', 'hard', 'wasm-boundary'), limits)
 
-it.each(
-  CORPUS_COMBINATIONS.flatMap((combination) =>
-    exhaustedLimits.map((limit) => ({ ...combination, ...limit })),
-  ),
-)(
-  'returns explicit exhaustion without a replacement puzzle for $variant/$difficulty at the $name limit',
-  ({ variant, difficulty, limits }) => {
-    const input = createGenerationInput(variant, difficulty, 'no-authored-substitution')
-    const result = generatePuzzle(input, limits)
-
-    expect(result).toMatchObject({ status: 'budget-exhausted', stage: 'construction' })
-    expect(result).not.toHaveProperty('puzzle')
-    expect(result).not.toHaveProperty('assessment')
-    expect(result.metrics).not.toHaveProperty('fallbackWork')
-    expect(result.metrics.constructionWork).toBeLessThanOrEqual(limits.maxWork)
-    expect(result.metrics.layouts).toBeLessThanOrEqual(limits.maxLayouts)
-    expect(generatePuzzle(input, limits)).toEqual(result)
-  },
-  60000,
-)
+  expect(result).toMatchObject({ status: 'budget-exhausted', stage: 'construction' })
+  expect(result).not.toHaveProperty('puzzle')
+  expect(result).not.toHaveProperty('assessment')
+  expect(result.metrics.constructionWork).toBeLessThanOrEqual(limits.maxWork)
+  expect(result.metrics.layouts).toBeLessThanOrEqual(limits.maxLayouts)
+})

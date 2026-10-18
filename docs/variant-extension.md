@@ -21,7 +21,7 @@ Follow [Web Architecture](architecture.md) and the [engine contracts](engine.md)
 | Player-facing names and explanations            | `features/game/model/variants.ts`, `techniquePresentation.ts`, `violationPresentation.ts`                        |
 | Accessible drawing and selected-clue text       | `shared/model/boardGeometry.ts`, `shared/components/`                                                            |
 | Authored lessons and stable identities          | `features/learning/model/{lessons,lessonIds,variantExamples,variantTemplates,courseFragments,exerciseStages}.ts` |
-| Independent fixtures and counters               | `tests/fixtures/`, `tests/support/referenceVariants.ts`, `tests/migration/`                                      |
+| Independent fixtures and counters               | `sudoku/core/tests/`, `tests/fixtures/`, `tests/support/referenceVariants.ts`                                    |
 
 ## Existing primitives
 
@@ -54,7 +54,7 @@ Every delivered puzzle must pass validated content/identity, requested-tier asse
 
 - Run `cargo fmt --all --check`, workspace tests, native/all-targets Clippy and wasm32 Clippy with warnings denied. Inspect `cargo tree -p sudoku-core -e normal` for platform dependencies.
 - Run `pnpm typecheck`, lint/format, actual-WASM unit tests, root/subpath builds and affected player-oriented Playwright projects.
-- Run native and supported-browser migration suites. Keep the sealed TypeScript oracle test-only; it cannot create expected results from Rust. Update fixtures only through an explicit independently reviewed source/version change.
+- Run native algorithm regressions and supported-browser WASM contracts. Add independently established fixtures and extend the small rule-aware test counter when needed; do not derive expected mathematical results from Rust. Update versioned fixtures only through an explicit independently reviewed source/version change. See [Testing](testing.md).
 - Preserve complete puzzles, evidence, rating traces, all work metrics and bounded outcomes during refactors. Identify reused independent evidence as reuse and require equal content fingerprints. New generation semantics need fresh independent validation.
 - Check generation cancellation/timeout, readiness, result ownership/disposal and save-before-switch/epoch/revision/lease fences. Unavailable computation must not quarantine an otherwise valid save.
 - Preserve existing work quotas and Worker deadline regressions when changing computation. Check interaction responsiveness in affected player flows and report unavailable browsers explicitly.

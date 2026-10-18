@@ -1,10 +1,11 @@
+import { createRequire } from 'node:module'
 import { createBindings } from '@sudoku/wasm/factory'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createMainEngine } from '@/sudoku/mainEngine'
 
 const compiled = new WebAssembly.Module(
-  readFileSync('packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm'),
+  readFileSync(createRequire(import.meta.url).resolve('@sudoku/wasm/binary')),
 )
 
 describe('owned main-thread WASM engine', () => {

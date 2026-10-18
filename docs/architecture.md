@@ -7,8 +7,10 @@ The [product contract](product.md) defines player behavior, and [Engine](engine.
 ```text
 sudoku/
   core/src/{types,board,budget,random,rules,constraints,search,editing,logic,rating,generation,hint,puzzle}
-  wasm/src/{dto,conversion,prepared}
-packages/sudoku-wasm/pkg/        # Generated and ignored
+  wasm/
+    Cargo.toml, package.json    # Rust crate and @sudoku/wasm exports
+    src/{dto,conversion,prepared}
+    pkg/                       # Generated and ignored
 src/
   main.ts, App.vue, ApplicationBootstrapState.vue, ReadyApplication.vue, runtime.ts
   sudoku/{contracts,values,catalogue,seed,generationInput,ruleInput,puzzleSnapshot}
@@ -51,11 +53,11 @@ Pure-model restrictions cover recursive game, learning, settings and records mod
 
 Shared presentation composables own only generic UI lifetimes, such as cancellable delayed progress feedback. `ResponsiveDialog` retains Naive UI's modal ownership while adapting its card to a narrow-screen sheet. Records owns completed-result viewing and reads validated result snapshots; historical viewing does not enter the editable game-session workflow.
 
-Source imports use `@/`; Worker asset URLs stay literal and relative. Contracts come from their explicit owner, rather than an operation facade. ESLint checks static and dynamic imports, prohibits uninspectable dynamic paths and rejects production imports of retired/reference engines. Tests also check the browser engine's runtime import graph for cycles. The sealed TypeScript reference is test-only under `tests/reference`; only test configuration resolves `@reference/` and its original internal aliases. Normal production builds contain no TypeScript rule compiler, solver, rater or generator.
+Source imports use `@/`; Worker asset URLs stay literal and relative. Contracts come from their explicit owner, rather than an operation facade. ESLint checks static and dynamic imports, prohibits uninspectable dynamic paths and rejects production imports of retired/reference engines. Tests also check the browser engine's runtime import graph for cycles. Tests use current Rust/WASM contracts, selected independently established fixtures and small test-only mathematical validators; there is no parallel legacy TypeScript engine or reference import alias. Normal production builds contain no TypeScript rule compiler, solver, rater or generator.
 
 ## WASM readiness and ownership
 
-`pnpm wasm:build` builds locked Rust/WASM, installs the pinned wasm-bindgen CLI if needed, and emits JS/WASM/declarations into the ignored workspace package. A build-time TypeScript compiler transform wraps self-contained generated glue in a collectable factory. Each instance owns separate memory; compiled immutable code can be shared. There is no source evaluation, handwritten pointer protocol, raw-memory alias or browser-side fallback solver.
+`pnpm wasm:build` builds locked Rust/WASM, installs the pinned wasm-bindgen CLI if needed, and emits JS/WASM/declarations into ignored `sudoku/wasm/pkg/`. The adapter owns both its Rust crate and the private `@sudoku/wasm` workspace package; consumers use the package exports rather than generated filesystem paths. A build-time TypeScript compiler transform wraps self-contained generated glue in a collectable factory. Each instance owns separate memory; compiled immutable code can be shared. There is no source evaluation, handwritten pointer protocol, raw-memory alias or browser-side fallback solver.
 
 `ApplicationBootstrapState.vue` and the controlled `shared/components/ApplicationLoadingState.vue` present application startup and retry. App constructs browsing services after initial route resolution without downloading WASM. Pinia 4.0.3 resolves store injections through the Vue application context, so `main.ts` publishes the runtime with an application-level provider before mounting `ReadyApplication.vue`. Runtime readiness means services are available; `ensureEngine()` separately shares the lazy module download, validation and initialization. Failed initialization is retryable, and a late initializer disposes its engine after shutdown.
 
@@ -103,4 +105,4 @@ Runtime guards retain explicit DTO shapes, ranges, answer consistency, and owned
 
 Chinese technique/violation text belongs to game presentation on both clients; shared board drawing consumes DTOs and owned metadata. Live assessment issues retain constraint identity, affected cells and typed violation details until that presentation boundary. Presentation explicitly converts them to stored strings when needed; adapters never reinterpret historical stored text. The native adapter uses bridge version 2 for this live contract. Display-only digit/mask formatting cannot infer candidates or Sudoku validity. A new primitive must support candidates, conflicts, completion, exact counting, deductions/evidence, validation and accessible drawing together.
 
-Use [the maintained migration suites](../tests/migration/README.md) for native/WASM parity and independent mathematical fixtures. Player/storage/lesson tests run actual WASM. Correctness and deadline checks do not establish physical-device performance or browser availability. See [development](development.md) for the configured checks.
+Use [the testing guide](testing.md) for Rust-native regression coverage, independent mathematical fixtures and browser WASM contracts. Player/storage/lesson tests run actual WASM. Correctness and deadline checks do not establish physical-device performance or browser availability. See [development](development.md) for the configured checks.
