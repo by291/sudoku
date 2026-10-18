@@ -318,7 +318,11 @@ test('switches independent daily types and restores the selected type after refr
     page.getByRole('radiogroup', { name: '玩法', exact: true }).getByRole('radio'),
   ).toHaveCount(6)
   await page.getByRole('dialog').getByRole('button', { name: '开始今日挑战', exact: true }).click()
+  await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
   await selectGameMenuAction(page, '生成候选数')
+  await expect
+    .poll(async () => (await readSessions(page))[0].session.assistance.candidateCount)
+    .toBe(1)
   await chooseVariant(page, '每日玩法', '箭头数独')
   await expect(
     page.getByRole('heading', { name: '每日挑战 · 箭头数独', exact: true }),

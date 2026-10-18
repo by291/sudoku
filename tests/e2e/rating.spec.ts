@@ -154,7 +154,10 @@ test('reloads a newly generated assessment snapshot', async ({ page }) => {
 
   expect(snapshot?.status).toBe('rated')
   await page.getByRole('link', { name: '返回首页', exact: true }).click()
+  // Finish the save-and-leave flow before reloading or starting another engine load.
+  await expect(page).toHaveURL(/#\/$/)
   await page.reload()
+  await expect(page.getByRole('button', { name: '继续上次', exact: true })).toBeEnabled()
   await page.goto(savedRoute)
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
 
