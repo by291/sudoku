@@ -20,7 +20,7 @@ required-features = ["cli"]
 sudoku-core = { path = "../../sudoku/core" }
 uniffi = "=0.31.2"
 serde.workspace = true
-thiserror = "=2.0.17"
+thiserror = "=2.0.21"
 
 [dev-dependencies]
 serde_json.workspace = true
