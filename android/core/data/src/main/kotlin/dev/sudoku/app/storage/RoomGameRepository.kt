@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 
 /** One application-scoped writer owns ordering; Room transactions provide cross-instance fencing. */
 class RoomGameRepository(private val database: SudokuDatabase, validator: MathematicalValidator) : GameRepository {
@@ -45,6 +44,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
 
     override suspend fun claimEditor(sessionId: String, ownerId: String): StorageOutcome<EditorToken> = write {
         require(sessionId.isNotBlank() && sessionId.length <= 200 && ownerId.isNotBlank())
+
         database.withTransaction {
             val state = dataset()
             val generation = increment(state.editorGeneration)
@@ -76,6 +76,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
         val record = SessionRecord(revision = increment(expectedRevision), session = validated)
         val entity = sessionEntity(record)
         val result = validated.completion?.let { resultEntity(ResultRecord(session = validated)) }
+
         database.withTransaction {
             assertEditor(dataset(), token)
             checkConflict(
@@ -91,12 +92,14 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                     "Formal attempt already completed"
                 )
             }
+
             val current = dao.session(session.id)
             checkConflict(
                 (current?.revision ?: 0) == expectedRevision,
                 StorageFailureKind.REVISION_CONFLICT,
                 "Saved revision changed"
             )
+
             dao.putSession(entity)
             summaries.putSession(SessionSummaryEntity(record.session.id, record.revision, validated.summaryFields()))
             if (result != null) {
@@ -106,6 +109,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 }
             }
         }
+
         record
     }
 
@@ -116,8 +120,10 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
     ): StorageOutcome<SessionRecord> = write {
         val validated = codec.validateSession(session)
         require(validated.mode != GameMode.DAILY) { "Daily attempts cannot replace an active slot" }
+
         val record = SessionRecord(revision = 1, session = validated)
         val entity = sessionEntity(record)
+
         database.withTransaction {
             val state = dataset()
             assertEditor(state, token)
@@ -126,6 +132,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 StorageFailureKind.REVISION_CONFLICT,
                 "Replacement identity exists"
             )
+
             val slots = summaries.slotIds(validated.mode.name, validated.puzzle.rules.variant.wireName)
                 .map { checkNotNull(dao.session(it)) }
             checkConflict(slots.size <= 1, StorageFailureKind.REVISION_CONFLICT, "Multiple active slots")
@@ -147,6 +154,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                     "Previous active session disappeared"
                 )
             }
+
             dao.putSession(entity)
             summaries.putSession(SessionSummaryEntity(record.session.id, record.revision, validated.summaryFields()))
             validated.completion?.let {
@@ -155,23 +163,28 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 }
             }
         }
+
         record
     }
 
     override suspend fun readSettings(): StorageOutcome<Settings> = access {
         val raw = dao.settings() ?: return@access Settings()
+
         codec.json.decodeFromString<Settings>(raw.payload).also(codec::validateSettings)
     }
 
     override suspend fun updateSettings(update: SettingsUpdate, expectedEpoch: Long): StorageOutcome<Settings> = write {
         database.withTransaction {
             assertEpoch(dataset(), expectedEpoch)
+
             val current = dao.settings()?.let {
                 codec.json.decodeFromString<Settings>(it.payload).also(codec::validateSettings)
             } ?: Settings()
             val next = current.updated(update)
             codec.validateSettings(next)
-            dao.putSettings(SettingsEntity(payload = encode(next)))
+
+            dao.putSettings(SettingsEntity(payload = codec.encodeRecord(Settings.serializer(), next)))
+
             next
         }
     }
@@ -183,7 +196,9 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
     override suspend fun writeLessonProgress(progress: LessonProgress, expectedEpoch: Long): StorageOutcome<Unit> =
         write {
             codec.validateLesson(progress)
-            val entity = LessonEntity(progress.lessonId, encode(progress))
+
+            val entity = LessonEntity(progress.lessonId, codec.encodeRecord(LessonProgress.serializer(), progress))
+
             database.withTransaction {
                 assertEpoch(dataset(), expectedEpoch)
                 dao.putLesson(entity)
@@ -196,6 +211,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
 
     override suspend fun previewBackup(text: String): StorageOutcome<BackupPreview> = access {
         val epoch = database.withTransaction { dataset().epoch }
+
         BackupPreview(codec.decodeBackup(text), epoch)
     }
 
@@ -204,11 +220,15 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
         val backup = codec.decodeBackup(codec.encodeBackup(preview.backup))
         val sessions = backup.sessions.map { sessionEntity(it.copy(revision = 1)) }
         val results = backup.results.map(::resultEntity)
-        val lessons = backup.lessons.map { LessonEntity(it.lessonId, encode(it)) }
-        val settings = SettingsEntity(payload = encode(backup.settings))
+        val lessons = backup.lessons.map {
+            LessonEntity(it.lessonId, codec.encodeRecord(LessonProgress.serializer(), it))
+        }
+        val settings = SettingsEntity(payload = codec.encodeRecord(Settings.serializer(), backup.settings))
+
         database.withTransaction {
             val state = dataset()
             assertEpoch(state, preview.expectedEpoch)
+
             clearCollections()
             sessions.forEach { dao.putSession(it) }
             backup.sessions.forEach {
@@ -239,6 +259,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
                 dao.quarantineCount()
             )
         }
+
         var excluded = 0
         val sessions = snapshot.sessions.mapNotNull { entity ->
             try {
@@ -276,6 +297,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
             excluded++
             Settings()
         }
+
         val backup =
             LocalBackup(
                 exportedAt = exportedAt,
@@ -286,6 +308,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
             )
         val text = codec.encodeBackup(backup)
         val validated = codec.decodeBackup(text)
+
         BackupExport(validated, text, excluded, snapshot.quarantined)
     }
 
@@ -293,6 +316,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
         database.withTransaction {
             val state = dataset()
             assertEpoch(state, expectedEpoch)
+
             clearCollections()
             summaries.sessionCoverage(true)
             summaries.resultCoverage(true)
@@ -351,31 +375,27 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
 
     private fun sessionEntity(record: SessionRecord): SessionEntity {
         val session = record.session
+
         return SessionEntity(
             session.id,
             record.revision,
             session.mode.name,
             session.puzzle.rules.variant.wireName,
             (session.metadata as? SessionMetadata.Daily)?.challengeDate,
-            encode(record)
+            codec.encodeRecord(SessionRecord.serializer(), record)
         )
     }
 
     private fun resultEntity(record: ResultRecord): ResultEntity {
         val session = record.session
+
         return ResultEntity(
             session.id,
             session.mode.name,
             session.puzzle.rules.variant.wireName,
             (session.metadata as? SessionMetadata.Daily)?.challengeDate,
-            encode(record)
+            codec.encodeRecord(ResultRecord.serializer(), record)
         )
-    }
-
-    private inline fun <reified T> encode(value: T): String = escapeSurrogates(codec.json.encodeToString(value))
-
-    private fun escapeSurrogates(text: String): String = buildString {
-        text.forEach { if (it.isSurrogate()) append("\\u${it.code.toString(16).padStart(4, '0')}") else append(it) }
     }
 
     private fun increment(value: Long): Long {

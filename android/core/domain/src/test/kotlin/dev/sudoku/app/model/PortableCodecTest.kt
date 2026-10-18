@@ -15,7 +15,7 @@ class PortableCodecTest {
             EngineOutcome.Completed(value)
     }
 
-    @Test fun `round trip preserves legacy surrogate code units and millisecond instants`() = runTest {
+    @Test fun `portable and local records preserve legacy surrogate code units and millisecond instants`() = runTest {
         val codec = PortableCodec(validator)
         val puzzle = puzzleFixture().copy(seed = "legacy\uD800text", puzzleVersion = "old\uDC00")
         val session = createSession(puzzle, SessionMetadata.Free, "legacy", "2026-10-16T01:02:03.004Z")
@@ -37,10 +37,19 @@ class PortableCodecTest {
             settings = Settings()
         )
 
-        val decoded = codec.decodeBackup(codec.encodeBackup(backup))
+        val backupText = codec.encodeBackup(backup)
+        val decoded = codec.decodeBackup(backupText)
+        val record = backup.sessions.single()
+        val recordText = codec.encodeRecord(SessionRecord.serializer(), record)
+        val decodedRecord = codec.decodeSessionRecord(recordText)
 
         assertEquals(backup, decoded)
-        assertTrue(codec.encodeBackup(backup).contains("\\ud800", ignoreCase = true))
+        assertTrue(backupText.contains("\\ud800", ignoreCase = true))
+        assertTrue(backupText.contains("\\udc00", ignoreCase = true))
+        assertEquals(record, decodedRecord)
+        assertTrue(recordText.contains("\\ud800", ignoreCase = true))
+        assertTrue(recordText.contains("\\udc00", ignoreCase = true))
+        assertTrue(recordText.contains("\"assessment\":null"))
     }
 
     @Test fun `local records preserve histories above portable transfer limits`() = runTest {
@@ -53,7 +62,7 @@ class PortableCodecTest {
         }
         val session = initial.copy(notes = noted.notes, undoStack = history)
         val record = SessionRecord(revision = 2001, session = session)
-        val text = codec.json.encodeToString(SessionRecord.serializer(), record)
+        val text = codec.encodeRecord(SessionRecord.serializer(), record)
 
         assertEquals(record, codec.decodeSessionRecord(text))
 

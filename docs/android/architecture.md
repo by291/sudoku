@@ -24,7 +24,7 @@ Features expose Route entry points and immutable navigation intents; screens, Vi
 
 App owns bootstrap, composition, typed navigation and global preferences. ViewModels expose immutable StateFlow and named actions; they do not own Context, Activity, Room or generated native objects. Routes connect lifecycle, navigation and platform document pickers to controlled screens. Touch, keyboard and hint application call the same player operations.
 
-`GameController` coordinates the complete session transaction; `SessionWriter` serializes and coalesces persistence. Disposal waits under the session mutex for any non-cancellable commit and identity adoption, then releases the final editor token and prepared handle. Save-before-switch and save-before-leave remain ordered. Restoration is paused and never resumes automatically.
+`GameController` coordinates the complete session transaction; its private replacement preparation owns native handle creation, persisted identity adoption and rejected-handle cleanup for both generation and restart. `SessionWriter` serializes and coalesces persistence. Disposal waits under the session mutex for any non-cancellable commit and identity adoption, then releases the final editor token and prepared handle. Save-before-switch and save-before-leave remain ordered. Restoration is paused and never resumes automatically.
 
 `GameEntryController` separately owns entry jobs, generations, dataset observations and mutually exclusive setup/daily/continue sheets. Dismissal cancels the pending request; stale completions cannot reopen or replace a newer sheet. Saved choices use `SavedStateHandle`; bootstrap data is reused for the first Home render.
 
@@ -34,7 +34,7 @@ App owns bootstrap, composition, typed navigation and global preferences. ViewMo
 
 ## Domain and persistence contracts
 
-`core/domain` contains plain Kotlin player facts, typed outcomes and narrow repository/engine interfaces. `SettingsUpdate` represents field-specific intents; `updateSettings` reads, merges and validates the latest settings in the write transaction under the expected epoch. Only backup replacement replaces the complete settings object.
+`core/domain` contains plain Kotlin player facts, typed outcomes and narrow repository/engine interfaces. `SettingsUpdate` represents field-specific intents; `updateSettings` reads, merges and validates the latest settings in the write transaction under the expected epoch. Only backup replacement replaces the complete settings object. `PortableCodec` owns local record encoding and the UTF-16 escaping shared with backup export; backup-only field normalization and transfer quotas never apply to local saves.
 
 `SummaryQuery` explicitly separates saves from history and carries filters into the cursor. Summaries authorize presentation only; selected records still require full validation. Cancellation, timeout, work exhaustion and engine failure are inconclusive and cannot authorize quarantine. Room write consistency and migration belong to [data loading](data-loading.md).
 

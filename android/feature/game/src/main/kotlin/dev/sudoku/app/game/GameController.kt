@@ -136,6 +136,7 @@ internal class GameController(
             val epoch = storage(repository.readDatasetEpoch())
             datasetEpoch = epoch
             val records = recordsFor(launch)
+
             if (launch is GameLaunch.Daily) {
                 openDaily(
                     launch,
@@ -246,6 +247,7 @@ internal class GameController(
             load(unfinished, epoch)
             return
         }
+
         generateSession(launch, epoch, records, generation)
     }
 
@@ -267,12 +269,14 @@ internal class GameController(
             is GameLaunch.Daily -> Difficulty.MEDIUM
             is GameLaunch.Resume -> throw WorkflowFailure("对局参数无效。")
         }
+
         val seed = retrySeed?.takeIf { it.launch == launch }?.bytes ?: if (launch is GameLaunch.Daily) {
             engineValue(engine.deriveSeed(dailySeedMaterial(launch.date)))
         } else {
             withContext(Dispatchers.IO) { ByteArray(32).also { SecureRandom().nextBytes(it) }.map { it.toUByte() } }
         }
         retrySeed = RetrySeed(launch, seed.toList())
+
         val generated = engineValue(
             engine.generate(
                 GenerationRequest(
@@ -283,6 +287,7 @@ internal class GameController(
             )
         )
         currentCoroutineContext().ensureActive()
+
         val metadata = when (launch) {
             is GameLaunch.Free -> SessionMetadata.Free
             is GameLaunch.Practice -> SessionMetadata.Learning(launch.lessonId)
@@ -308,24 +313,44 @@ internal class GameController(
             UUID.randomUUID().toString()
         }
         val session = createSession(generated.puzzle, metadata, id, nowText(), generated.assessment)
+
+        prepareReplacement(session, records, epoch, generation, clearRetrySeed = true)
+    }
+
+    /** Owns the prepared handle until persistence and identity adoption complete together. */
+    private suspend fun prepareReplacement(
+        session: GameSession,
+        records: List<SessionRecord>,
+        epoch: Long,
+        generation: Long,
+        clearRetrySeed: Boolean
+    ) {
         val handle = engineValue(engine.prepare(session.puzzle.rules))
         var installed = false
+
         try {
             currentCoroutineContext().ensureActive()
             ensureEpoch(epoch)
             val previous = previousSlot(session, records)
+
             actions.withLock {
                 currentCoroutineContext().ensureActive()
                 commitPreparation(generation) {
                     val saved = persistReplacement(session, previous, epoch)
                     install(saved.record, handle, saved.editor, epoch)
                     installed = true
-                    retrySeed = null
+
+                    // Clear only after generated identity adoption, even when cancellation prevents auto-resume.
+                    if (clearRetrySeed) {
+                        retrySeed = null
+                    }
                 }
             }
+
             resumeAfterPreparation(generation)
         } finally {
             if (!installed) {
+                // Rejection leaves ownership here; an installed handle belongs to the controller.
                 withContext(NonCancellable) { handle.close() }
             }
         }
@@ -334,6 +359,7 @@ internal class GameController(
     /** Once persistence starts, cancellation may stop auto-resume but must finish adopting the committed identity. */
     private suspend fun commitPreparation(generation: Long, operation: suspend () -> Unit) {
         update { it.copy(preparationCommitting = true) }
+
         try {
             withContext(NonCancellable) { operation() }
         } finally {
@@ -385,10 +411,12 @@ internal class GameController(
             } else {
                 null
             }
+
             val token = storage(repository.claimEditor(session.id, ownerId))
             if (token.epoch != epoch) {
                 throw WorkflowFailure("数据已更新，请返回重新打开对局。")
             }
+
             val saved = if (session.mode == GameMode.DAILY) {
                 storage(
                     repository.writeSession(
@@ -406,6 +434,7 @@ internal class GameController(
                     )
                 )
             }
+
             return PersistedSession(saved, token)
         } catch (failure: Exception) {
             // Claiming the target fences the previous editor; recover its token before permitting more saves.
@@ -426,9 +455,11 @@ internal class GameController(
             actions.withLock {
                 currentCoroutineContext().ensureActive()
                 ensureEpoch(epoch)
+
                 // Claiming and adopting a saved revision is one transition from the caller's perspective.
                 withContext(NonCancellable) {
                     var claimed: EditorToken? = null
+
                     try {
                         if (readOnly) {
                             editor?.let { storage(repository.releaseEditor(it)) }
@@ -437,11 +468,13 @@ internal class GameController(
                             if (claimed.epoch != epoch) {
                                 throw WorkflowFailure("数据已更新，请重新打开对局。")
                             }
+
                             val current = storage(reads.readSession(record.session.id))
                             if (current?.revision != record.revision) {
                                 throw WorkflowFailure("保存版本已变化，请重新打开最新的对局。")
                             }
                         }
+
                         ensureEpoch(epoch)
                         install(record, handle, claimed, epoch)
                         installed = true
@@ -449,6 +482,7 @@ internal class GameController(
                         if (claimed != null) {
                             repository.releaseEditor(claimed)
                         }
+
                         if (oldSession != null &&
                             oldRevision != null
                         ) {
@@ -458,6 +492,7 @@ internal class GameController(
                                 epoch
                             )
                         }
+
                         throw failure
                     }
                 }
@@ -495,6 +530,7 @@ internal class GameController(
         } else {
             writer = null
         }
+
         if (oldHandle != null) {
             withContext(NonCancellable) { oldHandle.close() }
         }
@@ -917,13 +953,16 @@ internal class GameController(
         scope.launch {
             actions.withLock {
                 val session = mutableState.value.session ?: return@withLock
+
                 pauseCurrent()
                 if (writer?.flush() == false) {
                     update { it.copy(error = "请先重试保存，再重新开始。") }
                     return@withLock
                 }
+
                 if (session.mode == GameMode.DAILY && session.completion == null) {
                     val snapshot = restartDailySession(timed(session))
+
                     clock = SessionClock(snapshot.elapsedMs)
                     update {
                         it.copy(
@@ -944,6 +983,7 @@ internal class GameController(
                         } else {
                             listOfNotNull(storage(reads.readSlot(session.mode, session.puzzle.rules.variant)))
                         }
+
                         val previousMetadata = session.metadata
                         val metadata = if (previousMetadata is SessionMetadata.Daily) {
                             previousMetadata.copy(formalAttempt = false)
@@ -957,24 +997,8 @@ internal class GameController(
                             nowText(),
                             session.assessment
                         )
-                        val handle = engineValue(engine.prepare(restarted.puzzle.rules))
-                        var installed = false
-                        try {
-                            ensureEpoch(epoch)
-                            actions.withLock {
-                                currentCoroutineContext().ensureActive()
-                                commitPreparation(generation) {
-                                    val saved = persistReplacement(restarted, previousSlot(restarted, records), epoch)
-                                    install(saved.record, handle, saved.editor, epoch)
-                                    installed = true
-                                }
-                            }
-                            resumeAfterPreparation(generation)
-                        } finally {
-                            if (!installed) {
-                                withContext(NonCancellable) { handle.close() }
-                            }
-                        }
+
+                        prepareReplacement(restarted, records, epoch, generation, clearRetrySeed = false)
                     }
                 }
             }
