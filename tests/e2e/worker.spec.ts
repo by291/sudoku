@@ -1,10 +1,10 @@
-import { runWorker, parseWorkerResponse, generateReference } from './workerHarness'
+import { runWorker, parseWorkerResponse } from './workerHarness'
 import { test, expect, makeVariantHintSession } from './support'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
 import { countReferenceSolutions } from '../support/referenceSudoku'
-import { assessPuzzle } from '@reference/core/sudoku/rating/assessment'
-import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
 import { generationInput } from '../support/generation'
+import type { GenerationInput } from '@/sudoku/generationInput'
+import type { Puzzle } from '@/sudoku/contracts'
 import { explainStep } from '@/features/game/model/techniquePresentation'
 import { referenceCountSolutions } from '../support/referenceVariants'
 import {
@@ -12,6 +12,16 @@ import {
   GENERATION_RECOVERY_INPUTS,
   KILLER_HARD_RECOVERY_INPUT,
 } from '../fixtures/generationLatency'
+
+// These checks cover Worker transport and identity; native tests own seeded algorithm fixtures.
+function expectGeneratedIdentity(puzzle: Puzzle, input: GenerationInput) {
+  expect(puzzle).toMatchObject({
+    rules: { kind: input.variant },
+    difficulty: input.difficulty,
+    puzzleVersion: input.puzzleVersion,
+    seed: Array.from(input.seed, (byte) => byte.toString(16).padStart(2, '0')).join(''),
+  })
+}
 
 test('verifies current-identity puzzles for historical recovery seeds at both roots', async ({
   page,
@@ -53,10 +63,7 @@ test('verifies current-identity puzzles for historical recovery seeds at both ro
         count: 1,
         solution: puzzle.solution,
       })
-      expect(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))).toMatchObject({
-        status: 'rated',
-        summary: { variant, difficulty },
-      })
+      expectGeneratedIdentity(puzzle, generationInput(variant, difficulty, seed))
     }
   }
 })
@@ -110,10 +117,6 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
 }) => {
   const { variant, difficulty, seed } = KILLER_HARD_RECOVERY_INPUT
   const input = generationInput(variant, difficulty, seed)
-  const result = await generateReference(input)
-  if (result.status !== 'ready') {
-    throw new Error('Missing fresh Killer Hard regression fixture')
-  }
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
     const started = performance.now()
@@ -138,14 +141,14 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
     }
     const puzzle = response.value.outcome.value
 
-    expect(puzzle).toEqual(result.puzzle)
+    expectGeneratedIdentity(puzzle, input)
     expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
       count: 1,
       solution: puzzle.solution,
     })
-    expect(response.value.outcome.assessment).toEqual({
+    expect(response.value.outcome.assessment).toMatchObject({
       status: 'rated',
-      summary: result.assessment,
+      summary: { variant, difficulty },
     })
   }
 })
@@ -189,10 +192,6 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
 
   for (const difficulty of ['easy', 'medium', 'hard', 'expert'] as const) {
     const input = generationInput('classic', difficulty, 'production-fixed-seed')
-    const expected = await generateReference(input)
-    if (expected.status !== 'ready') {
-      throw new Error('Expected a complete Classic reference result')
-    }
     const response = parseWorkerResponse(
       await runWorker(page, {
         kind: 'generate',
@@ -210,20 +209,13 @@ test('verifies fixed production-worker seeds and a known logical conclusion', as
 
     const puzzle = response.value.outcome.value
 
-    expect(puzzle).toEqual(expected.puzzle)
-    expect(response.value.outcome.assessment).toEqual({
+    expectGeneratedIdentity(puzzle, input)
+    expect(response.value.outcome.assessment).toMatchObject({
       status: 'rated',
-      summary: expected.assessment,
+      summary: { variant: 'classic', difficulty },
     })
 
     expect(countReferenceSolutions(puzzle.givens, 2)).toBe(1)
-    expect(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))).toMatchObject({
-      status: 'rated',
-      summary:
-        response.value.outcome.assessment?.status === 'rated'
-          ? response.value.outcome.assessment.summary
-          : undefined,
-    })
   }
 
   const hint = parseWorkerResponse(
@@ -254,10 +246,6 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
   }) => {
     const fixture = makeVariantHintSession(variant)
     const input = generationInput(variant, 'medium', 'production-fixed-variant-seed')
-    const expected = await generateReference(input)
-    if (expected.status !== 'ready') {
-      throw new Error('Expected a complete variant reference result')
-    }
 
     for (const base of ['/', '/sudoku/'] as const) {
       await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
@@ -282,20 +270,16 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
 
       const puzzle = generated.value.outcome.value
 
-      expect(puzzle).toEqual(expected.puzzle)
-      expect(generated.value.outcome.assessment).toEqual({
+      expectGeneratedIdentity(puzzle, input)
+      expect(generated.value.outcome.assessment).toMatchObject({
         status: 'rated',
-        summary: expected.assessment,
+        summary: { variant, difficulty: 'medium' },
       })
 
       expect(puzzle.rules.kind).toBe(variant)
       expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
         count: 1,
         solution: puzzle.solution,
-      })
-      expect(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))).toMatchObject({
-        status: 'rated',
-        summary: { variant, difficulty: 'medium' },
       })
       const hint = parseWorkerResponse(
         await runWorker(

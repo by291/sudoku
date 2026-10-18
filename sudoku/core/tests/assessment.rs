@@ -1,5 +1,9 @@
+#[path = "support/assessment.rs"]
+mod assessment_projection;
 #[path = "support/rules.rs"]
 pub mod fixtures;
+#[path = "support/projection.rs"]
+mod projection;
 
 use sudoku_core::budget::WorkBudget;
 use sudoku_core::rating::assessment::{prepare_assessment, prepare_assessment_with_computation};
@@ -27,10 +31,24 @@ fn policy_prefix_reuse_preserves_full_trace_and_charges() {
 
         assert_eq!(result.trace.len() as u64, result.summary.workload.steps);
         assert_eq!(budget.used(), row["expected"]["workUsed"].as_u64().unwrap());
-        let expected = &row["expected"]["budgeted"]["summary"]["difficulty"];
+        let expected = &row["expected"]["budgeted"];
         assert_eq!(
-            result.summary.difficulty.as_str(),
-            expected.as_str().unwrap()
+            assessment_projection::project_summary(&result.summary),
+            expected["summary"],
+            "summary {}",
+            row["id"]
+        );
+        assert_eq!(
+            serde_json::json!(
+                result
+                    .trace
+                    .iter()
+                    .map(projection::project_step)
+                    .collect::<Vec<_>>()
+            ),
+            expected["trace"],
+            "trace {}",
+            row["id"]
         );
     }
 }

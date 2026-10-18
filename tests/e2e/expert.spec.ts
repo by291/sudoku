@@ -8,13 +8,19 @@ import {
   countResults,
   selectGameMenuAction,
 } from './support'
-import { makeSession } from '../support/gameFixtures'
+import { makeSession, HISTORICAL_CLASSIC_VERSION } from '../support/gameFixtures'
 import { CLASSIC_PUZZLE_FIXTURES } from '../fixtures/classicPuzzles'
-import { PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
 import { generationInput } from '../support/generation'
-import { analyzeLogic } from '@reference/core/sudoku/logic/solver'
-import { RATING_POLICIES } from '@reference/core/sudoku/rating/policies'
+import type { Board } from '@/sudoku/contracts'
 import { runWorker, parseWorkerResponse, validateHintEvidence } from './workerHarness'
+
+// Frozen independently before removing the TypeScript solver: the authored Expert puzzle
+// after its basic techniques stall. Keep browser hint setup independent of the Rust solver.
+const stalledBoard: Board = [
+  4, 8, 1, 3, 5, 2, 7, 9, 6, 7, 2, 5, 0, 8, 0, 0, 0, 3, 6, 3, 9, 1, 0, 0, 5, 8, 2, 0, 0, 2, 0, 0, 5,
+  0, 0, 9, 5, 0, 0, 0, 0, 0, 0, 0, 4, 3, 9, 4, 7, 0, 0, 0, 5, 0, 0, 0, 3, 5, 9, 0, 0, 2, 0, 2, 5, 0,
+  0, 0, 3, 9, 0, 7, 9, 0, 0, 2, 0, 0, 0, 3, 5,
+]
 
 const authored = CLASSIC_PUZZLE_FIXTURES.find((template) => template.difficulty === 'expert')
 if (!authored) {
@@ -23,7 +29,7 @@ if (!authored) {
 const puzzle = {
   ...authored,
   seed: 'expert-fixture',
-  puzzleVersion: PUZZLE_VERSION,
+  puzzleVersion: HISTORICAL_CLASSIC_VERSION,
   rules: { kind: 'classic' } as const,
 }
 
@@ -70,14 +76,13 @@ for (const base of ['/', '/sudoku/'] as const) {
         },
       },
     })
-    const stalled = analyzeLogic(puzzle.givens, RATING_POLICIES.classic.hard, 500)
     const response = parseWorkerResponse(
       await runWorker(
         page,
         {
           kind: 'hint',
           requestId: 'expert-hint',
-          board: stalled.board,
+          board: stalledBoard,
           solution: puzzle.solution,
           rules: puzzle.rules,
         },
@@ -92,7 +97,7 @@ for (const base of ['/', '/sudoku/'] as const) {
       throw new Error('Expected Expert hint')
     }
     const hint = response.value.outcome.value
-    expect(validateHintEvidence(hint, puzzle.rules, stalled.board).valid).toBe(true)
+    expect(validateHintEvidence(hint, puzzle.rules, stalledBoard).valid).toBe(true)
     expect(hint).toMatchObject({
       kind: 'deduction',
       steps: expect.arrayContaining([expect.objectContaining({ technique: 'simple-coloring' })]),
@@ -101,9 +106,8 @@ for (const base of ['/', '/sudoku/'] as const) {
 }
 
 test('preserves Expert notes, hint assistance, history, pause and restart', async ({ page }) => {
-  const stalled = analyzeLogic(puzzle.givens, RATING_POLICIES.classic.hard, 500)
-  const entries = stalled.board.map((digit, cell) => (puzzle.givens[cell] === 0 ? digit : 0))
-  const target = stalled.board.findIndex((digit) => digit === 0)
+  const entries = stalledBoard.map((digit, cell) => (puzzle.givens[cell] === 0 ? digit : 0))
+  const target = stalledBoard.findIndex((digit) => digit === 0)
   await seedSession(page, makeSession({ id: 'expert-history', puzzle, entries }))
   await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
   const cell = page.getByRole('button', { name: cellName(target) })

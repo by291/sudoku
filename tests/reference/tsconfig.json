@@ -1,5 +1,0 @@
-{
-  "extends": "../../tsconfig.json",
-  "compilerOptions": { "paths": { "@/*": ["./typescript-engine/src/*"] } },
-  "include": ["typescript-engine/**/*.ts"]
-}

@@ -26,7 +26,7 @@ describe.each(['static', 'dynamic'] as const)('module dependency boundaries (%s)
   it.each([
     ['src/sudoku/values.ts', '@/sudoku/mainEngine'],
     ['src/sudoku/catalogue.ts', '@/storage/repository'],
-    ['src/features/game/model/fixture.ts', '@reference/core/sudoku/board'],
+    ['src/features/game/model/fixture.ts', '/tests/support/referenceVariants'],
     ['src/features/game/model/fixture.ts', '@/core/sudoku/board'],
     ['src/shared/components/Fixture.vue', '@/features/game/stores/useGameStore'],
     ['src/shared/components/Fixture.vue', '@/router'],

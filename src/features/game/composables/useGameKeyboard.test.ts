@@ -195,3 +195,37 @@ it('lets an open action menu own input while focus remains on its trigger', () =
   expect(actions).toEqual([{ kind: 'enter', cell: 2, digit: 4 }])
   menu.remove()
 })
+
+it('returns input to the board when a closed menu retains its visible transition attributes', () => {
+  const actions: GameAction[] = []
+  const game = {
+    editable: true,
+    selectedCell: 2,
+    noteMode: false,
+    dispatch: (action: GameAction) => actions.push(action),
+    selectCell() {},
+    toggleNoteMode() {},
+  }
+  const trigger = document.createElement('button')
+  trigger.setAttribute('aria-haspopup', 'menu')
+  trigger.setAttribute('aria-controls', 'departing-menu')
+  trigger.setAttribute('aria-expanded', 'true')
+  const menu = document.createElement('div')
+  menu.id = 'departing-menu'
+  menu.setAttribute('role', 'menu')
+  menu.setAttribute('aria-hidden', 'false')
+  document.body.append(trigger, menu)
+
+  try {
+    expect(handleGameKey(new KeyboardEvent('keydown', { key: '4' }), game)).toBe(false)
+
+    // Naive UI can retain the outgoing menu attributes until its leave transition ends.
+    trigger.setAttribute('aria-expanded', 'false')
+
+    expect(handleGameKey(new KeyboardEvent('keydown', { key: '4' }), game)).toBe(true)
+    expect(actions).toEqual([{ kind: 'enter', cell: 2, digit: 4 }])
+  } finally {
+    trigger.remove()
+    menu.remove()
+  }
+})

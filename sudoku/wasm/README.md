@@ -2,7 +2,9 @@
 
 A thin `wasm32-unknown-unknown` / wasm-bindgen adapter over `sudoku-core`. It owns explicit wire DTOs, fallible conversion, browser number/absence semantics and prepared-resource handles. Sudoku mathematics stays in the reusable native crate; browser services, Chinese presentation, Workers and persistence stay in the frontend.
 
-Run `pnpm wasm:build` from the workspace root. The pinned build installs its matching wasm-bindgen CLI and generates JS/WASM/TypeScript declarations under `packages/sudoku-wasm/pkg`. Do not edit or manually copy those outputs. Vite emits the binary at the correct deployment root.
+`Cargo.toml` declares the Rust adapter; the colocated `package.json` declares the private `@sudoku/wasm` workspace package. Its root export provides bindings and DTO types, `/factory` provides isolated instances, and `/binary` exposes the WASM asset. Node consumers resolve `/binary` through the package export; Vite consumers use `/binary?url`.
+
+Run `pnpm wasm:build` from the workspace root. The pinned build installs its matching wasm-bindgen CLI and generates JS/WASM/TypeScript declarations under `sudoku/wasm/pkg`. Do not edit or manually copy those outputs. Vite emits the binary at the correct deployment root.
 
 Release builds use thin LTO and one code generation unit. Keep profile changes separate from algorithm changes and measure size/throughput against identical deterministic inputs; see [engine contracts](../../docs/engine.md).
 

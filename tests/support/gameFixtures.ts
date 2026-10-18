@@ -1,10 +1,13 @@
 import type { GameSession } from '@/features/game/model/session'
-import { PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
-import type { Puzzle } from '@reference/core/sudoku/puzzle'
-import { assessPuzzle, toAssessmentOutcome } from '@reference/core/sudoku/rating/assessment'
-import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
-import { toPuzzleAssessment } from '@reference/core/sudoku/rating/decoding'
+import type { Puzzle } from '@/sudoku/contracts'
+import { assessPuzzle, toAssessmentOutcome } from './engine'
+import { createAssessmentInput } from './assessment'
+import { testEngine } from './semantics'
 import { uniqueBoard, solvedBoard } from '../fixtures/sudoku'
+
+// Authored persisted fixtures predate byte seeds; retain their historical text identities.
+export const HISTORICAL_CLASSIC_VERSION = 'sudoku-v10'
+export const HISTORICAL_VARIANT_VERSION = 'sudoku-variants-v10'
 
 export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
   return {
@@ -15,7 +18,7 @@ export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
       solution: solvedBoard,
       difficulty: 'easy',
       seed: 'fixture',
-      puzzleVersion: PUZZLE_VERSION,
+      puzzleVersion: HISTORICAL_CLASSIC_VERSION,
       rules: { kind: 'classic' },
     },
     entries: Array(81).fill(0),
@@ -33,8 +36,17 @@ export function makeSession(overrides: Partial<GameSession> = {}): GameSession {
 
 // Snapshot tests consume a real assessment; algorithm expectations live in the core fixture suite.
 export function makeAssessment(puzzle: Puzzle = makeSession().puzzle) {
-  return toPuzzleAssessment(
-    toAssessmentOutcome(assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules))),
-    { variant: puzzle.rules.kind, difficulty: puzzle.difficulty },
+  const assessment = toAssessmentOutcome(
+    assessPuzzle(createAssessmentInput(puzzle.givens, puzzle.rules)),
   )
+  const decoded = testEngine.validateAssessment({
+    present: true,
+    value: assessment,
+    identity: { variant: puzzle.rules.kind, difficulty: puzzle.difficulty },
+  })
+  if (decoded.status !== 'present') {
+    throw new Error('Expected assessment fixture')
+  }
+
+  return decoded.value
 }

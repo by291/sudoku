@@ -1,5 +1,5 @@
 import { isBoard } from '@/sudoku/values'
-import type { Board, Difficulty } from '@reference/core/sudoku/types'
+import type { Board, Difficulty } from '@/sudoku/contracts'
 
 export type ClassicPuzzleFixture = { difficulty: Difficulty; givens: Board; solution: Board }
 function literalBoard(text: string): Board {

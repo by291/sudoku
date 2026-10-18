@@ -4,7 +4,7 @@
 
 ## Provenance and mathematical ownership
 
-The initial extraction comes from `tests/fixtures/teaching-contracts.json.gz`, captured from the TypeScript teaching owners at commit `6b6807d` before the Rust migration. Its compressed SHA-256 is `c5105e8ba1a054cf5f4a036e31026914dc9b75312dd7f9d0fb50c40e4d86b13c`. The sealed fixture and independent reference engine remain unchanged. The Web equality contract reconstructs the original public course shape and compares every value with that fixture.
+The initial extraction comes from `tests/fixtures/teaching-contracts.json.gz`, captured from the TypeScript teaching owners at commit `6b6807d` before the Rust migration. Its compressed SHA-256 is `c5105e8ba1a054cf5f4a036e31026914dc9b75312dd7f9d0fb50c40e4d86b13c`. The sealed fixture and independent course proof checks remain; the retired TypeScript engine is no longer required. The Web equality contract reconstructs the original public course shape and compares every value with that fixture.
 
 Some variant examples contain materialized base-candidate results and the transfer exercises contain materialized permitted transformations. These are reused presentation snapshots, not new independent mathematical oracles. `candidateOrigin` identifies base-candidate snapshots or explicit authored preconditions; prior candidate eliminations remain supplied preconditions. The structured steps retain all original unit, subset, fish, wing, coloring, cage, path, and equation facts. Chinese stage explanations are materialized from the existing Web presentation formatter.
 
