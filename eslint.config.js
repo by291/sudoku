@@ -7,7 +7,7 @@ import globals from 'globals'
 const sourceImportPatterns = [
   { regex: '^\\.', message: 'Use @/ for source imports.' },
   {
-    regex: '^@reference/|^@/core/|(?:^|/)tests/reference/',
+    regex: '^@/core/|(?:^|/)tests/',
     message: 'Production must not import the retired TypeScript engine or test oracles.',
   },
 ]
@@ -56,21 +56,15 @@ export default [
       'android/**/.gradle/**',
       'android/**/.kotlin/**',
       'android/.native-tools/**',
-      'tests/reference/typescript-engine/**',
       '.agents/**',
       '.codex/**',
       'test-results/**',
       'playwright-report/**',
     ],
   },
-  // Reference snapshots remain byte exact; executable migration tools use Node globals.
+  // Build scripts and host interoperability tests execute in Node.
   {
-    files: [
-      'tests/migration/**/*.mjs',
-      'tests/reference/*.mjs',
-      'scripts/**/*.mjs',
-      'android/interop/**/*.ts',
-    ],
+    files: ['scripts/**/*.mjs', 'android/interop/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
   js.configs.recommended,

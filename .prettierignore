@@ -7,8 +7,6 @@ node_modules
 test-results
 playwright-report
 
-tests/reference/typescript-engine/
-
 target/
 sudoku/wasm/pkg/
 .tools/

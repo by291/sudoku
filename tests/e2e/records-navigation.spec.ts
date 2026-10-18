@@ -1,8 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect, seedRecords } from './support'
-import { makeSession } from '../support/gameFixtures'
+import { makeSession, HISTORICAL_VARIANT_VERSION } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
-import { VARIANT_PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
 import type { GameSession } from '@/features/game/model/session'
 
 async function chooseRecordsVariant(page: Page, name: string) {
@@ -29,7 +28,7 @@ async function seedCompletedRecords(page: Page) {
     puzzle: {
       ...makeSession().puzzle,
       ...VARIANT_FIXTURES.arrow,
-      puzzleVersion: VARIANT_PUZZLE_VERSION,
+      puzzleVersion: HISTORICAL_VARIANT_VERSION,
     },
   })
   const arrowAssisted = {

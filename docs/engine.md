@@ -65,4 +65,4 @@ The browser bridge is version 3 and the native bridge is version 2. These are tr
 
 A prepared layout can be reused only under its documented identity and lifetime. Mutable workspaces and returned evidence cannot alias another request. Preserve cancellation lifetime, exact-search restoration, random-call ordering, stage charges and rating-prefix behavior during refactors. A structural deduction check is not a mathematical proof.
 
-See [the variant checklist](variant-extension.md) for complete extension requirements and [the maintained migration tests](../tests/migration/README.md) for independent fixtures and commands. Expected outcomes must never be regenerated from the Rust implementation under test. Rust commands are documented in [the core README](../sudoku/core/README.md).
+See [the variant checklist](variant-extension.md) for complete extension requirements and [the testing guide](testing.md) for independent fixtures and commands. Expected outcomes must never be regenerated from the Rust implementation under test. Rust commands are documented in [the core README](../sudoku/core/README.md).

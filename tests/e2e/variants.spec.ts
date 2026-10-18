@@ -10,13 +10,12 @@ import {
   enterGameDigit,
   selectGameMenuAction,
 } from './support'
-import { makeSession } from '../support/gameFixtures'
+import { makeSession, HISTORICAL_VARIANT_VERSION } from '../support/gameFixtures'
 import type { Page } from '@playwright/test'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
 
-import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
-import { VARIANT_PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
-import type { Digit } from '@reference/core/sudoku/types'
+import { VARIANT_TEMPLATES } from '../fixtures/variantTemplates'
+import type { Digit } from '@/sudoku/contracts'
 
 async function chooseVariant(page: Page, field: string, name: string) {
   if (field !== '成绩玩法') {
@@ -239,7 +238,7 @@ test('explains a fixed Arrow combination and highlights the displayed step', asy
       puzzle: {
         ...VARIANT_TEMPLATES.arrow.hard[0],
         seed: 'fixed-arrow-proof',
-        puzzleVersion: VARIANT_PUZZLE_VERSION,
+        puzzleVersion: HISTORICAL_VARIANT_VERSION,
       },
       entries: Array.from({ length: 81 }, (_, cell) => entries.get(cell) ?? 0),
     }),

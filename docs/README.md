@@ -13,6 +13,10 @@ These documents describe maintained behavior, architecture and development workf
 | [Local backup](local-backup.md)          | Portable format, limits, validation, export and replacement                       |
 | [Adding a variant](variant-extension.md) | Registration points and required mathematical/presentation support                |
 
+## Testing
+
+[Testing and independent fixtures](testing.md) explains Rust-native coverage, WASM/browser contracts, fixture provenance and versioned regression policy.
+
 ## Web
 
 | Topic                                        | Contents                                                                   |
@@ -31,4 +35,4 @@ These documents describe maintained behavior, architecture and development workf
 
 ## Source-level references
 
-[Repository guidelines](../AGENTS.md) and [Android guidelines](../android/AGENTS.md) define coding conventions. [Rust core](../sudoku/core/README.md), [WASM adapter](../sudoku/wasm/README.md) and [migration tests](../tests/migration/README.md) retain instructions next to their source owners. Executable tests and independent oracle fixtures remain under their normal test directories.
+[Repository guidelines](../AGENTS.md) and [Android guidelines](../android/AGENTS.md) define coding conventions. [Rust core](../sudoku/core/README.md), [WASM adapter](../sudoku/wasm/README.md) and [test ownership and fixtures](testing.md) retain instructions next to their source owners. Executable tests and independent oracle fixtures remain under their normal test directories.

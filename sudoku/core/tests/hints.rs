@@ -1,8 +1,8 @@
 #[path = "support/rules.rs"]
 pub mod fixtures;
-#[path = "../examples/contracts/hints.rs"]
+#[path = "support/hints.rs"]
 mod hint_contracts;
-#[path = "../examples/contracts/projection.rs"]
+#[path = "support/projection.rs"]
 mod logical_projection;
 
 use sudoku_core::budget::WorkBudget;

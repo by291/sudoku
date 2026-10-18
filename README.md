@@ -44,17 +44,18 @@ Debug APKs are produced separately for arm64-v8a and x86_64. See the [Android bu
 
 The [documentation index](docs/README.md) groups maintained documents by topic.
 
-| Topic                                                   | Document                                             |
-| ------------------------------------------------------- | ---------------------------------------------------- |
-| Modes, variants, controls and player data               | [Product behavior](docs/product.md)                  |
-| Rust ownership, generation, rating and seed identity    | [Engine](docs/engine.md)                             |
-| Algorithm principles, supported techniques and research | [Algorithms](docs/algorithms/README.md)              |
-| Vue workflows, lazy computation and browser persistence | [Web architecture](docs/architecture.md)             |
-| Backup format, validation and replacement               | [Local backup](docs/local-backup.md)                 |
-| Shared authored lessons and durable progress            | [Learning content](docs/learning.md)                 |
-| Required variant registration and invariants            | [Adding a variant](docs/variant-extension.md)        |
-| Android modules, native lifetime and state ownership    | [Android architecture](docs/android/architecture.md) |
-| Room projections, migration and on-demand reads         | [Android data loading](docs/android/data-loading.md) |
-| Native navigation, layout and accessibility             | [Android interface](docs/android/interface.md)       |
+| Topic                                                       | Document                                             |
+| ----------------------------------------------------------- | ---------------------------------------------------- |
+| Modes, variants, controls and player data                   | [Product behavior](docs/product.md)                  |
+| Rust ownership, generation, rating and seed identity        | [Engine](docs/engine.md)                             |
+| Algorithm principles, supported techniques and research     | [Algorithms](docs/algorithms/README.md)              |
+| Native regressions, independent fixtures and WASM contracts | [Testing](docs/testing.md)                           |
+| Vue workflows, lazy computation and browser persistence     | [Web architecture](docs/architecture.md)             |
+| Backup format, validation and replacement                   | [Local backup](docs/local-backup.md)                 |
+| Shared authored lessons and durable progress                | [Learning content](docs/learning.md)                 |
+| Required variant registration and invariants                | [Adding a variant](docs/variant-extension.md)        |
+| Android modules, native lifetime and state ownership        | [Android architecture](docs/android/architecture.md) |
+| Room projections, migration and on-demand reads             | [Android data loading](docs/android/data-loading.md) |
+| Native navigation, layout and accessibility                 | [Android interface](docs/android/interface.md)       |
 
 Read [repository guidelines](AGENTS.md) and the relevant topic before changing behavior. Android also has [local guidelines](android/AGENTS.md). Documentation, identifiers and code comments use English; player-facing copy uses Chinese.

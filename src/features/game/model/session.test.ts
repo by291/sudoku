@@ -8,9 +8,8 @@ import { expect, it } from 'vitest'
 import { makeAssessment, makeSession } from '../../../../tests/support/gameFixtures'
 import { emptyBoard, solvedBoard } from '../../../../tests/fixtures/sudoku'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
-import { createWorkBudget } from '@reference/core/sudoku/budget'
 
-it('installs an independent assessment snapshot and preserves it through player actions', () => {
+it('installs an owned assessment snapshot and preserves it through player actions', () => {
   const fixture = makeSession()
   const assessment = makeAssessment(fixture.puzzle)
   const session = createSession(
@@ -137,7 +136,7 @@ it('generates rule-aware notes and retains all state when the candidate budget e
   const session = makeSession({
     puzzle: { ...makeSession().puzzle, ...fixture, givens: emptyBoard },
   })
-  const exhausted = applySessionAction(session, { kind: 'generate-notes' }, createWorkBudget(0))
+  const exhausted = applySessionAction(session, { kind: 'generate-notes' }, 0)
 
   expect(exhausted).toEqual({
     status: 'budget-exhausted',

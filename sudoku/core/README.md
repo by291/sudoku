@@ -39,7 +39,7 @@ Logical workspaces expose read-only board/candidate borrows through `board()` an
 
 `WorkBudget` charges before work, retains abandoned work and reports stage consumption. Expected incompleteness uses explicit bounded outcomes; exhaustion never means zero solutions, contradiction, uniqueness or success. Default generation limits are 40 layouts, 4,000,000 shared work units and 500 logical steps. Live arithmetic can consume its full allowance even on an 81-cell board: a UI must honor its measured execution policy rather than assuming every synchronous operation fits one frame.
 
-The public owners are `rules/`, `constraints/`, `search/`, `editing`, `logic/`, `rating/`, `generation/`, `hint` and `puzzle`. See the [algorithm guide](../../docs/algorithms/README.md) for principles, technique policies and research references; see the workspace [architecture](../../docs/architecture.md), [extension checklist](../../docs/variant-extension.md) and [migration contracts](../../tests/migration/README.md) for integration requirements.
+The public owners are `rules/`, `constraints/`, `search/`, `editing`, `logic/`, `rating/`, `generation/`, `hint` and `puzzle`. See the [algorithm guide](../../docs/algorithms/README.md) for principles, technique policies and research references; see the workspace [architecture](../../docs/architecture.md), [extension checklist](../../docs/variant-extension.md) and [testing guide](../../docs/testing.md) for integration requirements.
 
 From the workspace root:
 
