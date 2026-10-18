@@ -1,7 +1,7 @@
 import { assessmentIssueMessage } from '/src/features/game/model/assessmentPresentation.ts'
 import { violationMessage } from '/src/features/game/model/violationPresentation.ts'
 // Test-only transport projection. Every mathematical operation runs in the emitted WASM.
-import { createBindings } from '/packages/sudoku-wasm/pkg/factory.js'
+import { createBindings } from '/sudoku/wasm/pkg/factory.js'
 
 const wasm = createBindings()
 const init = wasm.default

@@ -36,7 +36,7 @@ test('loads the generated WASM library and reports typed algorithm identities', 
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const info: unknown = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -66,7 +66,7 @@ test('summary assessment preserves full outcomes and work in the browser', async
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const comparisons = await page.evaluate(async (board) => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     function record(value: unknown): value is Record<string, unknown> {
       return value !== null && typeof value === 'object'
@@ -124,7 +124,7 @@ test('rejects_text_wrong_seed_lengths_and_v10_requests', async ({ page }) => {
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const rejections = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -189,7 +189,7 @@ test('preserves_all_32_seed_bytes_and_hex_output', async ({ page }) => {
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const results = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -245,7 +245,7 @@ test('returned_arrays_do_not_alias_prepared_state', async ({ page }) => {
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const result = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -378,7 +378,7 @@ test('root_seed_derivation_matches_independent_blake3_bytes', async ({ page }) =
     Array.from(new TextEncoder().encode('daily:2026-10-16')),
   ]
   const actual: unknown = await page.evaluate(async (materials) => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -410,7 +410,7 @@ test('edit validates every note mask before length and action failures', async (
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const errors = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     if (
       !bindings ||
@@ -484,7 +484,7 @@ test('assessment technique coverage precedes count and workload contradictions',
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const outcomes = await page.evaluate(async (board) => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     function record(value: unknown): value is Record<string, unknown> {
       return value !== null && typeof value === 'object'
@@ -550,7 +550,7 @@ test('live assessment preserves typed violations and rejects malformed diagnosti
   await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
 
   const outcomes = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     function record(value: unknown): value is Record<string, unknown> {
       return value !== null && typeof value === 'object'

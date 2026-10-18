@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import 'fake-indexeddb/auto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
@@ -47,7 +48,9 @@ describe('portable Android backup interoperability', () => {
     }
     expect(selected.size).toBe(19)
     const engine = await createMainEngine(
-      new WebAssembly.Module(readFileSync('packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm')),
+      new WebAssembly.Module(
+        readFileSync(createRequire(import.meta.url).resolve('@sudoku/wasm/binary')),
+      ),
     )
     const database = await openSudokuDatabase('android-interop-export')
     try {
@@ -158,7 +161,9 @@ describe('portable Android backup interoperability', () => {
     'restores the actual Android export through the Web transaction',
     async () => {
       const engine = await createMainEngine(
-        new WebAssembly.Module(readFileSync('packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm')),
+        new WebAssembly.Module(
+          readFileSync(createRequire(import.meta.url).resolve('@sudoku/wasm/binary')),
+        ),
       )
       const database = await openSudokuDatabase('android-interop-import')
       try {

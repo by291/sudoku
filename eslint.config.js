@@ -50,7 +50,7 @@ export default [
       'dist-subpath/**',
       'node_modules/**',
       'target/**',
-      'packages/sudoku-wasm/pkg/**',
+      'sudoku/wasm/pkg/**',
       '.tools/**',
       'android/**/build/**',
       'android/**/.gradle/**',

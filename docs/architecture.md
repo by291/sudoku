@@ -7,8 +7,10 @@ The [product contract](product.md) defines player behavior, and [Engine](engine.
 ```text
 sudoku/
   core/src/{types,board,budget,random,rules,constraints,search,editing,logic,rating,generation,hint,puzzle}
-  wasm/src/{dto,conversion,prepared}
-packages/sudoku-wasm/pkg/        # Generated and ignored
+  wasm/
+    Cargo.toml, package.json    # Rust crate and @sudoku/wasm exports
+    src/{dto,conversion,prepared}
+    pkg/                       # Generated and ignored
 src/
   main.ts, App.vue, ApplicationBootstrapState.vue, ReadyApplication.vue, runtime.ts
   sudoku/{contracts,values,catalogue,seed,generationInput,ruleInput,puzzleSnapshot}
@@ -55,7 +57,7 @@ Source imports use `@/`; Worker asset URLs stay literal and relative. Contracts 
 
 ## WASM readiness and ownership
 
-`pnpm wasm:build` builds locked Rust/WASM, installs the pinned wasm-bindgen CLI if needed, and emits JS/WASM/declarations into the ignored workspace package. A build-time TypeScript compiler transform wraps self-contained generated glue in a collectable factory. Each instance owns separate memory; compiled immutable code can be shared. There is no source evaluation, handwritten pointer protocol, raw-memory alias or browser-side fallback solver.
+`pnpm wasm:build` builds locked Rust/WASM, installs the pinned wasm-bindgen CLI if needed, and emits JS/WASM/declarations into ignored `sudoku/wasm/pkg/`. The adapter owns both its Rust crate and the private `@sudoku/wasm` workspace package; consumers use the package exports rather than generated filesystem paths. A build-time TypeScript compiler transform wraps self-contained generated glue in a collectable factory. Each instance owns separate memory; compiled immutable code can be shared. There is no source evaluation, handwritten pointer protocol, raw-memory alias or browser-side fallback solver.
 
 `ApplicationBootstrapState.vue` and the controlled `shared/components/ApplicationLoadingState.vue` present application startup and retry. App constructs browsing services after initial route resolution without downloading WASM. Pinia 4.0.3 resolves store injections through the Vue application context, so `main.ts` publishes the runtime with an application-level provider before mounting `ReadyApplication.vue`. Runtime readiness means services are available; `ensureEngine()` separately shares the lazy module download, validation and initialization. Failed initialization is retryable, and a late initializer disposes its engine after shutdown.
 

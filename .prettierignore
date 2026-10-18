@@ -10,7 +10,7 @@ playwright-report
 tests/reference/typescript-engine/
 
 target/
-packages/sudoku-wasm/pkg/
+sudoku/wasm/pkg/
 .tools/
 
 android/**/.gradle/

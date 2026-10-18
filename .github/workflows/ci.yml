@@ -92,7 +92,7 @@ jobs:
           name: portable-engine-build
           path: |
             core-dependencies.txt
-            packages/sudoku-wasm/pkg/
+            sudoku/wasm/pkg/
             dist/
             dist-subpath/
           retention-days: 7
