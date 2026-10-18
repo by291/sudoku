@@ -1,14 +1,32 @@
 package dev.sudoku.app.engine
 
+import dev.sudoku.app.ffi.CancellationToken
+import dev.sudoku.app.ffi.DifficultyDto
+import dev.sudoku.app.ffi.GenerationOptionsDto
+import dev.sudoku.app.ffi.GenerationResultDto
+import dev.sudoku.app.ffi.GenerationVersionDto
+import dev.sudoku.app.ffi.NativeException
+import dev.sudoku.app.ffi.VariantDto
 import dev.sudoku.app.model.ArrowClue
 import dev.sudoku.app.model.AssessmentIssue
 import dev.sudoku.app.model.AssessmentResult
+import dev.sudoku.app.model.AssessmentSummary
+import dev.sudoku.app.model.AssessmentWorkload
 import dev.sudoku.app.model.BoardEdit
 import dev.sudoku.app.model.BoardLayers
 import dev.sudoku.app.model.Cage
+import dev.sudoku.app.model.Difficulty
+import dev.sudoku.app.model.EditResult
+import dev.sudoku.app.model.EngineInformation
 import dev.sudoku.app.model.EngineOutcome
+import dev.sudoku.app.model.GenerationRequest
+import dev.sudoku.app.model.PreparedPuzzle
+import dev.sudoku.app.model.PuzzleAssessment
+import dev.sudoku.app.model.PuzzleContent
 import dev.sudoku.app.model.PuzzleRules
 import dev.sudoku.app.model.RuleViolation
+import dev.sudoku.app.model.Validation
+import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.ViolationCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,19 +36,51 @@ import kotlinx.coroutines.runBlocking
 
 class RustSudokuEngineTest {
     @Test
+    fun invalidJigsawAndOutOfRangeBoardRemainConclusiveValidationFailures() = runBlocking<Unit> {
+        val engine = RustSudokuEngine()
+        val solved = List(81) { (it / 9 * 3 + it / 27 + it % 9) % 9 + 1 }
+        val invalidInputs = listOf(
+            PuzzleContent(
+                List(81) {
+                    0
+                },
+                solved,
+                PuzzleRules.Jigsaw(List(9) { List(9) { 0 } }),
+                Difficulty.EASY
+            ),
+            PuzzleContent(
+                List(81) {
+                    10
+                },
+                solved,
+                PuzzleRules.Classic,
+                Difficulty.EASY
+            )
+        )
+
+        for (input in invalidInputs) {
+            val outcome = engine.validatePuzzle(input)
+
+            assertIs<EngineOutcome.Completed<Validation>>(outcome).also {
+                assertIs<Validation.Invalid>(it.value)
+            }
+        }
+    }
+
+    @Test
     fun historicalUnavailableStringsRemainUnchanged() = runBlocking<Unit> {
-        val value = dev.sudoku.app.model.PuzzleAssessment.Unavailable(
+        val value = PuzzleAssessment.Unavailable(
             "invalid-input",
             listOf("原始历史文本", "  keep whitespace  ")
         )
 
         val response = RustSudokuEngine().validateAssessment(
             value,
-            dev.sudoku.app.model.Variant.CLASSIC,
-            dev.sudoku.app.model.Difficulty.EASY
+            Variant.CLASSIC,
+            Difficulty.EASY
         )
 
-        assertEquals(value, assertIs<EngineOutcome.Completed<dev.sudoku.app.model.PuzzleAssessment?>>(response).value)
+        assertEquals(value, assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(response).value)
     }
 
     @Test
@@ -99,12 +149,12 @@ class RustSudokuEngineTest {
     fun actualNativeLibraryReportsVersionsAndRejectsMalformedBoards() = runBlocking<Unit> {
         val engine = RustSudokuEngine()
         val information = assertIs<EngineOutcome.Completed<*>>(engine.information()).value
-        assertEquals("sudoku-v11", (information as dev.sudoku.app.model.EngineInformation).puzzleVersion)
-        val prepared = assertIs<EngineOutcome.Completed<dev.sudoku.app.model.PreparedPuzzle>>(
+        assertEquals("sudoku-v11", (information as EngineInformation).puzzleVersion)
+        val prepared = assertIs<EngineOutcome.Completed<PreparedPuzzle>>(
             engine.prepare(PuzzleRules.Classic)
         ).value
 
-        assertIs<EngineOutcome.Failed>(prepared.isComplete(List(80) { 0 }))
+        assertIs<EngineOutcome.InvalidInput>(prepared.isComplete(List(80) { 0 }))
         assertEquals(20, prepared.metadata.duplicatePeers[0].size)
         prepared.close()
         assertIs<EngineOutcome.Failed>(prepared.isComplete(List(81) { 0 }))
@@ -113,12 +163,12 @@ class RustSudokuEngineTest {
     @Test
     fun nativeEditingOwnsTheSnapshotAndReturnsAllCandidateMasks() = runBlocking<Unit> {
         val engine = RustSudokuEngine()
-        val prepared = assertIs<EngineOutcome.Completed<dev.sudoku.app.model.PreparedPuzzle>>(
+        val prepared = assertIs<EngineOutcome.Completed<PreparedPuzzle>>(
             engine.prepare(PuzzleRules.Classic)
         ).value
         val layers = BoardLayers(List(81) { 0 }, List(81) { 0 })
 
-        val changed = assertIs<EngineOutcome.Completed<dev.sudoku.app.model.EditResult>>(
+        val changed = assertIs<EngineOutcome.Completed<EditResult>>(
             prepared.edit(
                 List(81) {
                     0
@@ -139,7 +189,7 @@ class RustSudokuEngineTest {
     @Test
     fun malformedOptionalMetadataDowngradesThroughRustWithoutBlockingPlayableData() = runBlocking<Unit> {
         val engine = RustSudokuEngine()
-        val workload = dev.sudoku.app.model.AssessmentWorkload(
+        val workload = AssessmentWorkload(
             0,
             0,
             0,
@@ -149,30 +199,30 @@ class RustSudokuEngineTest {
             null,
             0
         )
-        val summary = dev.sudoku.app.model.AssessmentSummary(
+        val summary = AssessmentSummary(
             "sudoku-rating-v2",
-            dev.sudoku.app.model.Variant.CLASSIC,
-            dev.sudoku.app.model.Difficulty.EASY,
+            Variant.CLASSIC,
+            Difficulty.EASY,
             workload
         )
         val malformed = listOf(
-            dev.sudoku.app.model.PuzzleAssessment.Rated(
+            PuzzleAssessment.Rated(
                 summary.copy(workload = workload.copy(steps = 4_294_967_296L))
             ),
-            dev.sudoku.app.model.PuzzleAssessment.Rated(
+            PuzzleAssessment.Rated(
                 summary.copy(workload = workload.copy(techniqueCounts = mapOf("unknown-technique" to 1L)))
             ),
-            dev.sudoku.app.model.PuzzleAssessment.Unavailable("unknown-reason", emptyList())
+            PuzzleAssessment.Unavailable("unknown-reason", emptyList())
         )
 
         for (value in malformed) {
             val result = engine.validateAssessment(
                 value,
-                dev.sudoku.app.model.Variant.CLASSIC,
-                dev.sudoku.app.model.Difficulty.EASY
+                Variant.CLASSIC,
+                Difficulty.EASY
             )
-            val completed = assertIs<EngineOutcome.Completed<dev.sudoku.app.model.PuzzleAssessment?>>(result)
-            val unavailable = assertIs<dev.sudoku.app.model.PuzzleAssessment.Unavailable>(completed.value)
+            val completed = assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(result)
+            val unavailable = assertIs<PuzzleAssessment.Unavailable>(completed.value)
             assertEquals("invalid-summary", unavailable.reason)
         }
     }
@@ -181,18 +231,18 @@ class RustSudokuEngineTest {
 class NativeCancellationTest {
     @Test
     fun independentTokenStopsAnExecutingNativeGeneration() {
-        val token = dev.sudoku.app.ffi.CancellationToken()
+        val token = CancellationToken()
         val started = java.util.concurrent.CountDownLatch(1)
         val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
         try {
-            val future = executor.submit<dev.sudoku.app.ffi.GenerationResultDto> {
+            val future = executor.submit<GenerationResultDto> {
                 started.countDown()
                 dev.sudoku.app.ffi.generate(
                     ByteArray(32) { 42 },
-                    dev.sudoku.app.ffi.GenerationOptionsDto(
-                        dev.sudoku.app.ffi.VariantDto.KILLER,
-                        dev.sudoku.app.ffi.DifficultyDto.HARD,
-                        dev.sudoku.app.ffi.GenerationVersionDto.VARIANTS_V11,
+                    GenerationOptionsDto(
+                        VariantDto.KILLER,
+                        DifficultyDto.HARD,
+                        GenerationVersionDto.VARIANTS_V11,
                         null
                     ),
                     token
@@ -205,7 +255,7 @@ class NativeCancellationTest {
             val error = kotlin.test.assertFailsWith<java.util.concurrent.ExecutionException> {
                 future.get(5, java.util.concurrent.TimeUnit.SECONDS)
             }
-            assertIs<dev.sudoku.app.ffi.NativeException.Cancelled>(error.cause)
+            assertIs<NativeException.Cancelled>(error.cause)
         } finally {
             executor.shutdown()
             check(executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
@@ -218,15 +268,15 @@ class NativeCancellationTest {
         val engine = RustSudokuEngine(NativeExecutionLimits(generationDeadlineMs = 1))
         assertIs<EngineOutcome.Completed<*>>(engine.information())
         val result = engine.generate(
-            dev.sudoku.app.model.GenerationRequest(
-                dev.sudoku.app.model.Variant.KILLER,
-                dev.sudoku.app.model.Difficulty.HARD,
+            GenerationRequest(
+                Variant.KILLER,
+                Difficulty.HARD,
                 List(32) { 42.toUByte() }
             )
         )
 
         assertIs<EngineOutcome.TimedOut>(result)
-        val prepared = assertIs<EngineOutcome.Completed<dev.sudoku.app.model.PreparedPuzzle>>(
+        val prepared = assertIs<EngineOutcome.Completed<PreparedPuzzle>>(
             engine.prepare(PuzzleRules.Classic)
         ).value
         prepared.close()

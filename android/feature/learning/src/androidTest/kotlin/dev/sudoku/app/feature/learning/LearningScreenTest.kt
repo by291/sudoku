@@ -1,6 +1,15 @@
 package dev.sudoku.app.feature.learning
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -14,6 +23,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.sudoku.app.designsystem.SudokuTheme
 import dev.sudoku.app.designsystem.variantLabel
@@ -35,10 +46,56 @@ class LearningScreenTest {
             .bufferedReader().use { it.readText() }
     )
 
+    @Test fun delayedProgressKeepsCourseAndFirstLessonBoundsAtNormalFontScale() {
+        verifyDelayedProgressBounds(fontScale = 1f)
+    }
+
+    @Test fun delayedProgressKeepsCourseAndFirstLessonBoundsAtEnlargedFontScale() {
+        verifyDelayedProgressBounds(fontScale = 1.8f)
+    }
+
+    private fun verifyDelayedProgressBounds(fontScale: Float) {
+        val directory = catalogue().lessons.map { it.directoryEntry() }
+        val state = mutableStateOf(LearningDirectoryState(directory = directory))
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+                SudokuTheme(ThemePreference.SYSTEM) {
+                    // Keep both target rows composed so lazy scroll anchoring cannot mask a layout shift.
+                    Box(Modifier.requiredWidth(360.dp).requiredHeight(1800.dp)) {
+                        LearningScreen(state.value, {}, {}, {})
+                    }
+                }
+            }
+        }
+        val heading = compose.onNodeWithText("标准课程")
+        val firstLesson = compose.onNodeWithTag("lesson-rules")
+        val headingBefore = heading.getUnclippedBoundsInRoot()
+        val lessonBefore = firstLesson.getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("suggested-lesson-action").assertDoesNotExist()
+
+        compose.runOnIdle {
+            state.value = state.value.copy(
+                loading = false,
+                epoch = 0,
+                settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1))
+            )
+        }
+
+        val headingAfter = heading.getUnclippedBoundsInRoot()
+        // The progress label legitimately changes this weighted text node's width; its
+        // position/height and the first lesson's whole container must remain unchanged.
+        assertEquals(headingBefore.left, headingAfter.left)
+        assertEquals(headingBefore.top, headingAfter.top)
+        assertEquals(headingBefore.bottom, headingAfter.bottom)
+        assertEquals(lessonBefore, firstLesson.getUnclippedBoundsInRoot())
+        compose.onNodeWithTag("suggested-lesson-action").assertExists()
+    }
+
     @Test
     fun fixedCourseHeadingAppearsImmediatelyAndProgressDoesNotMoveIt() {
         val catalogue = catalogue()
-        val state = mutableStateOf(LearningUiState(directory = catalogue.lessons.map { it.directoryEntry() }))
+        val state = mutableStateOf(LearningDirectoryState(directory = catalogue.lessons.map { it.directoryEntry() }))
         compose.setContent {
             SudokuTheme(ThemePreference.SYSTEM) {
                 LearningScreen(state.value, {}, {}, {})
@@ -53,10 +110,10 @@ class LearningScreenTest {
         compose.onNodeWithTag("suggested-lesson-action").assertDoesNotExist()
 
         compose.runOnIdle {
-            state.value = LearningUiState(
+            state.value = LearningDirectoryState(
                 loading = false,
                 epoch = 0,
-                catalogue = catalogue,
+                directory = catalogue.lessons.map { it.directoryEntry() },
                 progress = listOf(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
             )
         }
@@ -73,7 +130,7 @@ class LearningScreenTest {
         compose.setContent {
             SudokuTheme(ThemePreference.SYSTEM) {
                 LearningScreen(
-                    LearningUiState(
+                    LearningDirectoryState(
                         loading = false,
                         directory = courses.lessons.map { it.directoryEntry() },
                         error = "学习进度暂时无法读取，请重试。"
@@ -87,13 +144,25 @@ class LearningScreenTest {
         compose.onNodeWithText("32 节互动课程，按自己的节奏来").assertIsDisplayed()
         compose.onNodeWithText("学习进度暂时无法读取，请重试。").assertIsDisplayed()
         compose.onNodeWithTag("lesson-rules").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("lesson-rules").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "进度待确认")
+        )
         compose.onNodeWithText("0 / 32").assertDoesNotExist()
     }
 
     @Test
     fun everyVariantIsSelectableAndOffersItsOwnFirstLesson() {
         val catalogue = catalogue()
-        val state = mutableStateOf(LearningUiState(loading = false, epoch = 0, catalogue = catalogue))
+        val state =
+            mutableStateOf(
+                LearningDirectoryState(
+                    loading = false,
+                    epoch = 0,
+                    directory = catalogue.lessons.map {
+                        it.directoryEntry()
+                    }
+                )
+            )
         var opened: String? = null
         compose.setContent {
             SudokuTheme(ThemePreference.SYSTEM) {
@@ -117,10 +186,10 @@ class LearningScreenTest {
 
     @Test
     fun savedCourseCanBeContinuedAndAnyLaterLessonCanBeOpened() {
-        val state = LearningUiState(
+        val state = LearningDirectoryState(
             loading = false,
             epoch = 0,
-            catalogue = catalogue(),
+            directory = catalogue().lessons.map { it.directoryEntry() },
             settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1)),
             progress = listOf(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
         )
@@ -143,10 +212,10 @@ class LearningScreenTest {
     fun completedCourseKeepsReviewDuringRefreshAndHidesItForAnUnknownDataset() {
         val catalogue = catalogue()
         val state = mutableStateOf(
-            LearningUiState(
+            LearningDirectoryState(
                 loading = false,
                 epoch = 0,
-                catalogue = catalogue,
+                directory = catalogue.lessons.map { it.directoryEntry() },
                 progress = catalogue.lessons.map { LessonProgress(it.id, "2026-10-17T00:00:00.000Z") }
             )
         )

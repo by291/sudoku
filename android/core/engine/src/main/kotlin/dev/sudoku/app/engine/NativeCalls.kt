@@ -12,12 +12,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 
-/** Deadlines include dispatch, owned conversion, native computation, and result validation. */
+/** Deadlines cover queueing and execution, including result conversion inside the lane.
+ * Input snapshots are captured before dispatch and are outside this execution deadline. */
 data class NativeExecutionLimits(val generationDeadlineMs: Long = 3_000, val analysisDeadlineMs: Long = 15_000) {
     init {
         require(generationDeadlineMs > 0 && analysisDeadlineMs > 0)
     }
 }
+
+internal enum class NativeLane { INTERACTIVE, ANALYSIS }
 
 // These application-wide lanes bound executing synchronous calls across all engine instances.
 internal object NativeCalls {
@@ -26,7 +29,7 @@ internal object NativeCalls {
     private val analysis = Dispatchers.IO.limitedParallelism(2)
 
     suspend fun <T> run(
-        long: Boolean,
+        lane: NativeLane,
         deadlineMs: Long,
         discard: (T) -> Unit = {},
         operation: (CancellationToken) -> EngineOutcome<T>
@@ -36,7 +39,7 @@ internal object NativeCalls {
                 suspendCancellableCoroutine { continuation ->
                     val cancellation = TokenOwner()
                     continuation.invokeOnCancellation { cancellation.cancel() }
-                    scope.launch(if (long) analysis else interactive) {
+                    scope.launch(if (lane == NativeLane.ANALYSIS) analysis else interactive) {
                         // Cancelled queued work never enters native computation.
                         if (!continuation.isActive) {
                             return@launch
@@ -44,6 +47,8 @@ internal object NativeCalls {
                         val result = try {
                             val token = cancellation.create()
                             operation(token)
+                        } catch (failure: NativeException.InvalidInput) {
+                            EngineOutcome.InvalidInput(failure.reason)
                         } catch (failure: NativeException.Cancelled) {
                             EngineOutcome.Cancelled
                         } catch (failure: NativeException.BudgetExhausted) {

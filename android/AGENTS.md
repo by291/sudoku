@@ -1,15 +1,40 @@
 # Android Guidelines
 
-Follow the root repository guidelines and the approved Android design in `../docs/superpowers/specs/2026-10-16-android-client-design.md`.
+Follow the root repository guidelines, the approved [client design](../docs/superpowers/specs/2026-10-16-android-client-design.md), and the [data-loading design](../docs/superpowers/specs/2026-10-17-android-data-loading-design.md).
 
-- Keep all Android-specific sources, including the Rust FFI adapter, in this directory. Reuse `../sudoku/core`.
-- Use Kotlin with four-space indentation, explicit imports, braces, descriptive names, and blank lines between meaningful workflow stages.
-- Write Chinese player copy and English identifiers, comments, documentation, and test descriptions.
-- Keep Kotlin-only contracts in `core/domain`, native ownership in `core/engine`, persistence and asset loading in `core/data`, generic theme in `core/design`, controlled board presentation in `core/ui`, and complete workflows in `feature/game`, `feature/learning`, and `feature/records`. App owns bootstrap and navigation only.
-- Apply no Sudoku algorithm in Kotlin. All edits and mathematical facts come from the engine contract.
-- Features expose Route entry points; screens and ViewModels stay internal. Features never import sibling features, app, data implementations, or generated bindings. Generic design has no domain dependencies. Build defaults live in `build-logic`, and Gradle checks configured project edges.
-- Use immutable UI state and lifecycle-aware collection. Release native objects only after their in-flight calls return.
-- Treat persisted and imported data as untrusted. Preserve inconclusive records and distinguish cancellation, timeout, exhaustion, and failure.
-- Keep every player operation consistent across touch, keyboard, and hints. Do not put native calls or database writes in composable bodies.
-- Run `./gradlew qualityCheck :app:assembleDebug` for changes spanning modules. Run focused JVM or instrumentation tests while developing.
-- Do not commit, reset, or change unrelated Web/Rust work without explicit authorization.
+## Ownership
+
+- Keep Android-specific sources, including the Rust FFI adapter, in this directory. Reuse `../sudoku/core`; do not implement Sudoku algorithms in Kotlin.
+- Keep Kotlin-only contracts in `core/domain`, native ownership in `core/engine`, persistence and asset loading in `core/data`, generic theme in `core/design`, and controlled board presentation in `core/ui`. App owns bootstrap, dependency composition, global preferences and navigation.
+- Keep complete workflows in their feature. Routes connect platform lifecycle and navigation to an internal screen and ViewModel. Features never import sibling features, app, data implementations or generated bindings. Generic design has no domain dependencies.
+- Use one owner for a complete transaction. `GameController` owns session transitions and ordered saves; `GameEntryController` owns entry queries. `RecordsViewModel` coordinates independent query and backup controllers. `LearningProgressWriter` owns durable advancement separately from lesson presentation.
+- Keep Room schema/migrations, compact queries, projection validation, coverage and selected-detail repair under their focused data owners. Do not move business rules into generic utilities or introduce callback-heavy context objects to shorten files.
+- Register every module and allowed project edge in the root build. `checkModuleDependencies` rejects unknown modules and forbidden edges. Build defaults belong in `build-logic`.
+
+## Readability and contracts
+
+- Use Kotlin with four-space indentation, explicit imports, braces and descriptive names. Write Chinese player copy and English identifiers, comments, documentation and test descriptions.
+- Separate adjacent function/class declarations and distinct workflow stages with one blank line. Keep related properties and tightly coupled calculations together. The Android-local `.editorconfig` enables ktlint 1.7.1's declaration-spacing rule; the formatter cannot decide where input guards, preparation, side effects and returned results need a paragraph break.
+- Prefer direct branches and named domain predicates over nested outcome selection. Keep short calls and conditions readable rather than retaining unnecessary multiline wrapping. Name non-obvious budgets, intervals and bit masks; ordinary board geometry and cohesive layout need no arbitrary extraction.
+- Keep screens, ViewModels and implementation collaborators internal unless another module needs their contract. Public data describes facts; resource-owning objects expose validated operations and explicit disposal.
+- Comment where correctness depends on ordering or ownership: immutable snapshots before suspension, operation generations, dataset epoch/revision/editor fences, save-before-switch and delayed native disposal. Explain what would break without the constraint; do not narrate obvious code.
+- Use concise KDoc for non-obvious public contracts: resource lifetime, cancellation, mutation, milliseconds, preconditions and incomplete outcomes. Preserve these comments when moving code.
+
+## State and platform boundaries
+
+- Use immutable UI state and lifecycle-aware collection. Keep each state workflow with its derived values, actions and cleanup. Do not call native code or write the database in composable bodies.
+- Snapshot mutable input before suspension. Retain operation and dataset fences when refactoring. Settings updates must preserve fields owned by other operations; late completions must not restore disposed owners.
+- Release native handles only after actual in-flight execution returns. Distinguish conclusive invalid input from cancellation, timeout, budget exhaustion and unavailable execution. Inconclusive data must not authorize quarantine or destructive replacement.
+- Keep unknown personal progress, summary coverage and query failure distinct from known-empty values. Preserve existing usable results during ordinary refresh, and invalidate old-epoch facts on restore/clear.
+- Route touch, keyboard and hint operations through the same session actions. Keep keyboard ownership, modal focus, touch targets and non-color error/evidence semantics observable.
+- Check the installed dependency version and relevant official documentation before introducing an API. For example, UniFFI 0.31.2's Android cleaner configuration selects guarded API 34+ SystemCleaner and JNA below it; declare its generated `RequiresApi` dependency explicitly. Change generator configuration and regenerate normally, never edit or suppress generated bindings.
+
+## Verification
+
+- Run `./gradlew spotlessApply` and review logical paragraphs yourself. Do not disable formatter or lint checks to pass a gate.
+- Run `./gradlew qualityCheck :app:assembleDebug` for changes spanning modules. The gate includes every registered Android module's debug lint, authored-source formatting, module directions and applicable JVM suites. Instrumentation and release checks are separate gates.
+- Test observable behavior and domain invariants. Separate arrangement, action and assertions with blank lines. Use fixed independent fixtures; extraction alone does not require mirror tests of private helpers.
+- For FFI configuration changes, rebuild generated bindings and packaged APKs, run host/native checks, and exercise affected runtime branches on disposable AVDs. Native cancellation tests must distinguish signalled return from work exhaustion.
+- Preserve backup v1/session v2 compatibility and independent Web fixtures. Actual export/reimport evidence requires the Android-produced fixture, not a fixture regenerated from Android expectations.
+- Record exact commands, suites, device/ABI and limitations in a dated English report under `docs/`. Keep historical release, timings, screenshots and hardware evidence separate from current-working-tree results. Use explicit disposable device serials; never modify a personal emulator or physical device without authorization.
+- Do not commit, reset, push or change unrelated Web/shared-Rust work without explicit authorization.

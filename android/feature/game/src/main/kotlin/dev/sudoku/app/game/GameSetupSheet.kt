@@ -49,9 +49,11 @@ import dev.sudoku.app.design.rememberDelayedProgress
 import dev.sudoku.app.designsystem.difficultyLabel
 import dev.sudoku.app.designsystem.formatElapsedTime
 import dev.sudoku.app.designsystem.variantLabel
+import dev.sudoku.app.model.DailyStatus
 import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.GameLaunch
 import dev.sudoku.app.model.GameMode
+import dev.sudoku.app.model.GameSummary
 import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.dailyFormalId
 import dev.sudoku.app.model.variant
@@ -64,9 +66,9 @@ internal enum class DailyEntryStatus(val label: String) {
 }
 
 internal fun GameEntryUiState.dailyStatus(variant: Variant): DailyEntryStatus = when (daily[variant]) {
-    dev.sudoku.app.model.DailyStatus.COMPLETED -> DailyEntryStatus.COMPLETED
-    dev.sudoku.app.model.DailyStatus.IN_PROGRESS -> DailyEntryStatus.IN_PROGRESS
-    dev.sudoku.app.model.DailyStatus.NOT_STARTED -> DailyEntryStatus.NOT_STARTED
+    DailyStatus.COMPLETED -> DailyEntryStatus.COMPLETED
+    DailyStatus.IN_PROGRESS -> DailyEntryStatus.IN_PROGRESS
+    DailyStatus.NOT_STARTED -> DailyEntryStatus.NOT_STARTED
     else -> DailyEntryStatus.PENDING
 }
 
@@ -76,7 +78,6 @@ internal fun GameSetupSheet(
     state: GameEntryUiState,
     onDismiss: () -> Unit,
     onPlay: (GameLaunch) -> Unit,
-    onRetry: () -> Unit,
     onLoad: (Boolean, Variant) -> Unit = { _, _ -> },
     daily: Boolean = false
 ) {
@@ -141,7 +142,7 @@ internal fun GameSetupSheet(
                         }
                         Text(
                             if (presentation.daily.size == Variant.entries.size &&
-                                presentation.daily.values.none { it == dev.sudoku.app.model.DailyStatus.PENDING }
+                                presentation.daily.values.none { it == DailyStatus.PENDING }
                             ) {
                                 "今日已完成 $completed / 6"
                             } else {
@@ -260,7 +261,7 @@ internal fun GameSetupSheet(
     }
 }
 
-private data class SetupDetails(val error: String?, val save: dev.sudoku.app.model.GameSummary?)
+private data class SetupDetails(val error: String?, val save: GameSummary?)
 
 @Composable
 private fun VariantOptions(selected: Variant, onSelect: (Variant) -> Unit, status: ((Variant) -> DailyEntryStatus)?) {

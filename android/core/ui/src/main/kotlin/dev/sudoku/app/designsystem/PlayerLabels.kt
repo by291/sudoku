@@ -33,3 +33,13 @@ fun formatElapsedTime(elapsedMs: Long): String {
         String.format(Locale.ROOT, "%02d:%02d", minutes, seconds)
     }
 }
+
+/** Compact labels shared by course and records variant selection. */
+fun shortVariantLabel(variant: Variant): String = when (variant) {
+    Variant.CLASSIC -> "标准"
+    Variant.DIAGONAL -> "对角线"
+    Variant.JIGSAW -> "不规则"
+    Variant.KILLER -> "杀手"
+    Variant.THERMO -> "温度计"
+    Variant.ARROW -> "箭头"
+}

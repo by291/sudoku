@@ -25,6 +25,46 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
+    @Test fun themeRetryRetainsTheRequestedThemeWithoutRepeatingBootstrap() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val reads = StartupReads().also { it.gate.complete(Unit) }
+            var fail = true
+            val updates = mutableListOf<dev.sudoku.app.model.SettingsUpdate>()
+            val repository = object : GameRepository by unsupported(GameRepository::class.java) {
+                override suspend fun readDatasetEpoch() = StorageOutcome.Success(0L)
+
+                override suspend fun readSettings() = StorageOutcome.Success(Settings())
+
+                override suspend fun updateSettings(
+                    update: dev.sudoku.app.model.SettingsUpdate,
+                    expectedEpoch: Long
+                ): StorageOutcome<Settings> {
+                    updates += update
+                    return if (fail) {
+                        StorageOutcome.Failure(StorageFailure(StorageFailureKind.WRITE_FAILED, "Disk"))
+                    } else {
+                        StorageOutcome.Success(Settings(theme = dev.sudoku.app.model.ThemePreference.DARK))
+                    }
+                }
+            }
+            val model = AppViewModel(repository, reads)
+            runCurrent()
+            model.setTheme(dev.sudoku.app.model.ThemePreference.DARK)
+            runCurrent()
+
+            fail = false
+            model.retry()
+            runCurrent()
+
+            org.junit.Assert.assertEquals(2, updates.size)
+            org.junit.Assert.assertEquals(dev.sudoku.app.model.ThemePreference.DARK, model.uiState.value.settings.theme)
+            org.junit.Assert.assertEquals(1, reads.calls)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test fun homeRequiresOnlyTheSmallSnapshotAndDoesNotStartMaintenance() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -70,7 +110,10 @@ private class StartupReads : GameReadRepository by unsupported(GameReadRepositor
     override val bootstrap = MutableStateFlow<BootstrapSnapshot?>(null)
     val gate = CompletableDeferred<Unit>()
     var fail = false
+    var calls = 0
+
     override suspend fun readBootstrap(): StorageOutcome<BootstrapSnapshot> {
+        calls++
         gate.await()
         if (fail) return StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Offline"))
         return StorageOutcome.Success(BootstrapSnapshot(0, Settings(), HomePresence(false, false)))

@@ -2,6 +2,7 @@ package dev.sudoku.app.game
 
 import dev.sudoku.app.model.BootstrapSnapshot
 import dev.sudoku.app.model.GameReadRepository
+import dev.sudoku.app.model.GameRepository
 import dev.sudoku.app.model.HomePresence
 import dev.sudoku.app.model.Settings
 import dev.sudoku.app.model.StorageFailure
@@ -16,13 +17,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class GameEntryLoaderTest {
+class GameEntryControllerTest {
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
     fun anOlderRefreshCannotRepublishAfterDatasetReplacement() = runTest {
         val reads = EntryReads()
         reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false, "old"))
-        val loader = GameEntryLoader(reads, unusedRepository())
+        val loader = GameEntryController(reads, unusedRepository(), backgroundScope)
         val release = kotlinx.coroutines.CompletableDeferred<Unit>()
         reads.gate = release
         val old = launch { loader.prepareHome() }
@@ -43,7 +44,7 @@ class GameEntryLoaderTest {
     @Test fun changedDatasetDropsOldPresenceEvenWhenTheRefreshFails() = runTest {
         val reads = EntryReads()
         reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false, "old-save"))
-        val loader = GameEntryLoader(reads, unusedRepository())
+        val loader = GameEntryController(reads, unusedRepository(), backgroundScope)
 
         loader.invalidate(1)
         reads.fail = true
@@ -58,7 +59,7 @@ class GameEntryLoaderTest {
     @Test fun initialHomeReusesPresenceWithoutFetchingSheetsOrDetails() = runTest {
         val reads = EntryReads()
         reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false))
-        val loader = GameEntryLoader(reads, unusedRepository())
+        val loader = GameEntryController(reads, unusedRepository(), backgroundScope)
 
         assertTrue(loader.uiState.value.hasSaves)
         assertTrue(loader.uiState.value.hasLoadedSnapshot)
@@ -69,7 +70,7 @@ class GameEntryLoaderTest {
     @Test fun pendingMigrationKeepsContinueAndRefreshFailureRetainsKnownPresence() = runTest {
         val reads = EntryReads()
         reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(false, true))
-        val loader = GameEntryLoader(reads, unusedRepository())
+        val loader = GameEntryController(reads, unusedRepository(), backgroundScope)
 
         reads.fail = true
         loader.prepareHome()
@@ -89,6 +90,7 @@ private class EntryReads :
     override val bootstrap = MutableStateFlow<BootstrapSnapshot?>(null)
     var gate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
     var fail = false
+
     override suspend fun readBootstrap(): StorageOutcome<BootstrapSnapshot> = if (fail) {
         StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Unavailable"))
     } else {
@@ -99,12 +101,12 @@ private class EntryReads :
 }
 
 private fun unusedRepository() = Proxy.newProxyInstance(
-    dev.sudoku.app.model.GameRepository::class.java.classLoader,
-    arrayOf(dev.sudoku.app.model.GameRepository::class.java)
+    GameRepository::class.java.classLoader,
+    arrayOf(GameRepository::class.java)
 ) { _, method, _ ->
     if (method.name == "getDatasetEpochs") {
         kotlinx.coroutines.flow.emptyFlow<Long>()
     } else {
         error("Unexpected repository operation: ${method.name}")
     }
-} as dev.sudoku.app.model.GameRepository
+} as GameRepository

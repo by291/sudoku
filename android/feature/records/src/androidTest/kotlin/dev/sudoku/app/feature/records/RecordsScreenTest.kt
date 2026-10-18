@@ -13,6 +13,7 @@ import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -51,6 +52,54 @@ import org.junit.Rule
 import org.junit.Test
 
 class RecordsScreenTest {
+    @Test fun queryRetryRemainsAvailableWhileExportAwaitsItsProvider() {
+        show(RecordsUiState(loading = false, busy = true, queryFailure = RecordsFailure("读取记录失败")))
+
+        compose.onNodeWithText("重试").performScrollTo().assertIsEnabled().performClick()
+
+        compose.runOnIdle { assertEquals(1, retries) }
+    }
+
+    @Test fun backupRetryRemainsAvailableWhileTheSelectedQueryLoads() {
+        show(RecordsUiState(loading = true, backupFailure = RecordsFailure("备份解析失败")), backup = true)
+
+        compose.onNodeWithText("重试").performScrollTo().assertIsEnabled().performClick()
+
+        compose.runOnIdle { assertEquals(1, backupRetries) }
+    }
+
+    @Test fun closedBackupFailureUsesItsOwnRetryWhileTheQueryLoads() {
+        show(RecordsUiState(loading = true, backupFailure = RecordsFailure("导出备份失败")))
+
+        compose.onNodeWithText("导出备份失败").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("重试").performScrollTo().assertIsEnabled().performClick()
+
+        compose.runOnIdle {
+            assertEquals(1, backupRetries)
+            assertEquals(0, retries)
+        }
+    }
+
+    @Test fun confirmedClearFailureRemainsRecoverableAfterItsSheetCloses() {
+        val state = show(RecordsUiState(loading = false, epoch = 1), backup = true)
+        compose.onNodeWithText("清空本机数据").performScrollTo().performClick()
+        compose.onNodeWithText("确认清空").assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            assertTrue(cleared)
+            state.value = state.value.copy(loading = true, backupFailure = RecordsFailure("清空数据失败"))
+        }
+
+        compose.onNodeWithText("确认清空").assertDoesNotExist()
+        compose.onNodeWithText("导出备份").assertDoesNotExist()
+        compose.onNodeWithText("清空数据失败").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("重试").performScrollTo().assertIsEnabled().performClick()
+
+        compose.runOnIdle {
+            assertEquals(1, backupRetries)
+            assertEquals(0, retries)
+        }
+    }
+
     @get:Rule val compose = createComposeRule()
     private lateinit var inputMode: InputModeManager
     private var resumed: String? = null
@@ -60,6 +109,7 @@ class RecordsScreenTest {
     private var imports = 0
     private var cleaned = false
     private var retries = 0
+    private var backupRetries = 0
 
     private fun show(
         initial: RecordsUiState =
@@ -97,6 +147,7 @@ class RecordsScreenTest {
                             },
                             onResume = { resumed = it },
                             onRetry = { retries++ },
+                            onRetryBackup = { backupRetries++ },
                             onExport = { exports++ },
                             onImport = { imports++ },
                             onDismissPreview = { state.value = state.value.copy(preview = null) },
@@ -227,7 +278,9 @@ class RecordsScreenTest {
         val state = show(RecordsUiState(loading = false, epoch = 1, busy = true), backup = true)
         compose.onNodeWithText("导出备份").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("从备份恢复").performScrollTo().assertIsNotEnabled()
-        compose.runOnIdle { state.value = state.value.copy(busy = false, error = "写入备份失败") }
+        compose.runOnIdle {
+            state.value = state.value.copy(busy = false, backupFailure = RecordsFailure("写入备份失败"))
+        }
 
         compose.onNodeWithText("写入备份失败").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("重试").performScrollTo().performClick()
@@ -236,7 +289,7 @@ class RecordsScreenTest {
         compose.runOnIdle {
             assertEquals(1, exports)
             assertEquals(1, imports)
-            assertEquals(1, retries)
+            assertEquals(1, backupRetries)
         }
         capture("backup")
     }

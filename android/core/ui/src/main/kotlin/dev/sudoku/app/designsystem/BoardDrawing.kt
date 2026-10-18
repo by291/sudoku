@@ -81,10 +81,7 @@ internal fun DrawScope.drawRuleClues(rules: PuzzleRules, colors: BoardColors) {
             val stroke = Stroke(
                 side * 0.10f,
                 pathEffect = PathEffect.dashPathEffect(
-                    floatArrayOf(
-                        side * 0.16f,
-                        side * 0.10f
-                    )
+                    floatArrayOf(side * 0.16f, side * 0.10f)
                 )
             )
             val path = Path().apply {
@@ -194,10 +191,11 @@ private fun DrawScope.pathThrough(cells: List<Int>): Path = Path().apply {
 }
 
 internal fun DrawScope.drawEvidence(evidence: Evidence?, colors: BoardColors) {
-    val side = size.width / 9
     if (evidence == null) {
         return
     }
+
+    val side = size.width / 9
     val color = colors.accent.copy(alpha = 0.65f)
     when (evidence) {
         is Evidence.Wing -> evidence.wings.forEach { drawLine(color, center(evidence.pivot), center(it), 2.dp.toPx()) }
@@ -208,27 +206,11 @@ internal fun DrawScope.drawEvidence(evidence: Evidence?, colors: BoardColors) {
                 }
             }
             evidence.colors.forEachIndexed { index, cells ->
+                val groupColor = if (index == 0) colors.accent else colors.error
+                val strokeWidth = if (index == 0) 1.5.dp.toPx() else 3.dp.toPx()
+
                 cells.forEach { cell ->
-                    drawCircle(
-                        if (index ==
-                            0
-                        ) {
-                            colors.accent
-                        } else {
-                            colors.error
-                        },
-                        side * 0.37f,
-                        center(cell),
-                        style = Stroke(
-                            if (index ==
-                                0
-                            ) {
-                                1.5.dp.toPx()
-                            } else {
-                                3.dp.toPx()
-                            }
-                        )
-                    )
+                    drawCircle(groupColor, side * 0.37f, center(cell), style = Stroke(strokeWidth))
                 }
             }
         }

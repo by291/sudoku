@@ -12,6 +12,7 @@ fun createSession(
     assessment: PuzzleAssessment? = null
 ): GameSession {
     require(id.isNotBlank() && id.length <= 200 && isIsoInstant(startedAt)) { "Invalid session identity" }
+
     return GameSession(
         id = id,
         puzzle = puzzle.copy(givens = puzzle.givens.toList(), solution = puzzle.solution.toList()),
@@ -23,9 +24,7 @@ fun createSession(
 }
 
 fun sessionBoard(session: GameSession): List<Int> = session.puzzle.givens.mapIndexed { cell, given ->
-    if (given ==
-        0
-    ) {
+    if (given == 0) {
         session.entries[cell]
     } else {
         given
@@ -36,6 +35,7 @@ fun commitBoardEdit(session: GameSession, result: EditResult, action: BoardEdit)
     if (session.completion != null) {
         return SessionActionResult(session, false)
     }
+
     val before = BoardLayers(session.entries.toList(), session.notes.toList())
     val after = BoardLayers(result.entries.toList(), result.notes.toList())
     val boardChanged = before != after
@@ -59,8 +59,7 @@ fun commitBoardEdit(session: GameSession, result: EditResult, action: BoardEdit)
             notes = after.notes,
             assistance = assistance,
             undoStack = if (boardChanged) {
-                session.undoStack +
-                    HistoryMove(before, after)
+                session.undoStack + HistoryMove(before, after)
             } else {
                 session.undoStack
             },
@@ -86,8 +85,7 @@ fun applySessionAction(session: GameSession, action: SessionFactAction): Session
                 undoStack = if (undo) {
                     source.dropLast(1)
                 } else {
-                    session.undoStack +
-                        move
+                    session.undoStack + move
                 },
                 redoStack = if (undo) session.redoStack + move else source.dropLast(1)
             ),
@@ -98,14 +96,11 @@ fun applySessionAction(session: GameSession, action: SessionFactAction): Session
     val assistance = session.assistance
     return SessionActionResult(
         session.copy(
-            assistance = if (action ==
-                SessionFactAction.HINT_SHOWN
-            ) {
+            assistance = if (action == SessionFactAction.HINT_SHOWN) {
                 assistance.copy(hintCount = assistance.hintCount + 1, assisted = true)
             } else {
                 assistance.copy(
-                    checkCount =
-                    assistance.checkCount + 1,
+                    checkCount = assistance.checkCount + 1,
                     assisted = true
                 )
             }
@@ -118,7 +113,9 @@ fun completeSession(session: GameSession, completedAt: String, elapsedMs: Long, 
     if (session.completion != null || !boardComplete) {
         return session
     }
+
     require(isIsoInstant(completedAt) && elapsedMs in 0..MAX_SAFE_INTEGER)
+
     return session.copy(elapsedMs = elapsedMs, completion = Completion(completedAt, elapsedMs))
 }
 
@@ -126,24 +123,32 @@ fun isChallengeDate(value: String): Boolean = runCatching {
     value.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}")) &&
         LocalDate.parse(value).toString() == value
 }.getOrDefault(false)
+
 fun challengeDate(now: Instant): String = now.atZone(ZoneId.of("Asia/Shanghai")).toLocalDate().toString()
+
+/** Eligibility uses the domain's historical Shanghai calendar, including past daylight saving. */
+fun eligibleChallengeDate(metadata: SessionMetadata.Daily, completedAt: Instant?): String? =
+    metadata.challengeDate.takeIf {
+        metadata.formalAttempt && completedAt != null && challengeDate(completedAt) == it
+    }
+
 fun dailyFormalId(date: String, variant: Variant): String {
     require(isChallengeDate(date))
     return if (variant == Variant.CLASSIC) "daily:$date:formal" else "daily:${variant.wireName}:$date:formal"
 }
+
 fun dailySeedMaterial(date: String): List<UByte> {
     require(isChallengeDate(date))
     return "daily:$date".encodeToByteArray().map { it.toUByte() }
 }
+
 fun restartDailySession(session: GameSession): GameSession {
     require(session.mode == GameMode.DAILY)
     if (session.completion != null) {
         return session
     }
     return session.copy(
-        entries = List(BOARD_SIZE) {
-            0
-        },
+        entries = List(BOARD_SIZE) { 0 },
         notes = List(BOARD_SIZE) { 0 },
         undoStack = emptyList(),
         redoStack = emptyList()

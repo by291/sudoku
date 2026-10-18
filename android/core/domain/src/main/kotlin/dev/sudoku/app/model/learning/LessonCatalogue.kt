@@ -88,13 +88,21 @@ data class Lesson(
 @Serializable
 data class LessonCursor(val lessonId: String, val stageIndex: Int)
 
-data class ExerciseSubmission(
-    val cursor: LessonCursor,
-    val correct: Boolean,
-    val advance: Boolean,
-    val completed: Boolean,
+/** Proposed transition only; accepted answers become visible progress after durable persistence. */
+sealed interface ExerciseSubmission {
+    val cursor: LessonCursor
     val explanation: String
-)
+    val correct: Boolean get() = this is Accepted
+    val completed: Boolean get() = this is Completed
+
+    data class Rejected(override val cursor: LessonCursor, override val explanation: String) : ExerciseSubmission
+
+    sealed interface Accepted : ExerciseSubmission
+
+    data class Advanced(override val cursor: LessonCursor, override val explanation: String) : Accepted
+
+    data class Completed(override val cursor: LessonCursor, override val explanation: String) : Accepted
+}
 
 @Serializable
 private data class CatalogueProvenance(
@@ -131,15 +139,20 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
         val lesson = lesson(cursor.lessonId)
         val stage = lesson?.stages?.getOrNull(cursor.stageIndex)
         if (stage == null || submittedStageIndex != cursor.stageIndex) {
-            return ExerciseSubmission(cursor, false, false, false, "请按顺序完成当前阶段，不能跳过推理。")
+            return ExerciseSubmission.Rejected(cursor, "请按顺序完成当前阶段，不能跳过推理。")
         }
         if (!sameAnswer(stage.answer, answer)) {
-            return ExerciseSubmission(cursor, false, false, false, "还差一点。请重新检查单元内候选数的位置，可以继续尝试。")
+            return ExerciseSubmission.Rejected(cursor, "还差一点。请重新检查单元内候选数的位置，可以继续尝试。")
         }
 
         val completed = cursor.stageIndex == lesson.stages.lastIndex
         val next = LessonCursor(cursor.lessonId, if (completed) 0 else cursor.stageIndex + 1)
-        return ExerciseSubmission(next, true, !completed, completed, "推理正确！" + stage.explanation)
+        val explanation = "推理正确！" + stage.explanation
+        return if (completed) {
+            ExerciseSubmission.Completed(next, explanation)
+        } else {
+            ExerciseSubmission.Advanced(next, explanation)
+        }
     }
 
     companion object {
@@ -178,7 +191,7 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
                         hasChineseCopy(it.title) && it.stages.isNotEmpty()
                     }
             ) { "Missing focused or transfer exercise in ${lesson.id}" }
-            require(lesson.stages.size == if (lesson.id.endsWith("-combined")) 6 else 2) {
+            require(lesson.stages.size == LessonIdentity.stageCount(lesson.id)) {
                 "Changed stage count in ${lesson.id}"
             }
             require(lesson.guided == lesson.stages.first()) {

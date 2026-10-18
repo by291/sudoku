@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.sudoku.app.model.GameReadRepository
 import dev.sudoku.app.model.GameRepository
+import dev.sudoku.app.model.LearningProgressRepository
 import dev.sudoku.app.model.SudokuEngine
 import dev.sudoku.app.model.learning.LearningContentRepository
 import javax.inject.Singleton
@@ -19,7 +20,8 @@ object StorageModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): SudokuDatabase =
-        Room.databaseBuilder(context, SudokuDatabase::class.java, "sudoku-local.db").build()
+        Room.databaseBuilder(context, SudokuDatabase::class.java, "sudoku-local.db")
+            .addMigrations(SchemaMigrations.version2To3).build()
 
     @Provides
     @Singleton
@@ -30,6 +32,9 @@ object StorageModule {
     @Singleton
     fun readRepository(database: SudokuDatabase, engine: SudokuEngine): GameReadRepository =
         RoomReadRepository(database, engine)
+
+    @Provides
+    fun learningProgress(repository: GameRepository): LearningProgressRepository = repository
 
     @Provides
     @Singleton

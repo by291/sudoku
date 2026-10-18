@@ -50,6 +50,16 @@ gradle.projectsEvaluated {
         ":feature:learning" to presentation,
         ":feature:records" to presentation
     )
+    // Gradle creates container projects for nested paths; every other project needs an owner.
+    val containers = allowed.keys.flatMap { path ->
+        path.split(":").drop(1).dropLast(1).runningFold("") { parent, name -> "$parent:$name" }.drop(1)
+    }.toSet()
+    val structuralContainers = containers.filter { path ->
+        val container = project(path)
+        !container.buildFile.exists() && container.configurations.isEmpty()
+    }
+    val registeredProjects = allowed.keys + structuralContainers
+    val configuredProjects = subprojects.map { it.path }.toSet()
     val edges = allowed.keys.associateWith { owner ->
         project(owner).configurations.flatMap { configuration ->
             configuration.dependencies.withType<org.gradle.api.artifacts.ProjectDependency>().map { it.path }
@@ -57,12 +67,25 @@ gradle.projectsEvaluated {
     }
     checkModuleDependencies.configure {
         inputs.property("edges", edges)
+        inputs.property("projects", configuredProjects)
         doLast {
+            val unregistered = configuredProjects - registeredProjects
+            check(unregistered.isEmpty()) { "Unregistered Android modules: ${unregistered.sorted().joinToString()}" }
+
             val forbidden = edges.flatMap { (owner, dependencies) ->
                 (dependencies - owner - allowed.getValue(owner)).map { "$owner -> $it" }
             }
             check(forbidden.isEmpty()) { "Forbidden dependencies: ${forbidden.joinToString()}" }
         }
+    }
+    tasks.named("qualityCheck") {
+        // App lint does not replace each library's own source and manifest checks.
+        dependsOn(
+            allowed.keys.filter { owner ->
+                val plugins = project(owner).plugins
+                plugins.hasPlugin("com.android.library") || plugins.hasPlugin("com.android.application")
+            }.map { "$it:lintDebug" }
+        )
     }
 }
 
@@ -70,7 +93,7 @@ tasks.register("qualityCheck") {
     group = "verification"
     dependsOn("spotlessCheck", checkModuleDependencies)
     dependsOn(":core:domain:test", ":core:engine:testDebugUnitTest", ":core:data:testDebugUnitTest")
-    dependsOn(":app:testDebugUnitTest", ":app:lintDebug", ":core:ui:lintDebug")
+    dependsOn(":app:testDebugUnitTest")
     dependsOn(
         ":feature:game:testDebugUnitTest",
         ":feature:learning:testDebugUnitTest",

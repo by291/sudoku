@@ -8,6 +8,7 @@ import dev.sudoku.app.design.SudokuTheme
 import dev.sudoku.app.model.ThemePreference
 
 internal typealias BoardColors = SudokuPalette
+
 internal val LocalBoardColors = LocalSudokuPalette
 
 /** Adapts the portable preference to the independent visual theme. */

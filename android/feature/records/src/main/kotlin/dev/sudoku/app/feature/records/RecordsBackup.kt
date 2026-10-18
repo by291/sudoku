@@ -65,7 +65,7 @@ internal fun RecordsBackup(
     var clearConfirmation by rememberSaveable { mutableStateOf(false) }
     var cleanupConfirmation by rememberSaveable { mutableStateOf(false) }
     val closeFocus = remember { FocusRequester() }
-    val pending = state.busy || state.loading
+    val pending = state.busy
     val showProgress = rememberDelayedProgress(pending)
     if (open && !clearConfirmation && !cleanupConfirmation && state.preview == null) {
         ModalBottomSheet(
@@ -96,7 +96,7 @@ internal fun RecordsBackup(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                RecordStatus(state, onRetry)
+                RecordStatus(state.backupFailure, state.notice, canRetry = !pending, onRetry)
                 if (showProgress) {
                     RecordCaption("正在处理，请稍候…")
                 }
@@ -120,7 +120,7 @@ internal fun RecordsBackup(
                     Text("有 ${state.quarantined} 条无效记录已隔离，未包含在统计中。", style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = { cleanupConfirmation = true }, enabled = available) { Text("清理隔离记录") }
                 }
-                TextButton(onClick = { clearConfirmation = true }, enabled = available) {
+                TextButton(onClick = { clearConfirmation = true }, enabled = available && state.epoch != null) {
                     Text("清空本机数据", color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -133,7 +133,7 @@ internal fun RecordsBackup(
                 "存档 ${preview.backup.sessions.size} 条 · 完成记录 ${preview.backup.results.size} 条 · " +
                 "课程完成 ${preview.backup.lessons.size} 条\n\n" +
                 "确认后将替换全部本机数据，此操作无法撤销。建议先导出当前备份。" +
-                (state.error?.let { "\n\n$it" } ?: ""),
+                (state.backupFailure?.let { "\n\n${it.message}" } ?: ""),
             confirmLabel = "确认替换本机数据",
             busy = pending,
             onDismiss = onDismissPreview,

@@ -8,8 +8,10 @@ import dev.sudoku.app.model.EditorToken
 import dev.sudoku.app.model.EngineOutcome
 import dev.sudoku.app.model.GameLaunch
 import dev.sudoku.app.model.GameMode
+import dev.sudoku.app.model.GameReadRepository
 import dev.sudoku.app.model.GameRepository
 import dev.sudoku.app.model.GameSession
+import dev.sudoku.app.model.GenerationRequest
 import dev.sudoku.app.model.HintResult
 import dev.sudoku.app.model.PreparedPuzzle
 import dev.sudoku.app.model.PreviousSession
@@ -18,6 +20,7 @@ import dev.sudoku.app.model.SessionFactAction
 import dev.sudoku.app.model.SessionMetadata
 import dev.sudoku.app.model.SessionRecord
 import dev.sudoku.app.model.Settings
+import dev.sudoku.app.model.SettingsUpdate
 import dev.sudoku.app.model.StorageFailure
 import dev.sudoku.app.model.StorageFailureKind
 import dev.sudoku.app.model.StorageOutcome
@@ -37,7 +40,6 @@ import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -57,7 +59,7 @@ import kotlinx.coroutines.withContext
 internal class GameController(
     private val engine: SudokuEngine,
     private val repository: GameRepository,
-    private val reads: dev.sudoku.app.model.GameReadRepository,
+    private val reads: GameReadRepository,
     private val scope: CoroutineScope,
     private val restoredSessionId: String?,
     private val rememberSession: (String?) -> Unit,
@@ -69,6 +71,8 @@ internal class GameController(
     private val actions = Mutex()
     private val ownerId = UUID.randomUUID().toString()
     private var opened = false
+    private var disposed = false
+    private var disposal: Job? = null
     private var prepared: PreparedPuzzle? = null
     private var editor: EditorToken? = null
     private var writer: SessionWriter? = null
@@ -84,18 +88,21 @@ internal class GameController(
     private var notesJob: Job? = null
     private var hintJob: Job? = null
     private var conflictsJob: Job? = null
-    private var retrySeed: Pair<GameLaunch, List<UByte>>? = null
+    private var retrySeed: RetrySeed? = null
 
     fun open(launch: GameLaunch) {
         if (opened) {
             return
         }
         opened = true
+
         beginTransition { generation ->
             val epoch = storage(repository.readDatasetEpoch())
             datasetEpoch = epoch
+
             val settings = storage(repository.readSettings())
             update { it.copy(settings = settings) }
+
             val intent = restoredSessionId?.let(GameLaunch::Resume) ?: launch
             val records = recordsFor(intent)
             when (intent) {
@@ -147,6 +154,7 @@ internal class GameController(
 
     fun confirmPracticeReplacement() {
         val intent = mutableState.value.practiceReplacement ?: return
+
         update { it.copy(practiceReplacement = null) }
         startNew(intent)
     }
@@ -156,6 +164,10 @@ internal class GameController(
     }
 
     private fun beginTransition(operation: suspend (Long) -> Unit) {
+        if (disposed) {
+            return
+        }
+
         transitionGeneration += 1
         val generation = transitionGeneration
         transition?.cancel()
@@ -172,6 +184,7 @@ internal class GameController(
                 if (generation != transitionGeneration) {
                     return@launch
                 }
+
                 currentCoroutineContext().ensureActive()
                 update { it.copy(phase = GamePhase.PREPARING, error = null, message = null) }
                 operation(generation)
@@ -254,15 +267,15 @@ internal class GameController(
             is GameLaunch.Daily -> Difficulty.MEDIUM
             is GameLaunch.Resume -> throw WorkflowFailure("对局参数无效。")
         }
-        val seed = retrySeed?.takeIf { it.first == launch }?.second ?: if (launch is GameLaunch.Daily) {
+        val seed = retrySeed?.takeIf { it.launch == launch }?.bytes ?: if (launch is GameLaunch.Daily) {
             engineValue(engine.deriveSeed(dailySeedMaterial(launch.date)))
         } else {
             withContext(Dispatchers.IO) { ByteArray(32).also { SecureRandom().nextBytes(it) }.map { it.toUByte() } }
         }
-        retrySeed = launch to seed.toList()
+        retrySeed = RetrySeed(launch, seed.toList())
         val generated = engineValue(
             engine.generate(
-                dev.sudoku.app.model.GenerationRequest(
+                GenerationRequest(
                     variant,
                     difficulty,
                     seed
@@ -305,7 +318,7 @@ internal class GameController(
                 currentCoroutineContext().ensureActive()
                 commitPreparation(generation) {
                     val saved = persistReplacement(session, previous, epoch)
-                    install(saved.first, handle, saved.second, epoch)
+                    install(saved.record, handle, saved.editor, epoch)
                     installed = true
                     retrySeed = null
                 }
@@ -336,7 +349,7 @@ internal class GameController(
     }
 
     private fun resumeAfterPreparation(generation: Long) {
-        if (generation == transitionGeneration) {
+        if (!disposed && generation == transitionGeneration) {
             resume(generation)
         }
     }
@@ -358,12 +371,10 @@ internal class GameController(
         session: GameSession,
         previous: SessionRecord?,
         epoch: Long
-    ): Pair<
-        SessionRecord,
-        EditorToken
-        > {
+    ): PersistedSession {
         val oldSession = mutableState.value.session
         val oldRevision = writer?.revision
+
         try {
             val previousToken = if (previous != null) {
                 val token = storage(repository.claimEditor(previous.session.id, ownerId))
@@ -395,7 +406,7 @@ internal class GameController(
                     )
                 )
             }
-            return saved to token
+            return PersistedSession(saved, token)
         } catch (failure: Exception) {
             // Claiming the target fences the previous editor; recover its token before permitting more saves.
             if (oldSession != null && oldRevision != null) {
@@ -410,6 +421,7 @@ internal class GameController(
         var installed = false
         val oldSession = mutableState.value.session
         val oldRevision = writer?.revision
+
         try {
             actions.withLock {
                 currentCoroutineContext().ensureActive()
@@ -457,12 +469,14 @@ internal class GameController(
         }
     }
 
-    private fun install(record: SessionRecord, handle: PreparedPuzzle, token: EditorToken?, epoch: Long) {
+    private suspend fun install(record: SessionRecord, handle: PreparedPuzzle, token: EditorToken?, epoch: Long) {
         val oldHandle = prepared
+
         writer?.invalidate()
         saveObserver?.cancel()
         ticker?.cancel()
         invalidateAnalysis()
+
         prepared = handle
         editor = token
         datasetEpoch = epoch
@@ -475,34 +489,26 @@ internal class GameController(
             settings = mutableState.value.settings
         )
         rememberSession(record.session.id)
-        if (token != null) {
+
+        if (token != null && !disposed) {
             attachWriter(record.revision, token)
         } else {
             writer = null
         }
         if (oldHandle != null) {
-            scope.launch(start = CoroutineStart.UNDISPATCHED) { oldHandle.close() }
+            withContext(NonCancellable) { oldHandle.close() }
         }
     }
 
     private fun attachWriter(revision: Long, token: EditorToken) {
         writer?.invalidate()
         saveObserver?.cancel()
-        val next = SessionWriter(
-            scope,
-            revision
-        ) {
-                snapshot,
-                expected
-            ->
-            repository.writeSession(
-                snapshot,
-                expected,
-                token
-            )
+        val next = SessionWriter(scope, revision) { snapshot, expected ->
+            repository.writeSession(snapshot, expected, token)
         }
         writer = next
         editor = token
+
         saveObserver = scope.launch { next.state.collectLatest { save -> update { it.copy(save = save) } } }
     }
 
@@ -635,6 +641,7 @@ internal class GameController(
     }
 
     fun undo() = history(SessionFactAction.UNDO)
+
     fun redo() = history(SessionFactAction.REDO)
 
     private fun history(action: SessionFactAction) {
@@ -669,7 +676,7 @@ internal class GameController(
     private fun resume(expectedGeneration: Long?) {
         scope.launch {
             actions.withLock {
-                if (expectedGeneration != null && expectedGeneration != transitionGeneration) {
+                if (disposed || (expectedGeneration != null && expectedGeneration != transitionGeneration)) {
                     return@withLock
                 }
                 if (mutableState.value.phase != GamePhase.PAUSED || editor == null) {
@@ -683,7 +690,7 @@ internal class GameController(
                     return@withLock
                 }
                 // An epoch read can suspend after the user has already paused or left this preparation.
-                if (expectedGeneration != null && expectedGeneration != transitionGeneration) {
+                if (disposed || (expectedGeneration != null && expectedGeneration != transitionGeneration)) {
                     return@withLock
                 }
                 clock?.resume(monotonicMs())
@@ -720,14 +727,14 @@ internal class GameController(
         ticker = scope.launch {
             var savedAt = monotonicMs()
             while (true) {
-                delay(250)
+                delay(CLOCK_TICK_MILLIS)
                 val activeClock = clock ?: break
                 if (!activeClock.isRunning) {
                     break
                 }
                 val now = monotonicMs()
                 update { it.copy(elapsedMs = activeClock.elapsedAt(now)) }
-                if (now - savedAt >= 5_000) {
+                if (now - savedAt >= CHECKPOINT_INTERVAL_MILLIS) {
                     val session = mutableState.value.session ?: break
                     val snapshot = timed(session)
                     update { it.copy(session = snapshot) }
@@ -958,7 +965,7 @@ internal class GameController(
                                 currentCoroutineContext().ensureActive()
                                 commitPreparation(generation) {
                                     val saved = persistReplacement(restarted, previousSlot(restarted, records), epoch)
-                                    install(saved.first, handle, saved.second, epoch)
+                                    install(saved.record, handle, saved.editor, epoch)
                                     installed = true
                                 }
                             }
@@ -995,17 +1002,17 @@ internal class GameController(
         }
     }
 
-    fun setShowTimer(show: Boolean) = settings { it.copy(showTimer = show) }
-    fun setHighlightConflicts(show: Boolean) = settings { it.copy(highlightConflicts = show) }
+    fun setShowTimer(show: Boolean) = settings(SettingsUpdate.ShowTimer(show))
 
-    private fun settings(transform: (Settings) -> Settings) {
+    fun setHighlightConflicts(show: Boolean) = settings(SettingsUpdate.HighlightConflicts(show))
+
+    private fun settings(intent: SettingsUpdate) {
         scope.launch {
             actions.withLock {
                 val epoch = datasetEpoch ?: storage(repository.readDatasetEpoch())
-                val next = transform(mutableState.value.settings)
-                when (val result = repository.writeSettings(next, epoch)) {
+                when (val result = repository.updateSettings(intent, epoch)) {
                     is StorageOutcome.Success -> {
-                        update { it.copy(settings = next) }
+                        update { it.copy(settings = result.value) }
                         refreshConflicts()
                     }
                     is StorageOutcome.Failure -> update { it.copy(error = "设置保存失败：${result.error.message}") }
@@ -1039,22 +1046,46 @@ internal class GameController(
         }
     }
 
-    fun dispose() {
+    fun dispose(): Job {
+        disposal?.let { return it }
+        disposed = true
         transitionGeneration += 1
         invalidateAnalysis()
         transition?.cancel()
         ticker?.cancel()
-        val handle = prepared
-        val token = editor
-        prepared = null
-        editor = null
-        // The route normally calls leave; this resource scope also closes after abrupt ViewModel disposal.
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            handle?.close()
-            if (token != null) {
-                repository.releaseEditor(token)
+
+        // ViewModel cancellation must not cancel cleanup. The lock waits for non-cancellable
+        // commits to adopt their identity before we capture the final handle and editor token.
+        val cleanupScope = CoroutineScope(scope.coroutineContext + SupervisorJob())
+        return cleanupScope.launch {
+            try {
+                actions.withLock {
+                    pauseCurrent()
+                    writer?.invalidate()
+                    saveObserver?.cancel()
+                    writer = null
+                    val handle = prepared
+                    val token = editor
+                    prepared = null
+                    editor = null
+
+                    try {
+                        handle?.close()
+                    } finally {
+                        if (token != null) {
+                            when (val result = repository.releaseEditor(token)) {
+                                is StorageOutcome.Failure -> update {
+                                    it.copy(error = "无法释放编辑权：${result.error.message}")
+                                }
+                                is StorageOutcome.Success -> Unit
+                            }
+                        }
+                    }
+                }
+            } finally {
+                cleanupScope.coroutineContext[Job]?.cancel()
             }
-        }
+        }.also { disposal = it }
     }
 
     private fun invalidateAnalysis() {
@@ -1082,7 +1113,7 @@ internal class GameController(
 
     private fun matches(fence: AnalysisFence): Boolean {
         val state = mutableState.value
-        return state.editable &&
+        return !disposed && state.editable &&
             state.session?.id == fence.sessionId &&
             state.session.puzzle.seed == fence.puzzleSeed &&
             boardRevision == fence.boardRevision &&
@@ -1115,30 +1146,38 @@ internal class GameController(
 
     private fun timed(session: GameSession): GameSession =
         session.copy(elapsedMs = clock?.elapsedAt(monotonicMs()) ?: session.elapsedMs)
+
     private fun nowText(): String = isoInstant(currentInstant())
+
     private fun settledPhase(session: GameSession?): GamePhase = when {
         session == null -> GamePhase.EMPTY
         session.completion != null -> GamePhase.COMPLETED
         else -> GamePhase.PAUSED
     }
+
     private fun update(transform: (GameUiState) -> GameUiState) {
         mutableState.value = transform(mutableState.value)
     }
+
     private fun showEngineFailure(result: EngineOutcome<*>) {
         update { it.copy(error = engineMessage(result)) }
     }
+
     private fun engineMessage(result: EngineOutcome<*>): String = when (result) {
         is EngineOutcome.BudgetExhausted -> "计算已达到工作上限，当前进度保持不变。"
         EngineOutcome.Cancelled -> "计算已取消，当前进度保持不变。"
         EngineOutcome.TimedOut -> "计算超时，请重试；重试会使用同一题目种子。"
+        is EngineOutcome.InvalidInput -> "数独数据无效：${result.message}"
         is EngineOutcome.Failed -> "数独引擎暂不可用：${result.message}"
         is EngineOutcome.Completed -> "计算已完成。"
     }
+
     private fun <T> engineValue(result: EngineOutcome<T>): T = when (result) {
         is EngineOutcome.Completed -> result.value
         EngineOutcome.Cancelled -> throw CancellationException("Native computation cancelled")
         else -> throw WorkflowFailure(engineMessage(result))
     }
+
     private fun <T> storage(result: StorageOutcome<T>): T = when (result) {
         is StorageOutcome.Success -> result.value
         is StorageOutcome.Failure -> throw WorkflowFailure("本机数据操作失败：${result.error.message}")
@@ -1152,4 +1191,12 @@ private data class AnalysisFence(
     val generation: Long,
     val epoch: Long
 )
+
 private class WorkflowFailure(message: String) : IllegalStateException(message)
+
+private const val CLOCK_TICK_MILLIS = 250L
+private const val CHECKPOINT_INTERVAL_MILLIS = 5_000L
+
+private data class PersistedSession(val record: SessionRecord, val editor: EditorToken)
+
+private data class RetrySeed(val launch: GameLaunch, val bytes: List<UByte>)

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sudoku.app.designsystem.difficultyLabel
 import dev.sudoku.app.designsystem.formatElapsedTime
+import dev.sudoku.app.designsystem.shortVariantLabel as recordVariantLabel
 import dev.sudoku.app.model.GameMode
 import dev.sudoku.app.model.GameSummary
 import dev.sudoku.app.model.RecordSummary
@@ -295,9 +296,7 @@ internal fun RecordEntry(session: GameSummary, enabled: Boolean, history: Boolea
                 Surface(shape = RoundedCornerShape(12.dp), color = colors.primaryContainer) {
                     Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
                         Icon(
-                            if (session.mode ==
-                                GameMode.DAILY
-                            ) {
+                            if (session.mode == GameMode.DAILY) {
                                 Icons.Outlined.CalendarMonth
                             } else if (history) {
                                 Icons.Outlined.Check

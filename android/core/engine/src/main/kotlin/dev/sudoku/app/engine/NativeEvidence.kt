@@ -1,187 +1,31 @@
 package dev.sudoku.app.engine
 
 import dev.sudoku.app.ffi.AdvancedEvidenceDto
-import dev.sudoku.app.ffi.ArrowDto
-import dev.sudoku.app.ffi.AssessmentIssueDto
-import dev.sudoku.app.ffi.AssessmentSummaryDto
 import dev.sudoku.app.ffi.BoundDto
-import dev.sudoku.app.ffi.CageDto
 import dev.sudoku.app.ffi.ColoringLinkDto
 import dev.sudoku.app.ffi.ColoringModeDto
-import dev.sudoku.app.ffi.ConstraintDto
-import dev.sudoku.app.ffi.DifficultyDto
 import dev.sudoku.app.ffi.DomainDto
 import dev.sudoku.app.ffi.EvidenceDto
 import dev.sudoku.app.ffi.HintResultDto
 import dev.sudoku.app.ffi.HintUnavailableDto
 import dev.sudoku.app.ffi.LogicalStepDto
-import dev.sudoku.app.ffi.MetadataDto
 import dev.sudoku.app.ffi.PlacementDto
-import dev.sudoku.app.ffi.PuzzleAssessmentDto
-import dev.sudoku.app.ffi.RatingVersionDto
 import dev.sudoku.app.ffi.RemovalDto
 import dev.sudoku.app.ffi.RuleEvidenceDto
-import dev.sudoku.app.ffi.RulesDto
-import dev.sudoku.app.ffi.StoredAssessmentDto
 import dev.sudoku.app.ffi.TechniqueDto
-import dev.sudoku.app.ffi.UnavailableReasonDto
 import dev.sudoku.app.ffi.UnitDto
 import dev.sudoku.app.ffi.UnitEvidenceDto
 import dev.sudoku.app.ffi.UnitEvidenceKindDto
 import dev.sudoku.app.ffi.UnitKindDto
-import dev.sudoku.app.ffi.VariantDto
-import dev.sudoku.app.ffi.ViolationCodeDto
-import dev.sudoku.app.ffi.ViolationDto
-import dev.sudoku.app.ffi.WorkloadDto
-import dev.sudoku.app.model.ArrowClue
-import dev.sudoku.app.model.AssessmentIssue
-import dev.sudoku.app.model.AssessmentSummary
-import dev.sudoku.app.model.AssessmentWorkload
 import dev.sudoku.app.model.BoundFact
 import dev.sudoku.app.model.Cage
 import dev.sudoku.app.model.ColoringLink
-import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.DomainFact
 import dev.sudoku.app.model.Evidence
 import dev.sudoku.app.model.HintResult
 import dev.sudoku.app.model.LogicalStep
 import dev.sudoku.app.model.Placement
-import dev.sudoku.app.model.PuzzleAssessment
-import dev.sudoku.app.model.PuzzleRules
-import dev.sudoku.app.model.RuleConstraint
-import dev.sudoku.app.model.RuleMetadata
-import dev.sudoku.app.model.RuleUnit
-import dev.sudoku.app.model.RuleViolation
 import dev.sudoku.app.model.UnitReference
-import dev.sudoku.app.model.Variant
-import dev.sudoku.app.model.ViolationCode
-
-// Conversions own collections on both sides; generated handles never enter player state.
-internal fun List<Int>.nativeBoard(): ByteArray {
-    require(size == 81) { "A board requires exactly 81 cells" }
-    require(all { it in 0..9 }) { "Invalid board digit" }
-    return ByteArray(size) { this[it].toByte() }
-}
-
-internal fun ByteArray.playerBoard(): List<Int> = map { it.toInt() and 255 }
-internal fun Int.nativeCell(): UInt {
-    require(this in 0..80) { "Invalid cell index" }
-    return toUInt()
-}
-internal fun Int.nativeDigit(): UByte {
-    require(this in 1..9) { "Invalid digit" }
-    return toUByte()
-}
-internal fun Int.nativeMask(): UShort {
-    require(this in 0..511) { "Invalid candidate mask" }
-    return toUShort()
-}
-private fun List<Int>.nativeCells(): List<UInt> = map { it.nativeCell() }
-private fun List<UInt>.playerCells(): List<Int> = map { it.toInt() }
-
-internal fun Variant.native(): VariantDto = when (this) {
-    Variant.CLASSIC -> VariantDto.CLASSIC
-    Variant.DIAGONAL -> VariantDto.DIAGONAL
-    Variant.JIGSAW -> VariantDto.JIGSAW
-    Variant.KILLER -> VariantDto.KILLER
-    Variant.THERMO -> VariantDto.THERMO
-    Variant.ARROW -> VariantDto.ARROW
-}
-
-internal fun VariantDto.player(): Variant = when (this) {
-    VariantDto.CLASSIC -> Variant.CLASSIC
-    VariantDto.DIAGONAL -> Variant.DIAGONAL
-    VariantDto.JIGSAW -> Variant.JIGSAW
-    VariantDto.KILLER -> Variant.KILLER
-    VariantDto.THERMO -> Variant.THERMO
-    VariantDto.ARROW -> Variant.ARROW
-}
-
-internal fun Difficulty.native(): DifficultyDto = when (this) {
-    Difficulty.EASY -> DifficultyDto.EASY
-    Difficulty.MEDIUM -> DifficultyDto.MEDIUM
-    Difficulty.HARD -> DifficultyDto.HARD
-    Difficulty.EXPERT -> DifficultyDto.EXPERT
-}
-
-internal fun DifficultyDto.player(): Difficulty = when (this) {
-    DifficultyDto.EASY -> Difficulty.EASY
-    DifficultyDto.MEDIUM -> Difficulty.MEDIUM
-    DifficultyDto.HARD -> Difficulty.HARD
-    DifficultyDto.EXPERT -> Difficulty.EXPERT
-}
-
-internal fun PuzzleRules.native(): RulesDto = when (this) {
-    PuzzleRules.Classic -> RulesDto.Classic
-    PuzzleRules.Diagonal -> RulesDto.Diagonal
-    is PuzzleRules.Jigsaw -> RulesDto.Jigsaw(regions.map { it.nativeCells() })
-    is PuzzleRules.Killer -> RulesDto.Killer(
-        cages.map {
-            require(it.sum in 1..45)
-            CageDto(it.cells.nativeCells(), it.sum.toUShort())
-        }
-    )
-    is PuzzleRules.Thermo -> RulesDto.Thermo(paths.map { it.nativeCells() })
-    is PuzzleRules.Arrow -> RulesDto.Arrow(arrows.map { ArrowDto(it.circle.nativeCell(), it.shaft.nativeCells()) })
-}
-
-internal fun RulesDto.player(): PuzzleRules = when (this) {
-    RulesDto.Classic -> PuzzleRules.Classic
-    RulesDto.Diagonal -> PuzzleRules.Diagonal
-    is RulesDto.Jigsaw -> PuzzleRules.Jigsaw(regions.map { it.playerCells() })
-    is RulesDto.Killer -> PuzzleRules.Killer(cages.map { Cage(it.cells.playerCells(), it.sum.toInt()) })
-    is RulesDto.Thermo -> PuzzleRules.Thermo(paths.map { it.playerCells() })
-    is RulesDto.Arrow -> PuzzleRules.Arrow(arrows.map { ArrowClue(it.circle.toInt(), it.shaft.playerCells()) })
-}
-
-internal fun MetadataDto.player(): RuleMetadata = RuleMetadata(
-    rules.player(),
-    units.map { RuleUnit(it.kind.name.lowercase(), it.index.toInt(), it.cells.playerCells()) },
-    constraints.map {
-        when (it) {
-            is ConstraintDto.Cage -> RuleConstraint(
-                it.id,
-                it.index.toInt(),
-                it.cells.playerCells(),
-                "cage",
-                sum = it.sum.toInt()
-            )
-            is ConstraintDto.Thermo -> RuleConstraint(it.id, it.index.toInt(), it.cells.playerCells(), "thermo")
-            is ConstraintDto.Arrow -> RuleConstraint(
-                it.id,
-                it.index.toInt(),
-                listOf(it.circle.toInt()) + it.shaft.playerCells(),
-                "arrow",
-                circle = it.circle.toInt(),
-                shaft = it.shaft.playerCells()
-            )
-        }
-    },
-    cellUnits.map {
-        it.playerCells()
-    },
-    cellConstraints.map {
-        it.playerCells()
-    },
-    duplicatePeers.map { it.playerCells() },
-    relatedCells.map { it.playerCells() }
-)
-
-internal fun ViolationDto.player(): RuleViolation = RuleViolation(
-    constraintId,
-    cells.playerCells(),
-    when (val value = code) {
-        ViolationCodeDto.Duplicate -> ViolationCode.Duplicate
-        is ViolationCodeDto.CageTotal -> ViolationCode.CageTotal(value.index.toLong(), value.sum.toInt())
-        is ViolationCodeDto.ThermoOrder -> ViolationCode.ThermoOrder(value.index.toLong())
-        is ViolationCodeDto.ArrowTotal -> ViolationCode.ArrowTotal(value.index.toLong())
-    }
-)
-
-internal fun AssessmentIssueDto.player(): AssessmentIssue = when (this) {
-    is AssessmentIssueDto.Message -> AssessmentIssue.Message(message)
-    is AssessmentIssueDto.Violation -> AssessmentIssue.Violation(violation.player())
-}
 
 internal fun TechniqueDto.wire(): String = when (this) {
     TechniqueDto.X_WING -> "x-wing"
@@ -189,16 +33,21 @@ internal fun TechniqueDto.wire(): String = when (this) {
     else -> name.lowercase().replace('_', '-')
 }
 
-private fun String.nativeTechnique(): TechniqueDto =
+internal fun String.nativeTechnique(): TechniqueDto =
     TechniqueDto.entries.firstOrNull { it.wire() == this } ?: error("Unknown technique: $this")
+
 private fun UnitDto.player(): UnitReference = UnitReference(kind.name.lowercase(), index.toInt())
+
 private fun UnitReference.native(): UnitDto {
     val kind = UnitKindDto.entries.firstOrNull { it.name.lowercase() == this.kind } ?: error("Unknown unit kind")
     require(index in 0..8 && (kind != UnitKindDto.DIAGONAL || index < 2))
     return UnitDto(kind, index.toUInt())
 }
+
 private fun DomainDto.player(): DomainFact = DomainFact(cell.toInt(), mask.toInt())
+
 private fun DomainFact.native(): DomainDto = DomainDto(cell.nativeCell(), mask.nativeMask())
+
 private fun RuleEvidenceDto.player(): Evidence = when (this) {
     is RuleEvidenceDto.Cage -> Evidence.Cage(
         cells.playerCells(),
@@ -447,77 +296,5 @@ internal fun HintResult.native(): HintResultDto = when (this) {
             it.name.lowercase().replace('_', '-') == reason
         }
             ?: error("Unknown hint outcome")
-    )
-}
-
-internal fun AssessmentSummaryDto.player(): AssessmentSummary = AssessmentSummary(
-    "sudoku-rating-v2",
-    variant.player(),
-    difficulty.player(),
-    AssessmentWorkload(
-        workload.steps.toLong(),
-        workload.placements.toLong(),
-        workload.eliminations.toLong(),
-        workload.candidateRemovals.toLong(),
-        workload.techniqueCounts.mapKeys {
-            it.key.wire()
-        }.mapValues {
-            it.value.toLong()
-        },
-        workload.highestTier?.player(),
-        workload.highestTechnique?.wire(),
-        workload.variantSteps.toLong()
-    )
-)
-
-private fun Long.nativeCount(): UInt {
-    require(this in 0..UInt.MAX_VALUE.toLong()) { "Invalid assessment count" }
-    return toUInt()
-}
-internal fun AssessmentSummary.native(): AssessmentSummaryDto = AssessmentSummaryDto(
-    RatingVersionDto.V2,
-    variant.native(),
-    difficulty.native(),
-    WorkloadDto(
-        workload.steps.nativeCount(),
-        workload.placements.nativeCount(),
-        workload.eliminations.nativeCount(),
-        workload.candidateRemovals.nativeCount(),
-        workload.techniqueCounts.mapKeys {
-            it.key.nativeTechnique()
-        }.mapValues {
-            it.value.nativeCount()
-        },
-        workload.highestTier?.native(),
-        workload.highestTechnique?.nativeTechnique(),
-        workload.variantSteps.nativeCount()
-    )
-)
-
-internal fun PuzzleAssessment.native(): StoredAssessmentDto = when (this) {
-    is PuzzleAssessment.Rated -> StoredAssessmentDto.Rated(
-        summary.ratingVersion,
-        if (summary.ratingVersion ==
-            "sudoku-rating-v2"
-        ) {
-            summary.native()
-        } else {
-            null
-        }
-    )
-    is PuzzleAssessment.Unavailable -> StoredAssessmentDto.Unavailable(
-        UnavailableReasonDto.entries.firstOrNull {
-            it.name.lowercase().replace('_', '-') == reason
-        }
-            ?: error("Unknown assessment availability"),
-        issues.toList()
-    )
-}
-
-internal fun PuzzleAssessmentDto.player(): PuzzleAssessment = when (this) {
-    is PuzzleAssessmentDto.Rated -> PuzzleAssessment.Rated(summary.player())
-    is PuzzleAssessmentDto.Unavailable -> PuzzleAssessment.Unavailable(
-        reason.name.lowercase().replace('_', '-'),
-        issues.toList()
     )
 }

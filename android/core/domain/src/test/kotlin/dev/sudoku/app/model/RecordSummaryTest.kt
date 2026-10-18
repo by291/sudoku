@@ -4,6 +4,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class RecordSummaryTest {
+    @Test fun `streaming streaks deduplicate days and retain the first and longest runs`() {
+        val statistics = StreakStatistics(100)
+
+        listOf(100L, 99L, 99L, 97L, 96L, 95L).forEach(statistics::include)
+
+        assertEquals(StreakSummary(current = 2, longest = 3), statistics.summary())
+    }
+
     @Test fun `daily totals retain assistance and streak uses Beijing completion date`() {
         fun completed(date: String, completedAt: String, assisted: Boolean): ResultRecord {
             val session =

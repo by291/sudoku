@@ -17,10 +17,8 @@ fun LessonRoute(lessonId: String, onPractice: (GameLaunch.Practice) -> Unit, onB
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.checkDataset() }
 
     LessonScreen(
-        // A shared preloaded directory must never appear as an initialized lesson interaction.
-        state = if (state.lessonId ==
-            lessonId
-        ) {
+        // Route reuse must never expose the previous lesson as the newly requested interaction.
+        state = if (state.lessonId == lessonId) {
             state
         } else {
             LearningUiState(lessonId = lessonId, directory = state.directory)

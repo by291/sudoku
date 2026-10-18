@@ -1,9 +1,7 @@
 package dev.sudoku.app.feature.learning
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,16 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -40,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -51,12 +43,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sudoku.app.design.rememberDelayedProgress
-import dev.sudoku.app.designsystem.variantLabel
+import dev.sudoku.app.designsystem.VariantSelection
+import dev.sudoku.app.designsystem.shortVariantLabel as courseLabel
 import dev.sudoku.app.model.Variant
 
 @Composable
 internal fun LearningScreen(
-    state: LearningUiState,
+    state: LearningDirectoryState,
     onVariant: (Variant) -> Unit,
     onOpenLesson: (String) -> Unit,
     onRetry: () -> Unit
@@ -72,7 +65,7 @@ internal fun LearningScreen(
             item(key = "overview") {
                 LearningHeading(overview, progressReady = state.epoch != null)
                 Spacer(Modifier.height(22.dp))
-                CourseChoices(state.selectedVariant, onVariant)
+                VariantSelection(state.selectedVariant, onVariant)
                 Spacer(Modifier.height(18.dp))
             }
             if (state.error != null) {
@@ -83,18 +76,14 @@ internal fun LearningScreen(
                     }
                 }
             }
-            overview.suggested?.let { suggested ->
-                item(key = "suggested") {
-                    Box(
-                        Modifier.then(if (state.epoch == null) Modifier.clearAndSetSemantics { } else Modifier)
-                            .alpha(if (state.epoch == null) 0f else 1f)
-                    ) {
-                        SuggestedLesson(suggested, overview.courseCompleted) {
-                            if (state.epoch != null) onOpenLesson(suggested.lesson.id)
-                        }
-                    }
-                    Spacer(Modifier.height(24.dp))
-                }
+            item(key = "suggested") {
+                LearningSuggestion(
+                    overview.lessons.map { it.lesson },
+                    overview.suggested,
+                    overview.courseCompleted,
+                    onOpenLesson
+                )
+                Spacer(Modifier.height(24.dp))
             }
             item(key = "course-heading") {
                 Row(
@@ -109,9 +98,7 @@ internal fun LearningScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        if (state.epoch ==
-                            null
-                        ) {
+                        if (state.epoch == null) {
                             "— / ${overview.lessons.size}"
                         } else {
                             "已完成 ${overview.courseCompleted} / ${overview.lessons.size}"
@@ -186,12 +173,10 @@ private fun LearningHeading(overview: LearningOverview, progressReady: Boolean) 
         }
         LinearProgressIndicator(
             progress = {
-                if (overview.totalCount ==
-                    0
-                ) {
+                if (overview.totalCount == 0) {
                     0f
                 } else {
-                    overview.completedCount.toFloat() / overview.totalCount
+                    (overview.completedCount ?: 0).toFloat() / overview.totalCount
                 }
             },
             modifier = Modifier.fillMaxWidth().height(4.dp)
@@ -211,117 +196,6 @@ private fun LearningHeading(overview: LearningOverview, progressReady: Boolean) 
 }
 
 @Composable
-private fun CourseChoices(selected: Variant, onSelect: (Variant) -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val fontScale = LocalDensity.current.fontScale
-    BoxWithConstraints {
-        val columns = when {
-            maxWidth < 240.dp && fontScale > 1.5f -> 1
-            fontScale > 1.3f || maxWidth < 280.dp -> 2
-            else -> 3
-        }
-        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Variant.entries.chunked(columns).forEach { choices ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    choices.forEach { choice ->
-                        val isSelected = choice == selected
-                        Surface(
-                            Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) colors.primaryContainer else colors.surface,
-                            border = BorderStroke(
-                                1.dp,
-                                if (isSelected) {
-                                    colors.primary.copy(
-                                        alpha = 0.5f
-                                    )
-                                } else {
-                                    colors.onSurface.copy(alpha = 0.1f)
-                                }
-                            )
-                        ) {
-                            Row(
-                                Modifier.selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(choice) })
-                                    .semantics { contentDescription = variantLabel(choice) }
-                                    .heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (isSelected) {
-                                    Icon(Icons.Outlined.Check, null, Modifier.size(14.dp), tint = colors.primary)
-                                }
-                                Text(
-                                    courseLabel(choice),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isSelected) colors.primary else colors.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SuggestedLesson(entry: LearningLessonEntry, courseCompleted: Int, onOpen: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val action = when {
-        entry.completed -> "复习课程"
-        entry.inProgress -> "继续学习"
-        courseCompleted > 0 -> "学习下一节"
-        else -> "开始学习"
-    }
-    val caption = when {
-        entry.completed -> "全部学完了，再巩固一次"
-        entry.inProgress -> "接着上次的思路"
-        courseCompleted > 0 -> "下一步，试试这节课"
-        else -> "推荐从这里开始"
-    }
-    Surface(
-        Modifier.fillMaxWidth().testTag("suggested-lesson"),
-        shape = RoundedCornerShape(20.dp),
-        color = colors.primaryContainer
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(caption, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = colors.primary)
-                Text(
-                    if (entry.inProgress) {
-                        "第 ${entry.stageIndex + 1} / ${entry.lesson.stageCount} 阶段"
-                    } else {
-                        "第 ${entry.number} 节"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.onSurfaceVariant
-                )
-            }
-            Text(entry.lesson.title, fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                entry.lesson.introduction,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-                maxLines = if (LocalDensity.current.fontScale > 1.3f) Int.MAX_VALUE else 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Button(
-                onClick = onOpen,
-                modifier = Modifier.fillMaxWidth().heightIn(
-                    min = 48.dp
-                ).padding(top = 4.dp).testTag("suggested-lesson-action"),
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                Text(action, style = MaterialTheme.typography.titleSmall)
-                Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.padding(start = 10.dp).size(20.dp))
-            }
-        }
-    }
-}
-
-@Composable
 private fun LessonRow(
     entry: LearningLessonEntry,
     suggested: Boolean,
@@ -331,6 +205,7 @@ private fun LessonRow(
 ) {
     val colors = MaterialTheme.colorScheme
     val status = when {
+        entry.status is LessonProgressStatus.Unknown -> "进度待确认"
         entry.completed -> "已掌握"
         entry.inProgress -> "学习中"
         else -> "未开始"
@@ -408,13 +283,4 @@ private fun LessonRow(
             }
         }
     }
-}
-
-private fun courseLabel(variant: Variant): String = when (variant) {
-    Variant.CLASSIC -> "标准"
-    Variant.DIAGONAL -> "对角线"
-    Variant.JIGSAW -> "不规则"
-    Variant.KILLER -> "杀手"
-    Variant.THERMO -> "温度计"
-    Variant.ARROW -> "箭头"
 }

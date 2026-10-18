@@ -5,15 +5,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 
 @Composable
 fun LearningRoute(onOpenLesson: (String) -> Unit) {
-    val model: LearningViewModel = hiltViewModel()
+    val model: LearningDirectoryViewModel = hiltViewModel()
     val state by model.uiState.collectAsStateWithLifecycle()
-    LaunchedEffect(model) { model.open() }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.checkDataset() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(model, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { model.observe() }
+    }
 
     LearningScreen(state, model::selectVariant, onOpenLesson, { model.open() })
 }

@@ -11,7 +11,9 @@ class BackupDocumentsTest {
     @Test fun `unknown provider size cannot bypass backup byte bound`() {
         val input = object : InputStream() {
             var remaining = BackupLimits.BYTES + 1
+
             override fun read(): Int = if (remaining-- > 0) ' '.code else -1
+
             override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
                 if (remaining == 0) return -1
                 val count = minOf(remaining, length)

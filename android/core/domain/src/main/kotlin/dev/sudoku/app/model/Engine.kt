@@ -6,14 +6,22 @@ import kotlinx.serialization.Serializable
 /** Incomplete computation cannot be mistaken for a valid empty result. */
 sealed interface EngineOutcome<out T> {
     data class Completed<T>(val value: T, val workUsed: Long = 0) : EngineOutcome<T>
+
     data class BudgetExhausted(val workUsed: Long = 0) : EngineOutcome<Nothing>
+
     data object Cancelled : EngineOutcome<Nothing>
+
     data object TimedOut : EngineOutcome<Nothing>
+
+    /** Conclusive input rejection; unlike execution failure it may establish invalid persisted data. */
+    data class InvalidInput(val message: String) : EngineOutcome<Nothing>
+
     data class Failed(val message: String) : EngineOutcome<Nothing>
 }
 
 sealed interface Validation {
     data object Valid : Validation
+
     data class Invalid(val issues: List<String>) : Validation
 }
 
@@ -23,18 +31,30 @@ data class EngineInformation(
     val variantPuzzleVersion: String,
     val ratingVersion: String
 )
+
 data class GenerationRequest(val variant: Variant, val difficulty: Difficulty, val seed: List<UByte>)
+
 data class GeneratedPuzzle(val puzzle: Puzzle, val assessment: PuzzleAssessment?)
+
 data class RuleUnit(val kind: String, val index: Int, val cells: List<Int>)
-data class RuleConstraint(
-    val id: String,
-    val index: Int,
-    val cells: List<Int>,
-    val kind: String,
-    val sum: Int? = null,
-    val circle: Int? = null,
-    val shaft: List<Int> = emptyList()
-)
+
+/** Each constraint carries only facts meaningful for that rule. */
+sealed interface RuleConstraint {
+    val id: String
+    val index: Int
+    val cells: List<Int>
+
+    data class Cage(override val id: String, override val index: Int, override val cells: List<Int>, val sum: Int) :
+        RuleConstraint
+
+    data class Thermo(override val id: String, override val index: Int, override val cells: List<Int>) : RuleConstraint
+
+    data class Arrow(override val id: String, override val index: Int, val circle: Int, val shaft: List<Int>) :
+        RuleConstraint {
+        override val cells: List<Int> get() = listOf(circle) + shaft
+    }
+}
+
 data class RuleMetadata(
     val rules: PuzzleRules,
     val units: List<RuleUnit>,
@@ -44,10 +64,14 @@ data class RuleMetadata(
     val duplicatePeers: List<List<Int>>,
     val relatedCells: List<List<Int>>
 )
+
 sealed interface ViolationCode {
     data object Duplicate : ViolationCode
+
     data class CageTotal(val index: Long, val sum: Int) : ViolationCode
+
     data class ThermoOrder(val index: Long) : ViolationCode
+
     data class ArrowTotal(val index: Long) : ViolationCode
 }
 
@@ -183,39 +207,54 @@ sealed interface LogicalStep {
         val removals: List<Placement>
     ) : LogicalStep
 }
+
 sealed interface HintResult {
     data class ReviewEntry(val cell: Int) : HintResult
+
     data class Deduction(val steps: List<LogicalStep>, val placement: Placement) : HintResult
+
     data class Unavailable(val reason: String) : HintResult
 }
 
 /** Newly computed diagnostics retain facts until a feature chooses player-facing rendering. */
 sealed interface AssessmentIssue {
     data class Message(val message: String) : AssessmentIssue
+
     data class Violation(val violation: RuleViolation) : AssessmentIssue
 }
 
 sealed interface AssessmentResult {
     data class Rated(val summary: AssessmentSummary, val trace: List<LogicalStep>) : AssessmentResult
+
     data class Ungraded(val variant: Variant) : AssessmentResult
+
     data class Invalid(val issues: List<AssessmentIssue>) : AssessmentResult
 }
 
 /** Main-safe calls own input snapshots. Close waits for executing native calls to release ownership. */
 interface PreparedPuzzle {
     val metadata: RuleMetadata
+
     suspend fun edit(givens: List<Int>, layers: BoardLayers, action: BoardEdit): EngineOutcome<EditResult>
+
     suspend fun candidates(board: List<Int>): EngineOutcome<List<Int>>
+
     suspend fun conflicts(board: List<Int>): EngineOutcome<List<RuleViolation>>
+
     suspend fun isComplete(board: List<Int>): EngineOutcome<Boolean>
+
     suspend fun reviewEntries(board: List<Int>, solution: List<Int>): EngineOutcome<List<Int>>
+
     suspend fun hint(board: List<Int>, solution: List<Int>): EngineOutcome<HintResult>
+
     suspend fun close()
 }
 
 /** Storage validates copies before opening transactions and sends no historical text into Rust. */
 interface MathematicalValidator {
+
     suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation>
+
     suspend fun validateAssessment(
         value: PuzzleAssessment?,
         variant: Variant,
@@ -224,13 +263,21 @@ interface MathematicalValidator {
 }
 
 interface SudokuEngine : MathematicalValidator {
+
     suspend fun information(): EngineOutcome<EngineInformation>
+
     suspend fun deriveSeed(material: List<UByte>): EngineOutcome<List<UByte>>
+
     suspend fun generate(request: GenerationRequest): EngineOutcome<GeneratedPuzzle>
+
     suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle>
+
     suspend fun assess(board: List<Int>, rules: PuzzleRules): EngineOutcome<AssessmentResult>
+
     suspend fun validateHint(hint: HintResult, board: List<Int>, rules: PuzzleRules): EngineOutcome<Validation>
+
     suspend fun transformRules(rules: PuzzleRules, symmetry: Int, complement: Boolean): EngineOutcome<PuzzleRules>
+
     suspend fun validateTeachingStep(
         board: List<Int>,
         candidates: List<Int>,

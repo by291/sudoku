@@ -6,20 +6,30 @@ import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 
+private const val DOCUMENT_BUFFER_BYTES = 8192
+
 /** Reads unknown-size document providers without ever buffering more than the portable limit. */
 internal fun readBackupDocument(input: InputStream): String {
     val output = ByteArrayOutputStream()
-    val buffer = ByteArray(8192)
+    val buffer = ByteArray(DOCUMENT_BUFFER_BYTES)
     var total = 0
     while (true) {
         val count = input.read(buffer)
-        if (count < 0) break
-        if (count == 0) continue
+        if (count < 0) {
+            break
+        }
+        if (count == 0) {
+            continue
+        }
+
         require(count <= BackupLimits.BYTES - total) { "备份超过 25 MiB 文件限制。" }
         output.write(buffer, 0, count)
         total += count
     }
-    return Charsets.UTF_8.newDecoder().onMalformedInput(
-        CodingErrorAction.REPORT
-    ).onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(output.toByteArray())).toString()
+
+    return Charsets.UTF_8.newDecoder()
+        .onMalformedInput(CodingErrorAction.REPORT)
+        .onUnmappableCharacter(CodingErrorAction.REPORT)
+        .decode(ByteBuffer.wrap(output.toByteArray()))
+        .toString()
 }

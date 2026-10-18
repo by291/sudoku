@@ -4,6 +4,7 @@ import dev.sudoku.app.model.LessonProgress
 import dev.sudoku.app.model.Settings
 import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.learning.LessonCatalogue
+import dev.sudoku.app.model.learning.directoryEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,8 +17,17 @@ class LearningOverviewTest {
     )
 
     @Test
+    fun unknownProgressNeverSuggestsAnUnstartedLesson() {
+        val overview = LearningDirectoryState(directory = catalogue.lessons.map { it.directoryEntry() }).overview()
+
+        org.junit.Assert.assertNull(overview.suggested)
+        org.junit.Assert.assertNull(overview.completedCount)
+        org.junit.Assert.assertNull(overview.lessons.first().stageIndex)
+    }
+
+    @Test
     fun bundledCourseCountIsAvailableBeforeLoadingProgress() {
-        val pending = LearningUiState().overview()
+        val pending = LearningDirectoryState().overview()
 
         assertEquals(32, pending.totalCount)
         assertEquals(catalogue.lessons.size, pending.totalCount)
@@ -25,7 +35,13 @@ class LearningOverviewTest {
 
     @Test
     fun newLearnerStartsWithFirstLessonInSelectedCourse() {
-        val overview = LearningUiState(loading = false, catalogue = catalogue).overview()
+        val overview = LearningDirectoryState(
+            loading = false,
+            epoch = 0,
+            directory = catalogue.lessons.map {
+                it.directoryEntry()
+            }
+        ).overview()
 
         assertEquals(32, overview.totalCount)
         assertEquals(0, overview.completedCount)
@@ -36,9 +52,10 @@ class LearningOverviewTest {
 
     @Test
     fun unfinishedCurrentLessonTakesPriorityAndKeepsItsSavedStage() {
-        val overview = LearningUiState(
+        val overview = LearningDirectoryState(
             loading = false,
-            catalogue = catalogue,
+            epoch = 0,
+            directory = catalogue.lessons.map { it.directoryEntry() },
             settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1)),
             progress = listOf(completed("rules"), completed("removed-legacy-lesson"))
         ).overview()
@@ -52,9 +69,10 @@ class LearningOverviewTest {
 
     @Test
     fun completedCurrentLessonAdvancesToFirstUnfinishedLesson() {
-        val overview = LearningUiState(
+        val overview = LearningDirectoryState(
             loading = false,
-            catalogue = catalogue,
+            epoch = 0,
+            directory = catalogue.lessons.map { it.directoryEntry() },
             settings = Settings(currentLessonId = "rules"),
             progress = listOf(completed("rules"))
         ).overview()
@@ -65,9 +83,10 @@ class LearningOverviewTest {
 
     @Test
     fun switchingCourseNeverSuggestsAnotherVariantsSavedLesson() {
-        val overview = LearningUiState(
+        val overview = LearningDirectoryState(
             loading = false,
-            catalogue = catalogue,
+            epoch = 0,
+            directory = catalogue.lessons.map { it.directoryEntry() },
             selectedVariant = Variant.DIAGONAL,
             settings = Settings(currentLessonId = "hidden-single")
         ).overview()
@@ -80,9 +99,10 @@ class LearningOverviewTest {
 
     @Test
     fun completedCourseOffersReviewWithoutReopeningCompletion() {
-        val overview = LearningUiState(
+        val overview = LearningDirectoryState(
             loading = false,
-            catalogue = catalogue,
+            epoch = 0,
+            directory = catalogue.lessons.map { it.directoryEntry() },
             progress = catalogue.lessons.filter { it.practiceVariant == Variant.CLASSIC }.map { completed(it.id) }
         ).overview()
 

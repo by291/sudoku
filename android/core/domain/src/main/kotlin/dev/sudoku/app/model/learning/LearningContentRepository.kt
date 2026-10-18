@@ -19,5 +19,6 @@ fun Lesson.directoryEntry() =
 /** The directory is generated at build time; only selected lesson assets are decoded at runtime. */
 interface LearningContentRepository {
     val directory: List<LessonDirectoryEntry>
+
     suspend fun loadLesson(id: String): EngineOutcome<LessonCatalogue>
 }

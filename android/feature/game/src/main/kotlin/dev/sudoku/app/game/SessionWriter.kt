@@ -14,10 +14,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-data class SaveState(val dirty: Boolean = false, val saving: Boolean = false, val failure: StorageFailure? = null)
+internal data class SaveState(
+    val dirty: Boolean = false,
+    val saving: Boolean = false,
+    val failure: StorageFailure? = null
+)
 
 /** Session-scope calls stay on one dispatcher; persistence awaits never prevent staging newer input. */
-class SessionWriter(
+internal class SessionWriter(
     private val scope: CoroutineScope,
     initialRevision: Long,
     private val write: suspend (GameSession, Long) -> StorageOutcome<SessionRecord>
@@ -81,6 +85,7 @@ class SessionWriter(
 
 private fun ownedSnapshot(session: GameSession): GameSession {
     fun layers(value: BoardLayers) = BoardLayers(value.entries.toList(), value.notes.toList())
+
     fun history(values: List<HistoryMove>) = values.map { HistoryMove(layers(it.before), layers(it.after)) }
 
     return session.copy(

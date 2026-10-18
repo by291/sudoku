@@ -34,7 +34,7 @@ class GameEntrySheetTest {
     @Test fun saveArrivingDuringEntranceWaitsBeforeExpandingSetup() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         compose.mainClock.autoAdvance = false
-        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}, {}) } }
+        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.mainClock.advanceTimeBy(80)
 
         compose.runOnIdle { state.value = state.value.copy(sheetLoading = false, freeSave = save("early").summary) }
@@ -88,7 +88,7 @@ class GameEntrySheetTest {
 
     @Test fun freeSaveExpandsGraduallyWhileTheStartButtonStaysAtTheBottom() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
-        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}, {}) } }
+        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.mainClock.advanceTimeBy(500)
         compose.waitForIdle()
         compose.onNodeWithText("读取中…").assertIsNotEnabled()
@@ -115,7 +115,7 @@ class GameEntrySheetTest {
 
     @Test fun noSaveKeepsSetupCompactWithoutAnEmptySaveRegion() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
-        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}, {}) } }
+        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.waitForIdle()
         val header = compose.onNodeWithText("开始一局").fetchSemanticsNode().boundsInRoot
         compose.runOnIdle { state.value = state.value.copy(sheetLoading = false) }
@@ -147,7 +147,7 @@ class GameEntrySheetTest {
     @Test fun setupErrorArrivingDuringEntranceWaitsBeforeResizing() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         compose.mainClock.autoAdvance = false
-        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}, {}) } }
+        compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.mainClock.advanceTimeBy(80)
 
         compose.runOnIdle { state.value = state.value.copy(sheetLoading = false, sheetError = "读取失败") }
@@ -162,7 +162,7 @@ class GameEntrySheetTest {
     @Test fun preloadedSaveContentIsIncludedInTheInitialSheet() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SudokuTheme { GameSetupSheet(GameEntryUiState(freeSave = save("cached").summary), {}, {}, {}) }
+            SudokuTheme { GameSetupSheet(GameEntryUiState(freeSave = save("cached").summary), {}, {}) }
         }
         compose.mainClock.advanceTimeBy(80)
         compose.onNodeWithText("继续存档").assertExists()

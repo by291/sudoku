@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.sudoku.app.model.GameRepository
 import dev.sudoku.app.model.Settings
+import dev.sudoku.app.model.SettingsUpdate
 import dev.sudoku.app.model.StorageOutcome
 import dev.sudoku.app.model.ThemePreference
 import javax.inject.Inject
@@ -18,8 +19,13 @@ internal data class AppUiState(
     val ready: Boolean = false,
     val loading: Boolean = true,
     val settings: Settings = Settings(),
-    val error: String? = null
-)
+    val bootstrapError: String? = null,
+    val themeFailure: ThemeFailure? = null
+) {
+    val error: String? get() = bootstrapError ?: themeFailure?.message
+}
+
+internal data class ThemeFailure(val requested: ThemePreference, val message: String)
 
 /** Owns readiness and global preferences; feature ViewModels own player workflows. */
 @HiltViewModel
@@ -33,12 +39,21 @@ internal class AppViewModel @Inject constructor(
     private val settingsWrites = Mutex()
 
     init {
-        retry()
+        loadBootstrap()
     }
 
     fun retry() {
+        val failedTheme = mutableState.value.themeFailure
+        if (failedTheme != null) {
+            setTheme(failedTheme.requested)
+        } else {
+            loadBootstrap()
+        }
+    }
+
+    private fun loadBootstrap() {
         viewModelScope.launch {
-            mutableState.value = mutableState.value.copy(loading = true, error = null)
+            mutableState.value = mutableState.value.copy(loading = true, bootstrapError = null)
             when (val snapshot = reads.readBootstrap()) {
                 is StorageOutcome.Success -> mutableState.value = AppUiState(
                     ready = true,
@@ -47,7 +62,7 @@ internal class AppViewModel @Inject constructor(
                 )
                 is StorageOutcome.Failure -> mutableState.value = mutableState.value.copy(
                     loading = false,
-                    error = "本机数据暂时无法读取，请重试。原有进度已保留。"
+                    bootstrapError = "本机数据暂时无法读取，请重试。原有进度已保留。"
                 )
             }
         }
@@ -62,10 +77,10 @@ internal class AppViewModel @Inject constructor(
         when (val result = reads.readBootstrap()) {
             is StorageOutcome.Success ->
                 mutableState.value =
-                    mutableState.value.copy(settings = result.value.settings, error = null)
+                    mutableState.value.copy(settings = result.value.settings, bootstrapError = null)
             is StorageOutcome.Failure ->
                 mutableState.value =
-                    mutableState.value.copy(error = "设置读取失败：${result.error.message}")
+                    mutableState.value.copy(bootstrapError = "设置读取失败：${result.error.message}")
         }
     }
 
@@ -73,20 +88,20 @@ internal class AppViewModel @Inject constructor(
         viewModelScope.launch {
             settingsWrites.withLock {
                 val epoch = repository.readDatasetEpoch()
-                val settings = repository.readSettings()
-                if (epoch !is StorageOutcome.Success || settings !is StorageOutcome.Success) {
-                    mutableState.value = mutableState.value.copy(error = "设置暂时不可保存，请重试。")
+                if (epoch !is StorageOutcome.Success) {
+                    mutableState.value = mutableState.value.copy(themeFailure = ThemeFailure(theme, "设置暂时不可保存，请重试。"))
                     return@withLock
                 }
 
-                val updated = settings.value.copy(theme = theme)
-                when (val result = repository.writeSettings(updated, epoch.value)) {
+                when (val result = repository.updateSettings(SettingsUpdate.Theme(theme), epoch.value)) {
                     is StorageOutcome.Success ->
                         mutableState.value =
-                            mutableState.value.copy(settings = updated, error = null)
+                            mutableState.value.copy(settings = result.value, themeFailure = null)
                     is StorageOutcome.Failure ->
                         mutableState.value =
-                            mutableState.value.copy(error = "设置保存失败：${result.error.message}")
+                            mutableState.value.copy(
+                                themeFailure = ThemeFailure(theme, "设置保存失败：${result.error.message}")
+                            )
                 }
             }
         }

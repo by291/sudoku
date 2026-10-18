@@ -12,6 +12,7 @@ class BackupInteroperabilityTest {
         val validator = object : MathematicalValidator {
             override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> =
                 EngineOutcome.Completed(Validation.Valid)
+
             override suspend fun validateAssessment(
                 value: PuzzleAssessment?,
                 variant: Variant,

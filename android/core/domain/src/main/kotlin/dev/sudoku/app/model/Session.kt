@@ -67,11 +67,16 @@ data class GameSession(
 
 sealed interface BoardEdit {
     data class Enter(val cell: Int, val digit: Int) : BoardEdit
+
     data class Erase(val cell: Int) : BoardEdit
+
     data class ToggleNote(val cell: Int, val digit: Int) : BoardEdit
+
     data object GenerateNotes : BoardEdit
 }
 
 enum class SessionFactAction { UNDO, REDO, HINT_SHOWN, CHECK }
+
 data class EditResult(val entries: List<Int>, val notes: List<Int>, val changed: Boolean, val boardComplete: Boolean)
+
 data class SessionActionResult(val session: GameSession, val changed: Boolean)

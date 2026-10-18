@@ -34,6 +34,7 @@ import dagger.hilt.android.testing.UninstallModules
 import dev.sudoku.app.engine.RustSudokuEngine
 import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.EngineOutcome
+import dev.sudoku.app.model.GameReadRepository
 import dev.sudoku.app.model.GameRepository
 import dev.sudoku.app.model.LogicalStep
 import dev.sudoku.app.model.PreparedPuzzle
@@ -43,6 +44,7 @@ import dev.sudoku.app.model.PuzzleRules
 import dev.sudoku.app.model.SessionMetadata
 import dev.sudoku.app.model.StorageOutcome
 import dev.sudoku.app.model.SudokuEngine
+import dev.sudoku.app.model.SummaryQuery
 import dev.sudoku.app.model.Validation
 import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.createSession
@@ -76,6 +78,8 @@ class PlayerWorkflowTest {
     val engine: SudokuEngine = controlledEngine
 
     @Inject lateinit var repository: GameRepository
+
+    @Inject lateinit var reads: GameReadRepository
     private var activity: ActivityScenario<MainActivity>? = null
 
     @Before
@@ -88,9 +92,7 @@ class PlayerWorkflowTest {
             // Eighty givens leave exactly the known first digit; no solver creates this oracle.
             val puzzle = Puzzle(
                 solution.mapIndexed { cell, value ->
-                    if (cell ==
-                        0
-                    ) {
+                    if (cell == 0) {
                         0
                     } else {
                         value
@@ -231,7 +233,13 @@ class PlayerWorkflowTest {
         awaitText("完成了！")
 
         runBlocking {
-            val results = (repository.listResults() as StorageOutcome.Success).value
+            val results = (
+                reads.readPage(
+                    query = SummaryQuery.History()
+                ) as StorageOutcome.Success
+                ).value.items.map {
+                requireNotNull((reads.readResult(it.id) as StorageOutcome.Success).value)
+            }
             assertEquals(1, results.size)
             assertEquals(1, results.single().session.entries[0])
             assertEquals(false, results.single().session.assistance.assisted)
@@ -249,8 +257,8 @@ class PlayerWorkflowTest {
 
         compose.onNodeWithTag("cell-0").assertDoesNotExist()
         runBlocking {
-            val sessions = (repository.listSessions() as StorageOutcome.Success).value
-            assertEquals("player-workflow", sessions.single().session.id)
+            val sessions = (reads.readPage() as StorageOutcome.Success).value.items
+            assertEquals("player-workflow", sessions.single().id)
         }
     }
 
@@ -417,7 +425,7 @@ class PlayerWorkflowTest {
         runBlocking {
             assertEquals(
                 "player-workflow",
-                (repository.listSessions() as StorageOutcome.Success).value.single().session.id
+                (reads.readPage() as StorageOutcome.Success).value.items.single().id
             )
         }
     }
@@ -451,7 +459,7 @@ class PlayerWorkflowTest {
         runBlocking {
             assertEquals(
                 "player-workflow",
-                (repository.listSessions() as StorageOutcome.Success).value.single().session.id
+                (reads.readPage() as StorageOutcome.Success).value.items.single().id
             )
         }
     }
@@ -525,7 +533,7 @@ class PlayerWorkflowTest {
         runBlocking {
             assertEquals(
                 "player-workflow",
-                (repository.listSessions() as StorageOutcome.Success).value.single().session.id
+                (reads.readPage() as StorageOutcome.Success).value.items.single().id
             )
         }
     }
@@ -594,7 +602,13 @@ class PlayerWorkflowTest {
     fun multipleSavesExposeTheirIdentityAndResumeTheChosenGame() {
         activity?.close()
         runBlocking {
-            val original = (repository.listSessions() as StorageOutcome.Success).value.single().session
+            val original = requireNotNull(
+                (
+                    reads.readSession(
+                        (reads.readPage() as StorageOutcome.Success).value.items.single().id
+                    ) as StorageOutcome.Success
+                    ).value
+            ).session
             val daily = createSession(
                 original.puzzle.copy(difficulty = Difficulty.MEDIUM),
                 SessionMetadata.Daily("2026-10-15", true),

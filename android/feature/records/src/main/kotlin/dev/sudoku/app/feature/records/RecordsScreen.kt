@@ -1,9 +1,7 @@
 package dev.sudoku.app.feature.records
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,23 +19,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -49,7 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sudoku.app.design.rememberDelayedProgress
-import dev.sudoku.app.designsystem.variantLabel
+import dev.sudoku.app.designsystem.VariantSelection
+import dev.sudoku.app.designsystem.shortVariantLabel as recordVariantLabel
 import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.variant
 import java.time.Instant
@@ -71,10 +62,10 @@ internal fun RecordsScreen(
     backupOpen: Boolean = false,
     onDismissBackup: () -> Unit = {},
     onTab: (RecordsTab) -> Unit = {},
-    onMore: () -> Unit = {}
+    onMore: () -> Unit = {},
+    onRetryBackup: () -> Unit = onRetry
 ) {
-    var tab by rememberSaveable { mutableStateOf(RecordsTab.OVERVIEW) }
-    androidx.compose.runtime.LaunchedEffect(tab) { onTab(tab) }
+    val tab = state.tab
     val scrollStates = rememberSaveableStateHolder()
     val available = !state.loading && !state.busy && state.epoch != null
     val showProgress = rememberDelayedProgress(state.loading || state.busy)
@@ -123,17 +114,28 @@ internal fun RecordsScreen(
                         }
                     }
                     Spacer(Modifier.height(20.dp))
-                    RecordVariants(state.variant, onVariant)
+                    VariantSelection(state.variant, onVariant, emphasizeSelected = false)
                     Spacer(Modifier.height(16.dp))
                 }
                 stickyHeader(key = "tabs") {
                     Surface(color = MaterialTheme.colorScheme.background) {
-                        RecordTabs(tab) { tab = it }
+                        RecordTabs(tab, onTab)
                     }
                 }
                 item(key = "status") {
                     if (!backupOpen && state.preview == null) {
-                        RecordStatus(state, onRetry)
+                        RecordStatus(
+                            state.queryFailure,
+                            notice = null,
+                            canRetry = !state.loading,
+                            onRetry
+                        )
+                        RecordStatus(
+                            state.backupFailure,
+                            state.notice,
+                            canRetry = !state.busy,
+                            onRetryBackup
+                        )
                     }
                 }
                 // Unknown data keeps the same overview structure; list placeholders must not claim an empty dataset.
@@ -143,7 +145,7 @@ internal fun RecordsScreen(
                             if (state.pending) {
                                 Column {
                                     RecordCaption("历史记录尚未整理完成，统计暂不可用")
-                                    androidx.compose.material3.TextButton(onClick = onRetry, enabled = !state.busy) {
+                                    androidx.compose.material3.TextButton(onClick = onRetry, enabled = !state.loading) {
                                         Text("继续整理")
                                     }
                                 }
@@ -229,24 +231,24 @@ internal fun RecordsScreen(
         }
     }
     RecordsBackup(
-        state, backupOpen, available, onDismissBackup, onRetry,
+        state, backupOpen, available = !state.busy, onDismissBackup, onRetryBackup,
         onExport, onImport, onDismissPreview, onRestore, onClear, onCleanup
     )
 }
 
 @Composable
-internal fun RecordStatus(state: RecordsUiState, onRetry: () -> Unit) {
-    state.error?.let { error ->
+internal fun RecordStatus(failure: RecordsFailure?, notice: String?, canRetry: Boolean, onRetry: () -> Unit) {
+    failure?.let { error ->
         Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                error,
+                error.message,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
             )
-            OutlinedButton(onClick = onRetry, enabled = !state.busy && !state.loading) { Text("重试") }
+            OutlinedButton(onClick = onRetry, enabled = canRetry) { Text("重试") }
         }
     }
-    state.notice?.let {
+    notice?.let {
         Text(
             it,
             Modifier.padding(bottom = 12.dp).semantics { liveRegion = LiveRegionMode.Polite },
@@ -268,9 +270,7 @@ private fun RecordTabs(selected: RecordsTab, onSelect: (RecordsTab) -> Unit) {
                 Surface(
                     Modifier.weight(1f),
                     shape = RoundedCornerShape(11.dp),
-                    color = if (tab ==
-                        selected
-                    ) {
+                    color = if (tab == selected) {
                         MaterialTheme.colorScheme.surface
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant
@@ -284,9 +284,7 @@ private fun RecordTabs(selected: RecordsTab, onSelect: (RecordsTab) -> Unit) {
                         Text(
                             tab.label,
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (tab ==
-                                selected
-                            ) {
+                            color = if (tab == selected) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
@@ -298,66 +296,4 @@ private fun RecordTabs(selected: RecordsTab, onSelect: (RecordsTab) -> Unit) {
             }
         }
     }
-}
-
-@Composable
-private fun RecordVariants(selected: Variant, onSelect: (Variant) -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val fontScale = LocalDensity.current.fontScale
-    BoxWithConstraints {
-        val columns = when {
-            maxWidth < 240.dp && fontScale > 1.5f -> 1
-            fontScale > 1.3f || maxWidth < 280.dp -> 2
-            else -> 3
-        }
-        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Variant.entries.chunked(columns).forEach { choices ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    choices.forEach { choice ->
-                        val chosen = choice == selected
-                        Surface(
-                            Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (chosen) colors.primaryContainer else colors.surface,
-                            border = BorderStroke(
-                                1.dp,
-                                if (chosen) colors.primary.copy(alpha = 0.5f) else colors.onSurface.copy(alpha = 0.1f)
-                            )
-                        ) {
-                            Row(
-                                Modifier.selectable(chosen, role = Role.RadioButton, onClick = { onSelect(choice) })
-                                    .semantics { contentDescription = variantLabel(choice) }
-                                    .heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (chosen) {
-                                    Icon(
-                                        Icons.Outlined.Check,
-                                        null,
-                                        Modifier.size(14.dp),
-                                        tint = colors.primary
-                                    )
-                                }
-                                Text(
-                                    recordVariantLabel(choice),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (chosen) colors.primary else colors.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-internal fun recordVariantLabel(variant: Variant): String = when (variant) {
-    Variant.CLASSIC -> "标准"
-    Variant.DIAGONAL -> "对角线"
-    Variant.JIGSAW -> "不规则"
-    Variant.KILLER -> "杀手"
-    Variant.THERMO -> "温度计"
-    Variant.ARROW -> "箭头"
 }

@@ -130,11 +130,12 @@ interface SudokuDao {
         DatasetEntity::class,
         QuarantineEntity::class
     ],
-    version = 2,
+    version = 3,
     autoMigrations = [AutoMigration(from = 1, to = 2)],
     exportSchema = true
 )
 abstract class SudokuDatabase : RoomDatabase() {
     abstract fun sudokuDao(): SudokuDao
+
     abstract fun summaryDao(): SummaryDao
 }

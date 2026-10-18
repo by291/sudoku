@@ -3,30 +3,34 @@ package dev.sudoku.app.feature.learning
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.sudoku.app.model.GameRepository
+import dev.sudoku.app.model.LearningProgressRepository
 import dev.sudoku.app.model.LessonProgress
 import dev.sudoku.app.model.Placement
 import dev.sudoku.app.model.Settings
 import dev.sudoku.app.model.StorageOutcome
-import dev.sudoku.app.model.Variant
-import dev.sudoku.app.model.isoInstant
 import dev.sudoku.app.model.learning.ExerciseAnswer
+import dev.sudoku.app.model.learning.ExerciseSubmission
 import dev.sudoku.app.model.learning.LessonCatalogue
 import dev.sudoku.app.model.learning.LessonCursor
 import dev.sudoku.app.model.learning.directoryEntry
-import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-internal data class ExerciseFeedback(
-    val correct: Boolean,
-    val explanation: String,
-    val nextCursor: LessonCursor?,
-    val completed: Boolean
-)
+internal sealed interface ExerciseFeedback {
+    val explanation: String
+    val correct: Boolean get() = this is Saved
+    val nextCursor: LessonCursor? get() = (this as? Saved)?.transition?.cursor
+    val completed: Boolean get() = (this as? Saved)?.transition is ExerciseSubmission.Completed
+
+    data class Incorrect(override val explanation: String) : ExerciseFeedback
+
+    data class Saved(val transition: ExerciseSubmission.Accepted) : ExerciseFeedback {
+        override val explanation get() = transition.explanation
+    }
+}
 
 internal data class LearningUiState(
     val loading: Boolean = true,
@@ -37,7 +41,6 @@ internal data class LearningUiState(
     val progress: List<LessonProgress> = emptyList(),
     val settings: Settings = Settings(),
     val epoch: Long? = null,
-    val selectedVariant: Variant = Variant.CLASSIC,
     val lessonId: String? = null,
     val cursor: LessonCursor? = null,
     val exerciseStarted: Boolean = false,
@@ -58,7 +61,7 @@ internal data class LearningUiState(
 /** Owns one teaching interaction; durable writes settle before a correct answer can expose Next. */
 @HiltViewModel
 internal class LearningViewModel @Inject constructor(
-    private val repository: GameRepository,
+    private val repository: LearningProgressRepository,
     private val loader: LearningSnapshotLoader
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(LearningUiState(directory = loader.snapshot.directory))
@@ -66,6 +69,8 @@ internal class LearningViewModel @Inject constructor(
     private var generation = 0L
     private var observedEpoch: Long? = null
     private var loading: Job? = null
+    private var submission: Job? = null
+    private val progressWriter = LearningProgressWriter(repository)
     private var requestedLessonId: String? = null
 
     init {
@@ -77,7 +82,7 @@ internal class LearningViewModel @Inject constructor(
                     (mutableState.value.epoch != null && mutableState.value.epoch != epoch)
                 ) {
                     invalidatePersonalState()
-                    open(requestedLessonId)
+                    requestedLessonId?.let(::open)
                 }
             }
         }
@@ -85,47 +90,27 @@ internal class LearningViewModel @Inject constructor(
 
     private fun invalidatePersonalState() {
         loading?.cancel()
+        submission?.cancel()
         generation++
         loader.invalidate()
         mutableState.value = LearningUiState(
             catalogue = mutableState.value.catalogue,
             directory = loader.snapshot.directory,
-            selectedVariant = mutableState.value.selectedVariant,
             lessonId = requestedLessonId
         )
     }
 
-    fun open(lessonId: String? = null) {
+    fun open(lessonId: String) {
         requestedLessonId = lessonId
         loading?.cancel()
+        submission?.cancel()
         val operation = ++generation
-        // Keep the directory mounted during return refreshes. Lessons still wait for a fresh
-        // durable cursor before permitting answers; the cached overview is not an exercise state.
-        mutableState.value = if (lessonId == null) {
-            mutableState.value.copy(error = null)
-        } else {
-            LearningUiState(
-                catalogue = mutableState.value.catalogue.takeIf { mutableState.value.lessonId == lessonId },
-                selectedVariant = mutableState.value.selectedVariant,
-                lessonId = lessonId,
-                directory = loader.snapshot.directory
-            )
-        }
+        mutableState.value = LearningUiState(
+            catalogue = mutableState.value.catalogue.takeIf { mutableState.value.lessonId == lessonId },
+            lessonId = lessonId,
+            directory = loader.snapshot.directory
+        )
         loading = viewModelScope.launch {
-            // A directory refresh may retain personal facts, but lesson entry starts without them.
-            if (lessonId == null) {
-                val currentEpoch = repository.readDatasetEpoch()
-                if (operation != generation) return@launch
-                if (currentEpoch is StorageOutcome.Success && mutableState.value.epoch != null &&
-                    currentEpoch.value != mutableState.value.epoch
-                ) {
-                    loader.invalidate()
-                    mutableState.value = LearningUiState(
-                        directory = loader.snapshot.directory,
-                        selectedVariant = mutableState.value.selectedVariant
-                    )
-                }
-            }
             val loaded = loader.read(lessonId) { catalogue ->
                 if (operation == generation) {
                     mutableState.value = mutableState.value.copy(catalogue = catalogue)
@@ -136,7 +121,7 @@ internal class LearningViewModel @Inject constructor(
             }
             if (loaded.epoch != null && observedEpoch?.let { loaded.epoch != it } == true) {
                 invalidatePersonalState()
-                open(requestedLessonId)
+                requestedLessonId?.let(::open)
                 return@launch
             }
             val catalogue = loaded.catalogue
@@ -144,12 +129,12 @@ internal class LearningViewModel @Inject constructor(
                 failLoad(checkNotNull(loaded.error))
                 return@launch
             }
-            val lesson = lessonId?.let { catalogue?.lesson(it) }
-            if (lessonId != null && lesson == null) {
+            val lesson = catalogue?.lesson(lessonId)
+            if (lesson == null) {
                 failLoad("找不到这节课程，请返回学习列表。")
                 return@launch
             }
-            val cursor = lessonId?.let { catalogue?.restoreCursor(it, loaded.settings.lessonStages?.get(it) ?: 0) }
+            val cursor = catalogue.restoreCursor(lessonId, loaded.settings.lessonStages?.get(lessonId) ?: 0)
             mutableState.value = LearningUiState(
                 loading = false,
                 catalogue = catalogue,
@@ -157,7 +142,6 @@ internal class LearningViewModel @Inject constructor(
                 progress = loaded.progress,
                 settings = loaded.settings,
                 epoch = loaded.epoch,
-                selectedVariant = lesson?.practiceVariant ?: mutableState.value.selectedVariant,
                 lessonId = lessonId,
                 cursor = cursor
             )
@@ -172,13 +156,9 @@ internal class LearningViewModel @Inject constructor(
             val epoch = repository.readDatasetEpoch()
             if (epoch is StorageOutcome.Success && epoch.value != mutableState.value.epoch) {
                 invalidatePersonalState()
-                open(requestedLessonId)
+                requestedLessonId?.let(::open)
             }
         }
-    }
-
-    fun selectVariant(variant: Variant) {
-        mutableState.value = mutableState.value.copy(selectedVariant = variant)
     }
 
     fun startExercise() {
@@ -253,79 +233,36 @@ internal class LearningViewModel @Inject constructor(
             return
         }
         val result = catalogue.submit(cursor, answer)
-        if (!result.correct) {
+        if (result is ExerciseSubmission.Rejected) {
             mutableState.value =
-                state.copy(feedback = ExerciseFeedback(false, result.explanation, null, false), error = null)
+                state.copy(feedback = ExerciseFeedback.Incorrect(result.explanation), error = null)
             return
         }
         val operation = generation
         mutableState.value = state.copy(busy = true, error = null)
-        viewModelScope.launch {
-            val currentEpoch = repository.readDatasetEpoch()
-            if (operation != generation) {
-                return@launch
+        if (result !is ExerciseSubmission.Accepted) {
+            return
+        }
+        submission = viewModelScope.launch {
+            when (val saved = progressWriter.save(result, epoch, state.progress)) {
+                LearningWriteResult.DatasetChanged -> {
+                    if (operation == generation) {
+                        invalidatePersonalState()
+                        requestedLessonId?.let(::open)
+                    }
+                }
+                is LearningWriteResult.Failed -> saveFailed(operation)
+                is LearningWriteResult.Saved -> if (operation == generation) {
+                    // The committed cursor authorizes Next, but explicit player input changes the shown stage.
+                    mutableState.value = state.copy(
+                        busy = false,
+                        settings = saved.settings,
+                        progress = saved.progress,
+                        feedback = ExerciseFeedback.Saved(result),
+                        error = null
+                    )
+                }
             }
-            if (currentEpoch is StorageOutcome.Success && currentEpoch.value != epoch) {
-                invalidatePersonalState()
-                open(requestedLessonId)
-                return@launch
-            }
-            if (currentEpoch !is StorageOutcome.Success) {
-                saveFailed(operation)
-                return@launch
-            }
-
-            // The completion's first timestamp is a retained fact; review cannot create a replacement.
-            val completion = if (result.completed && state.progress.none { it.lessonId == cursor.lessonId }) {
-                LessonProgress(cursor.lessonId, isoInstant(Instant.now()))
-            } else {
-                null
-            }
-            if (completion != null && repository.writeLessonProgress(completion, epoch) !is StorageOutcome.Success) {
-                handleSaveFailure(operation, epoch)
-                return@launch
-            }
-            val latestSettings = repository.readSettings()
-            if (operation != generation) {
-                return@launch
-            }
-            if (latestSettings !is StorageOutcome.Success) {
-                saveFailed(operation)
-                return@launch
-            }
-            val stages = latestSettings.value.lessonStages.orEmpty().toMutableMap()
-            if (result.completed) {
-                stages.remove(cursor.lessonId)
-            } else {
-                stages[cursor.lessonId] = result.cursor.stageIndex
-            }
-            val nextSettings = latestSettings.value.copy(currentLessonId = cursor.lessonId, lessonStages = stages)
-            if (repository.writeSettings(nextSettings, epoch) !is StorageOutcome.Success) {
-                handleSaveFailure(operation, epoch)
-                return@launch
-            }
-            val retainedProgress = repository.readLessonProgress()
-            val after = repository.readDatasetEpoch()
-            if (operation != generation) {
-                return@launch
-            }
-            if (after is StorageOutcome.Success && after.value != epoch) {
-                invalidatePersonalState()
-                open(requestedLessonId)
-                return@launch
-            }
-            if (after !is StorageOutcome.Success || retainedProgress !is StorageOutcome.Success) {
-                saveFailed(operation)
-                return@launch
-            }
-            // Keep the shown stage until the player explicitly chooses Next, even though its cursor is durable.
-            mutableState.value = state.copy(
-                busy = false,
-                settings = nextSettings,
-                progress = retainedProgress.value,
-                feedback = ExerciseFeedback(true, result.explanation, result.cursor, result.completed),
-                error = null
-            )
         }
     }
 
@@ -353,18 +290,6 @@ internal class LearningViewModel @Inject constructor(
     private fun saveFailed(operation: Long) {
         if (operation == generation) {
             mutableState.value = mutableState.value.copy(busy = false, error = "答题正确，但学习进度尚未保存。请再次提交以重试。")
-        }
-    }
-
-    private suspend fun handleSaveFailure(operation: Long, epoch: Long) {
-        val current = repository.readDatasetEpoch()
-        if (operation != generation) {
-            return
-        }
-        if (current is StorageOutcome.Success && current.value != epoch) {
-            open(requestedLessonId)
-        } else {
-            saveFailed(operation)
         }
     }
 }

@@ -32,9 +32,7 @@ class ControlledBoardTest {
                     givens,
                     List(81) { 0 },
                     List(81) {
-                        if (it ==
-                            1
-                        ) {
+                        if (it == 1) {
                             5
                         } else {
                             0

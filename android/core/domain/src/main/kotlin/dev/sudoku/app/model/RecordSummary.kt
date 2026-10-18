@@ -4,7 +4,9 @@ import java.time.Instant
 import java.time.LocalDate
 
 data class BestTimes(val assisted: Long? = null, val unassisted: Long? = null)
+
 data class DailyTotals(val assisted: Int = 0, val unassisted: Int = 0)
+
 data class RecordSummary(
     val freeBests: Map<Difficulty, BestTimes>,
     val dailyTotals: DailyTotals,
@@ -14,9 +16,7 @@ data class RecordSummary(
 
 fun summarizeRecords(results: List<ResultRecord>, today: String, variant: Variant = Variant.CLASSIC): RecordSummary {
     require(isChallengeDate(today))
-    val bests = Difficulty.entries.associateWith { BestTimes() }.toMutableMap()
-    var assistedDaily = 0
-    var unassistedDaily = 0
+    val statistics = RecordStatistics()
     val seen = mutableSetOf<String>()
     val eligibleDays = mutableSetOf<Long>()
 
@@ -28,46 +28,93 @@ fun summarizeRecords(results: List<ResultRecord>, today: String, variant: Varian
         }
         val assisted = session.assistance.assisted
         if (session.mode == GameMode.FREE) {
-            val previous = bests.getValue(session.puzzle.difficulty)
-            bests[session.puzzle.difficulty] =
-                if (assisted) {
-                    previous.copy(assisted = minOf(previous.assisted ?: Long.MAX_VALUE, session.elapsedMs))
-                } else {
-                    previous.copy(unassisted = minOf(previous.unassisted ?: Long.MAX_VALUE, session.elapsedMs))
-                }
+            statistics.includeFree(session.puzzle.difficulty, assisted, session.elapsedMs)
         }
         val metadata = session.metadata
         if (metadata is SessionMetadata.Daily && metadata.formalAttempt) {
-            if (assisted) {
-                assistedDaily++
-            } else {
-                unassistedDaily++
-            }
+            statistics.includeFormalDaily(assisted)
+
             // A completion after Beijing midnight counts in totals but cannot create a streak day.
-            if (metadata.challengeDate <= today &&
-                challengeDate(Instant.parse(completion.completedAt)) == metadata.challengeDate
-            ) {
-                eligibleDays += LocalDate.parse(metadata.challengeDate).toEpochDay()
+            val eligibleDate = eligibleChallengeDate(metadata, Instant.parse(completion.completedAt))
+            if (eligibleDate != null && eligibleDate <= today) {
+                eligibleDays += LocalDate.parse(eligibleDate).toEpochDay()
             }
         }
     }
 
-    var previousDay: Long? = null
-    var run = 0
-    var longest = 0
-    for (day in eligibleDays.sorted()) {
-        run = if (previousDay != null && day == previousDay + 1) run + 1 else 1
+    val streak = summarizeStreak(eligibleDays, LocalDate.parse(today).toEpochDay())
+    return statistics.summary(streak)
+}
+
+/** Day numbers use the challenge calendar; a current streak may end yesterday. */
+data class StreakSummary(val current: Int, val longest: Int)
+
+fun summarizeStreak(eligibleDays: Set<Long>, today: Long): StreakSummary {
+    val statistics = StreakStatistics(today)
+    eligibleDays.sortedDescending().forEach(statistics::include)
+    return statistics.summary()
+}
+
+/** Consumes eligible epoch-day numbers no later than today, in descending order, without retaining history. */
+class StreakStatistics(private val today: Long) {
+    private var previousDay: Long? = null
+    private var run = 0
+    private var longest = 0
+    private var current = 0
+    private var currentRunOpen = false
+
+    fun include(day: Long) {
+        require(day <= today) { "Future dates cannot contribute to challenge streaks" }
+        val previous = previousDay
+        require(previous == null || day <= previous) { "Streak dates must descend" }
+        if (day == previous) {
+            return
+        }
+
+        val consecutive = previous != null && day == previous - 1
+        run = if (consecutive) run + 1 else 1
         longest = maxOf(longest, run)
+        if (previous == null) {
+            currentRunOpen = day == today || day == today - 1
+        } else if (!consecutive) {
+            currentRunOpen = false
+        }
+        if (currentRunOpen) {
+            current++
+        }
         previousDay = day
     }
-    var day = LocalDate.parse(today).toEpochDay()
-    if (day !in eligibleDays) {
-        day--
+
+    fun summary(): StreakSummary = StreakSummary(current, longest)
+}
+
+/** Shared accumulation policy for canonical result fixtures and compact storage aggregates. */
+class RecordStatistics {
+    private val bests = Difficulty.entries.associateWith { BestTimes() }.toMutableMap()
+    private var assistedDaily = 0
+    private var unassistedDaily = 0
+
+    fun includeFree(difficulty: Difficulty, assisted: Boolean, elapsedMs: Long) {
+        val previous = bests.getValue(difficulty)
+        bests[difficulty] = if (assisted) {
+            previous.copy(assisted = minOf(previous.assisted ?: Long.MAX_VALUE, elapsedMs))
+        } else {
+            previous.copy(unassisted = minOf(previous.unassisted ?: Long.MAX_VALUE, elapsedMs))
+        }
     }
-    var current = 0
-    while (day in eligibleDays) {
-        current++
-        day--
+
+    fun includeFormalDaily(assisted: Boolean, count: Int = 1) {
+        if (assisted) {
+            assistedDaily += count
+        } else {
+            unassistedDaily += count
+        }
     }
-    return RecordSummary(bests, DailyTotals(assistedDaily, unassistedDaily), current, longest)
+
+    fun summary(streak: StreakSummary): RecordSummary = RecordSummary(
+        bests.toMap(),
+        DailyTotals(assistedDaily, unassistedDaily),
+        streak.current,
+        streak.longest
+    )
 }

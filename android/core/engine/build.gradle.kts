@@ -48,7 +48,10 @@ tasks.named("preBuild") { dependsOn(buildNative) }
 dependencies {
     implementation(project(":core:domain"))
     implementation(libs.coroutines.android)
-    implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
+    implementation(libs.androidx.annotation)
+    implementation(libs.jna) {
+        artifact { type = "aar" }
+    }
     testImplementation(libs.kotlin.test)
     testImplementation(libs.coroutines.test)
     testRuntimeOnly("net.java.dev.jna:jna:${libs.versions.jna.get()}")

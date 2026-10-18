@@ -10,6 +10,7 @@ class PortableCodecTest {
     private val validator = object : MathematicalValidator {
         override suspend fun validatePuzzle(content: PuzzleContent) =
             EngineOutcome.Completed<Validation>(Validation.Valid)
+
         override suspend fun validateAssessment(value: PuzzleAssessment?, variant: Variant, difficulty: Difficulty) =
             EngineOutcome.Completed(value)
     }
@@ -74,6 +75,16 @@ class PortableCodecTest {
         val disconnected = session.copy(undoStack = listOf(HistoryMove(empty, entered)))
 
         assertFailsWith<InvalidPortableData> { codec.validateSession(disconnected) }
+    }
+
+    @Test fun `typed invalid input is conclusive corruption at the portable boundary`() = runTest {
+        val invalid = object : MathematicalValidator by validator {
+            override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> =
+                EngineOutcome.InvalidInput("Invalid region cell")
+        }
+        val session = createSession(puzzleFixture(), SessionMetadata.Free, "invalid", "2026-10-16T01:02:03.004Z")
+
+        assertFailsWith<InvalidPortableData> { PortableCodec(invalid).validateSession(session) }
     }
 
     @Test fun `exhausted validator preserves data as unavailable`() = runTest {

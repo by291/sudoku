@@ -18,7 +18,10 @@ class AssetLearningContentRepository(private val context: Context) : LearningCon
 
     override suspend fun loadLesson(id: String): EngineOutcome<LessonCatalogue> =
         loading.withLock<EngineOutcome<LessonCatalogue>> {
-            if (directory.none { it.id == id }) return@withLock EngineOutcome.Failed("Unknown course identity")
+            if (directory.none { it.id == id }) {
+                return@withLock EngineOutcome.Failed("Unknown course identity")
+            }
+
             cached.remove(id)?.let {
                 cached[id] = it
                 return@withLock EngineOutcome.Completed(it)
@@ -31,7 +34,9 @@ class AssetLearningContentRepository(private val context: Context) : LearningCon
                 }
                 require(catalogue.lesson(id) != null) { "Lesson asset identity mismatch" }
                 cached[id] = catalogue
-                while (cached.size > 3) cached.remove(cached.keys.first())
+                while (cached.size > MAX_CACHED_LESSONS) {
+                    cached.remove(cached.keys.first())
+                }
                 EngineOutcome.Completed(catalogue)
             } catch (error: CancellationException) {
                 throw error
@@ -40,3 +45,5 @@ class AssetLearningContentRepository(private val context: Context) : LearningCon
             }
         }
 }
+
+private const val MAX_CACHED_LESSONS = 3

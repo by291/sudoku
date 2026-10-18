@@ -7,7 +7,6 @@ import dev.sudoku.app.model.EditorToken
 import dev.sudoku.app.model.GameMode
 import dev.sudoku.app.model.GameRepository
 import dev.sudoku.app.model.GameSession
-import dev.sudoku.app.model.InvalidPortableData
 import dev.sudoku.app.model.LessonProgress
 import dev.sudoku.app.model.LocalBackup
 import dev.sudoku.app.model.MAX_SAFE_INTEGER
@@ -18,10 +17,12 @@ import dev.sudoku.app.model.ResultRecord
 import dev.sudoku.app.model.SessionMetadata
 import dev.sudoku.app.model.SessionRecord
 import dev.sudoku.app.model.Settings
+import dev.sudoku.app.model.SettingsUpdate
 import dev.sudoku.app.model.SnapshotValidationUnavailable
 import dev.sudoku.app.model.StorageFailure
 import dev.sudoku.app.model.StorageFailureKind
 import dev.sudoku.app.model.StorageOutcome
+import dev.sudoku.app.model.updated
 import dev.sudoku.app.model.variant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -157,65 +158,21 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
         record
     }
 
-    override suspend fun listSessions(): StorageOutcome<List<SessionRecord>> = access {
-        val snapshot = database.withTransaction { dataset().epoch to dao.sessions() }
-        val records = mutableListOf<SessionRecord>()
-        for (entity in snapshot.second) {
-            try {
-                val record = codec.decodeSessionRecord(entity.payload)
-                require(
-                    record.formatVersion == 2 && record.revision == entity.revision && record.session.id == entity.id
-                )
-                records += record
-            } catch (error: Exception) {
-                preserveUnavailable(error)
-                quarantineSession(snapshot.first, entity, error.message ?: "Invalid session")
-            }
-        }
-        records
-    }
-
-    override suspend fun listResults(): StorageOutcome<List<ResultRecord>> = access {
-        val snapshot = database.withTransaction { dataset().epoch to dao.results() }
-        val records = mutableListOf<ResultRecord>()
-        for (entity in snapshot.second) {
-            try {
-                val record = codec.decodeResultRecord(entity.payload)
-                require(
-                    record.formatVersion == 2 && record.session.id == entity.id && record.session.completion != null
-                )
-                records += record
-            } catch (error: Exception) {
-                preserveUnavailable(error)
-                database.withTransaction {
-                    if (dataset().epoch == snapshot.first && dao.deleteResult(entity.id, entity.payload) == 1) {
-                        summaries.deleteResult(entity.id)
-                        dao.putQuarantine(
-                            QuarantineEntity(
-                                "results:${entity.id}",
-                                "results",
-                                entity.payload,
-                                error.message ?: "Invalid result"
-                            )
-                        )
-                    }
-                }
-            }
-        }
-        records
-    }
-
     override suspend fun readSettings(): StorageOutcome<Settings> = access {
         val raw = dao.settings() ?: return@access Settings()
         codec.json.decodeFromString<Settings>(raw.payload).also(codec::validateSettings)
     }
 
-    override suspend fun writeSettings(settings: Settings, expectedEpoch: Long): StorageOutcome<Unit> = write {
-        codec.validateSettings(settings)
-        val entity = SettingsEntity(payload = encode(settings))
+    override suspend fun updateSettings(update: SettingsUpdate, expectedEpoch: Long): StorageOutcome<Settings> = write {
         database.withTransaction {
             assertEpoch(dataset(), expectedEpoch)
-            dao.putSettings(entity)
+            val current = dao.settings()?.let {
+                codec.json.decodeFromString<Settings>(it.payload).also(codec::validateSettings)
+            } ?: Settings()
+            val next = current.updated(update)
+            codec.validateSettings(next)
+            dao.putSettings(SettingsEntity(payload = encode(next)))
+            next
         }
     }
 
@@ -346,6 +303,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
     }
 
     override suspend fun countQuarantined(): StorageOutcome<Int> = access { dao.quarantineCount() }
+
     override suspend fun removeQuarantined(): StorageOutcome<Unit> = write { dao.clearQuarantine() }
 
     private suspend fun quarantineSession(epoch: Long, entity: SessionEntity, reason: String) {
@@ -380,6 +338,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
         StorageFailureKind.REVISION_CONFLICT,
         "Dataset changed after operation started"
     )
+
     private fun assertEditor(state: DatasetEntity, token: EditorToken) {
         assertEpoch(state, token.epoch)
         checkConflict(
@@ -401,6 +360,7 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
             encode(record)
         )
     }
+
     private fun resultEntity(record: ResultRecord): ResultEntity {
         val session = record.session
         return ResultEntity(
@@ -411,20 +371,26 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
             encode(record)
         )
     }
+
     private inline fun <reified T> encode(value: T): String = escapeSurrogates(codec.json.encodeToString(value))
+
     private fun escapeSurrogates(text: String): String = buildString {
         text.forEach { if (it.isSurrogate()) append("\\u${it.code.toString(16).padStart(4, '0')}") else append(it) }
     }
+
     private fun increment(value: Long): Long {
         require(value in 0 until MAX_SAFE_INTEGER) { "Counter exceeds portable integer range" }
         return value + 1
     }
+
     private fun preserveUnavailable(error: Exception) {
         if (error is CancellationException || error is SnapshotValidationUnavailable) {
             throw error
         }
     }
+
     private suspend fun <T> write(operation: suspend () -> T): StorageOutcome<T> = writes.withLock { access(operation) }
+
     private suspend fun <T> access(operation: suspend () -> T): StorageOutcome<T> = withContext(Dispatchers.IO) {
         try {
             StorageOutcome.Success(operation())
@@ -453,11 +419,13 @@ class RoomGameRepository(private val database: SudokuDatabase, validator: Mathem
 }
 
 private class RepositoryConflict(val kind: StorageFailureKind, message: String) : IllegalStateException(message)
+
 private fun checkConflict(condition: Boolean, kind: StorageFailureKind, message: String) {
     if (!condition) {
         throw RepositoryConflict(kind, message)
     }
 }
+
 private data class ExportRows(
     val epoch: Long,
     val sessions: List<SessionEntity>,

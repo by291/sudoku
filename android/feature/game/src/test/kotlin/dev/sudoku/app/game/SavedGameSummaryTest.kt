@@ -1,6 +1,8 @@
 package dev.sudoku.app.game
 
 import dev.sudoku.app.model.Difficulty
+import dev.sudoku.app.model.GameSession
+import dev.sudoku.app.model.GameSummary
 import dev.sudoku.app.model.Puzzle
 import dev.sudoku.app.model.PuzzleRules
 import dev.sudoku.app.model.SessionMetadata
@@ -65,9 +67,9 @@ class SavedGameSummaryTest {
     }
 }
 
-private fun dev.sudoku.app.model.GameSession.savedGameSummary(zone: java.time.ZoneId, year: Int): SavedGameSummary {
+private fun GameSession.savedGameSummary(zone: java.time.ZoneId, year: Int): SavedGameSummary {
     val cells = puzzle.givens.indices.filter { puzzle.givens[it] == 0 }
-    return dev.sudoku.app.model.GameSummary(
+    return GameSummary(
         id, 1, puzzle.rules.variant, puzzle.difficulty, metadata,
         startedAt, elapsedMs, completion, assistance.assisted, cells.count { entries[it] != 0 }, cells.size
     )

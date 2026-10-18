@@ -117,8 +117,8 @@ private fun HomeHero(
     onRetry: () -> Unit,
     largeText: Boolean,
     short: Boolean,
-    showDescription: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDescription: Boolean = true
 ) {
     val colors = MaterialTheme.colorScheme
     // Refreshing an existing snapshot must not replace the home actions beneath a sheet.

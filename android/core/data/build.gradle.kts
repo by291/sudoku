@@ -24,6 +24,7 @@ val generateLessonAssets by tasks.registering {
         val kotlin = root.resolve("kotlin/dev/sudoku/app/storage").apply { mkdirs() }
         val document = JsonSlurper().parse(source) as Map<*, *>
         val lessons = document["lessons"] as List<*>
+
         fun quoted(value: Any?) = JsonOutput.toJson(value).replace("$", "\\$")
         val rows = lessons.map { raw ->
             val lesson = raw as Map<*, *>

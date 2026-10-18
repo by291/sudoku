@@ -169,9 +169,7 @@ private fun BoardCell(
     val label = listOf(
         cellDescription(cell, given, value, noteMask, conflict, evidence, rules),
         evidenceDescription
-    ).filter {
-        it.isNotBlank()
-    }.joinToString("，")
+    ).filter { it.isNotBlank() }.joinToString("，")
     val outline = when {
         focused -> colors.accent
         selected -> colors.accent

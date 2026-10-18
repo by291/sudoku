@@ -1,5 +1,7 @@
 # Android implementation verification
 
+For current responsibility/readability audit evidence, see the separate [2026-10-18 report](verification/2026-10-18-responsibilities.md). The results below are historical and do not establish verification of later working-tree changes.
+
 Date: 2026-10-17. Verification used the shared feature checkout before task-owned changes were committed in groups. Pre-existing changes from other work remain uncommitted.
 
 ## Delivered boundaries
@@ -21,10 +23,13 @@ The native client lives under `android/`, including the UniFFI adapter. It uses 
 Run Android commands from `android/` with JDK 21 and `ANDROID_HOME` configured. Run release assembly separately from the debug/lint invocation so lint and KSP do not race over generated release caches.
 
 ```sh
-./gradlew qualityCheck :app:assembleDebug :app:assembleDebugAndroidTest
+./gradlew :app:assembleDebugAndroidTest
+./gradlew qualityCheck :app:assembleDebug
 ./gradlew :app:assembleRelease
-python3 scripts/check-native-alignment.py app/build/outputs/apk/debug/app-debug.apk
-python3 scripts/check-native-alignment.py app/build/outputs/apk/release/app-release-unsigned.apk
+for abi in arm64-v8a x86_64; do
+  python3 scripts/check-native-alignment.py "app/build/outputs/apk/debug/app-${abi}-debug.apk" --abi "$abi"
+  python3 scripts/check-native-alignment.py "app/build/outputs/apk/release/app-${abi}-release-unsigned.apk" --abi "$abi"
+done
 ```
 
 `qualityCheck` passed: dependency directions, Spotless, Android lint, and 50 JVM tests (domain 20, engine 5, game 14, learning 6, records 5), with no failures or skips. Native-host tests use the actual generated bridge. Coroutine tests include pausing or leaving while a replacement commit is suspended, so a completed commit cannot silently restart the timer.
@@ -89,7 +94,7 @@ The heap delta includes every native allocation in the process; it is an observa
 
 Both debug and minified release APKs passed ELF `LOAD` alignment and APK ZIP alignment for **every** packaged library: Rust, JNA, and AndroidX graphics path, each for arm64-v8a and x86_64. The minified release was locally signed with a temporary verification key and actually installed and cold-started on the 16 KB emulator. Native generation, candidates, keyboard input, save/leave, and shared lesson loading were exercised. Android reported a 389 ms cold activity start in that run; this is one emulator observation.
 
-`app-debug.apk` is directly installable. `app-release-unsigned.apk` requires a release signing configuration. The temporary verification signature is not a production identity. CI is configured to run Android quality/build/alignment checks and upload APKs; a hosted CI execution has not been observed in this task.
+Current builds use ABI splits: `app-arm64-v8a-debug.apk` and `app-x86_64-debug.apk` are directly installable. The corresponding `app-<abi>-release-unsigned.apk` files require a release signing configuration. Historical filenames in the package manifest describe that earlier run. The temporary verification signature is not a production identity. CI is configured to run Android quality/build/alignment checks and upload APKs; a hosted CI execution has not been observed in this task.
 
 Exact APK sizes and SHA-256 hashes are recorded in [packages.json](verification/2026-10-17/packages.json). The temporary signing key, private ADB server, and task-owned AVD were removed after verification; the APKs and evidence remain available.
 

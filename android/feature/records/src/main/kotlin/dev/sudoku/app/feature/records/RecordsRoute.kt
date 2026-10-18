@@ -13,15 +13,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dev.sudoku.app.model.GameLaunch
-import dev.sudoku.app.model.challengeDate
-import dev.sudoku.app.model.challengeRefreshDelay
-import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -34,6 +31,7 @@ fun RecordsRoute(
 ) {
     val model: RecordsViewModel = hiltViewModel()
     val state by model.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var documentLoading by remember { mutableStateOf(false) }
@@ -44,7 +42,7 @@ fun RecordsRoute(
             if (uri == null) {
                 model.finishExport(null)
             } else if (export == null) {
-                model.documentFailure("导出已中断，请重新导出备份。")
+                model.documentFailure("导出已中断，请重新导出备份。", BackupDocumentAction.EXPORT)
             } else {
                 scope.launch {
                     try {
@@ -87,18 +85,8 @@ fun RecordsRoute(
         }
     }
 
-    LaunchedEffect(model) { model.observe() }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.refresh() }
-    LaunchedEffect(model) {
-        var date = challengeDate(Instant.now())
-        while (true) {
-            delay(challengeRefreshDelay(Instant.now()))
-            val today = challengeDate(Instant.now())
-            if (today != date) {
-                date = today
-                model.refresh()
-            }
-        }
+    LaunchedEffect(model, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { model.observe() }
     }
     LaunchedEffect(backupOpen) { if (backupOpen) model.openBackup() }
     LaunchedEffect(state.replacementGeneration) {
@@ -114,7 +102,20 @@ fun RecordsRoute(
         state = state.copy(busy = state.busy || documentLoading),
         onVariant = model::selectVariant,
         onResume = { onResume(GameLaunch.Resume(it)) },
-        onRetry = model::retry,
+        onRetry = model::retryQuery,
+        onRetryBackup = {
+            when (model.retryBackup()) {
+                BackupDocumentAction.EXPORT -> scope.launch {
+                    model.prepareExport()?.let { exported ->
+                        createDocument.launch("一格一念数独-${exported.backup.exportedAt.take(10)}.json")
+                    }
+                }
+                BackupDocumentAction.IMPORT -> openDocument.launch(
+                    arrayOf("application/json", "text/plain", "application/octet-stream")
+                )
+                null -> Unit
+            }
+        },
         onExport = {
             scope.launch {
                 val exported = model.prepareExport()

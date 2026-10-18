@@ -1,7 +1,6 @@
 package dev.sudoku.app.feature.learning
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -52,14 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -76,8 +67,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import dev.sudoku.app.design.rememberDelayedProgress
 import dev.sudoku.app.designsystem.NumberPad
 import dev.sudoku.app.designsystem.variantLabel
@@ -104,37 +93,7 @@ internal fun LessonScreen(
     val entry = state.lessonEntry
     val stage = if (state.exerciseStarted) state.stage else lesson?.guided
     var zoomed by remember(state.lessonId) { mutableStateOf(false) }
-    val digitKeys = remember {
-        mapOf(
-            Key.One to 1, Key.Two to 2, Key.Three to 3,
-            Key.Four to 4, Key.Five to 5, Key.Six to 6,
-            Key.Seven to 7, Key.Eight to 8, Key.Nine to 9,
-            Key.NumPad1 to 1, Key.NumPad2 to 2, Key.NumPad3 to 3,
-            Key.NumPad4 to 4, Key.NumPad5 to 5, Key.NumPad6 to 6,
-            Key.NumPad7 to 7, Key.NumPad8 to 8, Key.NumPad9 to 9
-        )
-    }
-    val keyboard = Modifier.onPreviewKeyEvent { event ->
-        if (
-            !state.exerciseStarted || state.busy || state.feedback?.correct == true ||
-            event.type != KeyEventType.KeyDown || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed
-        ) {
-            false
-        } else {
-            val digit = digitKeys[event.key]
-            when {
-                digit != null -> {
-                    onDigit(digit)
-                    true
-                }
-                event.key == Key.Backspace || event.key == Key.Delete -> {
-                    onClear()
-                    true
-                }
-                else -> false
-            }
-        }
-    }
+    val keyboard = Modifier.lessonKeyboard(state, onDigit, onClear)
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
@@ -229,35 +188,7 @@ internal fun LessonScreen(
         }
     }
     if (zoomed && stage != null) {
-        Dialog(onDismissRequest = { zoomed = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            Surface(Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.safeDrawingPadding().padding(16.dp).then(keyboard),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("放大棋盘", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                        TextButton(onClick = { zoomed = false }) { Text("关闭放大棋盘") }
-                    }
-                    Text("可以横向和纵向滚动查看棋盘。", style = MaterialTheme.typography.bodyMedium)
-                    Box(
-                        Modifier.weight(1f).horizontalScroll(rememberScrollState())
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        LessonBoard(stage, state, onCell, Modifier.size(540.dp))
-                    }
-                    if (state.exerciseStarted) {
-                        NumberPad(
-                            enabled = state.canEnterAnswer(),
-                            noteMode = state.stage?.answer is ExerciseAnswer.Eliminate,
-                            onDigit = onDigit,
-                            expandedTargets = true,
-                            digitLabel = { lessonDigitLabel(state, it) }
-                        )
-                    }
-                }
-            }
-        }
+        LessonZoom(stage, state, onCell, onDigit, onClear) { zoomed = false }
     }
 }
 
@@ -475,10 +406,10 @@ private fun ExerciseMessage(state: LearningUiState, height: Dp) {
     }
 }
 
-private fun LearningUiState.canEnterAnswer(): Boolean =
+internal fun LearningUiState.canEnterAnswer(): Boolean =
     !busy && feedback?.correct != true && selectedCell?.let { stage?.board?.get(it) == 0 } == true
 
-private fun lessonDigitLabel(state: LearningUiState, digit: Int): String =
+internal fun lessonDigitLabel(state: LearningUiState, digit: Int): String =
     if (state.stage?.answer is ExerciseAnswer.Eliminate) "排除候选数$digit" else "填入数字$digit"
 
 @Composable

@@ -47,7 +47,14 @@ import dev.sudoku.app.designsystem.numberPadColumns
 @Composable
 internal fun GameInputPanel(
     state: GameUiState,
-    model: GameViewModel,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onErase: () -> Unit,
+    onToggleNotes: () -> Unit,
+    onHint: () -> Unit,
+    onDigit: (Int) -> Unit,
+    onNote: (Int) -> Unit,
+    onRetrySave: () -> Unit,
     onMore: () -> Unit,
     moreMenu: @Composable () -> Unit,
     modifier: Modifier
@@ -75,21 +82,21 @@ internal fun GameInputPanel(
                     Icons.AutoMirrored.Outlined.Undo,
                     state.editable && state.session?.undoStack?.isNotEmpty() == true,
                     Modifier.weight(1f),
-                    onClick = model::undo
+                    onClick = onUndo
                 )
                 GameTool(
                     "重做",
                     Icons.AutoMirrored.Outlined.Redo,
                     state.editable && state.session?.redoStack?.isNotEmpty() == true,
                     Modifier.weight(1f),
-                    onClick = model::redo
+                    onClick = onRedo
                 )
                 GameTool(
                     "擦除",
                     Icons.AutoMirrored.Outlined.Backspace,
                     state.inputEditable,
                     Modifier.weight(1f),
-                    onClick = model::erase
+                    onClick = onErase
                 )
                 GameTool(
                     "笔记",
@@ -98,14 +105,14 @@ internal fun GameInputPanel(
                     Modifier.weight(1f),
                     active = state.noteMode,
                     toggle = true,
-                    onClick = model::toggleNotes
+                    onClick = onToggleNotes
                 )
                 GameTool(
                     "提示",
                     Icons.Outlined.Lightbulb,
                     state.editable && !state.hintPending,
                     Modifier.weight(1f),
-                    onClick = model::requestHint
+                    onClick = onHint
                 )
                 Box(Modifier.weight(1f)) {
                     GameTool(
@@ -123,8 +130,8 @@ internal fun GameInputPanel(
             enabled = state.inputEditable,
             noteMode = state.noteMode,
             noteMask = state.selectedCell?.let { state.session?.notes?.get(it) } ?: 0,
-            onDigit = model::enterDigit,
-            onNote = model::toggleNote
+            onDigit = onDigit,
+            onNote = onNote
         )
         state.save.failure?.let { failure ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -134,7 +141,7 @@ internal fun GameInputPanel(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
-                TextButton(onClick = model::retrySave) { Text("重试保存") }
+                TextButton(onClick = onRetrySave) { Text("重试保存") }
             }
         }
     }

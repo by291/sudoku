@@ -8,9 +8,9 @@ import dev.sudoku.app.model.GameRepository
 import dev.sudoku.app.model.GameSession
 import dev.sudoku.app.model.LessonProgress
 import dev.sudoku.app.model.PreviousSession
-import dev.sudoku.app.model.ResultRecord
 import dev.sudoku.app.model.SessionRecord
 import dev.sudoku.app.model.Settings
+import dev.sudoku.app.model.SettingsUpdate
 import dev.sudoku.app.model.StorageFailure
 import dev.sudoku.app.model.StorageFailureKind
 import dev.sudoku.app.model.StorageOutcome
@@ -18,16 +18,20 @@ import dev.sudoku.app.model.learning.ExerciseAnswer
 import dev.sudoku.app.model.learning.LearningContentRepository
 import dev.sudoku.app.model.learning.LessonCatalogue
 import dev.sudoku.app.model.learning.directoryEntry
+import dev.sudoku.app.model.updated
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -36,6 +40,74 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LearningViewModelTest {
+    @Test fun `replacement observed during unknown progress fences a suspended old final read`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val backing = LearningRepository()
+            backing.settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1))
+            backing.progress += LessonProgress("rules", "2026-10-17T00:00:00.000Z")
+            backing.datasetEpochs.emit(0)
+            val finalReadCaptured = CompletableDeferred<Unit>()
+            val releaseFinalRead = CompletableDeferred<Unit>()
+            var epochReads = 0
+            val repository = object : GameRepository by backing {
+                override suspend fun readDatasetEpoch(): StorageOutcome<Long> {
+                    val captured = backing.epoch
+                    epochReads++
+                    if (epochReads == 3) {
+                        finalReadCaptured.complete(Unit)
+                        withContext(NonCancellable) { releaseFinalRead.await() }
+                    }
+                    return StorageOutcome.Success(captured)
+                }
+            }
+            val courses = catalogue()
+            val model = LearningDirectoryViewModel(
+                LearningSnapshotLoader(
+                    repository,
+                    object : LearningContentRepository {
+                        override val directory = courses.lessons.map { it.directoryEntry() }
+
+                        override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
+                    }
+                )
+            )
+            val deliveries = mutableListOf<LearningDirectoryState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                model.uiState.collect { deliveries += it }
+            }
+            backgroundScope.launch { model.observe() }
+            runCurrent()
+            assertTrue(finalReadCaptured.isCompleted)
+            assertEquals(null, model.uiState.value.epoch)
+
+            backing.epoch = 1
+            backing.settings = Settings()
+            backing.progress.clear()
+            backing.failProgress = true
+            backing.datasetEpochs.emit(1)
+            runCurrent()
+            releaseFinalRead.complete(Unit)
+            runCurrent()
+
+            assertTrue(deliveries.none { it.epoch == 0L || it.progress.isNotEmpty() })
+            assertTrue(deliveries.none { it.settings.currentLessonId == "hidden-single" })
+            assertTrue(deliveries.all { it.overview().suggested == null })
+            assertEquals(null, model.uiState.value.epoch)
+            assertNotNull(model.uiState.value.error)
+
+            backing.failProgress = false
+            model.open()
+            runCurrent()
+
+            assertEquals(1L, model.uiState.value.epoch)
+            assertEquals(0, model.uiState.value.overview().completedCount)
+            assertEquals("rules", model.uiState.value.overview().suggested?.lesson?.id)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test
     fun `lesson content is visible while durable progress is still pending`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -56,6 +128,7 @@ class LearningViewModelTest {
                         repository,
                         object : LearningContentRepository {
                             override val directory = courses.lessons.map { it.directoryEntry() }
+
                             override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
                         }
                     )
@@ -115,8 +188,19 @@ class LearningViewModelTest {
         try {
             val repository = LearningRepository()
             repository.progress.add(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
-            val model = model(repository)
-            model.open()
+            val courses = catalogue()
+            val model =
+                LearningDirectoryViewModel(
+                    LearningSnapshotLoader(
+                        repository,
+                        object : LearningContentRepository {
+                            override val directory = courses.lessons.map { it.directoryEntry() }
+
+                            override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
+                        }
+                    )
+                )
+            backgroundScope.launch { model.observe() }
             runCurrent()
             assertEquals(1, model.uiState.value.overview().completedCount)
 
@@ -148,6 +232,7 @@ class LearningViewModelTest {
                 repository,
                 object : LearningContentRepository {
                     override val directory = courses.lessons.map { it.directoryEntry() }
+
                     override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
                 }
             )
@@ -165,13 +250,14 @@ class LearningViewModelTest {
                 repository,
                 object : LearningContentRepository {
                     override val directory = courses.lessons.map { it.directoryEntry() }
+
                     override suspend fun loadLesson(id: String): EngineOutcome<LessonCatalogue> {
                         reads++
                         return EngineOutcome.Completed(courses)
                     }
                 }
             )
-            val model = LearningViewModel(repository, loader)
+            val model = LearningDirectoryViewModel(loader)
 
             assertTrue(model.uiState.value.loading)
             assertEquals(12, model.uiState.value.overview().lessons.size)
@@ -204,6 +290,7 @@ class LearningViewModelTest {
             },
             object : LearningContentRepository {
                 override val directory = courses.lessons.map { it.directoryEntry() }
+
                 override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
             }
         )
@@ -413,20 +500,24 @@ private class LearningRepository : GameRepository {
     var pendingSettings: CompletableDeferred<Unit>? = null
 
     override suspend fun readDatasetEpoch() = StorageOutcome.Success(epoch)
+
     override suspend fun readSettings() = StorageOutcome.Success(settings)
+
     override suspend fun readLessonProgress(): StorageOutcome<List<LessonProgress>> = if (failProgress) {
         StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Progress unavailable"))
     } else {
         StorageOutcome.Success(progress.toList())
     }
-    override suspend fun writeSettings(settings: Settings, expectedEpoch: Long): StorageOutcome<Unit> {
+
+    override suspend fun updateSettings(update: SettingsUpdate, expectedEpoch: Long): StorageOutcome<Settings> {
         pendingSettings?.await()
         if (failSettings || expectedEpoch != epoch) {
             return StorageOutcome.Failure(StorageFailure(StorageFailureKind.WRITE_FAILED, "Test save failure"))
         }
-        this.settings = settings
-        return StorageOutcome.Success(Unit)
+        settings = settings.updated(update)
+        return StorageOutcome.Success(settings)
     }
+
     override suspend fun writeLessonProgress(progress: LessonProgress, expectedEpoch: Long): StorageOutcome<Unit> {
         check(expectedEpoch == epoch)
         if (this.progress.none { it.lessonId == progress.lessonId }) {
@@ -437,24 +528,31 @@ private class LearningRepository : GameRepository {
 
     override suspend fun claimEditor(sessionId: String, ownerId: String): StorageOutcome<EditorToken> =
         error("Unused player operation")
+
     override suspend fun releaseEditor(token: EditorToken): StorageOutcome<Unit> = error("Unused player operation")
+
     override suspend fun writeSession(
         session: GameSession,
         expectedRevision: Long,
         token: EditorToken
     ): StorageOutcome<SessionRecord> = error("Unused player operation")
+
     override suspend fun replaceActiveSession(
         session: GameSession,
         token: EditorToken,
         previous: PreviousSession?
     ): StorageOutcome<SessionRecord> = error("Unused player operation")
-    override suspend fun listSessions(): StorageOutcome<List<SessionRecord>> = error("Unused player operation")
-    override suspend fun listResults(): StorageOutcome<List<ResultRecord>> = error("Unused player operation")
+
     override suspend fun exportBackup(exportedAt: String): StorageOutcome<BackupExport> =
         error("Unused player operation")
+
     override suspend fun previewBackup(text: String): StorageOutcome<BackupPreview> = error("Unused player operation")
+
     override suspend fun restoreBackup(preview: BackupPreview): StorageOutcome<Unit> = error("Unused player operation")
+
     override suspend fun clearAll(expectedEpoch: Long): StorageOutcome<Unit> = error("Unused player operation")
+
     override suspend fun countQuarantined(): StorageOutcome<Int> = error("Unused player operation")
+
     override suspend fun removeQuarantined(): StorageOutcome<Unit> = error("Unused player operation")
 }

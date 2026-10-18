@@ -105,6 +105,7 @@ data class PuzzleContent(
     val rules: PuzzleRules,
     val difficulty: Difficulty
 )
+
 fun Puzzle.content() = PuzzleContent(givens.toList(), solution.toList(), rules, difficulty)
 
 @Serializable

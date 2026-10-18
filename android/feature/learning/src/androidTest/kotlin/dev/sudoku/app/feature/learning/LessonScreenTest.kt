@@ -82,12 +82,12 @@ class LessonScreenTest {
                         }
                         val result = catalogue.submit(checkNotNull(old.cursor), answer)
                         state.value = old.copy(
-                            feedback = ExerciseFeedback(
-                                result.correct,
-                                result.explanation,
-                                result.cursor,
-                                result.completed
-                            )
+                            feedback = when (result) {
+                                is dev.sudoku.app.model.learning.ExerciseSubmission.Rejected ->
+                                    ExerciseFeedback.Incorrect(result.explanation)
+                                is dev.sudoku.app.model.learning.ExerciseSubmission.Accepted ->
+                                    ExerciseFeedback.Saved(result)
+                            }
                         )
                     },
                     onNext = {
