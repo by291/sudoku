@@ -1,8 +1,8 @@
 import { CLASSIC_PUZZLE_FIXTURES } from './classicPuzzles'
-import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
-import { SUDOKU_VARIANTS } from '@reference/core/sudoku/rules/types'
-import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
-import type { Board, Difficulty } from '@reference/core/sudoku/types'
+import { VARIANT_TEMPLATES } from './variantTemplates'
+import { SUDOKU_VARIANTS } from '@/sudoku/catalogue'
+import type { PuzzleRules } from '@/sudoku/contracts'
+import type { Board, Difficulty } from '@/sudoku/contracts'
 
 export type RatingFixture = {
   id: string

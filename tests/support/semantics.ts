@@ -12,7 +12,6 @@ import {
   createSession as create,
 } from '@/features/game/model/session'
 import type { GameSession, GameAction } from '@/features/game/model/session'
-import type { WorkBudget } from '@reference/core/sudoku/budget'
 import { sessionBoard } from '@/features/game/model/session'
 import { validatePuzzleSnapshot } from '@/sudoku/puzzleSnapshot'
 
@@ -50,7 +49,7 @@ export function createSession(...args: Parameters<typeof create>) {
   )
 }
 
-export function applySessionAction(session: GameSession, action: GameAction, budget?: WorkBudget) {
+export function applySessionAction(session: GameSession, action: GameAction, maxWork?: number) {
   const prepared = testEngine.prepare(session.puzzle.rules)
   try {
     const result =
@@ -65,7 +64,7 @@ export function applySessionAction(session: GameSession, action: GameAction, bud
               entries: [...session.entries],
               notes: [...session.notes],
               action,
-              ...(budget ? { work: { maxWork: budget.limit - budget.used } } : {}),
+              ...(maxWork === undefined ? {} : { work: { maxWork } }),
             }).result,
             action,
           )

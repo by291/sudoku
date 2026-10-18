@@ -1,6 +1,6 @@
+import { createRequire } from 'node:module'
 import 'fake-indexeddb/auto'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { gunzipSync } from 'node:zlib'
 import { describe, expect, test } from 'vitest'
 import { format } from 'prettier'
 import { openSudokuDatabase } from '@/storage/database'
@@ -17,25 +17,19 @@ const androidPath = 'android/core/domain/build/interop/android-backup-v1.json'
 describe('portable Android backup interoperability', () => {
   test('exports the actual committed Web format with all nineteen identities', async () => {
     // Literal sealed-reference fixtures are reused as shared input, not new mathematical oracles.
-    const corpus: unknown[] = gunzipSync(
-      readFileSync('tests/fixtures/engine-contracts/generation-v11-full.jsonl.gz'),
+    const corpus: unknown[] = JSON.parse(
+      readFileSync('tests/fixtures/engine-contracts/generation.json', 'utf8'),
     )
-      .toString('utf8')
-      .trim()
-      .split('\n')
-      .map((line) => JSON.parse(line))
     const selected = new Map<string, { puzzle: Puzzle; assessment: PuzzleAssessment }>()
     for (const raw of corpus) {
       const record = raw as {
         expected: {
-          result: {
-            status: string
-            puzzle?: Puzzle
-            assessment?: Extract<PuzzleAssessment, { status: 'rated' }>['summary']
-          }
+          status: string
+          puzzle?: Puzzle
+          assessment?: Extract<PuzzleAssessment, { status: 'rated' }>['summary']
         }
       }
-      const result = record.expected.result
+      const result = record.expected
       if (result.status === 'ready' && result.puzzle && result.assessment) {
         const key = `${result.puzzle.rules.kind}:${result.puzzle.difficulty}`
         if (!selected.has(key))
@@ -47,7 +41,9 @@ describe('portable Android backup interoperability', () => {
     }
     expect(selected.size).toBe(19)
     const engine = await createMainEngine(
-      new WebAssembly.Module(readFileSync('packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm')),
+      new WebAssembly.Module(
+        readFileSync(createRequire(import.meta.url).resolve('@sudoku/wasm/binary')),
+      ),
     )
     const database = await openSudokuDatabase('android-interop-export')
     try {
@@ -158,7 +154,9 @@ describe('portable Android backup interoperability', () => {
     'restores the actual Android export through the Web transaction',
     async () => {
       const engine = await createMainEngine(
-        new WebAssembly.Module(readFileSync('packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm')),
+        new WebAssembly.Module(
+          readFileSync(createRequire(import.meta.url).resolve('@sudoku/wasm/binary')),
+        ),
       )
       const database = await openSudokuDatabase('android-interop-import')
       try {

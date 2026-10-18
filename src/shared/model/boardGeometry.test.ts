@@ -6,9 +6,9 @@ import {
   VARIANT_BOARD_ADAPTERS,
 } from '@/shared/model/boardGeometry'
 import { ARROW_REPEAT_RULES, VARIANT_FIXTURES } from '../../../tests/fixtures/variants'
-import { transformVariantTemplate } from '@reference/core/sudoku/generation/variant'
-import type { SpatialSymmetry } from '@reference/core/sudoku/generation/variant'
-import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
+import { testEngine } from '../../../tests/support/semantics'
+import { copyRules } from '@/sudoku/ruleInput'
+import { VARIANT_TEMPLATES } from '../../../tests/fixtures/variantTemplates'
 
 it('covers every variant with specialized visual and accessible clues', () => {
   expect(Object.keys(VARIANT_BOARD_ADAPTERS)).toEqual([
@@ -66,13 +66,16 @@ it('explains shared Arrow and Thermo constraints as text', () => {
 })
 it.each([0, 1, 2, 3, 4, 5, 6, 7] as const)(
   'follows transformed geometry under spatial symmetry %s',
-  (symmetry: SpatialSymmetry) => {
+  (symmetry) => {
     for (const variant of ['jigsaw', 'killer', 'thermo', 'arrow'] as const) {
-      const transformed = transformVariantTemplate(VARIANT_TEMPLATES[variant].easy[0], { symmetry })
-      const geometry = getBoardGeometry(transformed.rules)
-      if (transformed.rules.kind === 'jigsaw') {
+      const rules = testEngine.transformRules({
+        rules: copyRules(VARIANT_TEMPLATES[variant].easy[0].rules),
+        symmetry,
+      })
+      const geometry = getBoardGeometry(rules)
+      if (rules.kind === 'jigsaw') {
         for (let cell = 0; cell < 81; cell++) {
-          const region = transformed.rules.regions.find((cells) => cells.includes(cell))
+          const region = rules.regions.find((cells) => cells.includes(cell))
           if (!region) {
             throw new Error('Missing fixture region')
           }

@@ -6,12 +6,11 @@ import type { Page } from '@playwright/test'
 import type { GameSession } from '@/features/game/model/session'
 import { projectRecord } from '@/storage/projections'
 
-import { makeSession } from '../support/gameFixtures'
+import { makeSession, HISTORICAL_VARIANT_VERSION } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
 
-import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
-import { VARIANT_PUZZLE_VERSION } from '@reference/core/sudoku/generation/types'
-import type { NewSudokuVariant } from '@reference/core/sudoku/rules/types'
+import { VARIANT_TEMPLATES } from '../fixtures/variantTemplates'
+import type { NewSudokuVariant } from '@/sudoku/contracts'
 
 export { expect }
 
@@ -99,7 +98,7 @@ export function makeVariantHintSession(variant: NewSudokuVariant): GameSession {
       rules: example.rules,
       difficulty: 'easy',
       seed: `${variant}-known-rule-facts`,
-      puzzleVersion: VARIANT_PUZZLE_VERSION,
+      puzzleVersion: HISTORICAL_VARIANT_VERSION,
     },
   })
 }

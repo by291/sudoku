@@ -4,7 +4,7 @@ import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { checkExercise } from '@/features/learning/model/lessons'
 import { EXAMPLES } from '../../../../tests/fixtures/classicLessonExamples'
 import { solvedBoard } from '../../../../tests/fixtures/sudoku'
-import { UNITS, maskOf, digitsIn } from '@reference/core/sudoku/board'
+import { UNITS, maskOf, digitsIn } from '../../../../tests/support/boardFacts'
 import { LESSON_IDS } from '@/features/learning/model/lessonIds'
 
 it('provides six lessons with explicit exercises and mode-appropriate practice', () => {

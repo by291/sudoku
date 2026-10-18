@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
 import { afterEach, expect, it, vi } from 'vitest'
 import { loadSudokuModule } from '@/sudoku/wasmModule'
@@ -12,7 +13,9 @@ it('rejects_unavailable_assets_before_module_instantiation', async () => {
 })
 
 it('retry_compiles_fresh_code_after_a_failed_download', async () => {
-  const bytes = new Uint8Array(readFileSync('packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm'))
+  const bytes = new Uint8Array(
+    readFileSync(createRequire(import.meta.url).resolve('@sudoku/wasm/binary')),
+  )
   const fetch = vi
     .fn()
     .mockRejectedValueOnce(new Error('Offline'))

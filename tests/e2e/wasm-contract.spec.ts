@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { deriveSeed } from '../migration/v11-random'
+import { deriveSeed } from '../support/independentRandom'
 import { test, expect } from '@playwright/test'
 import { createServer } from 'vite'
 import type { ViteDevServer } from 'vite'
@@ -16,7 +16,7 @@ test.beforeAll(async () => {
     resolve: { alias: { '@': resolve(process.cwd(), 'src') } },
     server: { host: '127.0.0.1', port: 0 },
     logLevel: 'error',
-    optimizeDeps: { entries: ['tests/migration/wasm-smoke.html'] },
+    optimizeDeps: { entries: ['tests/browser/wasm-smoke.html'] },
   })
   await server.listen()
   const address = server.httpServer?.address()
@@ -33,10 +33,10 @@ test.afterAll(async () => {
 test('loads the generated WASM library and reports typed algorithm identities', async ({
   page,
 }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const info: unknown = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -63,10 +63,10 @@ test('loads the generated WASM library and reports typed algorithm identities', 
 })
 
 test('summary assessment preserves full outcomes and work in the browser', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const comparisons = await page.evaluate(async (board) => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     function record(value: unknown): value is Record<string, unknown> {
       return value !== null && typeof value === 'object'
@@ -121,10 +121,10 @@ test('summary assessment preserves full outcomes and work in the browser', async
 })
 
 test('rejects_text_wrong_seed_lengths_and_v10_requests', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const rejections = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -186,10 +186,10 @@ test('rejects_text_wrong_seed_lengths_and_v10_requests', async ({ page }) => {
 })
 
 test('preserves_all_32_seed_bytes_and_hex_output', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const results = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -242,10 +242,10 @@ test('preserves_all_32_seed_bytes_and_hex_output', async ({ page }) => {
 })
 
 test('returned_arrays_do_not_alias_prepared_state', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const result = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -325,10 +325,10 @@ test('returned_arrays_do_not_alias_prepared_state', async ({ page }) => {
 })
 
 test('preserves_null_absence_number_kinds_and_allocator_reuse', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const result: unknown = await page.evaluate(async () => {
-    const url = '/tests/migration/browser-compute.mjs'
+    const url = '/tests/browser/boundary-probes.mjs'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -371,14 +371,14 @@ test('preserves_null_absence_number_kinds_and_allocator_reuse', async ({ page })
 })
 
 test('root_seed_derivation_matches_independent_blake3_bytes', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
   const materials = [
     [],
     [0, 255, 192, 128, 239],
     Array.from(new TextEncoder().encode('daily:2026-10-16')),
   ]
   const actual: unknown = await page.evaluate(async (materials) => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const module: unknown = await import(url)
     if (
       !module ||
@@ -407,10 +407,10 @@ test('root_seed_derivation_matches_independent_blake3_bytes', async ({ page }) =
 })
 
 test('edit validates every note mask before length and action failures', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const errors = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     if (
       !bindings ||
@@ -481,10 +481,10 @@ test('edit validates every note mask before length and action failures', async (
 test('assessment technique coverage precedes count and workload contradictions', async ({
   page,
 }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const outcomes = await page.evaluate(async (board) => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     function record(value: unknown): value is Record<string, unknown> {
       return value !== null && typeof value === 'object'
@@ -547,10 +547,10 @@ test('assessment technique coverage precedes count and workload contradictions',
 test('live assessment preserves typed violations and rejects malformed diagnostics in the browser', async ({
   page,
 }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const outcomes = await page.evaluate(async () => {
-    const url = '/packages/sudoku-wasm/pkg/sudoku_wasm.js'
+    const url = '/sudoku/wasm/pkg/sudoku_wasm.js'
     const bindings: unknown = await import(url)
     function record(value: unknown): value is Record<string, unknown> {
       return value !== null && typeof value === 'object'

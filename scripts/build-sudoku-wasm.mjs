@@ -75,7 +75,7 @@ run('cargo', [
   '--release',
   '--locked',
 ])
-const output = resolve(root, 'packages/sudoku-wasm/pkg')
+const output = resolve(root, 'sudoku/wasm/pkg')
 mkdirSync(output, { recursive: true })
 run(bindgen, [
   resolve(root, 'target/wasm32-unknown-unknown/release/sudoku_wasm.wasm'),

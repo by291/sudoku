@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { createBindings } from '@sudoku/wasm/factory'
@@ -117,9 +118,7 @@ export function lessonCatalogueValidation(
     const source = await readFile(cataloguePath, 'utf8')
     const catalogue: unknown = JSON.parse(source)
     const bindings = createBindings()
-    const wasm = await readFile(
-      new URL('../packages/sudoku-wasm/pkg/sudoku_wasm_bg.wasm', import.meta.url),
-    )
+    const wasm = await readFile(createRequire(import.meta.url).resolve('@sudoku/wasm/binary'))
     await bindings.default({ module_or_path: wasm })
     const result = validateLessonCatalogueMath(catalogue, bindings.validate_teaching_step)
 
