@@ -35,4 +35,4 @@ These documents describe maintained behavior, architecture and development workf
 
 ## Source-level references
 
-[Repository guidelines](../AGENTS.md) and [Android guidelines](../android/AGENTS.md) define coding conventions. [Rust core](../sudoku/core/README.md), [WASM adapter](../sudoku/wasm/README.md) and [test ownership and fixtures](testing.md) retain instructions next to their source owners. Executable tests and independent oracle fixtures remain under their normal test directories.
+[Repository guidelines](../AGENTS.md) define shared working conventions and verification entry points. Scoped [Web](../src/AGENTS.md), [Rust/WASM](../sudoku/AGENTS.md) and [Android](../android/AGENTS.md) guidelines define their area-specific contracts. [Rust core](../sudoku/core/README.md), [WASM adapter](../sudoku/wasm/README.md) and [test ownership and fixtures](testing.md) retain instructions next to their source owners. Executable tests and independent oracle fixtures remain under their normal test directories.

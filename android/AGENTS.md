@@ -1,6 +1,6 @@
 # Android Guidelines
 
-Follow the root repository guidelines, the [architecture](../docs/android/architecture.md), and the [data-loading contract](../docs/android/data-loading.md).
+These rules supplement the [repository guidelines](../AGENTS.md) for `android/`, including its Rust FFI adapter. For Rust work, also read the [Rust guidelines](../sudoku/AGENTS.md). Use [architecture](../docs/android/architecture.md) for module/ownership changes, [data loading](../docs/android/data-loading.md) for persistence and queries, and [build](../docs/android/build.md) for tooling, bindings and packaging.
 
 ## Ownership
 
@@ -14,7 +14,7 @@ Follow the root repository guidelines, the [architecture](../docs/android/archit
 ## Readability and contracts
 
 - Use Kotlin with four-space indentation, explicit imports, braces and descriptive names. Write Chinese player copy and English identifiers, comments, documentation and test descriptions.
-- Separate adjacent function/class declarations and distinct workflow stages with one blank line. Keep related properties and tightly coupled calculations together. The Android-local `.editorconfig` enables ktlint 1.7.1's declaration-spacing rule; the formatter cannot decide where input guards, preparation, side effects and returned results need a paragraph break.
+- Separate adjacent function/class declarations and distinct workflow stages with one blank line. Keep related properties and tightly coupled calculations together. The Android-local `.editorconfig` enables ktlint's declaration-spacing rule; the formatter cannot decide where input guards, preparation, side effects and returned results need a paragraph break.
 - Prefer direct branches and named domain predicates over nested outcome selection. Keep short calls and conditions readable rather than retaining unnecessary multiline wrapping. Name non-obvious budgets, intervals and bit masks; ordinary board geometry and cohesive layout need no arbitrary extraction.
 - Keep screens, ViewModels and implementation collaborators internal unless another module needs their contract. Public data describes facts; resource-owning objects expose validated operations and explicit disposal.
 - Comment where correctness depends on ordering or ownership: immutable snapshots before suspension, operation generations, dataset epoch/revision/editor fences, save-before-switch and delayed native disposal. Explain what would break without the constraint; do not narrate obvious code.
@@ -27,14 +27,15 @@ Follow the root repository guidelines, the [architecture](../docs/android/archit
 - Release native handles only after actual in-flight execution returns. Distinguish conclusive invalid input from cancellation, timeout, budget exhaustion and unavailable execution. Inconclusive data must not authorize quarantine or destructive replacement.
 - Keep unknown personal progress, summary coverage and query failure distinct from known-empty values. Preserve existing usable results during ordinary refresh, and invalidate old-epoch facts on restore/clear.
 - Route touch, keyboard and hint operations through the same session actions. Keep keyboard ownership, modal focus, touch targets and non-color error/evidence semantics observable.
-- Check the installed dependency version and relevant official documentation before introducing an API. For example, UniFFI 0.32.2's Android cleaner configuration selects guarded API 34+ SystemCleaner and JNA below it; declare its generated `RequiresApi` dependency explicitly. Change generator configuration and regenerate normally, never edit or suppress generated bindings.
+- Check the installed dependency version and relevant official documentation before introducing an API. The UniFFI Android cleaner configuration selects guarded API 34+ SystemCleaner and JNA below it; declare its generated `RequiresApi` dependency explicitly. Keep crate-local `ffi/uniffi.toml` discovery through Cargo metadata; `--config` expects global configuration. Change generator configuration and regenerate normally, never edit or suppress generated bindings.
 
 ## Verification
 
-- Run `./gradlew spotlessApply` and review logical paragraphs yourself. Do not disable formatter or lint checks to pass a gate.
+Run Gradle commands from `android/`, or use `android/gradlew -p android` from the repository root. Documentation-only changes use the root documentation checks.
+
+- For Kotlin/build-source edits, run `./gradlew spotlessApply` and review logical paragraphs yourself. Do not disable formatter or lint checks to pass a gate.
 - Run `./gradlew qualityCheck :app:assembleDebug` for changes spanning modules. The gate includes every registered Android module's debug lint, authored-source formatting, module directions and applicable JVM suites. Instrumentation and release checks are separate gates.
 - Test observable behavior and domain invariants. Separate arrangement, action and assertions with blank lines. Use fixed independent fixtures; extraction alone does not require mirror tests of private helpers.
 - For FFI configuration changes, rebuild generated bindings and packaged APKs, run host/native checks, and exercise affected runtime branches on disposable AVDs. Native cancellation tests must distinguish signalled return from work exhaustion.
 - Preserve backup v1/session v2 compatibility and independent Web fixtures. Actual export/reimport evidence requires the Android-produced fixture, not a fixture regenerated from Android expectations.
 - Report executed commands, suites, device/ABI and limitations in the change summary. Keep reusable instructions under the root `docs/android/`; do not commit dated verification reports, screenshots or run logs. Use explicit disposable device serials; never modify a personal emulator or physical device without authorization.
-- Do not commit, reset, push or change unrelated Web/shared-Rust work without explicit authorization.

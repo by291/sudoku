@@ -1,167 +1,63 @@
 # Repository Guidelines
 
-These instructions apply to the entire repository.
+These instructions apply to the entire repository. Read the relevant scoped guide before editing its area; it supplements this file. A closer `AGENTS.md` takes precedence for files in its directory. When working from the repository root, open the scoped guide explicitly.
 
-## Language and project context
+## Project and entry points
 
-- Write repository documentation in English, including README files, design documents, implementation plans, and this file.
-- Use English for identifiers, code comments, docstrings, and test descriptions.
-- Write player-facing interface copy in Chinese, as specified in the product design.
-- The selected stack uses a reusable synchronous Rust core, a separate wasm-bindgen adapter, Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI for common controls, Web Workers, IndexedDB with idb, and native CSS. Use pnpm, ESLint, Prettier, Vitest, and Playwright for tooling.
-- Read the applicable topic in [Documentation](docs/README.md) before changing product behavior. Keep documentation organized by topic; do not add one-off plans, execution logs or verification reports.
-- Read [Web Architecture](docs/architecture.md) before moving modules or changing their dependencies.
+Sudoku has a Vue/TypeScript Web client and a Kotlin/Compose Android client sharing one synchronous Rust engine. Player data stays local; the Web client has no backend service.
 
-## Learn and follow the stack's conventions
+- **Web:** `src/` and [Web guidelines](src/AGENTS.md); use the same guide for Web tests/tooling. Read [architecture](docs/architecture.md) for dependencies/ownership and [development](docs/development.md) for setup/deployment.
+- **Rust/WASM:** `sudoku/core`, `sudoku/wasm` and [Rust guidelines](sudoku/AGENTS.md). Use [Engine](docs/engine.md) for computation/identity contracts and [algorithms](docs/algorithms/README.md) for mathematical changes.
+- **Android:** `android/` and [Android guidelines](android/AGENTS.md); also read the Rust guide for `android/ffi`. Use Android [architecture](docs/android/architecture.md), [data loading](docs/android/data-loading.md) or [build](docs/android/build.md) for the changed boundary.
+- **Product/data:** [Product](docs/product.md) owns player behavior, [learning](docs/learning.md) owns lessons and [backup](docs/local-backup.md) owns import/export. The [documentation index](docs/README.md) lists maintained topics.
+- **Tests/extensions:** [Testing](docs/testing.md) owns coverage, fixture provenance and compatibility; follow the [variant checklist](docs/variant-extension.md) when adding a variant.
 
-Before implementing or materially changing code in an area, review the relevant official documentation and the repository's existing conventions. Apply the idioms of the technology being used; do not transfer assumptions from another framework without checking them.
+## Working conventions
 
-- Check the installed dependency version before using an API or following a version-specific example.
-- Prefer official documentation and maintained first-party examples to older tutorials or copied snippets.
-- Resolve conflicts between older style-guide examples and current Vue 3 documentation in favor of guidance applicable to the installed version.
-- Reuse guidance already reviewed during the same task; revisit it when the version, API, or area of work changes.
-- When a convention is important to the implementation, make it visible through types, module boundaries, lint rules, or a short explanatory comment.
+- Write documentation, identifiers, comments, docstrings and test descriptions in English. Write player-facing copy in Chinese.
+- Inspect Git status before editing and preserve unrelated work. Commit, push and merge only when the user authorizes the respective action; authorization already given for the current task remains valid.
+- Use the repository's pinned tools. `package.json` owns Node requirements and pnpm; `rust-toolchain.toml` owns the Rust toolchain; Cargo manifests/lockfile and `android/gradle/libs.versions.toml` own dependency versions. Avoid copying changing version numbers into these instructions.
+- Before introducing an API or materially changing an area, check its installed version, existing conventions and relevant official documentation. Prefer current first-party guidance; reuse research already done in the task.
+- Keep maintained documentation under `docs/`, organized by topic. Update the existing topic when a contract changes. Do not add one-off plans, execution journals, screenshots or verification reports.
+- Edit source manifests/configuration and regenerate through the owning build. Do not hand-edit generated WASM, TypeScript or Kotlin bindings, or commit ignored build output.
 
-Primary references:
+## Readability and responsibility
 
-- [Vue Style Guide](https://vuejs.org/style-guide/)
-- [Vue Composition API with TypeScript](https://vuejs.org/guide/typescript/composition-api.html)
-- [Vue composables](https://vuejs.org/guide/reusability/composables.html)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
-- [TypeScript strict configuration](https://www.typescriptlang.org/tsconfig/strict.html)
-- [Vite Guide](https://vite.dev/guide/)
-- [Vue Router Guide](https://router.vuejs.org/guide/)
-- [Pinia core concepts](https://pinia.vuejs.org/core-concepts/)
-- [Naive UI documentation](https://www.naiveui.com/) and [first-party source and examples](https://github.com/tusen-ai/naive-ui)
-- [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers)
-- [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
-- [idb documentation](https://github.com/jakearchibald/idb)
-- [Vitest Guide](https://vitest.dev/guide/)
-- [Playwright best practices](https://playwright.dev/docs/best-practices)
-- [eslint-plugin-vue](https://eslint.vuejs.org/)
-- [typescript-eslint](https://typescript-eslint.io/)
-- [ESLint control-flow braces](https://eslint.org/docs/latest/rules/curly) and [individual declarations](https://eslint.org/docs/latest/rules/one-var)
-- [Prettier configuration](https://prettier.io/docs/configuration)
-- [Rust Style Guide](https://doc.rust-lang.org/style-guide/)
-- [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/), especially type safety, documentation, and private state invariants
-- [Rustdoc](https://doc.rust-lang.org/rustdoc/how-to-write-documentation.html) and [Clippy](https://doc.rust-lang.org/clippy/usage.html)
+- Keep functions, components and modules focused on one coherent responsibility. Split by reasons to change, coupled state and dependencies, not arbitrary line limits. Introduce abstractions only for current clarity or meaningful reuse.
+- Prefer descriptive domain names, named constants and explicit control flow. Avoid deeply nested branches, unrelated outcomes in nested ternaries, generic `utils` containers and callback-heavy context objects that merely shorten a file.
+- Separate imports from declarations, adjacent functions, and meaningful stages with one blank line. Within workflows, distinguish guards, preparation, computation, side effects and results; keep tightly related calculations together. Declare variables separately.
+- Keep a reactive workflow's state, derived values, actions and cleanup together. Do not scatter effects just to group every declaration of the same kind.
+- Comments explain why correctness depends on a constraint: ownership/revision fencing, snapshots before suspension, save-before-switch ordering, random-call order or work budgets. Place them beside the operation, preserve them when moving code and remove stale explanations. Add a brief responsibility comment at a complex module boundary when its ownership is otherwise unclear. Do not narrate obvious code.
+- Document non-obvious public contracts: ownership/disposal, mutation, cancellation, preconditions, units and incomplete outcomes. Use JSDoc, rustdoc or KDoc as appropriate; do not repeat types or document every trivial accessor.
+- Validate external and persisted input before mutation. Preserve atomic failure, distinguish incomplete/unavailable/cancelled outcomes from success, and never hide failures with empty catches or success-shaped defaults.
+- Formatting tools handle layout, not logical paragraphs or responsibility boundaries. Review both; do not disable lint, type or formatting checks to pass a gate.
 
-## Readability comes first
+## Shared computation and compatibility
 
-- Prefer straightforward control flow and explicit data flow to clever shortcuts.
-- Use descriptive domain names. Avoid unexplained abbreviations, unrelated responsibilities in one function, and deeply nested branches.
-- Keep functions and components focused on a coherent responsibility. Extract a unit when it improves understanding or reuse, rather than enforcing an arbitrary line count or splitting every small operation into its own file.
-- Keep complete workflows under their feature. Place route views in `views/`, business components in `components/`, and logic in the applicable `model/`, `stores/`, or `composables/` directory; omit unused directories and colocate tests.
-- Keep browser services under explicit owners: persistence and editing leases in `storage/`, computation in `worker/`, and application service composition in `src/runtime.ts`. Do not introduce an `infrastructure/` directory as a generic container.
-- Keep compact summary queries in `storage/readRepository.ts`, coverage metadata in `summaryCoverage.ts`, legacy repair in `summaryMaintenance.ts`, and projection aggregation in `summaryStatistics.ts`. Records browsing and backup work belong to `recordsReader.ts` and `recordsBackup.ts` behind the public records coordinator; daily status reads belong to `useDailyStatuses`.
-- Use `@/` for source imports. Keep worker asset URLs literal and relative, and allow relative imports for test fixtures outside `src/`.
-- Keep templates easy to scan. Move substantial calculations and branching into named functions or computed values.
-- Name domain constants instead of repeating magic values. Document the meaning of bit masks, seeded generation, timing rules, and other non-obvious invariants.
-- Comments should explain reasoning, constraints, and trade-offs. Do not narrate obvious statements or leave misleading comments after a change.
-- Handle errors explicitly. Do not hide failures with empty catch blocks or return success-shaped defaults after an operation fails.
-- Introduce abstractions only when they clarify a current responsibility or remove meaningful duplication.
+- Rust owns Sudoku rules, search, deductions, assessment and generation. Keep platform conversion in `sudoku/wasm` and `android/ffi`; do not introduce a production TypeScript or Kotlin solver.
+- Preserve persisted formats, worker/FFI contracts, owned outputs, historical saved text and version-owned puzzle identities. Seeds contain exactly 32 bytes; new metadata uses strict lowercase 64-character hex and v11 identities. An incompatible change requires an explicit version/compatibility decision.
+- Preserve deterministic random-call ordering, work charges, failed/abandoned work, finite limits, exact-search restoration and rating-prefix semantics. Do not lower work allowances to make performance checks pass.
+- For variants, keep explicit rule shapes and exhaustive registration. Distinguish full nine-digit units, duplicate-exclusion peers, highlights and arithmetic/path constraints. A new primitive needs candidates, conflicts, completion, exact counting, deductions/evidence, boundary validation and accessible presentation. Follow the variant checklist rather than adding scattered dispatch branches or a general-purpose plugin framework.
+- Rust native tests own algorithm regressions. Preserve sealed independent fixtures and focused mathematical validators; never derive their expected outputs from the implementation under test. Comparisons between Rust-backed paths establish transport/consistency, not independent mathematical evidence. Do not restore the retired TypeScript engine or migration comparison harness.
 
-### Logical sections and whitespace
+## Setup and verification
 
-- Use one blank line to separate imports from declarations, adjacent function declarations, and distinct responsibilities in a component or module. Keep related declarations together.
-- Within a function, separate meaningful stages with a blank line: input guards, preparation, computation, side effects, and the returned result. A reader should be able to identify these stages without tracing every statement. Do not add a blank line after every statement or inside a tightly related calculation.
-- Declare each variable separately instead of comma-separated declarations. Keep a value and its immediate validation together, then separate the next operation.
-- Keep each reactive workflow together: its local state, derived state, actions, and lifecycle effects. Do not scatter its watchers and cleanup across unrelated sections merely to group every `ref` or every `watch` together.
-- Keep the existing single-file component order: `<script setup lang="ts">`, `<template>`, then scoped `<style>`. Use whitespace between major template regions when it clarifies the page hierarchy.
-- Prettier handles mechanical formatting; it does not decide where business logic needs a paragraph break. Review logical grouping as well as running the formatter.
+Run commands from the repository root unless stated otherwise. Web setup is `corepack enable` and `pnpm install --frozen-lockfile`; `pnpm dev` builds WASM and starts Vite. Follow the development/build guides for browser and Android SDK installation.
 
-### Necessary comments
+Choose checks for the changed boundary; do not run unrelated suites for a documentation edit. Test observable behavior and invariants, use fixed seeds/independent fixtures, and separate arrangement, action and assertions with blank lines. Refactoring alone does not require tests that mirror private helpers.
 
-- Add a short English comment where correctness depends on an invariant that names and types cannot adequately express. Examples include operation generations, ownership and revision fencing, save-before-switch ordering, immutable snapshots across `await`, seeded random-call ordering, work budgets, and permitted rule transformations.
-- Explain why a guard, ordering constraint, or unusual operation exists and what would break if it were removed. Place the comment immediately above the relevant code, rather than documenting a distant caller's implementation.
-- Use concise JSDoc for exported contracts whose semantics are not obvious: mutation, resource ownership and disposal, incomplete outcomes, preconditions, and units of measurement. Do not require JSDoc for every function or duplicate parameter and return types already expressed in TypeScript.
-- Add a brief responsibility comment at a complex module boundary when its ownership would otherwise be unclear. Prefer focused functions and descriptive names to large banner comments or numbered narration of obvious steps.
-- When moving code, move or update its explanatory comments and remove stale ones. Document library workarounds with the affected behavior and installed version when the version matters.
+| Change                                             | Verification                                                                                                                                          |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Documentation only                                 | Review content and relative links; run `pnpm exec prettier --check <changed-markdown-files>` and `git diff --check`                                   |
+| Web source or dependencies                         | `pnpm typecheck`, `pnpm lint`, `pnpm test:unit`, `pnpm build`; check formatting and relevant player flows                                             |
+| Browser behavior, workers or WASM boundary         | Build with `pnpm build`, then `pnpm exec playwright test <affected-specs> --project=<project>`; projects are `desktop`, `mobile`, `firefox`, `webkit` |
+| Rust source, dependencies or contracts             | Use the native, Clippy and dependency checks in [Rust guidelines](sudoku/AGENTS.md); rebuild and test affected adapters/consumers                     |
+| Android source, native packaging or backup interop | Use the scoped gates in [Android guidelines](android/AGENTS.md) and the [build guide](docs/android/build.md)                                          |
 
-### Control flow and responsibility boundaries
+`pnpm typecheck`, `pnpm test:unit` and production builds rebuild WASM first. Direct Vitest/consumer commands need `pnpm wasm:build` after Rust changes. Vite build success does not establish Vue/TypeScript type correctness. Playwright normally builds its subpath deployment; `PLAYWRIGHT_USE_PREBUILT=1` requires both root and subpath builds to exist.
 
-- Prefer named domain predicates and explicit branches to nested ternaries or long expressions that select unrelated outcomes. Simple two-way value selection may remain a ternary.
-- Use braces for branching and loops in new or rewritten workflow code, including early-return guards. Short callbacks can remain expressions. Avoid several levels of indentation; extract a meaningful operation when its inputs and result are clear.
-- Views should compose a workflow, render its state, and handle presentation-local decisions. Move route initialization, asynchronous loading, and a complete exercise workflow into a feature composable when they obscure that purpose.
-- Keep a store's public actions aligned with player operations. Extract resource management or an independent persistence/transition responsibility behind a narrow typed contract; do not split one transaction across loosely coordinated stores.
-- Extract pure transformations and validation into ordinary functions. Use a composable for reactive state or lifecycle effects, not as a naming convention for every helper.
-- Pure feature models, including nested model directories and records models, must stay independent of Vue, browser services and application state. Import persisted types explicitly with `import type` from `storage/readModels` or `storage/records`; those exceptions do not permit runtime imports or arbitrary storage dependencies.
-- Assess excessive responsibility by reasons to change, coupled state, and dependencies, not total line count. A component with substantial cohesive CSS or static teaching data does not require splitting solely because it is long.
-- Do not hide dependency cycles with barrel exports, move business rules into generic `utils`, or introduce callback-heavy context objects just to make a file shorter. Keep dependencies explicit and preserve the enforced direction.
+`pnpm check` runs the broad Rust/Web workflow; it does not include every Clippy, Android or device gate. CI definitions in `.github/workflows/` are the source of truth for remote checks. Report what actually ran, its result and any remaining coverage limits; distinguish local tests, device tests and remote CI.
 
-### Variant extension contracts
+## Maintaining these instructions
 
-- Keep each variant's data shape explicit in the Rust rule enum and generated `PuzzleRules` discriminated union. Keep runtime validation of rules, generated puzzles, worker messages, and saved records.
-- Use typed, statically assembled definition maps for common dispatch. Validate map completeness with `satisfies` or an equivalent mapped type; keep exhaustive narrowing at dispatch boundaries instead of unchecked casts or fallthrough to an unrelated variant.
-- Keep pure engine definitions independent of presentation, Vue, storage, and workers. Player-facing names, rule text, and clue rendering belong to presentation definitions, with compile-time coverage of every supported variant.
-- Compile variant rules into the shared rule model where possible. Distinguish full nine-digit units, duplicate-exclusion peers, related-cell highlights, and arithmetic/path constraints; these concepts are not interchangeable.
-- State generation capabilities explicitly, including permitted transformations, fallback requirements, version/seed identity, and difficulty policy. Preserve existing random-call ordering and identity contracts during a refactor.
-- A new variant using existing constraint primitives should add a focused implementation and registration, rather than new branches throughout the application. A genuinely new primitive must also implement and test candidate support, conflicts, completion, deductions/evidence, boundary validation, and accessible drawing.
-- Never replace type safety or validation with a general-purpose plugin framework. Maintain an English extension checklist with the actual required registration, fixtures, and verification steps.
-
-## TypeScript
-
-- Enable strict type checking.
-- Define clear types for domain data, public function contracts, worker messages, and persisted records; allow inference for obvious local values.
-- Use discriminated unions where states or outcomes have different meanings, such as completed, cancelled, failed, and budget-exhausted worker results.
-- Treat external and persisted data as untrusted at runtime. Validate and narrow it before using it as domain data.
-- Prefer `unknown` and narrowing to `any`. Avoid unchecked casts, double assertions, non-null assertions, and diagnostic suppressions used merely to silence errors.
-- Keep the Sudoku engine independent of Vue, Pinia, browser APIs, and persistence so its rules can be understood and tested directly.
-
-## Vue and Pinia
-
-- Use Vue single-file components with `<script setup lang="ts">` and Composition API.
-- Use PascalCase for component filenames, a `View` suffix for route views, camelCase for functions and variables, and descriptive `use...` names for composables and `use...Store` names for Pinia stores.
-- Declare typed props and emits. Do not mutate props.
-- Use computed values for derived state; reserve watchers for necessary side effects.
-- Keep temporary component-local state local. Put shared session state in Pinia, with named actions for meaningful game operations.
-- Route keyboard input, touch input, and hint application through the same session actions.
-- Preserve reactivity when reading stores; use `storeToRefs` when destructuring reactive state or getters.
-- Clean up event listeners, timers, subscriptions, and worker resources when their owning scope is disposed.
-- Keep Sudoku rules out of templates and components. Keep database writes behind the persistence module.
-- Keep root providers and resource lifetime in App, visual navigation in AppLayout, and shared components independent of features, storage, workers, and the application runtime. Follow the enforced dependency rules described in Web Architecture.
-- Shared presentation must not import `idb` directly. Application startup presentation describes route/service readiness; lazy engine readiness remains owned by the computation services.
-
-## Styles and interaction
-
-- Use semantic HTML, accessible labels, visible keyboard focus, and usable touch targets.
-- Use CSS Grid for the board and responsive layouts; use shared CSS variables for theme values.
-- Scope component styles where appropriate and keep global styles limited to theme, reset, and application-wide rules.
-- Use Naive UI for common controls and the shared CSS palette for theme overrides. Keep the Sudoku board specialized. Verify keyboard ownership, modal focus, and touch operation when integrating library components.
-- Communicate errors, selection, and hints with more than color alone.
-
-## Verification
-
-- Use the configured ESLint rules and Prettier settings consistently. Do not disable checks to make a change pass.
-- Type-check Vue and TypeScript with `vue-tsc`; a successful Vite build alone does not establish type correctness.
-- Test observable behavior and domain invariants, not private implementation details.
-- Separate test arrangement, action, and assertions with blank lines. Name meaningful fixture values and explain independent expected facts where the oracle is not obvious; avoid comments that simply label every line.
-- For behavior-preserving refactors, use existing contract tests and add regressions only for uncovered invariants or new extension contracts. Review the public API, persistence format, worker protocol, seeded outputs, and player flows for accidental changes.
-- Use fixed seeds and explicit fixtures for algorithm tests. Validate hint conclusions against known facts rather than asking the implementation under test to confirm itself.
-- Use player-oriented Playwright locators and assertions for keyboard input, touch controls, pauses, persistence, lessons, and completion.
-- Run the relevant checks for the change. Documentation-only edits require content and formatting review, not unrelated application test runs.
-
-## Sudoku core organization
-
-### Rust readability and public contracts
-
-- Use rustfmt for mechanical layout and review logical paragraph breaks separately. Separate adjacent functions and distinct validation, preparation, computation, mutation, and result-construction stages with one blank line; keep a tightly related calculation together.
-- Group fields that become present or absent together into one optional record. Use enums for mutually exclusive outcomes and meaningful modes; do not make callers reconstruct an outcome from correlated booleans or a misleading success-named variant.
-- Keep a variable's domain meaning stable. Distinguish digits, cell indices, masks, and counters through checked types or explicit private structures when the same underlying integer could mean different things.
-- Keep orchestration with its domain owner and extract coherent private operations. Judge a split by coupled state, dependencies, and reasons to change, not a function/file line limit. Simple transformations may use iterators; search and accounting workflows should remain straightforward to trace.
-- Prefer private or `pub(crate)` implementation details. Public fields are appropriate for passive data; a workspace that maintains coupled board, candidate, premise, or cache invariants needs read-only access and explicit validated mutation/construction operations. Review native callers before tightening an existing public API.
-- Rustdoc must explain non-obvious ownership, borrowing, mutation, preconditions, identity comparisons, units, cancellation lifetime, and incomplete outcomes. Document relevant `Errors` and `Panics`; link closely related contracts instead of repeating them on every accessor.
-- Internal assertions must follow an established invariant. Untrusted values require fallible validation before mutation; an error must not leave a partially applied action. A structurally checked deduction is not automatically a mathematical proof.
-- Name version-owned exploration limits and explain deterministic ordering, budget charges, abandoned work, queue priority, and restoration beside the relevant operation. Preserve explanatory comments when moving code and remove misleading copied documentation.
-- Keep platform conversions explicit and exhaustive. Derive collection completeness from the owning catalogue instead of duplicating its count. Preserve boundary validation order and owned outputs; do not move ABI workarounds into the portable core.
-- Preserve independent proof validators and sealed fixtures. Public-boundary regressions should exercise malformed input and observable atomicity; private helper extraction and formatting alone do not require new tests.
-
-### Computation and compatibility boundaries
-
-- Keep reusable computation in `sudoku/core`, typed browser conversion in `sudoku/wasm`, and browser ownership/dispatch in `src/sudoku` and `src/worker`. Core must not depend on Vue, JS/WASM bindings, browser APIs, storage, clocks, OS entropy or an async runtime.
-- Import native contracts from their explicit owner (`types.rs` or subsystem `types.rs`); import frontend DTO contracts from `src/sudoku/contracts.ts`. Do not reintroduce a production TypeScript solver or a facade hiding dependency cycles.
-- Keep rule definitions under `rules/definitions/`, arithmetic support in `constraints/`, exact counting in `search/`, human deductions/evidence in `logic/`, assessment in `rating/` and geometry/frontier/scheduling in `generation/`. Lower layers must not import generation. Keep Chinese technique/violation presentation in game models.
-- Use checked board/digit/cell/mask values and forbid unsafe application code. Keep immutable prepared layout data separate from mutable workspaces and owned returned evidence. Document borrowing, mutation, incomplete outcomes and units. Read-only TypeScript types do not establish runtime ownership.
-- Seeds contain exactly 32 bytes. New metadata uses strict lowercase 64-character hex and v11 identities. Do not add legacy string-generator adapters. Preserve historical saved text in JS and send only mathematical content to Rust.
-- Preserve random-call order, work charges, failed/abandoned work, finite limits, exact-search restoration and rating-prefix semantics. Do not lower allowances to pass performance tests. Measure hard arithmetic and near-exhaustion cases before choosing synchronous UI dispatch.
-- Run rustfmt, native tests, native/all-targets and wasm32 Clippy with warnings denied; inspect the normal core dependency tree. Rebuild generated WASM before type checking or testing frontend consumers. Do not edit generated bindings.
-- Rust native tests own algorithm regression coverage. Retain selected independent fixtures and focused test-only counters/proof validators; do not restore a parallel legacy TypeScript engine or full migration comparison harness. Never derive independent expected outputs from Rust. Label comparisons between Rust-backed paths as transport or consistency checks, not independent mathematical evidence. See [Testing](docs/testing.md) for fixture provenance and versioned compatibility policy.
+Keep root guidance cross-cutting and put area-specific rules in the nearest scoped guide. Link to detailed architecture and procedures instead of duplicating them. Add durable, actionable constraints; remove obsolete rules and verify paths/commands when their owners change. Keep task history and temporary workarounds out of this file unless they remain necessary project constraints.
