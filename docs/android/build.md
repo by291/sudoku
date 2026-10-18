@@ -27,7 +27,7 @@ done
 
 The engine build installs pinned cargo-ndk `4.1.2` into the ignored `.native-tools` directory when necessary, installs the two Rust Android targets, builds the host library and matching UniFFI generator, generates Kotlin bindings, and produces arm64-v8a and x86_64 libraries. Normal builds need no manual copying of native binaries. The first build needs network access; subsequent builds reuse Gradle and Cargo caches. Generated sources and binaries are not committed.
 
-UniFFI 0.31.2 is configured for Android: its generated cleaner uses guarded SystemCleaner on API 34+ and the JNA fallback on lower APIs. The engine declares AndroidX annotations for the generated API boundary. Keep generated files disposable and change `ffi/uniffi.toml` rather than patching or suppressing generated code.
+UniFFI 0.32.2 is configured for Android: its generated cleaner uses guarded SystemCleaner on API 34+ and the JNA fallback on lower APIs. The generator discovers `ffi/uniffi.toml` through Cargo metadata; `--config` is reserved for UniFFI global configuration. The engine declares AndroidX annotations for the generated API boundary. Keep generated files disposable and change `ffi/uniffi.toml` rather than patching or suppressing generated code.
 
 Native bridge version 2 transports live assessment issues as diagnostic messages or structured rule violations. `core/domain` owns the live result contract, `core/engine` converts generated bindings, and `feature/game` renders Chinese explanations or explicitly produces persisted issue strings. Stored `PuzzleAssessment` values and backup formats retain their historical string representation. Generation and rating identities remain unchanged.
 

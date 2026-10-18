@@ -1,4 +1,4 @@
-# UniFFI 0.31.2 and JNA 5.18.1 discover generated interfaces and structures through reflection.
+# UniFFI and JNA discover generated interfaces and structures through reflection.
 -keepattributes Signature,InnerClasses,EnclosingMethod
 -keep class dev.sudoku.app.ffi.** { *; }
 -keep class com.sun.jna.** { *; }

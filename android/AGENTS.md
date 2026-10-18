@@ -27,7 +27,7 @@ Follow the root repository guidelines, the [architecture](../docs/android/archit
 - Release native handles only after actual in-flight execution returns. Distinguish conclusive invalid input from cancellation, timeout, budget exhaustion and unavailable execution. Inconclusive data must not authorize quarantine or destructive replacement.
 - Keep unknown personal progress, summary coverage and query failure distinct from known-empty values. Preserve existing usable results during ordinary refresh, and invalidate old-epoch facts on restore/clear.
 - Route touch, keyboard and hint operations through the same session actions. Keep keyboard ownership, modal focus, touch targets and non-color error/evidence semantics observable.
-- Check the installed dependency version and relevant official documentation before introducing an API. For example, UniFFI 0.31.2's Android cleaner configuration selects guarded API 34+ SystemCleaner and JNA below it; declare its generated `RequiresApi` dependency explicitly. Change generator configuration and regenerate normally, never edit or suppress generated bindings.
+- Check the installed dependency version and relevant official documentation before introducing an API. For example, UniFFI 0.32.2's Android cleaner configuration selects guarded API 34+ SystemCleaner and JNA below it; declare its generated `RequiresApi` dependency explicitly. Change generator configuration and regenerate normally, never edit or suppress generated bindings.
 
 ## Verification
 

@@ -38,9 +38,11 @@ case "$(uname -s)" in
     Linux) host_library="$repository_root/target/debug/libsudoku_ffi.so" ;;
     *) printf '%s\n' 'Use macOS or Linux to build the generated Android bindings.' >&2; exit 1 ;;
 esac
+# UniFFI 0.32 discovers the crate-local uniffi.toml through Cargo metadata.
+# --config is reserved for global configuration, not this crate-local file.
 cargo run --locked -p sudoku-ffi --features cli --bin uniffi-bindgen -- \
     generate --library "$host_library" --language kotlin \
-    --config "$android_root/ffi/uniffi.toml" --no-format \
+    --no-format \
     --out-dir "$output_root/generated/uniffi"
 
 # One locked source/version produces both ABI libraries and the Kotlin binding metadata.
