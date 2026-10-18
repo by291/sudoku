@@ -4,13 +4,14 @@ These documents describe maintained behavior, architecture and development workf
 
 ## Shared product and engine
 
-| Topic                                    | Contents                                                                        |
-| ---------------------------------------- | ------------------------------------------------------------------------------- |
-| [Product behavior](product.md)           | Modes, variants, controls, assistance, timing and local-data policy             |
-| [Engine](engine.md)                      | Rust responsibilities, generation/rating, deterministic seeds and compatibility |
-| [Learning content](learning.md)          | Shared catalogue schema, authored evidence and durable advancement              |
-| [Local backup](local-backup.md)          | Portable format, limits, validation, export and replacement                     |
-| [Adding a variant](variant-extension.md) | Registration points and required mathematical/presentation support              |
+| Topic                                    | Contents                                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------- |
+| [Product behavior](product.md)           | Modes, variants, controls, assistance, timing and local-data policy               |
+| [Engine](engine.md)                      | Rust responsibilities, generation/rating, deterministic seeds and compatibility   |
+| [Algorithms](algorithms/README.md)       | Constraint search, logical techniques, rating, generation and research references |
+| [Learning content](learning.md)          | Shared catalogue schema, authored evidence and durable advancement                |
+| [Local backup](local-backup.md)          | Portable format, limits, validation, export and replacement                       |
+| [Adding a variant](variant-extension.md) | Registration points and required mathematical/presentation support                |
 
 ## Web
 

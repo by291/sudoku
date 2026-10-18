@@ -48,6 +48,7 @@ The [documentation index](docs/README.md) groups maintained documents by topic.
 | ------------------------------------------------------- | ---------------------------------------------------- |
 | Modes, variants, controls and player data               | [Product behavior](docs/product.md)                  |
 | Rust ownership, generation, rating and seed identity    | [Engine](docs/engine.md)                             |
+| Algorithm principles, supported techniques and research | [Algorithms](docs/algorithms/README.md)              |
 | Vue workflows, lazy computation and browser persistence | [Web architecture](docs/architecture.md)             |
 | Backup format, validation and replacement               | [Local backup](docs/local-backup.md)                 |
 | Shared authored lessons and durable progress            | [Learning content](docs/learning.md)                 |
