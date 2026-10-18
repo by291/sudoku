@@ -2,7 +2,7 @@ import { LESSONS } from '../../../../tests/support/lessons'
 import { expect, it } from 'vitest'
 
 import { LESSON_IDS } from '@/features/learning/model/lessonIds'
-import { supportsDifficulty } from '@reference/core/sudoku/difficulties'
+import { supportsDifficulty } from '@/sudoku/catalogue'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'

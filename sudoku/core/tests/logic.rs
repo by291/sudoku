@@ -1,8 +1,8 @@
-#[path = "../examples/contracts/logic.rs"]
+#[path = "support/logic.rs"]
 mod contracts;
 #[path = "support/rules.rs"]
 pub mod fixtures;
-#[path = "../examples/contracts/projection.rs"]
+#[path = "support/projection.rs"]
 mod logical_projection;
 
 use sudoku_core::budget::WorkBudget;

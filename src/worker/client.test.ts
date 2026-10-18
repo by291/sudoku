@@ -9,7 +9,7 @@ import { PUZZLE_VERSION } from '@/sudoku/guards'
 import { VARIANT_FIXTURES } from '../../tests/fixtures/variants'
 import { solvedBoard, uniqueBoard } from '../../tests/fixtures/sudoku'
 import type { WorkerRequest } from '@/worker/protocol'
-import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
+import { createAssessmentInput } from '../../tests/support/assessment'
 
 const engine = await createTestEngine()
 afterAll(() => engine.dispose())

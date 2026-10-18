@@ -168,7 +168,7 @@ importers:
     dependencies:
       '@sudoku/wasm':
         specifier: workspace:*
-        version: link:packages/sudoku-wasm
+        version: link:sudoku/wasm
       idb:
         specifier: 8.0.4
         version: 8.0.4
@@ -246,7 +246,7 @@ importers:
         specifier: 3.3.13
         version: 3.3.13(typescript@6.0.3)
 
-  packages/sudoku-wasm: {}
+  sudoku/wasm: {}
 
 packages:
 

@@ -3,8 +3,8 @@ import { runWorker, parseWorkerResponse } from './workerHarness'
 import { RATING_FIXTURES } from '../fixtures/rating'
 import { solvedBoard, emptyBoard, conflictingBoard } from '../fixtures/sudoku'
 import { makeSession } from '../support/gameFixtures'
-import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
-import { RATING_VERSION } from '@reference/core/sudoku/rating/policies'
+import { createAssessmentInput } from '../support/assessment'
+import { RATING_VERSION } from '@/sudoku/guards'
 
 test('assesses authored fixtures and explicit outcomes through real production workers', async ({
   page,
@@ -154,7 +154,10 @@ test('reloads a newly generated assessment snapshot', async ({ page }) => {
 
   expect(snapshot?.status).toBe('rated')
   await page.getByRole('link', { name: '返回首页', exact: true }).click()
+  // Finish the save-and-leave flow before reloading or starting another engine load.
+  await expect(page).toHaveURL(/#\/$/)
   await page.reload()
+  await expect(page.getByRole('button', { name: '继续上次', exact: true })).toBeEnabled()
   await page.goto(savedRoute)
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
 

@@ -39,7 +39,8 @@ for (const root of ['http://127.0.0.1:4173/', 'http://127.0.0.1:4174/sudoku/']) 
     })
 
     try {
-      await page.goto(`${root}#/learn/rules`)
+      // The gated module can delay Firefox's load event; wait for the pending UI below.
+      await page.goto(`${root}#/learn/rules`, { waitUntil: 'commit' })
       await expect(page.getByRole('heading', { name: '认识数独', exact: true })).toBeVisible()
       await expect(page.getByRole('status')).toContainText('正在读取课程内容')
       await expect(page.getByRole('radio', { name: '动手练习', exact: true })).toBeDisabled()

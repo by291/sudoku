@@ -9,17 +9,17 @@
   },
   "scripts": {
     "dev": "pnpm wasm:build && vite --host 127.0.0.1",
-    "typecheck": "pnpm wasm:build && vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.e2e.json && tsc --noEmit -p tests/reference/tsconfig.json",
+    "typecheck": "pnpm wasm:build && vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test:rust": "cargo test --workspace --locked",
     "test:unit": "pnpm wasm:build && vitest run",
     "build": "pnpm wasm:build && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "build:subpath": "pnpm wasm:build && vite build --base /sudoku/ --outDir dist-subpath",
     "test:e2e": "playwright test",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm build && pnpm test:e2e",
-    "test:migration": "node tests/migration/run.mjs",
+    "check": "pnpm test:rust && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm build && pnpm test:e2e",
     "wasm:build": "node scripts/build-sudoku-wasm.mjs"
   },
   "dependencies": {
