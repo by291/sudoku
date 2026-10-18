@@ -2,6 +2,8 @@
 
 All mathematical computation lives in [`sudoku/core`](../sudoku/core/README.md), a synchronous Rust library. [`sudoku/wasm`](../sudoku/wasm/README.md) owns typed browser conversion; [`android/ffi`](../android/ffi) owns UniFFI conversion. Neither client implements a replacement solver. Presentation, clocks, IDs, storage and resource scheduling remain client responsibilities.
 
+The [algorithm guide](algorithms/README.md) explains constraint propagation, exact search, logical techniques, difficulty policies and puzzle construction, with source maps and research references. This document owns architecture, bounded execution and deterministic compatibility contracts.
+
 ## Native engine contracts
 
 `types.rs` owns checked board/digit/cell/mask values. Boards contain 81 values in 0..=9; candidate masks use nine bits. `rules/types.rs` owns the explicit variant union, constraints and immutable prepared topology. Full nine-digit units, duplicate-exclusion peers, related highlights and arithmetic/path constraints are distinct concepts. Definitions do not depend on generation, assessment, storage or UI.
@@ -20,13 +22,13 @@ Generation owns terminal construction, geometry, bounded mask frontiers, ranking
 
 The scheduler delegates layout preparation and proposal evaluation to focused operations while retaining layout-slot and accumulated-work ownership. A pending proposal owns its parent even after frontier eviction. Prepared edit order binds its partition to one clue mask; an inherited sweep rebuilds that partition without another random shuffle. Accepted delivery, rejection, failure and exhaustion are distinct outcomes.
 
-Every delivery validates terminal-consistent givens/rules/identity, exact requested difficulty, clue policy, completed assessment, exact uniqueness with the known terminal and variant necessity, with the existing Jigsaw exception. A known terminal establishes existence only. A changed clue mask starts a new workspace; stalled checkpoints have unknown uniqueness until counted.
+Every delivery validates terminal-consistent givens/rules/identity, exact requested difficulty, clue policy, completed assessment, exact uniqueness with the known terminal and variant necessity. For Jigsaw, a terminal invalid under Classic already establishes regional necessity; otherwise the check counts Classic solutions, as detailed in [generation acceptance](algorithms/generation.md#accept-only-a-complete-match). A known terminal establishes existence only. A changed clue mask starts a new workspace; stalled checkpoints have unknown uniqueness until counted.
 
 ## Seed and identity
 
 Current generation versions are `sudoku-v11` and `sudoku-variants-v11`; rating remains `sudoku-rating-v2`. A root seed is exactly 32 arbitrary bytes. Web free play obtains fresh bytes from `crypto.getRandomValues`; request/retry workflows copy and retain that one seed independently of session UUIDs.
 
-Rust derives daily roots from exactly ASCII `daily:YYYY-MM-DD`; Each client chooses the Beijing date and stable formal ID. Existing formal attempts are looked up before deriving a new root. Status lookup does not invoke generation or hashing. New stored/share seeds are exactly 64 lowercase ASCII hex characters. Historical seed/version text, including unpaired UTF-16 code units, stays in JavaScript and never enters Rust mathematical content validation.
+Rust derives daily roots from exactly ASCII `daily:YYYY-MM-DD`; each client chooses the Beijing date and stable formal ID. Existing formal attempts are looked up before deriving a new root. Status lookup does not invoke generation or hashing. New stored/share seeds are exactly 64 lowercase ASCII hex characters. Historical seed/version text, including unpaired UTF-16 code units, stays in JavaScript and never enters Rust mathematical content validation.
 
 BLAKE3 contexts and the 43-byte phase frame are version-owned. Frame fields are root bytes, variant/tier/phase tags and little-endian layout/proposal counters. ChaCha8 starts at zero stream/word position; one u32 produces one random fraction and each descending Fisher–Yates swap consumes one draw. The stream recipe below and independent primitive/phase vectors pin the complete recipe. Reproducing old string-seeded puzzles is unsupported; saved boards/rules/progress/results remain authoritative.
 
@@ -63,4 +65,4 @@ The browser bridge is version 3 and the native bridge is version 2. These are tr
 
 A prepared layout can be reused only under its documented identity and lifetime. Mutable workspaces and returned evidence cannot alias another request. Preserve cancellation lifetime, exact-search restoration, random-call ordering, stage charges and rating-prefix behavior during refactors. A structural deduction check is not a mathematical proof.
 
-See [the variant checklist](variant-extension.md) for complete extension requirements and [the maintained migration tests](../tests/migration/README.md) for independent fixtures and commands. Expected outcomes must never be regenerated from the Rust implementation under test. Rust commands are documented in [the core README](../sudoku/core/README.md).
+See [the variant checklist](variant-extension.md) for complete extension requirements and [the testing guide](testing.md) for independent fixtures and commands. Expected outcomes must never be regenerated from the Rust implementation under test. Rust commands are documented in [the core README](../sudoku/core/README.md).

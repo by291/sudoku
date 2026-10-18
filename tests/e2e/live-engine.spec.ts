@@ -17,7 +17,7 @@ test.beforeAll(async () => {
       },
     },
     server: { host: '127.0.0.1', port: 0, hmr: false },
-    optimizeDeps: { entries: ['tests/migration/wasm-smoke.html'] },
+    optimizeDeps: { entries: ['tests/browser/wasm-smoke.html'] },
     logLevel: 'error',
   })
   await server.listen()
@@ -33,9 +33,9 @@ test.afterAll(async () => {
 })
 
 test('preserves optional unit fields without mutating caller proofs', async ({ page }) => {
-  await page.goto(`${origin}/tests/migration/wasm-smoke.html`)
+  await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
   const result: unknown = await page.evaluate(async () => {
-    const url = '/tests/migration/optional-unit-fields.ts'
+    const url = '/tests/browser/optional-unit-fields.ts'
     const module: unknown = await import(url)
     if (
       !module ||

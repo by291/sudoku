@@ -16,7 +16,7 @@ import { useGameStore } from '@/features/game/stores/useGameStore'
 import { generationInput } from '../../../../tests/support/generation'
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import type { GenerateOutcome, WorkerOutcome } from '@/worker/protocol'
-import type { Puzzle } from '@reference/core/sudoku/puzzle'
+import type { Puzzle } from '@/sudoku/contracts'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 
 const runtimes: Awaited<ReturnType<typeof createTestRuntime>>[] = []

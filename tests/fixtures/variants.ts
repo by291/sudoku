@@ -1,6 +1,6 @@
-import type { Board } from '@reference/core/sudoku/types'
-import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
-import type { NewSudokuVariant } from '@reference/core/sudoku/rules/types'
+import type { Board } from '@/sudoku/contracts'
+import type { PuzzleRules } from '@/sudoku/contracts'
+import type { NewSudokuVariant } from '@/sudoku/contracts'
 import { isBoard } from '@/sudoku/values'
 
 export const ARROW_REPEAT_RULES: PuzzleRules = {

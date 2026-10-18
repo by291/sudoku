@@ -1,6 +1,6 @@
 import { createGenerationInput } from '@/sudoku/generationInput'
 import type { Difficulty, SudokuVariant } from '@/sudoku/contracts'
-import { deriveSeed } from '../migration/v11-random'
+import { deriveSeed } from './independentRandom'
 
 /** Test labels are byte material for the independent v11 recipe, never a production seed overload. */
 export function seedForTest(label: string): Uint8Array {

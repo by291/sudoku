@@ -12,8 +12,8 @@ import { openSudokuDatabase } from '@/storage/database'
 import { createOwnershipCoordinator } from '@/storage/ownership'
 import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 import { makeSession, makeAssessment } from '../../tests/support/gameFixtures'
-import { CORPUS_COMBINATIONS } from '../../tests/fixtures/generationCorpus'
-import { VARIANT_TEMPLATES } from '@reference/core/sudoku/examples/variants'
+import { SUDOKU_VARIANTS, supportedDifficulties } from '@/sudoku/catalogue'
+import { VARIANT_TEMPLATES } from '../../tests/fixtures/variantTemplates'
 import { CLASSIC_PUZZLE_FIXTURES } from '../../tests/fixtures/classicPuzzles'
 
 import { createSaveQueue } from '@/storage/saveQueue'
@@ -49,7 +49,11 @@ afterEach(async () => {
   }
 })
 
-it.each(CORPUS_COMBINATIONS)(
+it.each(
+  SUDOKU_VARIANTS.flatMap((variant) =>
+    supportedDifficulties(variant).map((difficulty) => ({ variant, difficulty })),
+  ),
+)(
   'round-trips $variant/$difficulty domain facts and revision rebasing',
   async ({ variant, difficulty }) => {
     const { database, repository, reset } = await setup()

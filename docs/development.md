@@ -30,12 +30,13 @@ Open the Local URL printed by Vite. No server account, API keys, or backend serv
 | `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types   |
 | `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries         |
 | `pnpm format:check` / `pnpm format` | Check or apply formatting                                         |
+| `pnpm test:rust`                    | Run the Rust workspace's algorithm and adapter tests              |
 | `pnpm test:unit`                    | Run domain, store, component, and storage tests                   |
 | `pnpm build`                        | Create the production `dist/` directory                           |
 | `pnpm build:subpath`                | Create the `/sudoku/` verification build in `dist-subpath/`       |
 | `pnpm preview`                      | Serve the production build locally                                |
 | `pnpm test:e2e`                     | Test the production build in Chromium, Firefox, and mobile WebKit |
-| `pnpm check`                        | Run all type, lint, formatting, unit, build, and browser checks   |
+| `pnpm check`                        | Run Rust tests, Web checks, builds, and browser tests             |
 
 Build before running `test:e2e` directly. Playwright starts preview servers on ports 4173 and 4174; its second server builds and tests `/sudoku/` deployment in `dist-subpath/`. Test output, traces, and screenshots are ignored by Git. Tests use isolated browser contexts, fixture records for lengthy completion scenarios, and real production workers for generation and hints.
 
@@ -51,11 +52,11 @@ pnpm exec playwright install --no-remove chromium firefox webkit
 pnpm check
 ```
 
-Browser screenshots, traces and temporary corpus output belong under ignored `test-results/`; browser HTML reports use `playwright-report/`. Use `SUDOKU_CORPUS_OUTPUT` to select a separate corpus-output directory. These outputs are disposable and are not project documentation. Checked-in independent input/oracle fixtures remain under `tests/`.
+Browser screenshots and traces belong under ignored `test-results/`; browser HTML reports use `playwright-report/`. These outputs are disposable and are not project documentation. Checked-in independent input/oracle fixtures remain under `tests/`.
 
 ## Continuous integration and dependency updates
 
-[CI](../.github/workflows/ci.yml) runs on pull requests, pushes to `main`, and manual dispatches. Ubuntu 24.04 jobs install Node.js 26 and the `packageManager`-pinned pnpm with a frozen lockfile. Type checking, lint, formatting, unit tests, and root/subpath builds run before browser jobs. Desktop Chromium, mobile Chromium, Firefox, and WebKit run as separate matrix jobs; WebKit uses one worker. Browser jobs download the WASM package and both production deployments from the checks job instead of rebuilding Rust or the application. Each job installs its browser with system dependencies and retains its HTML report, failure screenshots, and traces for seven days. Rust build jobs cache Cargo dependencies, target output, and private CLI tools, with keys partitioned by platform, toolchain, manifests, lockfile, and source inputs. Actions use release commit hashes, and superseded runs are cancelled.
+[CI](../.github/workflows/ci.yml) runs on pull requests, pushes to `main`, and manual dispatches. Ubuntu 24.04 jobs install Node.js 26 and the `packageManager`-pinned pnpm with a frozen lockfile. Rust native tests and Clippy, TypeScript checks, lint, formatting, Web unit tests, and root/subpath builds run before browser jobs. Full comparisons against the retired TypeScript engine are not part of CI; browser jobs retain real WASM contract tests and player workflows. Desktop Chromium, mobile Chromium, Firefox, and WebKit run as separate matrix jobs; WebKit uses one worker. Browser jobs download the WASM package and both production deployments from the checks job instead of rebuilding Rust or the application. Each job installs its browser with system dependencies and retains its HTML report, failure screenshots, and traces for seven days. Rust build jobs cache Cargo dependencies, target output, and private CLI tools, with keys partitioned by platform, toolchain, manifests, lockfile, and source inputs. Actions use release commit hashes, and superseded runs are cancelled.
 
 [Android CI](../.github/workflows/android.yml) checks and builds the native client and verifies the portable backup contract in both directions: the current Web exporter must match the checked-in fixture, Android imports and exports that fixture, and Web restores the actual Android output. It does not run device instrumentation tests. The domain test declares its exported backup as a Gradle output so cached test results retain the file required by Web.
 
@@ -77,6 +78,6 @@ Serve the resulting `dist-subpath/` output at the matching path. Changing the ho
 
 ## Change verification
 
-Run checks appropriate to the changed boundary. Vue/TypeScript type checking is separate from Vite build success. Build Rust/WASM before checking its consumers. Preserve sealed expected fixtures and test behavior rather than private helper structure.
+Run checks appropriate to the changed boundary. Vue/TypeScript type checking is separate from Vite build success. Build Rust/WASM before checking its consumers. Preserve independently established fixture expectations and test behavior rather than private helper structure. See [Testing](testing.md) for ownership and the versioned compatibility policy.
 
 Documentation changes require content, formatting and local-link checks; they do not require unrelated application suites. Changes to test output paths additionally require the affected test files to type-check and remain discoverable. Report actual executed coverage in the change summary. Do not add dated task plans, run logs, screenshots or one-off verification reports to the maintained documentation.

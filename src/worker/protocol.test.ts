@@ -5,18 +5,15 @@ import {
   validateHintEvidence as validateEvidence,
 } from '@/worker/protocol'
 import { generationInput } from '../../tests/support/generation'
-import { assessPuzzle, toAssessmentOutcome } from '@reference/core/sudoku/rating/assessment'
-import { createAssessmentInput } from '@reference/core/sudoku/rating/input'
+import { assessPuzzle, toAssessmentOutcome } from '../../tests/support/engine'
+import { createAssessmentInput } from '../../tests/support/assessment'
 import { RATING_FIXTURES } from '../../tests/fixtures/rating'
-import { analyzeHint } from '@reference/core/sudoku/hint'
-import { createLogicalWorkspace } from '@reference/core/sudoku/logic/workspace'
-import { findVariantStep } from '@reference/core/sudoku/logic/variantTechniques'
-import { compileRules } from '@reference/core/sudoku/rules/context'
-import { createWorkBudget } from '@reference/core/sudoku/budget'
-import type { HintResult } from '@reference/core/sudoku/hint'
+import { analyzeHint, analyzeLogic } from '../../tests/support/engine'
+import { copyRules } from '@/sudoku/ruleInput'
+import type { HintResult } from '@/sudoku/contracts'
 import { createTestEngine } from '../../tests/support/wasm'
-import type { Board } from '@reference/core/sudoku/types'
-import type { PuzzleRules } from '@reference/core/sudoku/rules/types'
+import type { Board } from '@/sudoku/contracts'
+import type { PuzzleRules } from '@/sudoku/contracts'
 import {
   ARROW_REPEAT_BOARD,
   ARROW_REPEAT_RULES,
@@ -149,10 +146,7 @@ it.each(Object.entries(VARIANT_FIXTURES))(
         solution: fixture.solution,
       }).valid,
     ).toBe(false)
-    const result = analyzeHint(fixture.givens, fixture.solution, 500, {
-      context: compileRules(fixture.rules),
-      workBudget: createWorkBudget(1000000),
-    })
+    const result = analyzeHint(fixture.givens, fixture.solution, fixture.rules)
 
     expect(
       parseWorkerResponse({
@@ -206,28 +200,28 @@ it.each(['killer', 'thermo', 'arrow'] as const)(
         : variant === 'thermo'
           ? 'thermo-bound'
           : 'arrow-equation'
-    const context = compileRules(fixture.rules)
-    const result = findVariantStep(
-      createLogicalWorkspace(board, context),
-      context,
-      [technique],
-      createWorkBudget(1000000),
-    )
+    const analysis = analyzeLogic({
+      board: [...board],
+      rules: copyRules(fixture.rules),
+      allowed: [technique],
+      maxSteps: 1,
+      maxWork: 1000000,
+    })
+    const step = analysis.steps[0]
     if (
-      result.status !== 'complete' ||
-      !result.step ||
-      result.step.kind !== 'placement' ||
-      (result.step.evidence.kind !== 'cage' &&
-        result.step.evidence.kind !== 'thermo' &&
-        result.step.evidence.kind !== 'arrow')
+      !step ||
+      step.kind !== 'placement' ||
+      (step.evidence.kind !== 'cage' &&
+        step.evidence.kind !== 'thermo' &&
+        step.evidence.kind !== 'arrow')
     ) {
       throw new Error('Expected fixed clue placement')
     }
 
     const hint: HintResult = {
       kind: 'deduction',
-      steps: [result.step],
-      placement: { cell: result.step.cell, digit: result.step.digit },
+      steps: [step],
+      placement: { cell: step.cell, digit: step.digit },
     }
     const parsed = parseWorkerResponse({
       kind: 'hint',
@@ -241,9 +235,7 @@ it.each(['killer', 'thermo', 'arrow'] as const)(
       validateHintEvidence(
         {
           ...hint,
-          steps: [
-            { ...result.step, evidence: { ...result.step.evidence, constraintId: 'missing:999' } },
-          ],
+          steps: [{ ...step, evidence: { ...step.evidence, constraintId: 'missing:999' } }],
         },
         fixture.rules,
       ).valid,
@@ -253,10 +245,7 @@ it.each(['killer', 'thermo', 'arrow'] as const)(
 it('rejects malformed evidence masks and out-of-range placements', () => {
   const fixture = VARIANT_FIXTURES.arrow
   const board = ARROW_REPEAT_BOARD.map((digit, cell) => (cell === 40 ? 0 : digit))
-  const hint = analyzeHint(board, fixture.solution, 500, {
-    context: compileRules(ARROW_REPEAT_RULES),
-    workBudget: createWorkBudget(1000000),
-  })
+  const hint = analyzeHint(board, fixture.solution, ARROW_REPEAT_RULES)
   if (hint.kind !== 'deduction') {
     throw new Error('Missing fixed Arrow proof')
   }
