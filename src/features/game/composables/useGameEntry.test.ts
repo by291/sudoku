@@ -20,8 +20,10 @@ function createEntryHost(showError = false) {
       return () =>
         h('div', [
           showError ? (entry.initializationError.value ?? '') : '',
+          h('output', entry.targetError.value ?? ''),
           h('button', { onClick: entry.startSelected }, 'Start'),
           h('button', { onClick: entry.retryTarget }, 'Retry'),
+          h('button', { onClick: () => (entry.nextVariant.value = 'diagonal') }, 'Choose diagonal'),
         ])
     },
   })
@@ -162,6 +164,84 @@ it('cancels legacy maintenance when the game setup owner leaves', async () => {
     expect(maintenance.mock.calls[0]?.[0]?.aborted).toBe(true)
   } finally {
     pending.resolve({ ok: false, error: { kind: 'unavailable', message: 'Cancelled' } })
+    wrapper.unmount()
+    test.dispose()
+  }
+})
+
+it('ignores a failed slot read after the player selects another variant', async () => {
+  const test = await createTestRuntime()
+  const pending = deferred<Awaited<ReturnType<typeof test.runtime.repository.readSlotSummary>>>()
+  vi.spyOn(test.runtime.repository, 'readSlotSummary').mockImplementation((_mode, variant) =>
+    variant === 'classic'
+      ? pending.promise
+      : Promise.resolve({
+          ok: true,
+          value: { coverage: 'ready', epoch: 0, generation: 0, summary: null },
+        }),
+  )
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/play/free', component: { render: () => h('div') } }],
+  })
+  await router.push('/play/free')
+  const wrapper = mount(createEntryHost(), {
+    global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
+  })
+
+  try {
+    await flushPromises()
+    await wrapper.findAll('button')[2]?.trigger('click')
+    await flushPromises()
+
+    pending.resolve({ ok: false, error: { kind: 'unavailable', message: 'Old slot failed' } })
+    await flushPromises()
+
+    expect(wrapper.get('output').text()).toBe('')
+  } finally {
+    wrapper.unmount()
+    test.dispose()
+  }
+})
+
+it('cancels legacy repair without publishing its error into another variant', async () => {
+  const test = await createTestRuntime()
+  vi.spyOn(test.runtime.repository, 'readSlotSummary').mockImplementation(
+    async (_mode, variant) => ({
+      ok: true,
+      value: {
+        coverage: variant === 'classic' ? 'pending' : 'ready',
+        epoch: 0,
+        generation: 0,
+        summary: null,
+      },
+    }),
+  )
+  const pending = deferred<Awaited<ReturnType<typeof test.runtime.repository.maintainSummaries>>>()
+  const maintenance = vi
+    .spyOn(test.runtime.repository, 'maintainSummaries')
+    .mockReturnValue(pending.promise)
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/play/free', component: { render: () => h('div') } }],
+  })
+  await router.push('/play/free')
+  const wrapper = mount(createEntryHost(), {
+    global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
+  })
+
+  try {
+    await flushPromises()
+    await wrapper.findAll('button')[1]?.trigger('click')
+    await wrapper.findAll('button')[2]?.trigger('click')
+    await flushPromises()
+
+    pending.resolve({ ok: false, error: { kind: 'unavailable', message: 'Old repair failed' } })
+    await flushPromises()
+
+    expect(maintenance.mock.calls[0]?.[0]?.aborted).toBe(true)
+    expect(wrapper.get('output').text()).toBe('')
+  } finally {
     wrapper.unmount()
     test.dispose()
   }

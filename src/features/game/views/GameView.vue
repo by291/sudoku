@@ -42,6 +42,7 @@ const props = withDefaults(
   },
 )
 const emit = defineEmits<{ chooseDaily: [] }>()
+
 const game = useGameStore()
 const {
   session,
@@ -69,6 +70,7 @@ const {
   conflictEvaluation,
   ruleMetadata,
 } = storeToRefs(game)
+
 const entry = useGameEntry({
   metadata: () => props.metadata,
   autoRestore: () => props.autoRestore,
@@ -142,6 +144,7 @@ const analysisMessage = computed(() => {
 
   return showConflictProgress.value ? '正在检查线索，仅显示已确认的冲突。' : ''
 })
+
 const inputEditable = computed(
   () =>
     hasSession.value &&
@@ -182,6 +185,7 @@ const selectionMessage = computed(() => {
 
   return inputEditable.value ? `已选 ${position}` : `${position}是题目给定，不能修改。`
 })
+
 const preferences = usePreferencesStore()
 const showTimer = computed({
   get: () => preferences.settings.showTimer,
@@ -195,6 +199,7 @@ const highlightConflicts = computed({
     void preferences.update({ highlightConflicts: value })
   },
 })
+
 const confirmation = ref<'restart' | 'new' | 'reload' | null>(null)
 const confirmationContent = computed(() => {
   if (confirmation.value === 'reload') {
@@ -223,6 +228,7 @@ const confirmationContent = computed(() => {
     confirmLabel: '确认开始',
   }
 })
+
 const displayedHintStep = ref<LogicalStep | null>(null)
 watch(hint, () => {
   displayedHintStep.value = null
@@ -247,6 +253,7 @@ const relatedCells = computed(() =>
     ? (ruleMetadata.value?.relatedCells[selectedCell.value] ?? [])
     : [],
 )
+
 const saveLabel = computed(
   () =>
     ({ idle: '尚未保存', saving: '正在保存…', saved: '已保存到本机', failed: '尚未保存' })[
@@ -331,6 +338,7 @@ function requestRestart(event?: MouseEvent) {
 async function confirm() {
   const intention = confirmation.value
   confirmation.value = null
+
   if (intention === 'reload') {
     await game.reloadLatestSession()
   } else if (intention === 'restart') {

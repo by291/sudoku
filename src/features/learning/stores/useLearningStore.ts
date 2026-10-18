@@ -14,11 +14,44 @@ import type { ExerciseSubmissionResult, Lesson } from '@/features/learning/model
 export const useLearningStore = defineStore('learning', () => {
   const runtime = useGameRuntime()
   const directory = LESSON_DIRECTORY
+
+  // Authored content survives player-data resets; selection has its own request lifetime.
   const content = createLessonContentLoader()
   const selectedLesson = shallowRef<Lesson>()
   const contentLoading = ref(false)
   const contentError = ref<string | null>(null)
   let contentOperation = 0
+
+  async function loadLesson(id: string) {
+    const current = ++contentOperation
+    if (selectedLesson.value?.id !== id) {
+      selectedLesson.value = undefined
+    }
+    contentError.value = null
+    contentLoading.value = true
+
+    try {
+      const lesson = await content.load(id)
+
+      // A slower old route cannot replace the currently selected lesson or its error state.
+      if (current === contentOperation) {
+        selectedLesson.value = lesson
+      }
+    } catch {
+      if (current === contentOperation) {
+        contentError.value = '课程内容读取失败，请重试。'
+      }
+    } finally {
+      if (current === contentOperation) {
+        contentLoading.value = false
+      }
+    }
+  }
+
+  onScopeDispose(() => {
+    contentOperation++
+  })
+
   const preferences = usePreferencesStore()
   const progress = shallowRef<readonly LessonProgress[]>([])
   const error = ref<string | null>(null)
@@ -62,18 +95,21 @@ export const useLearningStore = defineStore('learning', () => {
     if (progressRequest) {
       return progressRequest
     }
+
     const request = readProgress().finally(() => {
       if (progressRequest === request) {
         progressRequest = null
       }
     })
     progressRequest = request
+
     return request
   }
 
   async function readProgress() {
     const current = ++operation
     loading.value = true
+
     try {
       await preferences.load()
       if (current !== operation) {
@@ -115,34 +151,6 @@ export const useLearningStore = defineStore('learning', () => {
       }
     }
   }
-
-  async function loadLesson(id: string) {
-    const current = ++contentOperation
-    if (selectedLesson.value?.id !== id) {
-      selectedLesson.value = undefined
-    }
-    contentError.value = null
-    contentLoading.value = true
-    try {
-      const lesson = await content.load(id)
-      // A slower old route cannot replace the currently selected lesson or its error state.
-      if (current === contentOperation) {
-        selectedLesson.value = lesson
-      }
-    } catch {
-      if (current === contentOperation) {
-        contentError.value = '课程内容读取失败，请重试。'
-      }
-    } finally {
-      if (current === contentOperation) {
-        contentLoading.value = false
-      }
-    }
-  }
-
-  onScopeDispose(() => {
-    contentOperation++
-  })
 
   async function selectLesson(id: string) {
     if (directory.some((lesson) => lesson.id === id)) {
@@ -224,6 +232,7 @@ export const useLearningStore = defineStore('learning', () => {
     // Publish the cursor only after its committed settings write, never an optimistic draft.
     exerciseStages.value = next
     error.value = null
+
     return { kind: 'advance', explanation }
   }
 
@@ -276,6 +285,7 @@ export const useLearningStore = defineStore('learning', () => {
     const next = { ...exerciseStages.value }
     delete next[id]
     exerciseStages.value = next
+
     await preferences.update(
       { lessonStages: next },
       { optimistic: false, expectedEpoch: datasetEpoch ?? undefined },

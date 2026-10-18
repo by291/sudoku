@@ -30,16 +30,22 @@ export const useGameStore = defineStore('game', () => {
   const runtime = useGameRuntime()
   const session = shallowRef<GameSession | null>(null)
   const phase = ref<SessionPhase>('paused')
+
   const selectedCell = ref<number | null>(null)
   const noteMode = ref(false)
+
   const hint = shallowRef<HintResult | null>(null)
   const hintLoading = ref(false)
+  let hintBoardIdentity = ''
+
   const checkedCells = ref<readonly number[]>([])
   const checkedBoard = ref<string | null>(null)
   const error = ref<string | null>(null)
   const readOnly = ref(false)
+
   const clock = shallowRef<RunClock>({ accumulatedMs: 0, runningSince: null })
   const now = ref(runtime.monotonicNow())
+
   const persistence = createSessionPersistence(runtime)
   const { saveState, saveMessage } = persistence
   const transitions = createSessionTransitions(
@@ -62,11 +68,6 @@ export const useGameStore = defineStore('game', () => {
     startDaily,
     failedGeneration,
   } = transitions
-  const notesLoading = ref(false)
-  let notesGeneration = 0
-  let notesController: AbortController | null = null
-  let layerRevision = 0
-  let hintBoardIdentity = ''
 
   function activateClock() {
     clock.value = resumeClock(clock.value, runtime.monotonicNow())
@@ -85,9 +86,11 @@ export const useGameStore = defineStore('game', () => {
   const stopPreparing = watch(
     () => session.value?.puzzle,
     (puzzle) => {
+      // Replace the owned layout only when the puzzle changes; edits reuse its immutable rules.
       prepared.value?.dispose()
       prepared.value = null
       ruleMetadata.value = null
+
       if (puzzle) {
         prepared.value = runtime.engine.prepare(puzzle.rules)
         ruleMetadata.value = prepared.value.metadata()
@@ -95,6 +98,7 @@ export const useGameStore = defineStore('game', () => {
     },
     { flush: 'sync' },
   )
+
   const editable = computed(() => phase.value === 'playing' && !readOnly.value)
   const conflictAnalysis = useConflictAnalysis(prepared, board, editable, runtime.worker)
   const conflictEvaluation = conflictAnalysis.evaluation
@@ -113,6 +117,11 @@ export const useGameStore = defineStore('game', () => {
   function tick() {
     now.value = runtime.monotonicNow()
   }
+
+  const notesLoading = ref(false)
+  let notesGeneration = 0
+  let notesController: AbortController | null = null
+  let layerRevision = 0
 
   function cancelNotes() {
     notesGeneration++
@@ -136,6 +145,65 @@ export const useGameStore = defineStore('game', () => {
     },
     { flush: 'sync' },
   )
+
+  async function requestNotes() {
+    const captured = session.value
+    const layout = prepared.value
+    if (!captured || !layout || !editable.value || notesLoading.value) {
+      return
+    }
+
+    const revision = layerRevision
+    const generation = ++notesGeneration
+    const owner = new AbortController()
+    notesController = owner
+    notesLoading.value = true
+
+    try {
+      const result = await runtime.worker.generateNotes(
+        {
+          givens: captured.puzzle.givens,
+          entries: captured.entries,
+          notes: captured.notes,
+          rules: captured.puzzle.rules,
+        },
+        owner.signal,
+      )
+
+      // Identity and revision both matter: the same session id can be restored with new layers.
+      if (
+        generation !== notesGeneration ||
+        revision !== layerRevision ||
+        owner.signal.aborted ||
+        !editable.value ||
+        session.value?.id !== captured.id ||
+        session.value.puzzle !== captured.puzzle
+      ) {
+        return
+      }
+
+      notesController = null
+      notesLoading.value = false
+
+      if (result.status !== 'completed') {
+        error.value = '候选数暂时无法生成，原有笔记已保留。请重试。'
+        return
+      }
+
+      // Reuse the normal history, assistance and save path only after the worker result is current.
+      commitAction(
+        commitBoardEdit(session.value, result.value.computation.result, { kind: 'generate-notes' }),
+        { kind: 'generate-notes' },
+        layout,
+      )
+    } catch {
+      if (generation === notesGeneration && !owner.signal.aborted) {
+        notesController = null
+        notesLoading.value = false
+        error.value = '候选数暂时无法生成，原有笔记已保留。请重试。'
+      }
+    }
+  }
 
   function cancelOperation() {
     cancelNotes()
@@ -201,11 +269,13 @@ export const useGameStore = defineStore('game', () => {
     cancelOperation()
     session.value = next
     persistence.attach(next.id, nextToken, revision)
+
     selectedCell.value = null
     noteMode.value = false
     hint.value = null
     checkedCells.value = []
     checkedBoard.value = null
+
     clock.value = { accumulatedMs: next.elapsedMs, runningSince: null }
     tick()
     if (next.completion) {
@@ -233,6 +303,7 @@ export const useGameStore = defineStore('game', () => {
       void requestNotes()
       return
     }
+
     const outcome =
       action.kind === 'enter' ||
       action.kind === 'erase' ||
@@ -249,6 +320,7 @@ export const useGameStore = defineStore('game', () => {
             action,
           )
         : applySessionAction(session.value, action)
+
     commitAction(outcome, action, layout)
   }
 
@@ -293,59 +365,6 @@ export const useGameStore = defineStore('game', () => {
     void save()
   }
 
-  async function requestNotes() {
-    const captured = session.value
-    const layout = prepared.value
-    if (!captured || !layout || !editable.value || notesLoading.value) {
-      return
-    }
-
-    const revision = layerRevision
-    const generation = ++notesGeneration
-    const owner = new AbortController()
-    notesController = owner
-    notesLoading.value = true
-    try {
-      const result = await runtime.worker.generateNotes(
-        {
-          givens: captured.puzzle.givens,
-          entries: captured.entries,
-          notes: captured.notes,
-          rules: captured.puzzle.rules,
-        },
-        owner.signal,
-      )
-      // Identity and revision both matter: the same session id can be restored with new layers.
-      if (
-        generation !== notesGeneration ||
-        revision !== layerRevision ||
-        owner.signal.aborted ||
-        !editable.value ||
-        session.value?.id !== captured.id ||
-        session.value.puzzle !== captured.puzzle
-      ) {
-        return
-      }
-      notesController = null
-      notesLoading.value = false
-      if (result.status !== 'completed') {
-        error.value = '候选数暂时无法生成，原有笔记已保留。请重试。'
-        return
-      }
-      commitAction(
-        commitBoardEdit(session.value, result.value.computation.result, { kind: 'generate-notes' }),
-        { kind: 'generate-notes' },
-        layout,
-      )
-    } catch {
-      if (generation === notesGeneration && !owner.signal.aborted) {
-        notesController = null
-        notesLoading.value = false
-        error.value = '候选数暂时无法生成，原有笔记已保留。请重试。'
-      }
-    }
-  }
-
   function selectCell(cell: number) {
     if (isCellIndex(cell) && phase.value !== 'paused') {
       selectedCell.value = cell
@@ -366,6 +385,7 @@ export const useGameStore = defineStore('game', () => {
     const job = transitions.beginOperation()
     hintLoading.value = true
     const analyzed = board.value.join(',')
+
     const result = await runtime.worker.hint(
       board.value,
       session.value.puzzle.solution,
@@ -468,7 +488,9 @@ export const useGameStore = defineStore('game', () => {
     if (phase.value === 'generating') {
       cancelLoading()
     }
+
     const result = await transitions.prepareTransition()
+
     return result.status === 'ready'
   }
 
@@ -494,11 +516,13 @@ export const useGameStore = defineStore('game', () => {
   })
 
   let disposed = false
+
   function dispose() {
     if (disposed) {
       return
     }
     disposed = true
+
     stopNoteRevision()
     conflictAnalysis.dispose()
     stopPreparing()

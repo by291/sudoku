@@ -20,6 +20,7 @@ const variantQuery = computed(() => parseVariantQuery(route.query.variant))
 const selectedVariant = computed(() =>
   variantQuery.value.valid ? variantQuery.value.value : 'classic',
 )
+
 const completedLessonIds = computed(() => new Set(learning.progress.map((item) => item.lessonId)))
 const totalCompleted = computed(
   () => LESSONS.filter((lesson) => completedLessonIds.value.has(lesson.id)).length,
@@ -54,10 +55,13 @@ const totalProgressText = computed(() =>
 const progressPercentage = computed(() =>
   selectedLessons.value.length ? (completedCount.value / selectedLessons.value.length) * 100 : 0,
 )
+
 const suggestedLesson = computed(() => {
+  // Browsable content does not imply known progress; do not recommend from an unread empty snapshot.
   if (!learning.progressReady) {
     return undefined
   }
+
   const unfinished = selectedLessons.value.filter(
     (lesson) => !completedLessonIds.value.has(lesson.id),
   )
@@ -68,6 +72,7 @@ const suggestedLesson = computed(() => {
     selectedLessons.value[0]
   )
 })
+
 type RecommendationKind = 'review' | 'continue' | 'next' | 'start'
 
 const recommendationKind = computed<RecommendationKind>(() => {
@@ -97,6 +102,7 @@ const suggestionStage = computed(() => {
   const total = lesson.stageCount
   return `第 ${Math.min(learning.exerciseStage(lesson.id) + 1, total)} / ${total} 阶段`
 })
+
 function lessonStatus(id: string, suggested: boolean): string {
   if (!learning.progressReady) {
     return '可阅读'
@@ -110,6 +116,7 @@ function lessonStatus(id: string, suggested: boolean): string {
 
   return suggested ? '推荐学习' : '可学习'
 }
+
 const classicStages: Readonly<Record<string, string>> = {
   rules: '起步 · 认识棋盘',
   'naked-single': '基础 · 寻找唯一',

@@ -8,7 +8,7 @@ import type { SudokuVariant } from '@/sudoku/contracts'
 import { createGenerationInput } from '@/sudoku/generationInput'
 import { parseVariantQuery } from '@/features/game/model/variants'
 import type { SessionMetadata } from '@/features/game/model/session'
-import type { GameSummary } from '@/storage/readModels'
+import { useFreeSlotStatus } from '@/features/game/composables/useFreeSlotStatus'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { useGameRuntime } from '@/runtime'
 
@@ -30,76 +30,25 @@ export function useGameEntry(options: GameEntryOptions) {
 
   const difficulty = ref<Difficulty>(options.practiceDifficulty())
   const setupOpen = ref(false)
-  const targetLoading = ref(false)
-  const targetPending = ref(false)
-  const targetError = ref<string | null>(null)
   const nextVariant = ref<SudokuVariant>(options.practiceVariant())
   const queryVariant = computed(() => parseVariantQuery(route.query.variant))
-  const targetSummary = ref<GameSummary | null>(null)
-  let targetLookup = 0
-  let targetMaintenance: AbortController | null = null
-
-  async function refreshTarget() {
-    targetMaintenance?.abort()
-    targetMaintenance = null
-    const epoch = ++targetLookup
-    if (metadata.value.kind !== 'free') {
-      return
-    }
-
-    targetLoading.value = true
-    const result = await runtime.repository.readSlotSummary('free', nextVariant.value)
-    if (epoch !== targetLookup) {
-      return
-    }
-
-    targetLoading.value = false
-    targetSummary.value = result.ok ? result.value.summary : null
-    targetPending.value = result.ok && result.value.coverage === 'pending'
-    if (!result.ok) {
-      targetError.value = '目标玩法存档读取失败，请重试。'
-    } else if (targetPending.value) {
-      targetError.value = '旧存档尚待校验，请重新读取后继续。'
-    } else {
-      targetError.value = null
-    }
-  }
-
-  async function retryTarget() {
-    if (targetPending.value) {
-      targetLoading.value = true
-      const epoch = ++targetLookup
-      targetMaintenance?.abort()
-      const controller = new AbortController()
-      targetMaintenance = controller
-      const result = await runtime.repository.maintainSummaries(controller.signal)
-      if (disposed || epoch !== targetLookup) {
-        return
-      }
-      if (!result.ok) {
-        targetLoading.value = false
-        targetError.value = '旧存档暂时无法校验，请重试。原有进度已保留。'
-        return
-      }
-    }
-    await refreshTarget()
-  }
-
-  watch(nextVariant, () => {
-    void refreshTarget()
-  })
+  const {
+    summary: targetSummary,
+    loading: targetLoading,
+    pending: targetPending,
+    error: targetError,
+    refresh: refreshTarget,
+    retry: retryTarget,
+  } = useFreeSlotStatus(
+    nextVariant,
+    computed(() => metadata.value.kind === 'free'),
+  )
 
   const ready = ref(false)
   const replacementAvailable = ref(false)
   const initializationError = ref<string | null>(null)
   let initialization = 0
   let disposed = false
-  onScopeDispose(() => {
-    disposed = true
-    initialization++
-    targetLookup++
-    targetMaintenance?.abort()
-  })
   const active = computed(
     () =>
       session.value &&
@@ -239,6 +188,11 @@ export function useGameEntry(options: GameEntryOptions) {
     { immediate: true },
   )
 
+  onScopeDispose(() => {
+    disposed = true
+    initialization++
+  })
+
   async function start() {
     if (!queryVariant.value.valid) {
       return
@@ -271,6 +225,7 @@ export function useGameEntry(options: GameEntryOptions) {
     const query = { ...route.query }
     delete query.start
     delete query.difficulty
+
     await router.replace({
       query: { ...query, variant: activeVariant.value, session: session.value.id },
     })
@@ -315,6 +270,7 @@ export function useGameEntry(options: GameEntryOptions) {
     if (targetLoading.value || targetPending.value || targetError.value) {
       return
     }
+
     setupOpen.value = false
     void start()
   }
