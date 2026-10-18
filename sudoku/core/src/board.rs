@@ -1,3 +1,4 @@
+use crate::rules::evaluation::satisfies_constraint;
 use crate::rules::types::PreparedRules;
 use crate::types::{ALL_DIGITS_MASK, BOARD_SIZE, Board, CandidateMask};
 
@@ -7,6 +8,7 @@ pub fn is_complete(board: &Board, prepared: &PreparedRules) -> bool {
     if values.contains(&0) {
         return false;
     }
+
     let context = prepared.context();
     for unit in &context.units {
         let mask = unit
@@ -17,10 +19,11 @@ pub fn is_complete(board: &Board, prepared: &PreparedRules) -> bool {
             return false;
         }
     }
+
     context
         .constraints
         .iter()
-        .all(|constraint| crate::rules::context::satisfies_constraint(board, constraint))
+        .all(|constraint| satisfies_constraint(board, constraint))
 }
 
 /// Base candidates apply duplicate peers only; arithmetic refinement belongs to constraints.

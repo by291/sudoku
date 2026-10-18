@@ -23,6 +23,7 @@ fn memberships<'a>(
             if !charge(budget) {
                 return None;
             }
+
             result[cell].push(index);
         }
     }
@@ -44,6 +45,7 @@ fn relationships<'a>(
                 if !charge(budget) {
                     return None;
                 }
+
                 if cell != peer {
                     result[cell][peer / 64] |= 1_u64 << (peer % 64);
                 }
@@ -111,54 +113,10 @@ pub fn validate_rules(rules: &PuzzleRules) -> CoreResult<()> {
     definitions::validate(rules)
 }
 
-/// Scan validated rule groups without constructing memberships or pairwise topology.
-/// Invalid geometry is rejected before givens, and only a completed board checks arithmetic totals.
-pub(crate) fn directly_contradictory_rules(
-    board: &crate::types::Board,
-    rules: &PuzzleRules,
-) -> CoreResult<bool> {
-    validate_rules(rules)?;
-    if matches!(rules, PuzzleRules::Classic) {
-        let prepared = classic_prepared_rules()?;
-        return Ok(prepared
-            .context()
-            .units
-            .iter()
-            .any(|unit| has_duplicate(board, &unit.cells)));
-    }
-    let compiled = definitions::compile(rules);
-    if compiled
-        .duplicate_groups
-        .iter()
-        .any(|cells| has_duplicate(board, cells))
-    {
-        return Ok(true);
-    }
-    Ok(!board.values().contains(&0)
-        && compiled
-            .constraints
-            .iter()
-            .any(|constraint| !satisfies_constraint(board, constraint)))
-}
-
-fn has_duplicate(board: &crate::types::Board, cells: &[usize]) -> bool {
-    let mut seen = 0_u16;
-    for &cell in cells {
-        let digit = board.values()[cell];
-        if digit == 0 {
-            continue;
-        }
-        let bit = 1 << (digit - 1);
-        if seen & bit != 0 {
-            return true;
-        }
-        seen |= bit;
-    }
-    false
-}
-
-fn classic_prepared_rules() -> CoreResult<PreparedRules> {
+/// Reuse static Classic topology without charging per-board validation or preparation.
+pub(super) fn classic_prepared_rules() -> CoreResult<PreparedRules> {
     static CLASSIC: OnceLock<CoreResult<PreparedRules>> = OnceLock::new();
+
     CLASSIC
         .get_or_init(|| compile_rules(&PuzzleRules::Classic))
         .clone()
@@ -178,6 +136,7 @@ pub fn prepare_rules(
     budget: &mut WorkBudget,
 ) -> CoreResult<Bounded<PreparedRules>> {
     definitions::validate(rules)?;
+
     if matches!(rules, PuzzleRules::Classic) {
         return classic_prepared_rules().map(Bounded::Complete);
     }
@@ -188,48 +147,4 @@ pub fn prepare_rules(
             None => Bounded::BudgetExhausted,
         }
     }))
-}
-
-/// Called only with a validated constraint from an immutable prepared layout.
-pub(crate) fn satisfies_constraint(
-    board: &crate::types::Board,
-    constraint: &super::types::RuleConstraint,
-) -> bool {
-    use super::types::RuleConstraint;
-    let values = board.values();
-    if constraint.cells().iter().any(|&cell| values[cell] == 0) {
-        return false;
-    }
-    match constraint {
-        RuleConstraint::Thermo { cells, .. } => {
-            if !cells
-                .windows(2)
-                .all(|pair| values[pair[0]] < values[pair[1]])
-            {
-                return false;
-            }
-        }
-        RuleConstraint::Arrow { cells, .. } => {
-            let total: u16 = cells[1..].iter().map(|&cell| u16::from(values[cell])).sum();
-            if total != u16::from(values[cells[0]]) {
-                return false;
-            }
-        }
-        RuleConstraint::Cage { cells, sum, .. } => {
-            let mut seen = 0_u16;
-            let mut total = 0_u16;
-            for &cell in cells {
-                let bit = 1 << (values[cell] - 1);
-                if seen & bit != 0 {
-                    return false;
-                }
-                seen |= bit;
-                total += u16::from(values[cell]);
-            }
-            if total != *sum {
-                return false;
-            }
-        }
-    }
-    true
 }

@@ -1,12 +1,12 @@
 use super::advanced_techniques::find_advanced_step;
 use super::basic_techniques::find_basic_step;
-use super::techniques::{ALL_CLASSIC_TECHNIQUES, Technique};
+use super::techniques::{Technique, execution_order};
 use super::types::{LogicResult, LogicStatus, LogicalStep, LogicalWorkspace, StepOutcome};
 use super::variant_techniques::find_variant_step;
 use super::workspace::{apply_established_step, create_workspace};
 use crate::board::is_complete;
 use crate::budget::{WorkBudget, WorkStage};
-use crate::rules::types::{PreparedRules, PuzzleRules};
+use crate::rules::types::PreparedRules;
 use crate::types::{Board, Bounded};
 
 /// Classic uses catalogue order; variants retain the caller's explicit policy priorities.
@@ -16,19 +16,15 @@ pub fn find_step(
     budget: &mut WorkBudget,
 ) -> StepOutcome {
     budget.with_stage(WorkStage::Logic, |budget| {
-        let classic = matches!(state.rules.rules(), PuzzleRules::Classic);
-        let order = if classic {
-            &ALL_CLASSIC_TECHNIQUES[..]
-        } else {
-            allowed
-        };
+        let order = execution_order(state.rules.rules().variant(), allowed);
+
+        // Charge every attempt before visiting techniques, including an empty allowed policy.
         if !budget.consume(1) {
             return Bounded::BudgetExhausted;
         }
-        for &technique in order {
-            if classic && !allowed.contains(&technique) {
-                continue;
-            }
+
+        for technique in order {
+            // Incomplete detector work must stop the scan rather than fall through to another technique.
             if technique.is_advanced() {
                 let result = find_advanced_step(state, technique, budget);
                 if !matches!(result, Bounded::Complete(None)) {
@@ -45,6 +41,7 @@ pub fn find_step(
                 }
             }
         }
+
         Bounded::Complete(None)
     })
 }
@@ -93,9 +90,11 @@ pub(crate) fn analyze_workspace_owned(
             Bounded::Complete(None) => break LogicStatus::Stalled,
             Bounded::Complete(Some(step)) => step,
         };
+
         apply_established_step(state, &step);
         steps.push(*step);
     };
+
     LogicResult {
         status,
         board: state.board.clone(),

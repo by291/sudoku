@@ -1,3 +1,5 @@
+use crate::rules::types::SudokuVariant;
+
 /// Stable engine identities; player-facing names belong to the presentation layer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
@@ -28,6 +30,7 @@ pub const BASIC_TECHNIQUES: [Technique; 5] = [
     Technique::NakedPair,
     Technique::HiddenPair,
 ];
+
 pub const ADVANCED_TECHNIQUES: [Technique; 6] = [
     Technique::NakedTriple,
     Technique::HiddenTriple,
@@ -36,6 +39,7 @@ pub const ADVANCED_TECHNIQUES: [Technique; 6] = [
     Technique::XYWing,
     Technique::SimpleColoring,
 ];
+
 pub const ALL_CLASSIC_TECHNIQUES: [Technique; 11] = [
     Technique::NakedSingle,
     Technique::HiddenSingle,
@@ -49,6 +53,7 @@ pub const ALL_CLASSIC_TECHNIQUES: [Technique; 11] = [
     Technique::XYWing,
     Technique::SimpleColoring,
 ];
+
 pub const ALL_TECHNIQUES: [Technique; 17] = [
     Technique::NakedSingle,
     Technique::HiddenSingle,
@@ -133,4 +138,23 @@ impl Technique {
             | Self::ArrowCombination => TechniqueAction::Either,
         }
     }
+}
+
+/// Borrow allowed techniques in their actual solver priority order.
+/// Classic uses catalogue order; variants retain caller order, including repeated entries.
+pub(crate) fn execution_order(
+    variant: SudokuVariant,
+    allowed: &[Technique],
+) -> impl Iterator<Item = Technique> + Clone + '_ {
+    let classic = variant == SudokuVariant::Classic;
+    let order = if classic {
+        &ALL_CLASSIC_TECHNIQUES[..]
+    } else {
+        allowed
+    };
+
+    order
+        .iter()
+        .copied()
+        .filter(move |technique| !classic || allowed.contains(technique))
 }

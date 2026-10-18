@@ -4,7 +4,7 @@ use crate::board::is_complete;
 use crate::budget::{WorkBudget, WorkStage};
 use crate::constraints::computation::prepare_computation;
 use crate::constraints::types::PreparedComputation;
-use crate::rules::context::directly_contradictory_rules;
+use crate::rules::evaluation::directly_contradictory_rules;
 use crate::rules::types::{PreparedRules, PuzzleRules};
 use crate::types::{Board, Bounded, CoreResult};
 
@@ -43,6 +43,7 @@ pub fn count_solutions(
     if directly_contradictory(board, &computation.rules) {
         return contradictory_result();
     }
+
     budget.with_stage(WorkStage::Exact, |budget| {
         count_propagation_solutions(board, computation, budget, node_limit)
     })
@@ -58,6 +59,7 @@ pub fn count_with_rules(
     if directly_contradictory_rules(board, rules)? {
         return Ok(contradictory_result());
     }
+
     let started = budget.used();
     let Bounded::Complete(computation) = prepare_computation(rules, budget)? else {
         return Ok(SearchResult::BudgetExhausted {
@@ -65,6 +67,7 @@ pub fn count_with_rules(
             work_used: budget.used() - started,
         });
     };
+
     let result = count_solutions(board, &computation, budget, node_limit);
     Ok(result.with_work_used(budget.used() - started))
 }

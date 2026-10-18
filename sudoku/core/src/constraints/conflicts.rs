@@ -5,7 +5,7 @@ use super::types::{
 };
 use crate::board::base_candidates;
 use crate::budget::WorkBudget;
-use crate::rules::context::satisfies_constraint;
+use crate::rules::evaluation::satisfies_constraint;
 use crate::rules::types::{PreparedRules, RuleConstraint};
 use crate::types::{Board, Bounded};
 
@@ -20,6 +20,7 @@ fn add_duplicates(board: &Board, id: String, cells: &[usize], violations: &mut V
                     .any(|&other| other != cell && board.values()[other] == board.values()[cell])
         })
         .collect();
+
     if !duplicates.is_empty() {
         violations.push(RuleViolation {
             constraint_id: id,
@@ -38,6 +39,7 @@ fn constraint_violation(constraint: &RuleConstraint) -> RuleViolation {
         RuleConstraint::Thermo { index, .. } => ViolationCode::ThermoOrder { index: *index },
         RuleConstraint::Arrow { index, .. } => ViolationCode::ArrowTotal { index: *index },
     };
+
     RuleViolation {
         constraint_id: constraint.id().to_owned(),
         cells: constraint.cells().to_vec(),
@@ -53,6 +55,7 @@ fn evaluate(
 ) -> ConflictResult {
     let context = rules.context();
     let mut violations = vec![];
+
     for unit in &context.units {
         add_duplicates(
             board,
@@ -61,11 +64,13 @@ fn evaluate(
             &mut violations,
         );
     }
+
     for constraint in &context.constraints {
         if let RuleConstraint::Cage { id, cells, .. } = constraint {
             add_duplicates(board, id.clone(), cells, &mut violations);
         }
     }
+
     let candidates = base_candidates(board, rules);
 
     for (index, constraint) in context.constraints.iter().enumerate() {
@@ -79,12 +84,14 @@ fn evaluate(
             }
             continue;
         }
+
         if !budget.consume(1) {
             return ConflictResult {
                 status: ConflictStatus::BudgetExhausted,
                 violations,
             };
         }
+
         let result = match support {
             Some(prepared) => prepared.query_at(board, &candidates, index, budget),
             None => raw_for_constraint(board, &candidates, rules, constraint, budget),
@@ -95,6 +102,7 @@ fn evaluate(
                 violations,
             };
         };
+
         if local.as_slice().contains(&0) {
             violations.push(constraint_violation(constraint));
         }

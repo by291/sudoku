@@ -68,6 +68,7 @@ pub(crate) fn policy_slice(variant: SudokuVariant, difficulty: Difficulty) -> &'
             }
         }
     };
+
     &catalogue[..length]
 }
 
@@ -94,23 +95,6 @@ pub fn technique_tier(technique: Technique) -> Difficulty {
         | Technique::XYWing
         | Technique::SimpleColoring => Difficulty::Expert,
     }
-}
-
-/// Classic always follows catalogue order even if a caller's allowed list has another order.
-pub(crate) fn execution_order(
-    variant: SudokuVariant,
-    allowed: &[Technique],
-) -> impl Iterator<Item = Technique> + Clone + '_ {
-    let classic = variant == SudokuVariant::Classic;
-    let order = if classic {
-        &ALL_CLASSIC_TECHNIQUES[..]
-    } else {
-        allowed
-    };
-    order
-        .iter()
-        .copied()
-        .filter(move |technique| !classic || allowed.contains(technique))
 }
 
 pub(crate) fn hint_techniques_slice(variant: SudokuVariant) -> &'static [Technique] {

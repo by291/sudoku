@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 
 use super::input::validate_input;
-use super::policies::{execution_order, policy_slice, supported_difficulties, supports_difficulty};
+use super::policies::{policy_slice, supported_difficulties, supports_difficulty};
 use super::types::{
     AssessmentFailure, AssessmentIssue, AssessmentResult, AssessmentStage, DifficultyAssessment,
     ExhaustionCause, PreparedAssessment, RatedAssessment, RatedTrial, TargetFeedback,
@@ -14,7 +14,7 @@ use crate::constraints::computation::prepare_computation;
 use crate::constraints::conflicts::evaluate_prepared_conflicts;
 use crate::constraints::types::{ConflictStatus, PreparedComputation};
 use crate::logic::solver::analyze_workspace_owned;
-use crate::logic::techniques::Technique;
+use crate::logic::techniques::{Technique, execution_order};
 use crate::logic::types::{LogicStatus, LogicalStep};
 use crate::logic::workspace::create_prepared_workspace;
 use crate::rules::context::validate_rules;
@@ -28,6 +28,7 @@ pub fn prepare_assessment(
 ) -> CoreResult<PreparedAssessment> {
     validate_rules(rules)?;
     limits.validate()?;
+
     Ok(PreparedAssessment {
         rules: rules.clone(),
         limits,
@@ -41,6 +42,7 @@ pub fn prepare_assessment_with_computation(
     limits: AssessmentLimits,
 ) -> CoreResult<PreparedAssessment> {
     limits.validate()?;
+
     Ok(PreparedAssessment {
         rules: computation.rules().rules().clone(),
         limits,
@@ -58,6 +60,7 @@ pub fn assess_puzzle_with_budget(
 ) -> AssessmentResult {
     let prepared =
         validate_input(input).and_then(|()| prepare_assessment(&input.rules, input.limits));
+
     match prepared {
         Ok(owner) => owner.assess(&input.board, budget),
         Err(error) => AssessmentResult::Unrated(AssessmentFailure::Invalid {
@@ -93,9 +96,11 @@ impl PreparedAssessment {
         let Bounded::Complete(computation) = prepare_computation(&self.rules, budget)? else {
             return Ok(Bounded::BudgetExhausted);
         };
+
         self.computation
             .set(computation)
             .map_err(|_| EngineError::invalid("Assessment preparation was already initialized"))?;
+
         self.computation
             .get()
             .map(Bounded::Complete)
@@ -126,6 +131,7 @@ impl PreparedAssessment {
             }
             Err(error) => return PolicyScreen::Invalid(message(error.to_string())),
         };
+
         budget.with_stage(WorkStage::Logic, |budget| {
             let policies = supported_difficulties(self.rules.variant())
                 .iter()
@@ -192,6 +198,7 @@ impl RatedTrial {
     /// Consume this owned trial and replay statistics without any search or additional charged work.
     pub fn complete(self) -> CoreResult<RatedAssessment> {
         let workload = summarize_trace(&self.board, &self.rules, &self.trace)?;
+
         Ok(RatedAssessment {
             summary: DifficultyAssessment {
                 variant: self.rules.rules().variant(),
@@ -243,8 +250,10 @@ fn screen_policies<'policy>(
         remaining_cells: board.values().iter().filter(|&&digit| digit == 0).count(),
         deductions: 0,
     };
+
     for (difficulty, allowed) in policies {
         let variant = computation.rules().rules().variant();
+
         // Only an unchanged priority prefix can resume domains; changed priorities need a fresh board.
         if !extends_prefix(
             execution_order(variant, previous_allowed),
@@ -261,6 +270,7 @@ fn screen_policies<'policy>(
             budget,
             previous_steps,
         );
+
         match result.status {
             LogicStatus::WorkLimit | LogicStatus::StepLimit => {
                 return PolicyScreen::Exhausted {
@@ -275,6 +285,7 @@ fn screen_policies<'policy>(
             }
             LogicStatus::Solved | LogicStatus::Stalled => {}
         }
+
         feedback = TargetFeedback {
             remaining_cells: result
                 .board
@@ -284,6 +295,7 @@ fn screen_policies<'policy>(
                 .count(),
             deductions: result.steps.len(),
         };
+
         if result.status == LogicStatus::Solved {
             return PolicyScreen::Rated {
                 trial: RatedTrial {
@@ -298,9 +310,11 @@ fn screen_policies<'policy>(
         if Some(difficulty) == target {
             break;
         }
+
         previous_allowed = allowed;
         previous_steps = result.steps;
     }
+
     PolicyScreen::Stalled(feedback)
 }
 
