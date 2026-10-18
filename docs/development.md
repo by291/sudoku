@@ -6,7 +6,7 @@ For Android requirements and packaging, use [Android build](android/build.md). M
 
 Use Node.js 26 or later and the repository-pinned pnpm 12.11.2. TypeScript is pinned to 6.0.3 for compatibility with the installed lint tooling.
 
-Install Rust through rustup as well. `rust-toolchain.toml` pins Rust 1.98.0, Clippy, rustfmt and the `wasm32-unknown-unknown` target. Development, type checking, unit tests and production builds run `pnpm wasm:build` first. It compiles the separate Rust core and binding crates and installs the pinned wasm-bindgen CLI automatically on the first run. Generated JS/WASM/declarations stay under the ignored workspace package; no manually copied binary is required.
+Install Rust through rustup as well. `rust-toolchain.toml` pins Rust 1.99.1, Clippy, rustfmt and the `wasm32-unknown-unknown` target. Development, type checking, unit tests and production builds run `pnpm wasm:build` first. It compiles the separate Rust core and binding crates and installs the pinned wasm-bindgen CLI automatically on the first run. Generated JS/WASM/declarations stay under the ignored workspace package; no manually copied binary is required.
 
 After changing Rust source, restart `pnpm dev` to rebuild WASM. Vite owns the emitted binary URL at both `/` and `/sudoku/`; computation loads lazily, and initialization failures offer retry in the affected workflow. Summary browsing and navigation do not require WASM readiness.
 
