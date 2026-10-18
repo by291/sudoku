@@ -41,6 +41,13 @@ For an Android App Bundle, run `./gradlew :app:bundleRelease -PsplitApksByAbi=fa
 
 ## Installable artifacts
 
+The launcher uses the home's tilted board icon for both `android:icon` and
+`android:roundIcon`. A separate transparent monochrome layer omits the board's
+opaque fill for themed icons. The shared mark stays within the adaptive icon safe zone;
+both foreground layers scale to 92% around the center while the launcher owns
+the outer shape. See [application icon generation](../development.md#application-icons)
+to update the Web and Android assets together.
+
 Debug APKs are `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` and `app/build/outputs/apk/debug/app-x86_64-debug.apk`. Release APKs use the corresponding `app/build/outputs/apk/release/app-<abi>-release-unsigned.apk` names. Install the ABI matching the selected device; production release requires your own signing configuration.
 
 When assembling instrumentation APKs, run that invocation separately from `qualityCheck` so lint does not race Hilt/KSP test-source generation. Use a dedicated emulator and set `ANDROID_SERIAL` to its actual serial before connected-test commands; direct ADB commands must also select it explicitly. Do not operate a personal emulator or physical device without authorization.

@@ -66,6 +66,27 @@ Browser screenshots and traces belong under ignored `test-results/`; browser HTM
 
 ## Static deployment
 
+### Application icons
+
+Web and Android share a 3×3 version of the home's tilted board, with sparse
+numerals, a pale highlighted row and center cell, a subtle board edge and a warm
+off-white background. Colors follow the shared light theme, including the teal
+accent for the frame and numerals. `scripts/generate-app-icons.mjs` defines the mark and reads
+fixed numeral outlines from `resources/branding/icon-numerals.json`, so their
+appearance does not depend on platform fonts. Small favicons strengthen the grid
+lines to retain their shape.
+After editing its colors or geometry, run `pnpm icons:generate` with the pinned
+Playwright Chromium installed. Commit the generated SVG/PNG assets in `public/`
+and Android launcher foreground/color resources together. Normal builds consume
+these checked-in assets and do not need to run the icon generator.
+
+The Web entry point declares an SVG favicon, a 32-pixel PNG fallback and a
+180-pixel Apple touch icon. Vite rewrites their URLs for the configured deployment
+base. The touch icon has an opaque square background so the platform applies its
+own corner mask. These assets do not enable a service worker or PWA installation.
+
+### Hosting
+
 Upload the complete `dist/` directory to a static HTTPS host. The application uses hash routes, so refreshing a game route does not require server-side route rewriting. Preserve the emitted worker asset and its relative location; the host must allow same-origin module workers.
 
 For a deployment under `/sudoku/`:
