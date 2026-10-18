@@ -1,6 +1,6 @@
 # Adding a Sudoku Variant
 
-Follow [Web Architecture](architecture.md) and the [portable engine design](superpowers/specs/2026-10-16-rust-core-and-wasm-design.md). Extend explicit typed definitions and existing primitives; do not introduce a general plugin framework or branches throughout the application.
+Follow [Web Architecture](architecture.md) and the [engine contracts](engine.md). Extend explicit typed definitions and existing primitives; do not introduce a general plugin framework or branches throughout the application.
 
 ## Registration locations
 

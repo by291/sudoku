@@ -1,6 +1,6 @@
 # Android Guidelines
 
-Follow the root repository guidelines, the approved [client design](../docs/superpowers/specs/2026-10-16-android-client-design.md), and the [data-loading design](../docs/superpowers/specs/2026-10-17-android-data-loading-design.md).
+Follow the root repository guidelines, the [architecture](../docs/android/architecture.md), and the [data-loading contract](../docs/android/data-loading.md).
 
 ## Ownership
 
@@ -36,5 +36,5 @@ Follow the root repository guidelines, the approved [client design](../docs/supe
 - Test observable behavior and domain invariants. Separate arrangement, action and assertions with blank lines. Use fixed independent fixtures; extraction alone does not require mirror tests of private helpers.
 - For FFI configuration changes, rebuild generated bindings and packaged APKs, run host/native checks, and exercise affected runtime branches on disposable AVDs. Native cancellation tests must distinguish signalled return from work exhaustion.
 - Preserve backup v1/session v2 compatibility and independent Web fixtures. Actual export/reimport evidence requires the Android-produced fixture, not a fixture regenerated from Android expectations.
-- Record exact commands, suites, device/ABI and limitations in a dated English report under `docs/`. Keep historical release, timings, screenshots and hardware evidence separate from current-working-tree results. Use explicit disposable device serials; never modify a personal emulator or physical device without authorization.
+- Report executed commands, suites, device/ABI and limitations in the change summary. Keep reusable instructions under the root `docs/android/`; do not commit dated verification reports, screenshots or run logs. Use explicit disposable device serials; never modify a personal emulator or physical device without authorization.
 - Do not commit, reset, push or change unrelated Web/shared-Rust work without explicit authorization.

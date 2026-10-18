@@ -57,7 +57,7 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
   await expect(page.getByRole('button', { name: cellName(41) })).toBeFocused()
   await page.keyboard.press('ArrowLeft')
   await page.screenshot({
-    path: `.superpowers/navigation-refinement/lesson-${testInfo.project.name}.png`,
+    path: `test-results/visual/navigation-refinement/lesson-${testInfo.project.name}.png`,
     fullPage: true,
     animations: 'disabled',
   })

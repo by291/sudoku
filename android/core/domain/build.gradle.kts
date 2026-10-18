@@ -5,7 +5,7 @@ plugins {
 
 kotlin { jvmToolchain(21) }
 
-sourceSets.test { resources.srcDir("../../../content") }
+sourceSets.test { resources.srcDir("../../../resources") }
 
 // The Web interop step consumes this test output, including after Gradle restores cached results.
 tasks.test {

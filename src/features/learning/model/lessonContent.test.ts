@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import catalogue from '@content/lessons/catalogue.json' with { type: 'json' }
+import catalogue from '@resources/lessons/catalogue.json' with { type: 'json' }
 import { createLessonContentLoader } from '@/features/learning/model/lessonContent'
 import { deferred } from '../../../../tests/support/deferred'
 

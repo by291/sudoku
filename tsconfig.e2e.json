@@ -5,7 +5,7 @@
     "types": ["node"],
     "paths": {
       "@/*": ["./src/*"],
-      "@content/*": ["./content/*"],
+      "@resources/*": ["./resources/*"],
       "@reference/*": ["./tests/reference/typescript-engine/src/*"],
       "@/core/sudoku/*": ["./tests/reference/typescript-engine/src/core/sudoku/*"]
     }

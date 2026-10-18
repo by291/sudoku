@@ -78,7 +78,7 @@ test('keeps statistics and completion history readable in a short desktop window
   await expect(navigation.getByRole('link', { name: '箭头数独 3 局', exact: true })).toBeVisible()
   await expect(navigation.getByRole('link', { name: /0 局$/ })).toHaveCount(4)
   await page.screenshot({
-    path: `.superpowers/records-inline/counts-${testInfo.project.name}.png`,
+    path: `test-results/visual/records-inline/counts-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
   await page.getByRole('tab', { name: '完成历史', exact: true }).click()
@@ -99,7 +99,7 @@ test('restores the records type from its URL through refresh and browser history
   await page.reload()
   await expect(page.getByRole('heading', { name: '箭头数独', exact: true })).toBeVisible()
   await page.screenshot({
-    path: `.superpowers/navigation-refinement/records-${testInfo.project.name}.png`,
+    path: `test-results/visual/navigation-refinement/records-${testInfo.project.name}.png`,
     fullPage: true,
     animations: 'disabled',
   })
@@ -202,7 +202,7 @@ test('opens the original completed board with variant clues and returns to the s
     true,
   )
   await page.screenshot({
-    path: `.superpowers/web-parity/result-${testInfo.project.name}.png`,
+    path: `test-results/visual/web-parity/result-${testInfo.project.name}.png`,
     fullPage: true,
     animations: 'disabled',
   })

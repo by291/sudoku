@@ -18,7 +18,7 @@ test('uses physical keyboard input on desktop without showing a number pad', asy
   await expect(cell).toHaveAccessibleName(/空格/)
   await expect(page.getByRole('button', { name: '更多操作', exact: true })).toBeInViewport()
   await page.screenshot({
-    path: `.superpowers/compact-play/desktop-${testInfo.project.name}.png`,
+    path: `test-results/visual/compact-play/desktop-${testInfo.project.name}.png`,
     fullPage: true,
     animations: 'disabled',
   })
@@ -79,7 +79,7 @@ test('keeps tools, digits and independent quick notes in aligned phone rows', as
   await page.getByRole('button', { name: '重做', exact: true }).click()
   await expect(quickNote).toHaveAttribute('aria-pressed', 'true')
   await page.screenshot({
-    path: `.superpowers/compact-play/phone-${testInfo.project.name}.png`,
+    path: `test-results/visual/compact-play/phone-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
 })

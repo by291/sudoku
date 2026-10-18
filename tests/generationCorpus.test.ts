@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterAll, expect, it } from 'vitest'
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { cpus, platform, release } from 'node:os'
 import {
   createGenerationInput,
@@ -137,10 +137,10 @@ afterAll(() => {
     },
     rows,
   }
-  writeFileSync(
-    `${process.env.SUDOKU_CORPUS_OUTPUT ?? '.superpowers/sdd/2026-10-14-sudoku-local-product-roadmap'}/corpus-${phase}.json`,
-    JSON.stringify(report, null, 2),
-  )
+  const outputDirectory = process.env.SUDOKU_CORPUS_OUTPUT ?? 'test-results/generation-corpus'
+  mkdirSync(outputDirectory, { recursive: true })
+
+  writeFileSync(`${outputDirectory}/corpus-${phase}.json`, JSON.stringify(report, null, 2))
   if (phase === 'current') {
     for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow']) {
       const accepted = rows.filter((row) => row.variant === variant && row.status === 'ready')

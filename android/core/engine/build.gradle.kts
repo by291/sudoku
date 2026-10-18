@@ -15,7 +15,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     testOptions.unitTests.all {
-        val catalogue = file("../../../content/lessons/catalogue.json")
+        val catalogue = file("../../../resources/lessons/catalogue.json")
         it.inputs.file(catalogue)
         it.systemProperty("sudoku.learningCatalogue", catalogue.absolutePath)
         it.systemProperty("jna.library.path", file("../../../target/debug").absolutePath)

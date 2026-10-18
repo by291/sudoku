@@ -112,7 +112,7 @@ test('keeps long daily metadata and full-row targets inside a narrow resume shee
     .poll(() => dialog.evaluate((element) => element.scrollWidth <= element.clientWidth))
     .toBe(true)
   await page.screenshot({
-    path: `.superpowers/web-parity/resume-${testInfo.project.name}.png`,
+    path: `test-results/visual/web-parity/resume-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
 })

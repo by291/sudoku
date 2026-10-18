@@ -108,7 +108,7 @@ function createLessonAssets(source: string): LessonAssets {
 
 /** All generated modules own the same source snapshot proved by Rust before publication. */
 export function lessonCatalogueValidation(
-  cataloguePath = fileURLToPath(new URL('../content/lessons/catalogue.json', import.meta.url)),
+  cataloguePath = fileURLToPath(new URL('../resources/lessons/catalogue.json', import.meta.url)),
 ): Plugin {
   let assets: LessonAssets | null = null
   let catalogueId: string | null = null

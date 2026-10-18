@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "paths": { "@/*": ["./src/*"], "@content/*": ["./content/*"] },
+    "paths": { "@/*": ["./src/*"], "@resources/*": ["./resources/*"] },
     "strict": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,

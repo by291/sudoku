@@ -27,7 +27,7 @@ test('chooses the free puzzle in a home dialog before creating a session', async
   await expect(dialog.getByRole('button', { name: '开始游戏', exact: true })).toBeEnabled()
   if (testInfo.project.name === 'desktop') {
     await page.screenshot({
-      path: '.superpowers/ux-refinement/setup-desktop.png',
+      path: 'test-results/visual/ux-refinement/setup-desktop.png',
       animations: 'disabled',
     })
   }
@@ -97,7 +97,7 @@ test('resumes from a standalone home action', async ({ page }, testInfo) => {
   await expect(page.getByRole('button', { name: '继续上次', exact: true })).toBeVisible()
   if (testInfo.project.name === 'desktop') {
     await page.screenshot({
-      path: '.superpowers/ux-refinement/home-desktop.png',
+      path: 'test-results/visual/ux-refinement/home-desktop.png',
       fullPage: true,
       animations: 'disabled',
     })

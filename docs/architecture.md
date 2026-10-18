@@ -1,6 +1,6 @@
 # Web Architecture
 
-The [product design](superpowers/specs/2026-10-11-sudoku-design.md), [variant design](superpowers/specs/2026-10-11-sudoku-variants-design.md), and [portable engine design](superpowers/specs/2026-10-16-rust-core-and-wasm-design.md) define behavior. [AGENTS.md](../AGENTS.md) defines development conventions; [Adding a Sudoku Variant](variant-extension.md) lists concrete extension points.
+The [product contract](product.md) defines player behavior, and [Engine](engine.md) defines mathematical ownership and deterministic identity. [AGENTS.md](../AGENTS.md) defines development conventions; [Adding a Sudoku Variant](variant-extension.md) lists concrete extension points.
 
 ## Owners and dependencies
 
@@ -53,34 +53,6 @@ Shared presentation composables own only generic UI lifetimes, such as cancellab
 
 Source imports use `@/`; Worker asset URLs stay literal and relative. Contracts come from their explicit owner, rather than an operation facade. ESLint checks static and dynamic imports, prohibits uninspectable dynamic paths and rejects production imports of retired/reference engines. Tests also check the browser engine's runtime import graph for cycles. The sealed TypeScript reference is test-only under `tests/reference`; only test configuration resolves `@reference/` and its original internal aliases. Normal production builds contain no TypeScript rule compiler, solver, rater or generator.
 
-## Native engine contracts
-
-`types.rs` owns checked board/digit/cell/mask values. Boards contain 81 values in 0..=9; candidate masks use nine bits. `rules/types.rs` owns the explicit variant union, constraints and immutable prepared topology. Full nine-digit units, duplicate-exclusion peers, related highlights and arithmetic/path constraints are distinct concepts. Definitions do not depend on generation, assessment, storage or UI.
-
-Dependencies flow from values/budgets and rules to constraints, search/logical deductions, rating and generation composition. `constraints/types.rs` owns prepared computation and owned result contracts. `search/exact.rs` is the counting boundary; propagation initializes fresh domains/queues/trails for every board and restores branches on every exit, including exhaustion. Returned solutions/evidence own their data. Logical deductions never obtain their justification from search guesses.
-
-`hint.rs` owns hint results and `hint/validation.rs` owns complete chain replay. Logic owns `step_shape`, `step_validation`, independent `unit_evidence`/`advanced_evidence` proofs and authored `teaching` states; production code imports those contracts from their owner. Compatibility re-exports do not establish a dependency in the opposite direction. A logical workspace exposes read-only board/candidate access and `LogicalWorkspace::from_authored_candidates` for checked authored construction. Public `apply_step` validates every action before changing the workspace; callers still need a detector result or a proof validated against that same state. Structural action checks do not establish mathematical soundness.
-
-All work consumes one caller-owned finite budget with explicit stage accounting. Abandoned layouts/catalogues, failed proposals and retries retain their charges. Incomplete support, search, preparation or generation never implies contradiction, zero solutions, uniqueness or successful delivery. Static layout data may be shared through immutable `Arc` ownership; mutable domains and domain-dependent caches cannot cross boards/requests.
-
-Small Killer cages use complete ordered catalogues: at most four cells, 512 tuples per clue and 8,192 per layout. Capacity overflow discards partial preparation and uses bounded enumeration without a refund. Larger cages, arrows and thermometers use exact local support. A fresh logical workspace owns at most one complete effective-domain memo per cage; incomplete support is never cached. Exact counting and raw live operations retain their original work semantics.
-
-Rating preserves actual technique priority. A stalled policy continues only when its priority order is a prefix of the next policy; otherwise it resets both state and trace. Reused steps count toward the policy limit. Successful trial completion owns and summarizes the original successful trace without another search or additional charged work. Optional stored assessments are validated, never regraded on restore.
-
-Generation owns terminal construction, geometry, bounded mask frontiers, ranking, scheduling and final acceptance. Defaults remain 40 layouts, 4,000,000 shared work units and 500 logical steps. Regional terminal construction has a separate 6,561-visit local attempt cap. Retained frontier bounds, random draw order, work charges and permitted transformations are contract-tested. Complete-unit prefill requires digit-relabeling invariance and is not valid for arbitrary arithmetic variants. There is no authored-board fallback, hidden retry allowance or historical generator.
-
-The scheduler delegates layout preparation and proposal evaluation to focused operations while retaining layout-slot and accumulated-work ownership. A pending proposal owns its parent even after frontier eviction. Prepared edit order binds its partition to one clue mask; an inherited sweep rebuilds that partition without another random shuffle. Accepted delivery, rejection, failure and exhaustion are distinct outcomes.
-
-Every delivery validates terminal-consistent givens/rules/identity, exact requested difficulty, clue policy, completed assessment, exact uniqueness with the known terminal and variant necessity, with the existing Jigsaw exception. A known terminal establishes existence only. A changed clue mask starts a new workspace; stalled checkpoints have unknown uniqueness until counted.
-
-## Seed and identity
-
-Current generation versions are `sudoku-v11` and `sudoku-variants-v11`; rating remains `sudoku-rating-v2`. A root seed is exactly 32 arbitrary bytes. Free play obtains fresh bytes from `crypto.getRandomValues`; request/retry workflows copy and retain that one seed independently of session UUIDs.
-
-Rust derives daily roots from exactly ASCII `daily:YYYY-MM-DD`; JavaScript chooses the Beijing date and stable formal ID. Existing formal attempts are looked up before deriving a new root. Status lookup does not invoke generation or hashing. New stored/share seeds are exactly 64 lowercase ASCII hex characters. Historical seed/version text, including unpaired UTF-16 code units, stays in JavaScript and never enters Rust mathematical content validation.
-
-BLAKE3 contexts and the 43-byte phase frame are version-owned. Frame fields are root bytes, variant/tier/phase tags and little-endian layout/proposal counters. ChaCha8 starts at zero stream/word position; one u32 produces one random fraction and each descending Fisher–Yates swap consumes one draw. The design document and independent primitive/phase vectors pin the complete recipe. Reproducing old string-seeded puzzles is unsupported; saved boards/rules/progress/results remain authoritative.
-
 ## WASM readiness and ownership
 
 `pnpm wasm:build` builds locked Rust/WASM, installs the pinned wasm-bindgen CLI if needed, and emits JS/WASM/declarations into the ignored workspace package. A build-time TypeScript compiler transform wraps self-contained generated glue in a collectable factory. Each instance owns separate memory; compiled immutable code can be shared. There is no source evaluation, handwritten pointer protocol, raw-memory alias or browser-side fallback solver.
@@ -99,7 +71,7 @@ The client sends initialization before a job and validates readiness/version ide
 
 Rust classifies live computation cost exhaustively by constraint primitive. A Killer cage larger than four cells is conservatively heavy; the main facade rejects full candidates/conflicts/generated notes for that layout. It offers a zero-arithmetic-work sound conflict preview, while focused Worker jobs retain exactly 1,000,000 action work units and separately report bounded layout preparation. Exhaustion is incomplete analysis, never validity.
 
-Live conflicts own a separate abort generation keyed by puzzle/board/editability. Heavy notes capture puzzle/session identity and layer revision; edits, history, pause, ownership loss and reset cancel them. Clock/selection and assistance-only updates do not restart conflicts or invalidate notes. Only a current complete note result commits through the same atomic history/assistance function. Pending and failed states have explicit Chinese feedback; duplicate note requests are disabled. See the [approved live-analysis design](superpowers/specs/2026-10-16-async-live-analysis-design.md).
+Live conflicts own a separate abort generation keyed by puzzle/board/editability. Heavy notes capture puzzle/session identity and layer revision; edits, history, pause, ownership loss and reset cancel them. Clock/selection and assistance-only updates do not restart conflicts or invalidate notes. Only a current complete note result commits through the same atomic history/assistance function. Pending and failed states have explicit Chinese feedback; duplicate note requests are disabled. These fences preserve the same player action and assistance contracts as synchronous edits.
 
 ## Player facts and storage
 
@@ -131,4 +103,4 @@ Runtime guards retain explicit DTO shapes, ranges, answer consistency, and owned
 
 Chinese technique/violation text belongs to game presentation on both clients; shared board drawing consumes DTOs and owned metadata. Live assessment issues retain constraint identity, affected cells and typed violation details until that presentation boundary. Presentation explicitly converts them to stored strings when needed; adapters never reinterpret historical stored text. The native adapter uses bridge version 2 for this live contract. Display-only digit/mask formatting cannot infer candidates or Sudoku validity. A new primitive must support candidates, conflicts, completion, exact counting, deductions/evidence, validation and accessible drawing together.
 
-Native tests and 5,742 sealed migration comparisons cover full math/work/random contracts. Available browser bindings run 4,262 complete comparisons each, including all 2,241 v11 puzzles and 152 budget cases; independent counters and literal evidence provide separate oracles. Player/storage/lesson tests run actual WASM. The [release audit](superpowers/verification/2026-10-16-rust-core-migration.md) records artifact/toolchain hashes, full-generation and 171-board performance, startup/memory, supported-browser limitations and source-equivalent evidence reuse. Controlled-machine timing is separate from CI correctness/deadline checks. Never count an unavailable browser as a pass.
+Use [the maintained migration suites](../tests/migration/README.md) for native/WASM parity and independent mathematical fixtures. Player/storage/lesson tests run actual WASM. Correctness and deadline checks do not establish physical-device performance or browser availability. See [development](development.md) for the configured checks.

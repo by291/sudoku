@@ -1,178 +1,59 @@
 # Sudoku · 一格一念
 
-A local Sudoku game with Chinese Web and native Android interfaces. The Web client uses the reusable Rust core through wasm-bindgen, Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI, Web Workers, IndexedDB (`idb`), and native CSS. Android uses Kotlin, Compose, Room, and generated UniFFI bindings over the same core. Repository documentation and code identifiers are in English.
+A local Sudoku game with Chinese Web and native Android interfaces, powered by one reusable Rust engine.
 
-The Web client remains browser-local and statically hosted; Android runs independently offline. Backup files transfer player data between clients. Accounts, automatic cloud synchronization, friends, global leaderboards, and Web PWA/offline installation are outside the product scope.
+- Six variants: Classic, Diagonal, Jigsaw, Killer, Thermo and Arrow.
+- Free play with 19 variant/difficulty combinations, daily challenges and personal records.
+- 32 courses with guided reasoning and interactive exercises.
+- Notes, undo/redo, logical hints, pause/resume and local saves.
+- Compatible backup files for moving player data between Web and Android.
 
-The approved [Local Product Roadmap](docs/superpowers/plans/2026-10-14-sudoku-local-product-roadmap.md) is implemented and locally verified: LF consistency, advanced Classic play, 32 course units, broader variant generation, and local backup/restore. See the [delivery and verification report](docs/superpowers/verification/2026-10-14-sudoku-local-roadmap.md) for evidence and practical limits. Difficulty feedback, manual playtest calibration, and a separate release-acceptance project are outside this roadmap.
+The Web client is statically hosted and stores data in the browser. Android runs independently offline. Accounts, automatic cloud synchronization, social features and Web PWA installation are outside the scope.
 
-## Native Android client
+## Quick start: Web
 
-The project lives under [`android/`](android/README.md), with app/core/feature modules and its dedicated Rust adapter in `android/ffi`. It supports six variants, all 19 difficulty combinations, the shared 32-course catalogue, daily challenges, local records, and compatible backup import/export. See the [Android build guide](android/README.md) and [verification report](android/docs/verification.md) for requirements, APK locations, screenshots, actual test results, and remaining device coverage.
-
-## Web requirements and setup
-
-Use Node.js 26 or later and the repository-pinned pnpm 12.11.2. Development was verified on Windows with Node.js 26.10.0. TypeScript is pinned to 6.0.3 for compatibility with the installed lint tooling.
-
-Install Rust through rustup as well. `rust-toolchain.toml` pins Rust 1.98.0, Clippy, rustfmt and the `wasm32-unknown-unknown` target. Development, type checking, unit tests and production builds run `pnpm wasm:build` first. It compiles the separate Rust core and binding crates and installs the pinned wasm-bindgen CLI automatically on the first run. Generated JS/WASM/declarations stay under the ignored workspace package; no manually copied binary is required.
-
-After changing Rust source, restart `pnpm dev` to rebuild WASM. Vite owns the emitted binary URL at both `/` and `/sudoku/`; loading failures offer a retry before business services or storage decoding start.
-
-Repository text uses LF line endings on every platform. Git attributes, EditorConfig, and Prettier enforce the same convention, including Windows checkouts with `core.autocrlf` enabled.
+Install Node.js 26+, Corepack and Rust through rustup. The repository pins pnpm and the Rust toolchain.
 
 ```sh
 corepack enable
 pnpm install --frozen-lockfile
-pnpm exec playwright install chromium firefox webkit
 pnpm dev
 ```
 
-Open the Local URL printed by Vite. No server account, API keys, or backend service is required.
+Open the local URL printed by Vite. The development command builds the Rust/WASM package automatically; the first run installs the pinned binding tool. Restart it after changing Rust source.
 
-## Commands
-
-| Command                             | Purpose                                                           |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| `pnpm wasm:build`                   | Build pinned Rust/WASM and generated TypeScript contracts         |
-| `pnpm dev`                          | Start the development server on loopback                          |
-| `pnpm typecheck`                    | Check Vue, browser, worker, Node-config, and browser-test types   |
-| `pnpm lint`                         | Check correctness, Vue conventions, and module boundaries         |
-| `pnpm format:check` / `pnpm format` | Check or apply formatting                                         |
-| `pnpm test:unit`                    | Run domain, store, component, and storage tests                   |
-| `pnpm build`                        | Create the production `dist/` directory                           |
-| `pnpm build:subpath`                | Create the `/sudoku/` verification build in `dist-subpath/`       |
-| `pnpm preview`                      | Serve the production build locally                                |
-| `pnpm test:e2e`                     | Test the production build in Chromium, Firefox, and mobile WebKit |
-| `pnpm check`                        | Run all type, lint, formatting, unit, build, and browser checks   |
-
-Build before running `test:e2e` directly. Playwright starts preview servers on ports 4173 and 4174; its second server builds and tests `/sudoku/` deployment in `dist-subpath/`. Test output, traces, and screenshots are ignored by Git. Tests use isolated browser contexts, fixture records for lengthy completion scenarios, and real production workers for generation and hints.
-
-Every production build validates all 32 bundled lessons and their 116 teaching stages with Rust/WASM before emitting the verified catalogue. Invalid proofs, incomplete validation, and validator errors fail the build. Runtime loading retains structural checks without repeating these mathematical proofs; saved-game and backup validation still runs at its existing boundaries.
-
-On the current Windows development host, Firefox 157.0 (Playwright revision 1555) fails from the default browser cache before opening a page. Windows reports error 14001 and cannot resolve the `mozglue` assembly; Playwright reports `spawn UNKNOWN`. An independent download contained the same 61 files with identical SHA-256 hashes, but launched successfully inside the repository. Recreating the default cache did not resolve the failure. The directory-specific Windows loading cause remains undetermined.
-
-Use Playwright's supported [browser-cache location](https://playwright.dev/docs/browsers#managing-browser-binaries) setting for a project-local installation. From the repository root in PowerShell:
-
-```powershell
-$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD '.superpowers/playwright-browsers'
-pnpm exec playwright install --no-remove chromium firefox webkit
+```sh
+pnpm exec playwright install chromium firefox webkit
 pnpm check
 ```
 
-Set the variable in the same terminal for installation and subsequent test commands; it applies to that terminal session. The project cache is ignored by Git. This workaround retains every configured browser project and the pinned dependency versions. On 2026-10-13, all 94 Firefox end-to-end tests passed using the project-local installation. The [generation milestone verification report](docs/superpowers/verification/2026-10-13-sudoku-classic-terminal-diversity.md) records the historical checks and browser concurrency used on this host.
+`pnpm check` runs type checks, lint, formatting, unit tests, production builds and browser tests. See [development and deployment](docs/development.md) for individual commands, requirements, CI and troubleshooting.
 
-## Continuous integration and dependency updates
+## Quick start: Android
 
-[CI](.github/workflows/ci.yml) runs on pull requests, pushes to `main`, and manual dispatches. Ubuntu 24.04 jobs install Node.js 26 and the `packageManager`-pinned pnpm with a frozen lockfile. Type checking, lint, formatting, unit tests, and root/subpath builds run before browser jobs. Desktop Chromium, mobile Chromium, Firefox, and WebKit run as separate matrix jobs; WebKit uses one worker. Browser jobs download the WASM package and both production deployments from the checks job instead of rebuilding Rust or the application. Each job installs its browser with system dependencies and retains its HTML report, failure screenshots, and traces for seven days. Rust build jobs cache Cargo dependencies, target output, and private CLI tools, with keys partitioned by platform, toolchain, manifests, lockfile, and source inputs. Actions use release commit hashes, and superseded runs are cancelled.
-
-[Android CI](.github/workflows/android.yml) checks and builds the native client and verifies the portable backup contract in both directions: the current Web exporter must match the checked-in fixture, Android imports and exports that fixture, and Web restores the actual Android output. It does not run device instrumentation tests. The domain test declares its exported backup as a Gradle output so cached test results retain the file required by Web.
-
-[Dependency graph submission](.github/workflows/dependency-submission.yml) resolves the Android Gradle dependencies and submits them to GitHub on pushes to `main` (or manual dispatch on `main`), retaining the graph artifact for seven days. Only that job has `contents: write`; pull-request checks remain read-only. Submission requires the repository dependency graph to be enabled.
-
-[Dependabot](.github/dependabot.yml) checks pnpm/npm packages, GitHub Actions, the Cargo workspace, Android Gradle dependencies and wrapper, and the pinned Rust toolchain every Monday at 09:00 Asia/Shanghai. Minor and patch version updates are grouped per ecosystem; major updates remain separate. Updates use pull requests and the same CI checks. Rust toolchain updates remain individual pull requests; the workspace `rust-version` remains the independently declared minimum supported compiler. The WASM build resolves its private `wasm-bindgen-cli` version from locked Cargo metadata and replaces an older local CLI when necessary; an explicit `WASM_BINDGEN` override must already match. The current updater includes [pnpm 12 support](https://github.com/dependabot/dependabot-core/pull/16169), even though the published support table may lag behind its implementation. These configurations take effect after they reach the GitHub default branch.
-
-## Portable engine
-
-All Sudoku computation lives in [`sudoku/core`](sudoku/core/README.md); [`sudoku/wasm`](sudoku/wasm/README.md) is the separate typed browser adapter. The frontend loads WASM before stores/storage decoding, owns disposable prepared layouts, and delegates heavy jobs to isolated Workers. There is no shipped TypeScript solver or fallback engine. NAPI is not required for browser WASM; an optional future native Node adapter can reuse the same Rust crate.
-
-Generation requests use exactly 32 byte seeds, independent of UUID session IDs. New stored/share identities use strict lowercase 64-character hex with `sudoku-v11` / `sudoku-variants-v11`; rating remains `sudoku-rating-v2`. Daily roots derive from ASCII `daily:YYYY-MM-DD`. Existing daily attempts and historical saved boards/rules/progress/results remain authoritative; historical seed/version strings are never decoded or regenerated.
-
-Run `pnpm test:migration -- --suite all --engine native` for 5,742 complete comparisons, and the `wasm-chromium`, `wasm-firefox` or `wasm-webkit` adapters for 4,262 comparisons each. See [migration evidence](tests/migration/README.md) for sealed inputs, independent oracles and the test-only v11 recipe.
-
-The migration's verification status, asynchronous live analysis and historical performance measurements are recorded in the [release audit](docs/superpowers/verification/2026-10-16-rust-core-migration.md). Experimental and benchmark harnesses have been removed; their reports remain historical evidence. Independent correctness fixtures and Worker deadline regressions remain maintained.
-
-## Internal assessment
-
-Production Workers call the pure Rust assessor through the isolated WASM adapter, using `sudoku-rating-v2` and default limits of 500 steps per policy and four million shared work units. No external rater or runtime service is required. Browser tests verify actual emitted workers against authored fixture grades, explicit unavailable outcomes, and request budgets at both deployment roots.
-
-Generation defaults for all types and tiers are `{ maxLayouts: 40, maxWork: 4000000, maxSteps: 500 }`. Construction, uniqueness, assessment, and variant necessity share `maxWork`. Exhaustion returns an explicit failure without substituting an authored puzzle. Ready generation includes its accepted compact assessment, which Worker delivery reuses.
-
-Versioned summaries carry the type, difficulty, and workload: steps, placements, eliminations, explicit candidate removals, all technique counts, highest technique/tier, and steps using variant evidence. Placement propagation is excluded from candidate-removal counts. A higher policy reuses the easier policy's workspace and trace only when its actual technique priorities retain that prefix; changed priorities reset both. The complete successful trace contributes statistics, and prior deductions count toward the same per-policy step limit. Completed boards have zero counts and null highest fields. No weighted numeric score is assigned.
-
-Difficulty is the first supported Easy/Medium/Hard policy that completes the puzzle, compared within its type. Rating does not prove uniqueness. Ungraded, exhausted, and invalid outcomes remain explicit. Sessions/results store compact assessment snapshots; restoring valid saved boards does not generate or regrade them. Missing, corrupt, unsupported, or mismatched metadata retains the existing explicit boundary behavior.
-
-Classic and variants share a feedback-guided candidate explorer. Each layout owns a fresh complete terminal, rule geometry, prepared exact validator and target assessor. Candidate masks retain only terminal-consistent clues; bounded lower-tier and stalled frontiers explore removal, restoration and clue exchanges. Logical state never crosses clue masks. Static topology and bounded small-Killer-cage catalogues are reused within a layout; exact probes use reversible domain trails. Target screening stops at the requested policy, while delivery still requires a complete matching assessment, independent uniqueness, existing Classic clue caps and meaningful variant rules. All preparation, abandoned layouts and proposals consume the same original allowance. Reaching 40 layout attempts stops creation but permits remaining active frontiers to continue. No authored fallback, lower-grade substitute or background puzzle pool is used.
-
-The [feedback-guided generation design](docs/superpowers/specs/2026-10-15-feedback-guided-generation-design.md) defines this refactor and its release gates. The [v10 verification report](docs/superpowers/verification/2026-10-15-feedback-guided-generation.md) records paired algorithm comparisons, current identities and runtime checks. The [v9 report](docs/superpowers/verification/2026-10-15-targeted-generation-v9.md) remains the frozen comparison baseline. Stored free/daily puzzles and completed facts remain authoritative across generation upgrades. Production Workers now execute the portable Rust core through a separate WASM binding crate. New construction uses `sudoku-v11` / `sudoku-variants-v11`, a 32-byte seed, BLAKE3 phase derivation and ChaCha8; rating remains `sudoku-rating-v2`. The v10 reports remain historical evidence. Existing stored puzzles and formal daily attempts restore their original content without regeneration.
-
-## Play
-
-- **Free play:** Start opens a dialog to choose one of six types and a supported difficulty. Classic offers Easy, Medium, Hard, and Expert; variants offer the first three tiers. New Game opens the same dialog; changing a choice does not edit the current puzzle. Each type retains its own unfinished save, with an explicit resume action and a replacement notice. New puzzles replace saves only after successful generation. Play supports manual notes, atomic undo/redo, pause, and restart. Restarting creates a new session with the same puzzle and resets its time and assistance counts.
-- **Learning:** The 32-unit catalogue contains 12 Classic units and four units for each variant. Every unit has guided reasoning and two exercises; variant combined units require three ordered stages per exercise. Wrong answers retain their stage, committed stage cursors survive refresh, and course completion is recorded only after all stages succeed. The original 11 completion identities remain valid. Advanced Classic lessons open Expert practice; foundations and variants use a supported tier. Type navigation, resume/review, freely selectable units, and one active full-board practice save remain available.
-- **Daily challenge:** Start opens a type-selection dialog showing each type's available, in-progress, or completed state. The confirmation starts or resumes the selected challenge; completed types explicitly offer practice. Each of the six types has a Medium puzzle that changes at midnight in `Asia/Shanghai`, with independent progress and one formal result per type/date. Restarting an unfinished daily puzzle retains accumulated time and assistance. Older unfinished dates remain resumable.
-- **Records:** A type filter selects its own assisted/unassisted free-play bests, completed-game history, formal daily totals, and consecutive eligible challenge days. Learning and daily practice do not enter free-play bests. A late formal completion remains in history and totals, but does not enter that date's streak.
-
-| Type     | Rules in addition to distinct digits in each row and column                                                                           |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Classic  | Each 3×3 box contains 1–9                                                                                                             |
-| Diagonal | Classic boxes plus distinct digits on both long diagonals                                                                             |
-| Jigsaw   | Nine connected nine-cell regions replace the 3×3 boxes                                                                                |
-| Killer   | Classic boxes plus connected cages with distinct digits and a target sum                                                              |
-| Thermo   | Classic boxes plus strictly increasing digits from each bulb along its ordered tube                                                   |
-| Arrow    | Classic boxes plus shaft digits summing to the circle digit; repeated shaft digits are allowed when ordinary Sudoku units permit them |
-
-Clue overlays scale with the board and leave cell input available. Selected-cell text explains cage totals and ordered paths, and accessible cell labels include relevant rule context. Pausing conceals numbers, notes, and all clue details.
-
-Use digits 1–9, arrow keys, Delete/Backspace, `N` for notes, and Ctrl/Cmd+Z or Ctrl/Cmd+Shift+Z for undo/redo. Desktop play uses the physical keyboard and hides the on-screen number pad. Phone and coarse-pointer play place six common tools in one row below the board and digits 1–9 in another row. More contains checks, candidate generation, new games, restart, and a settings dialog; open menus and modals own keyboard input. Lesson exercises use the same keyboard or touch digit-entry convention, with an explicit submit action. Select an editable cell to enable digit entry and erasing; the controls explain paused, protected, and read-only states. The difficulty choice applies to the next puzzle.
-
-Touch play also has a separate quick-note row that reflects existing marks and leaves the main entry mode unchanged. Records provides Overview, Local Saves, and Completion History tabs, with stored completed boards available for read-only viewing. Lessons separate authored explanations from hands-on exercises, retain drafts between these modes, and require explicit answer submission. The course directory shows in-progress lessons and their saved stage. Narrow-screen setup, resume, settings, rules, and backup dialogs appear as bottom sheets; transient progress waits 350 ms and the game reserves board space while loading. Board zoom is not implemented on Web.
-
-Save choices show filled editable cells, elapsed play time, and the local start date/time, newest first. Progress counts entries rather than correctness and excludes givens and notes. Candidate notes retain their fixed digit positions with only present marks rendered; conflicts use a quiet tint and an explicit exclamation marker. Tall phone layouts place Home and viewport-fitting games slightly above center while short screens retain scrolling.
-
-Showing a hint, checking entries, or generating candidates permanently classifies that session as assisted. Applying a hint is an ordinary undoable entry; undoing it does not remove the assistance classification. Hints explain supported logical deductions rather than revealing a search answer. Arithmetic steps name each removed candidate and its position, list the clue's numeric domains or ordered bounds, and show direct remainder equations. Board highlights follow the displayed hint step.
-
-## Local data and timing
-
-Sessions, results, lessons, and preferences belong to the current browser and origin. They do not sync across devices. Clearing browser storage or using the confirmed clear-data action deletes them. Invalid or incompatible records are isolated; valid records remain available, and the records page offers cleanup.
-
-The records page can export a local JSON backup and preview a backup before confirmed replacement. Export settles current saves and reports quarantined/excluded records; a failed current save blocks downloading an incomplete snapshot. Restoration validates the whole file, replaces collections and advances the dataset epoch atomically, stops old editors across tabs, and loads imported games paused. Files retain old puzzle identities, difficulty, history, time, assistance, original results and lesson progress. Keep backup files separately before clearing browser data. See [Local Backup](docs/local-backup.md) for the format, 25 MiB limit and validation boundaries.
-
-Every effective action queues a save, elapsed time is checkpointed every five seconds, and success is shown only after transaction commit. Abrupt termination can lose pending changes and up to the uncheckpointed five-second time interval. Storage failures remain visible; keep the page open and retry. An explicitly started first free/practice game can continue in memory when storage is unavailable, but is not durably saved until recovery succeeds. Switching away from an existing unsaved session is blocked until it can be saved.
-
-In-app links, browser history within the app, and returning from lesson practice await a successful save before leaving. A failed save keeps the original game available for retry. During a slow outgoing save, the visible board stays stable and input is disabled; backgrounding still conceals it immediately. Closing or leaving the browser itself remains best effort.
-
-New sessions and results use record format 2; the IndexedDB schema, name, and stores remain at version 1. Valid legacy format-1 records normalize to Classic rules without changing IDs, seeds, revisions, history, assistance, or completion facts; subsequent writes upgrade them. Malformed or unknown records are quarantined. Classic daily identities remain `daily:<date>:formal`; new types use `daily:<type>:<date>:formal`, so legacy results cannot grant another formal attempt.
-
-Only one tab may edit a session. A transactional six-second lease, renewed every two seconds, fences stale writers; notices use BroadcastChannel when available. After an abrupt close or refresh, a surviving lease may take up to six seconds to expire before takeover. Following a revision or ownership conflict, the reload action requires confirmation before replacing unsaved local edits with the latest record. A failed reload retains local edits; a peer's active lease keeps the reloaded session read-only. Clearing data advances a dataset epoch so stale session/result writes cannot recreate old records.
-
-Elapsed play time uses a monotonic clock. Leaving the game or hiding the page pauses play; returning or refreshing requires explicit resume. Successful free/practice starts, resumes, and restarts update the URL to the actual session and type without interrupting play. Pause removes numbers and notes from both visual and accessible presentation. Hiding the timer does not stop the clock.
-
-## Static deployment
-
-Upload the complete `dist/` directory to a static HTTPS host. The application uses hash routes, so refreshing a game route does not require server-side route rewriting. Preserve the emitted worker asset and its relative location; the host must allow same-origin module workers.
-
-For a deployment under `/sudoku/`:
+Install JDK 21, Android SDK platform 37 and NDK `29.0.14206865`, and configure `ANDROID_HOME` or `android/local.properties`.
 
 ```sh
-pnpm exec vite build --base /sudoku/
+cd android
+./gradlew qualityCheck :app:assembleDebug
 ```
 
-Serve that output at the matching path. Changing the host/origin creates a separate browser-local data area. There is no service worker; PWA/offline installation is outside the product scope.
+Debug APKs are produced separately for arm64-v8a and x86_64. See the [Android build guide](docs/android/build.md) for installation, release packaging and device checks.
 
-## Architecture and development guidance
+## Documentation
 
-- `sudoku/core/`: Portable rules, bounded search, byte-seeded generation, logic, rating, edits and validation.
-- `sudoku/wasm/` and `src/sudoku/`: Typed WASM adaptation, readiness and owned browser resources.
-- `src/main.ts`, `src/runtime.ts`, `src/App.vue`, `src/layouts/`, `src/router/`, and `src/theme/`: Bootstrap, injected browser services, root providers, visual shell, hash routes, and theme synchronization.
-- `src/features/game/`: Game/daily views, session controls, composables, pure models, and Pinia orchestration.
-- `src/features/learning/` and `src/features/records/`: Lessons, progress, history, and statistics.
-- `src/features/home/` and `src/features/settings/`: Resume entries, mode selection, preference types/defaults, and shared settings actions.
-- `src/storage/`: Runtime-validated records, IndexedDB transactions, editing leases, and serialized saves.
-- `src/worker/`: Validated worker messages, computation requests, and cancellation.
-- `src/shared/components/` and `src/shared/model/`: Feature-independent Sudoku board, clue geometry, digit input, and confirmation dialog.
+The [documentation index](docs/README.md) groups maintained documents by topic.
 
-See [Web Architecture](docs/architecture.md) for module ownership, dependency direction, source aliases, and naming. See [Adding a Sudoku Variant](docs/variant-extension.md) for rule, generation, board, evidence, teaching, and compatibility registration. Tests remain beside their owners; features create only the responsibility directories they need.
+| Topic                                                   | Document                                             |
+| ------------------------------------------------------- | ---------------------------------------------------- |
+| Modes, variants, controls and player data               | [Product behavior](docs/product.md)                  |
+| Rust ownership, generation, rating and seed identity    | [Engine](docs/engine.md)                             |
+| Vue workflows, lazy computation and browser persistence | [Web architecture](docs/architecture.md)             |
+| Backup format, validation and replacement               | [Local backup](docs/local-backup.md)                 |
+| Shared authored lessons and durable progress            | [Learning content](docs/learning.md)                 |
+| Required variant registration and invariants            | [Adding a variant](docs/variant-extension.md)        |
+| Android modules, native lifetime and state ownership    | [Android architecture](docs/android/architecture.md) |
+| Room projections, migration and on-demand reads         | [Android data loading](docs/android/data-loading.md) |
+| Native navigation, layout and accessibility             | [Android interface](docs/android/interface.md)       |
 
-Common controls use Naive UI 2.45.3 with local imports. The CSS palette in `src/styles/theme.css` supplies its theme overrides, including system-theme changes. The board remains a specialized accessible CSS Grid. Modal cancellation restores focus to its trigger, and the skip link preserves the current hash route. Browser tests are configured for Chromium, Firefox, and WebKit engines; mobile emulation is not a physical-device or Safari certification.
-
-Game and lesson pages share `NumberPad`, while their owners handle session and exercise actions. Errors use `NAlert` directly; routine feedback uses `NCard` with `role="status"` or semantic status text. Confirmation dialogs use the library's dialog preset and retain explicit Cancel focus and trigger restoration.
-
-Read [AGENTS.md](AGENTS.md), the [original product design](docs/superpowers/specs/2026-10-11-sudoku-design.md), and the [variants design](docs/superpowers/specs/2026-10-11-sudoku-variants-design.md) before changing behavior. The [variants implementation plan](docs/superpowers/plans/2026-10-11-sudoku-variants.md) records its contracts and verification. Prefer current official documentation for the installed stack and keep core logic independent of browser/framework APIs. Algorithm tests use fixed seeds, an independent exact-cover Classic oracle, and a separate rule-aware variant oracle that never calls production evaluation.
-
-Current generation uses `sudoku-v10` for Classic and `sudoku-variants-v10` for variants, with type, difficulty, and seed in the construction identity. Daily seeds are `daily:sudoku-v10:<date>` for Classic and `daily:sudoku-variants-v10:<type>:<date>` for variants. Stored daily attempts remain snapshots and take precedence over new construction.
-
-Variant generation allows 40 layout attempts and 500 logical steps per analysis, sharing four million work units across generation searches, arithmetic assignments, and repeated propagation. Construction-only exhaustion publishes no puzzle, preserves the current save, and asks the player to choose again. A new free/practice start can use a new seed; formal daily identity remains deterministic. Delivered clues must matter to solving; transformations remap the entire geometry and preserve sums/order. Exhaustion is explicit and never becomes a false proof, a different difficulty, or an unverified puzzle. Generation shows a cancellable loading notice. The client prepares one idle Worker ahead of interaction without computing a puzzle, and terminates active generation requests after three seconds. Runtime disposal releases idle and active Workers. Timeout retains the current save and offers retry with the same input; it does not publish a different puzzle. Assessment and hints retain a 15-second timeout.
-
-Easy variant policies use singles and direct cage remainder, Thermo bounds, and Arrow equations. Medium adds intersections and cage/Arrow combinations; Hard adds pairs. Hints include the arithmetic or region premises leading to a placement. Difficulty compares puzzles within the selected type. Supported techniques deliberately limit generation and hints; advanced variant strategies are outside this release.
-
-Classic uses seeded randomized MRV terminal construction followed by clue removal and validation. Variants construct fresh terminals under their applicable units, then compatible geometry and givens. Jigsaw also branches on missing unit digits with fewer positions; arithmetic paths are rebuilt for the new terminal. The sole delivery path constructs new puzzles under deterministic work limits; it does not claim uniform sampling of completed grids. Authored grading fixtures and teaching examples remain independent validation data, and Jigsaw retains regional layout presets. The versioned corpus contains 64 fixed seeds per supported type/tier (1,216 requests); the four-seed subset runs with regular unit tests.
+Read [repository guidelines](AGENTS.md) and the relevant topic before changing behavior. Android also has [local guidelines](android/AGENTS.md). Documentation, identifiers and code comments use English; player-facing copy uses Chinese.

@@ -2,7 +2,6 @@ pnpm-lock.yaml
 dist
 dist-subpath
 node_modules
-.superpowers
 .agents
 .codex
 test-results

@@ -211,7 +211,7 @@ test('downloads a committed backup and restores notes, history and learning prog
   await reachBackupPanel(page)
   await expect(page.getByRole('button', { name: '导入备份', exact: true })).toBeEnabled()
   await page.screenshot({
-    path: `.superpowers/records-inline/backup-${testInfo.project.name}.png`,
+    path: `test-results/visual/records-inline/backup-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
   const downloadPromise = page.waitForEvent('download')
@@ -238,7 +238,7 @@ test('downloads a committed backup and restores notes, history and learning prog
   await expect(preview).toContainText('存档 1 个')
   await preview.scrollIntoViewIfNeeded()
   await page.screenshot({
-    path: `.superpowers/records-inline/preview-${testInfo.project.name}.png`,
+    path: `test-results/visual/records-inline/preview-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
   await expect(page.getByRole('dialog')).toHaveCount(0)

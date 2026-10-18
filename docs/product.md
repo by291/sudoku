@@ -1,0 +1,57 @@
+# Product behavior
+
+The Web and Android clients share Sudoku rules, puzzle identities, daily eligibility, authored courses and portable player data. Web uses browser-local storage; Android runs independently offline. Backup files provide explicit transfer between clients. Accounts, automatic synchronization, social features, global leaderboards and Web PWA installation are outside the scope.
+
+Repository documentation is English; player-facing interface copy is Chinese. The shared engine is described in [Engine](engine.md), browser ownership in [Web architecture](architecture.md), and native presentation in [Android interface](android/interface.md).
+
+## Modes, variants and controls
+
+- **Free play:** Start opens a dialog to choose one of six types and a supported difficulty. Classic offers Easy, Medium, Hard, and Expert; variants offer the first three tiers. New Game opens the same dialog; changing a choice does not edit the current puzzle. Each type retains its own unfinished save, with an explicit resume action and a replacement notice. New puzzles replace saves only after successful generation. Play supports manual notes, atomic undo/redo, pause, and restart. Restarting creates a new session with the same puzzle and resets its time and assistance counts.
+- **Learning:** The 32-unit catalogue contains 12 Classic units and four units for each variant. Every unit has guided reasoning and two exercises; variant combined units require three ordered stages per exercise. Wrong answers retain their stage, committed stage cursors survive refresh, and course completion is recorded only after all stages succeed. The original 11 completion identities remain valid. Advanced Classic lessons open Expert practice; foundations and variants use a supported tier. Type navigation, resume/review, freely selectable units, and one active full-board practice save remain available.
+- **Daily challenge:** Start opens a type-selection dialog showing each type's available, in-progress, or completed state. The confirmation starts or resumes the selected challenge; completed types explicitly offer practice. Each of the six types has a Medium puzzle that changes at midnight in `Asia/Shanghai`, with independent progress and one formal result per type/date. Restarting an unfinished daily puzzle retains accumulated time and assistance. Older unfinished dates remain resumable.
+- **Records:** A type filter selects its own assisted/unassisted free-play bests, completed-game history, formal daily totals, and consecutive eligible challenge days. Learning and daily practice do not enter free-play bests. A late formal completion remains in history and totals, but does not enter that date's streak.
+
+| Type     | Rules in addition to distinct digits in each row and column                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Classic  | Each 3×3 box contains 1–9                                                                                                             |
+| Diagonal | Classic boxes plus distinct digits on both long diagonals                                                                             |
+| Jigsaw   | Nine connected nine-cell regions replace the 3×3 boxes                                                                                |
+| Killer   | Classic boxes plus connected cages with distinct digits and a target sum                                                              |
+| Thermo   | Classic boxes plus strictly increasing digits from each bulb along its ordered tube                                                   |
+| Arrow    | Classic boxes plus shaft digits summing to the circle digit; repeated shaft digits are allowed when ordinary Sudoku units permit them |
+
+Clue overlays scale with the board and leave cell input available. Selected-cell text explains cage totals and ordered paths, and accessible cell labels include relevant rule context. Pausing conceals numbers, notes, and all clue details.
+
+Use digits 1–9, arrow keys, Delete/Backspace, `N` for notes, and Ctrl/Cmd+Z or Ctrl/Cmd+Shift+Z for undo/redo. Desktop play uses the physical keyboard and hides the on-screen number pad. Phone and coarse-pointer play place six common tools in one row below the board and digits 1–9 in another row. More contains checks, candidate generation, new games, restart, and a settings dialog; open menus and modals own keyboard input. Lesson exercises use the same keyboard or touch digit-entry convention, with an explicit submit action. Select an editable cell to enable digit entry and erasing; the controls explain paused, protected, and read-only states. The difficulty choice applies to the next puzzle.
+
+Touch play also has a separate quick-note row that reflects existing marks and leaves the main entry mode unchanged. Records provides Overview, Local Saves, and Completion History tabs, with stored completed boards available for read-only viewing. Lessons separate authored explanations from hands-on exercises, retain drafts between these modes, and require explicit answer submission. The course directory shows in-progress lessons and their saved stage. Narrow-screen setup, resume, settings and rules dialogs appear as bottom sheets; transient progress waits 350 ms and the game reserves board space while loading. Board zoom is not implemented on Web.
+
+Save choices show filled editable cells, elapsed play time, and the local start date/time, newest first. Progress counts entries rather than correctness and excludes givens and notes. Candidate notes retain their fixed digit positions with only present marks rendered; conflicts use a quiet tint and accessible conflict descriptions. Tall phone layouts place Home and viewport-fitting games slightly above center while short screens retain scrolling.
+
+Showing a hint, checking entries, or generating candidates permanently classifies that session as assisted. Applying a hint is an ordinary undoable entry; undoing it does not remove the assistance classification. Hints explain supported logical deductions rather than revealing a search answer. Arithmetic steps name each removed candidate and its position, list the clue's numeric domains or ordered bounds, and show direct remainder equations. Board highlights follow the displayed hint step.
+
+## Local data and timing
+
+On Web, sessions, results, lessons, and preferences belong to the current browser and origin. Android uses its own local database. They do not sync across devices. Clearing browser storage or using the confirmed clear-data action deletes them. Invalid or incompatible records are isolated; valid records remain available, and the records page offers cleanup.
+
+The records page can export a local JSON backup and preview a backup before confirmed replacement. Export settles current saves and reports quarantined/excluded records; a failed current save blocks downloading an incomplete snapshot. Restoration validates the whole file, replaces collections and advances the dataset epoch atomically, stops old editors across tabs, and loads imported games paused. Files retain old puzzle identities, difficulty, history, time, assistance, original results and lesson progress. Keep backup files separately before clearing browser data. See [Local Backup](local-backup.md) for the format, 25 MiB limit and validation boundaries.
+
+Every effective action queues a save, elapsed time is checkpointed every five seconds, and success is shown only after transaction commit. Abrupt termination can lose pending changes and up to the uncheckpointed five-second time interval. Storage failures remain visible; keep the page open and retry. An explicitly started first free/practice game can continue in memory when storage is unavailable, but is not durably saved until recovery succeeds. Switching away from an existing unsaved session is blocked until it can be saved.
+
+In-app links, browser history within the app, and returning from lesson practice await a successful save before leaving. A failed save keeps the original game available for retry. During a slow outgoing save, the visible board stays stable and input is disabled; backgrounding still conceals it immediately. Closing or leaving the browser itself remains best effort.
+
+New sessions and results use record format 2. Web uses IndexedDB schema 2; Android uses Room schema 3. Database schema versions are separate from portable backup version 1. Valid legacy format-1 records normalize to Classic rules without changing IDs, seeds, revisions, history, assistance, or completion facts; subsequent writes upgrade them. Malformed or unknown records are quarantined. Classic daily identities remain `daily:<date>:formal`; new types use `daily:<type>:<date>:formal`, so legacy results cannot grant another formal attempt.
+
+On Web, only one tab may edit a session. A transactional six-second lease, renewed every two seconds, fences stale writers; notices use BroadcastChannel when available. After an abrupt close or refresh, a surviving lease may take up to six seconds to expire before takeover. Following a revision or ownership conflict, the reload action requires confirmation before replacing unsaved local edits with the latest record. A failed reload retains local edits; a peer's active lease keeps the reloaded session read-only. Clearing data advances a dataset epoch so stale session/result writes cannot recreate old records.
+
+Elapsed play time uses a monotonic clock. Leaving the game or hiding the page pauses play; returning or refreshing requires explicit resume. On Web, successful free/practice starts, resumes, and restarts update the URL to the actual session and type without interrupting play. Pause removes numbers and notes from both visual and accessible presentation. Hiding the timer does not stop the clock.
+
+## Presentation and loading
+
+Use paper-like surfaces, teal primary actions and blue-gray resume actions in light, dark and system themes. Keep the specialized board accessible independently of its clue drawing. Conflicts use a soft error background and accessible descriptions; fixed and entered values, evidence and selection remain distinguishable.
+
+Web uses hash routes and library-owned responsive dialogs. Setup, resume and settings are bottom sheets on narrow windows and centered dialogs on wide windows. Records import/export and its confirmation preview live inline on the Web records page. Android uses Home as its navigation hub and native sheets for setup and saved-game selection.
+
+Transient loading feedback appears only after 350 ms of continuous pending work. This delay affects presentation, never the operation, disabled controls or error feedback. Preserve the board square, timer slot and control positions during loading. Unknown personal progress or incomplete summary coverage must not be shown as zero or as a recommendation based on invented progress. Ordinary refresh retains compatible visible data; dataset replacement discards stale personal facts immediately.
+
+Desktop Web play uses keyboard input; touch input includes a separate quick-note row without changing the primary entry mode. Modal dialogs own keyboard focus and restore it to their trigger. Short windows and enlarged text scroll rather than clipping controls. Web has no board zoom; Android provides zoom for inspection and input.

@@ -100,7 +100,7 @@ test('keeps the board and primary action stable while preserving a draft between
   expect(await actions.boundingBox()).toEqual(guideActions)
   await expect(page.getByText(/练习阶段 1 \/ 2/)).toBeVisible()
   await page.screenshot({
-    path: `.superpowers/web-parity/lesson-modes-${testInfo.project.name}.png`,
+    path: `test-results/visual/web-parity/lesson-modes-${testInfo.project.name}.png`,
     fullPage: true,
     animations: 'disabled',
   })

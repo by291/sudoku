@@ -19,7 +19,7 @@ test('keeps setup inside the phone viewport and restores keyboard focus', async 
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(360)
   expect(Math.abs(bounds.y + bounds.height - 800)).toBeLessThan(2)
   await page.screenshot({
-    path: `.superpowers/web-parity/setup-${testInfo.project.name}.png`,
+    path: `test-results/visual/web-parity/setup-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
   await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeFocused()
@@ -80,7 +80,7 @@ test('keeps ready dialog content close to its heading and actions', async ({ pag
   // A completed read must not leave an empty loading panel between the warning and actions.
   expect.soft(startBounds.y - warningBounds.y - warningBounds.height).toBeLessThanOrEqual(48)
   await page.screenshot({
-    path: `.superpowers/dialog-redesign/setup-${testInfo.project.name}.png`,
+    path: `test-results/visual/dialog-redesign/setup-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
   await setup.getByRole('button', { name: '取消', exact: true }).click()
@@ -97,13 +97,13 @@ test('keeps ready dialog content close to its heading and actions', async ({ pag
 
   expect.soft(introBounds.y - headingBounds.y - headingBounds.height).toBeLessThanOrEqual(32)
   await page.screenshot({
-    path: `.superpowers/dialog-redesign/resume-${testInfo.project.name}.png`,
+    path: `test-results/visual/dialog-redesign/resume-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.screenshot({
-    path: `.superpowers/dialog-redesign/resume-dark-${testInfo.project.name}.png`,
+    path: `test-results/visual/dialog-redesign/resume-dark-${testInfo.project.name}.png`,
     animations: 'disabled',
   })
 })

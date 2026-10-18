@@ -51,7 +51,7 @@ test('shows conflicts through cell backgrounds and preserves sparse notes in bot
     )
     if (testInfo.project.name === 'desktop') {
       await page.getByRole('group', { name: '数独棋盘' }).screenshot({
-        path: `.superpowers/board-feedback/conflict-${theme === '浅色' ? 'light' : 'dark'}.png`,
+        path: `test-results/visual/board-feedback/conflict-${theme === '浅色' ? 'light' : 'dark'}.png`,
       })
     }
   }
@@ -129,7 +129,7 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
       )
       if (testInfo.project.name === 'desktop') {
         await board.screenshot({
-          path: `.superpowers/sdd/2026-10-11-sudoku-variants/${variant}-${theme === '深色' ? 'dark' : 'light'}-360.png`,
+          path: `test-results/visual/variants/${variant}-${theme === '深色' ? 'dark' : 'light'}-360.png`,
         })
       }
     }
@@ -202,7 +202,7 @@ test('keeps boards square and focus visible at 360, 390 and desktop widths', asy
     }).toPass({ timeout: 10_000 })
     if (testInfo.project.name === 'desktop') {
       await page.screenshot({
-        path: `.superpowers/sdd/2026-10-11-sudoku-variants/game-${width}.png`,
+        path: `test-results/visual/variants/game-${width}.png`,
         fullPage: true,
       })
     }
@@ -225,7 +225,7 @@ test('keeps boards square and focus visible at 360, 390 and desktop widths', asy
     .click()
   if (testInfo.project.name === 'desktop') {
     await page.screenshot({
-      path: '.superpowers/sdd/2026-10-11-sudoku-variants/home-desktop.png',
+      path: 'test-results/visual/variants/home-desktop.png',
       fullPage: true,
     })
   }

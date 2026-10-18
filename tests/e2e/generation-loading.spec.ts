@@ -25,7 +25,7 @@ test('shows one accessible loading notice and cancels without replacing the paus
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page
     .locator('.generation-status')
-    .screenshot({ path: `.superpowers/generation-loading-${testInfo.project.name}.png` })
+    .screenshot({ path: `test-results/visual/generation-loading-${testInfo.project.name}.png` })
   await page.getByRole('button', { name: '取消出题', exact: true }).click()
 
   await expect(status).toBeHidden()

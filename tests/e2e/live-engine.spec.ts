@@ -13,7 +13,7 @@ test.beforeAll(async () => {
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('../../src', import.meta.url)),
-        '@content': fileURLToPath(new URL('../../content', import.meta.url)),
+        '@resources': fileURLToPath(new URL('../../resources', import.meta.url)),
       },
     },
     server: { host: '127.0.0.1', port: 0, hmr: false },

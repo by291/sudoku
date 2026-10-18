@@ -66,7 +66,7 @@ test('recommends the next unfinished lesson and resumes the last visited lesson'
   await expect(page.getByRole('list', { name: '课程路径' })).toContainText('已完成')
   if (testInfo.project.name === 'desktop' || testInfo.project.name === 'mobile') {
     await page.screenshot({
-      path: `.superpowers/ux-refinement/learning-${testInfo.project.name}.png`,
+      path: `test-results/visual/ux-refinement/learning-${testInfo.project.name}.png`,
       fullPage: true,
       animations: 'disabled',
     })

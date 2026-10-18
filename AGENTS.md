@@ -8,7 +8,7 @@ These instructions apply to the entire repository.
 - Use English for identifiers, code comments, docstrings, and test descriptions.
 - Write player-facing interface copy in Chinese, as specified in the product design.
 - The selected stack uses a reusable synchronous Rust core, a separate wasm-bindgen adapter, Vue 3, TypeScript, Vite, Vue Router, Pinia, Naive UI for common controls, Web Workers, IndexedDB with idb, and native CSS. Use pnpm, ESLint, Prettier, Vitest, and Playwright for tooling.
-- Read the applicable design document in `docs/superpowers/specs/` before changing product behavior.
+- Read the applicable topic in [Documentation](docs/README.md) before changing product behavior. Keep documentation organized by topic; do not add one-off plans, execution logs or verification reports.
 - Read [Web Architecture](docs/architecture.md) before moving modules or changing their dependencies.
 
 ## Learn and follow the stack's conventions

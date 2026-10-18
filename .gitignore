@@ -4,7 +4,6 @@ dist-subpath/
 coverage/
 playwright-report/
 test-results/
-.superpowers/
 *.tsbuildinfo
 
 target/

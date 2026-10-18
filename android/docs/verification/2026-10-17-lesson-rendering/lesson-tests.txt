@@ -1,6 +1,0 @@
-
-dev.yigeyinian.sudoku.feature.learning.LessonScreenTest:.....
-
-Time: 12.083
-
-OK (5 tests)

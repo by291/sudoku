@@ -56,7 +56,6 @@ export default [
       'android/**/.gradle/**',
       'android/**/.kotlin/**',
       'android/.native-tools/**',
-      '.superpowers/**',
       'tests/reference/typescript-engine/**',
       '.agents/**',
       '.codex/**',

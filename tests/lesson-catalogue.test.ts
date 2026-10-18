@@ -5,9 +5,9 @@ import { LESSONS } from './support/lessons'
 import { LESSON_IDS, lessonStageCount } from '@/features/learning/model/lessonIds'
 
 it('shares all stable authored courses and complete stage facts with Android', () => {
-  expect(existsSync('content/lessons/catalogue.json')).toBe(true)
+  expect(existsSync('resources/lessons/catalogue.json')).toBe(true)
 
-  const catalogue = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
+  const catalogue = JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8'))
   expect(catalogue.schemaVersion).toBe(1)
   expect(catalogue.lessons.map((lesson: { id: string }) => lesson.id)).toEqual(LESSON_IDS)
   expect(
@@ -33,26 +33,26 @@ it('shares all stable authored courses and complete stage facts with Android', (
 
 it('loads an owned copy and rejects forged answers, candidates and transfer capabilities', async () => {
   const { loadLessonCatalogue } = await import('@/features/learning/model/lessonCatalogue')
-  const catalogue = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
+  const catalogue = JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8'))
   const original = catalogue.lessons[0].guided.board[0]
   const loaded = loadLessonCatalogue(catalogue)
   catalogue.lessons[0].guided.board[0] = 0
 
   expect(loaded[0].guided.board[0]).toBe(original)
   expect(
-    loadLessonCatalogue(JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8')))[0]
+    loadLessonCatalogue(JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8')))[0]
       .guided.board[0],
   ).toBe(original)
 
-  const invalidAnswer = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
+  const invalidAnswer = JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8'))
   invalidAnswer.lessons[0].guided.answer.expected.digit = 6
   expect(() => loadLessonCatalogue(invalidAnswer)).toThrow(/answer/)
 
-  const invalidCandidates = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
+  const invalidCandidates = JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8'))
   invalidCandidates.lessons[0].guided.candidates = [0]
   expect(() => loadLessonCatalogue(invalidCandidates)).toThrow(/catalogue entry/)
 
-  const invalidTransform = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
+  const invalidTransform = JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8'))
   invalidTransform.lessons[12].transfer.kind = 'swap-rows'
   expect(() => loadLessonCatalogue(invalidTransform)).toThrow(/variant/)
 })
@@ -61,7 +61,7 @@ it('records the original transfer transforms and materialized stage copy without
   const { stageAnswer, transformStage } = await import('@/features/learning/model/exerciseStages')
   const { explainStep } = await import('@/features/game/model/techniquePresentation')
   const { testEngine } = await import('./support/semantics')
-  const catalogue = JSON.parse(readFileSync('content/lessons/catalogue.json', 'utf8'))
+  const catalogue = JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8'))
 
   for (const [index, lesson] of LESSONS.entries()) {
     const authored = catalogue.lessons[index]

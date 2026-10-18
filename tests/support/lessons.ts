@@ -1,4 +1,4 @@
-import catalogue from '@content/lessons/catalogue.json' with { type: 'json' }
+import catalogue from '@resources/lessons/catalogue.json' with { type: 'json' }
 import { loadLessonCatalogue } from '@/features/learning/model/lessonCatalogue'
 
 export function createLessons() {

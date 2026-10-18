@@ -15,7 +15,7 @@ ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 val generatedLessons = layout.buildDirectory.dir("generated/lessons")
 val generateLessonAssets by tasks.registering {
-    val source = file("../../../content/lessons/catalogue.json")
+    val source = file("../../../resources/lessons/catalogue.json")
     inputs.file(source)
     outputs.dir(generatedLessons)
     doLast {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build, createLogger } from 'vite'
 import { expect, it, vi } from 'vitest'
-import catalogue from '@content/lessons/catalogue.json' with { type: 'json' }
+import catalogue from '@resources/lessons/catalogue.json' with { type: 'json' }
 import { createTestEngine } from './support/wasm'
 import { loadLessonCatalogue } from '@/features/learning/model/lessonCatalogue'
 import {

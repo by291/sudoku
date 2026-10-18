@@ -1,5 +1,0 @@
-dev.yigeyinian.sudoku.PlayerWorkflowTest:.
-
-Time: 4.81
-
-OK (1 test)

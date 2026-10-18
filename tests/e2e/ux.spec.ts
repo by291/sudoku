@@ -26,7 +26,7 @@ test('reserves the theme focus ring for keyboard navigation', async ({ page }, t
       /^(none|rgba\(0, 0, 0, 0\).*)$/,
     )
     await themes.screenshot({
-      path: `.superpowers/board-feedback/theme-${theme === '浅色' ? 'light' : 'dark'}-${testInfo.project.name}.png`,
+      path: `test-results/visual/board-feedback/theme-${theme === '浅色' ? 'light' : 'dark'}-${testInfo.project.name}.png`,
       animations: 'disabled',
     })
 

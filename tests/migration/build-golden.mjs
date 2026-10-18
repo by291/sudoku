@@ -28,10 +28,7 @@ const { referenceCountSolutions } = await import(
   pathToFileURL(resolve(referenceRoot, 'tests/support/referenceVariants.ts')).href
 )
 const historical = JSON.parse(
-  readFileSync(
-    resolve('docs/superpowers/verification/2026-10-15-sudoku-core-organization.json'),
-    'utf8',
-  ),
+  readFileSync(resolve('tests/migration/historical-corpus.json'), 'utf8'),
 )
 mkdirSync(fixtureRoot, { recursive: true })
 const record = (name, data) =>

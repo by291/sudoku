@@ -48,7 +48,7 @@ test('places records in a home card and gives both resume actions the same disti
 
   if (testInfo.project.name === 'desktop') {
     await page.screenshot({
-      path: '.superpowers/compact-play/home-desktop.png',
+      path: 'test-results/visual/compact-play/home-desktop.png',
       fullPage: true,
       animations: 'disabled',
     })
