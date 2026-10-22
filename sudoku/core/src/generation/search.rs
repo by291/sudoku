@@ -10,7 +10,7 @@ use super::types::{
     GenerationMetrics, GenerationOutcome, LayoutConstructionResult,
 };
 use super::variant::variant_rules_matter;
-use crate::board::is_complete;
+use crate::board::{KnownCompletion, is_complete};
 use crate::constraints::computation::prepare_computation;
 use crate::constraints::types::PreparedComputation;
 use crate::control::ExecutionControl;
@@ -21,13 +21,14 @@ use crate::rating::types::{
     RatedTrial, TargetScreenResult,
 };
 use crate::rules::types::SudokuVariant;
-use crate::search::exact::count_solutions;
+use crate::search::exact::{count_solutions, count_with_completion};
 use crate::search::types::SearchResult;
 use crate::types::{Board, Bounded, CoreResult, Difficulty};
 
 struct ActiveLayout {
     id: u32,
     terminal: Board,
+    completion: KnownCompletion,
     computation: PreparedComputation,
     assessor: PreparedAssessment,
     frontier: CandidateFrontier,
@@ -175,8 +176,13 @@ fn evaluate_candidate(
     let board = mask.materialize(&layout.terminal)?;
     let mut exact = SolvedExact::Unchecked;
     if !screening_first(input) {
-        let SearchResult::Complete { count, .. } =
-            count_solutions(&board, &layout.computation, control, u64::MAX)
+        let SearchResult::Complete { count, .. } = count_with_completion(
+            &board,
+            &layout.computation,
+            &layout.completion,
+            control,
+            u64::MAX,
+        )?
         else {
             return Ok(CandidateEvaluation::Cancelled);
         };
@@ -194,9 +200,12 @@ fn evaluate_candidate(
         exact = SolvedExact::Unique;
     }
 
-    let trial = layout
-        .assessor
-        .screen_target(&board, input.difficulty, control);
+    let trial = layout.assessor.screen_target_with_completion(
+        &board,
+        input.difficulty,
+        control,
+        &layout.completion,
+    );
     let (trial, feedback, matching) = match trial {
         TargetScreenResult::Invalid { issues } => {
             let reason = issues
@@ -323,9 +332,11 @@ fn prepare_layout(
             max_steps: limits.max_steps,
         },
     )?;
+    let completion = KnownCompletion::new(&terminal, computation.rules())?;
     let layout = ActiveLayout {
         id,
         terminal,
+        completion,
         computation,
         assessor,
         frontier,

@@ -80,3 +80,62 @@ pub fn incorrect_entries(board: &Board, solution: &Board) -> Vec<usize> {
         })
         .collect()
 }
+
+/// A complete assignment for one immutable prepared layout. This proves existence only.
+pub(crate) struct KnownCompletion {
+    board: Board,
+    rules: PreparedRules,
+}
+
+impl KnownCompletion {
+    pub(crate) fn new(board: &Board, rules: &PreparedRules) -> crate::types::CoreResult<Self> {
+        if !is_complete(board, rules) {
+            return Err(crate::types::EngineError::invalid(
+                "Known completion does not satisfy the layout",
+            ));
+        }
+        Ok(Self {
+            board: board.clone(),
+            rules: rules.clone(),
+        })
+    }
+
+    pub(crate) fn covers(&self, board: &Board, rules: &PreparedRules) -> bool {
+        self.rules.same_layout(rules)
+            && board
+                .values()
+                .iter()
+                .zip(self.board.values())
+                .all(|(&given, &terminal)| given == 0 || given == terminal)
+    }
+
+    pub(crate) fn board(&self) -> &Board {
+        &self.board
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rules::context::compile_rules;
+    use crate::rules::types::PuzzleRules;
+
+    #[test]
+    fn completion_witness_rejects_invalid_terminals_mismatched_givens_and_other_layouts() {
+        let rules = compile_rules(&PuzzleRules::Classic).unwrap();
+        let values: [u8; 81] =
+            std::array::from_fn(|cell| ((cell / 9 * 3 + cell / 27 + cell % 9) % 9 + 1) as u8);
+        let terminal = Board::try_from(values.as_slice()).unwrap();
+        let mut givens = values;
+        givens[0] = 0;
+        let partial = Board::try_from(givens.as_slice()).unwrap();
+        let witness = KnownCompletion::new(&terminal, &rules).unwrap();
+
+        assert!(witness.covers(&partial, &rules));
+        assert!(KnownCompletion::new(&partial, &rules).is_err());
+        givens[0] = 2;
+        assert!(!witness.covers(&Board::try_from(givens.as_slice()).unwrap(), &rules));
+        let other = compile_rules(&PuzzleRules::Classic).unwrap();
+        assert!(!witness.covers(&partial, &other));
+    }
+}

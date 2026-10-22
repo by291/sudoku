@@ -9,6 +9,7 @@ use super::types::{
 };
 use super::types::{AssessmentInput, AssessmentLimits};
 use super::workload::summarize_trace;
+use crate::board::KnownCompletion;
 use crate::constraints::computation::prepare_computation;
 use crate::constraints::conflicts::evaluate_prepared_conflicts;
 use crate::constraints::types::{ConflictStatus, PreparedComputation};
@@ -115,6 +116,7 @@ impl PreparedAssessment {
         board: &Board,
         control: &mut ExecutionControl,
         target: Option<Difficulty>,
+        completion: Option<&KnownCompletion>,
     ) -> PolicyScreen {
         if target.is_some_and(|target| !supports_difficulty(self.rules.variant(), target)) {
             return PolicyScreen::Invalid(message("Unsupported assessment target"));
@@ -135,13 +137,21 @@ impl PreparedAssessment {
         let policies = supported_difficulties(self.rules.variant())
             .iter()
             .map(|&difficulty| (difficulty, policy_slice(self.rules.variant(), difficulty)));
-        screen_policies(board, self.limits, computation, control, target, policies)
+        screen_policies(
+            board,
+            self.limits,
+            computation,
+            control,
+            target,
+            policies,
+            completion,
+        )
     }
 
     /// Share the caller cancellation signal across policies and boards.
     pub fn screen(&self, board: &Board, control: &mut ExecutionControl) -> TrialAssessmentResult {
         let variant = self.rules.variant();
-        match self.evaluate(board, control, None) {
+        match self.evaluate(board, control, None, None) {
             PolicyScreen::Rated { trial, .. } => TrialAssessmentResult::Rated(trial),
             PolicyScreen::Stalled(_) => {
                 TrialAssessmentResult::Unrated(AssessmentFailure::Ungraded { variant })
@@ -177,7 +187,29 @@ impl PreparedAssessment {
         target: Difficulty,
         control: &mut ExecutionControl,
     ) -> TargetScreenResult {
-        match self.evaluate(board, control, Some(target)) {
+        self.screen_target_inner(board, target, control, None)
+    }
+
+    /// A validated completion avoids re-enumerating partial-clue feasibility for its own givens.
+    /// Layout identity and every given are checked again; this does not establish uniqueness.
+    pub(crate) fn screen_target_with_completion(
+        &self,
+        board: &Board,
+        target: Difficulty,
+        control: &mut ExecutionControl,
+        completion: &KnownCompletion,
+    ) -> TargetScreenResult {
+        self.screen_target_inner(board, target, control, Some(completion))
+    }
+
+    fn screen_target_inner(
+        &self,
+        board: &Board,
+        target: Difficulty,
+        control: &mut ExecutionControl,
+        completion: Option<&KnownCompletion>,
+    ) -> TargetScreenResult {
+        match self.evaluate(board, control, Some(target), completion) {
             PolicyScreen::Rated { trial, feedback } => {
                 if trial.difficulty() == target {
                     TargetScreenResult::MatchingTarget { trial, feedback }
@@ -222,23 +254,37 @@ fn screen_policies<'policy>(
     control: &mut ExecutionControl,
     target: Option<Difficulty>,
     policies: impl IntoIterator<Item = (Difficulty, &'policy [Technique])>,
+    completion: Option<&KnownCompletion>,
 ) -> PolicyScreen {
-    let conflicts = evaluate_prepared_conflicts(board, computation, control);
-    if !conflicts.violations.is_empty() {
-        return PolicyScreen::Invalid(
-            conflicts
-                .violations
-                .into_iter()
-                .map(AssessmentIssue::Violation)
-                .collect(),
-        );
-    }
-    if conflicts.status == ConflictStatus::Incomplete {
-        return PolicyScreen::Exhausted {
-            cause: ExhaustionCause::Cancelled,
-            stage: AssessmentStage::Validation,
-            difficulty: None,
-        };
+    if let Some(completion) = completion {
+        if !completion.covers(board, computation.rules()) {
+            return PolicyScreen::Invalid(message("Board does not belong to the known completion"));
+        }
+        if !control.check() {
+            return PolicyScreen::Exhausted {
+                cause: ExhaustionCause::Cancelled,
+                stage: AssessmentStage::Validation,
+                difficulty: None,
+            };
+        }
+    } else {
+        let conflicts = evaluate_prepared_conflicts(board, computation, control);
+        if !conflicts.violations.is_empty() {
+            return PolicyScreen::Invalid(
+                conflicts
+                    .violations
+                    .into_iter()
+                    .map(AssessmentIssue::Violation)
+                    .collect(),
+            );
+        }
+        if conflicts.status == ConflictStatus::Incomplete {
+            return PolicyScreen::Exhausted {
+                cause: ExhaustionCause::Cancelled,
+                stage: AssessmentStage::Validation,
+                difficulty: None,
+            };
+        }
     }
 
     let mut workspace = create_prepared_workspace(board, computation);
@@ -373,6 +419,7 @@ mod tests {
             policies
                 .iter()
                 .map(|(difficulty, allowed)| (*difficulty, allowed.as_slice())),
+            None,
         ) else {
             panic!("Expected changed-priority rating");
         };

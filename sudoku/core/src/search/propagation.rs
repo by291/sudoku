@@ -70,14 +70,10 @@ struct DomainChange {
     previous: CandidateMask,
 }
 
-enum DigitPositions {
-    Missing,
-    One(usize),
-    Multiple,
-}
-
 struct SearchState<'a> {
     computation: &'a PreparedComputation,
+    known: Option<&'a Board>,
+    givens: &'a Board,
     control: &'a mut ExecutionControl,
     domains: [CandidateMask; BOARD_SIZE],
     trail: Vec<DomainChange>,
@@ -147,7 +143,11 @@ impl SearchState<'_> {
                 queues.constraints.insert(index);
             }
         } else {
-            queues.cells.extend(0..BOARD_SIZE);
+            // Base domains already exclude every given from its duplicate peers. Only empty
+            // cells can add singleton effects here; arithmetic and full units still all run.
+            queues
+                .cells
+                .extend((0..BOARD_SIZE).filter(|&cell| self.givens.values()[cell] == 0));
             for index in 0..context.units.len() {
                 queues.units.insert(index);
             }
@@ -205,32 +205,32 @@ impl SearchState<'_> {
         if !self.checkpoint() {
             return false;
         }
-        for digit in 1..=UNIT_SIZE {
-            let bit = 1 << (digit - 1);
-            let mut positions = DigitPositions::Missing;
-            for &cell in &self.computation.rules.context().units[index].cells {
-                if self.domains[cell].bits() & bit != 0 {
-                    positions = match positions {
-                        DigitPositions::Missing => DigitPositions::One(cell),
-                        DigitPositions::One(_) | DigitPositions::Multiple => {
-                            DigitPositions::Multiple
-                        }
-                    };
-                    if matches!(positions, DigitPositions::Multiple) {
-                        break;
-                    }
-                }
-            }
-            match positions {
-                DigitPositions::Missing => return false,
-                DigitPositions::One(cell) => {
-                    if !self.reduce(cell, bit, queues) {
-                        return false;
-                    }
-                }
-                DigitPositions::Multiple => {}
+        let cells = &self.computation.rules.context().units[index].cells;
+        let mut positions = [0_u16; UNIT_SIZE];
+        for (position, &cell) in cells.iter().enumerate() {
+            for digit in self.domains[cell].digits() {
+                positions[usize::from(digit.value() - 1)] |= 1 << position;
             }
         }
+        for digit in 0..UNIT_SIZE {
+            let locations = positions[digit];
+            if locations == 0 {
+                return false;
+            }
+            if locations & (locations - 1) != 0 {
+                continue;
+            }
+            let cell = cells[locations.trailing_zeros() as usize];
+            let bit = 1 << digit;
+            let removed = CandidateMask::from_computed_bits(self.domains[cell].bits() & !bit);
+            if !self.reduce(cell, bit, queues) {
+                return false;
+            }
+            for excluded in removed.digits() {
+                positions[usize::from(excluded.value() - 1)] &= !locations;
+            }
+        }
+
         true
     }
 
@@ -275,13 +275,16 @@ impl SearchState<'_> {
             if size > 1 && size < fewest {
                 target = Some(cell);
                 fewest = size;
+                if size == 2 {
+                    break;
+                }
             }
         }
         let Some(target) = target else {
             let values =
                 std::array::from_fn(|cell| (self.domains[cell].bits().trailing_zeros() + 1) as u8);
             let completed = Board::from_computed_values(values);
-            if is_complete(&completed, &self.computation.rules) {
+            if self.known != Some(&completed) && is_complete(&completed, &self.computation.rules) {
                 self.count = if self.count == 0 { 1 } else { 2 };
                 if self.solution.is_none() {
                     self.solution = Some(completed);
@@ -291,7 +294,12 @@ impl SearchState<'_> {
         };
 
         let choices = self.domains[target].bits();
-        for digit in 1..=UNIT_SIZE {
+        // Generated givens already have one solution: try departures from it before following it.
+        let known_digit = self.known.map(|board| usize::from(board.values()[target]));
+        for digit in (1..=UNIT_SIZE)
+            .filter(|digit| Some(*digit) != known_digit)
+            .chain(known_digit)
+        {
             let bit = 1 << (digit - 1);
             if choices & bit == 0 {
                 continue;
@@ -326,6 +334,7 @@ pub(super) fn count_propagation_solutions(
     computation: &PreparedComputation,
     control: &mut ExecutionControl,
     node_limit: u64,
+    known: Option<&Board>,
 ) -> SearchResult {
     let base = base_candidates(board, &computation.rules);
     // Search uses singleton domains for givens; presentation candidates use zero for filled cells.
@@ -337,6 +346,8 @@ pub(super) fn count_propagation_solutions(
         }
     });
     let mut state = SearchState {
+        givens: board,
+        known,
         computation,
         control,
         domains,
@@ -345,8 +356,8 @@ pub(super) fn count_propagation_solutions(
         exhausted: false,
         node_limit,
         nodes_visited: 0,
-        count: 0,
-        solution: None,
+        count: u8::from(known.is_some()),
+        solution: known.cloned(),
     };
     let mut queues = Queues::new(computation);
     {
