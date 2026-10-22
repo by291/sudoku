@@ -1,6 +1,6 @@
 use super::pattern_facts::mask_of;
 use super::types::{Evidence, LogicalAction, LogicalStep, LogicalWorkspace};
-use crate::board::base_candidates;
+use crate::board::{base_candidates, unit_candidates};
 use crate::constraints::types::PreparedComputation;
 use crate::rules::types::{PreparedRules, PuzzleRules};
 use crate::types::{BOARD_SIZE, Board, CandidateMask, CoreResult, EngineError};
@@ -9,26 +9,13 @@ use crate::types::{BOARD_SIZE, Board, CandidateMask, CoreResult, EngineError};
 pub fn create_workspace(board: &Board, rules: &PreparedRules) -> LogicalWorkspace {
     let candidates = if matches!(rules.rules(), PuzzleRules::Killer { .. }) {
         // Cage exclusion must appear as an explained deduction, so initialize from full units only.
-        std::array::from_fn(|cell| {
-            if board.values()[cell] != 0 {
-                return CandidateMask::EMPTY;
-            }
-
-            let mut bits = CandidateMask::ALL.bits();
-            for &index in &rules.context().cell_units[cell] {
-                for &peer in &rules.context().units[index].cells {
-                    if board.values()[peer] != 0 {
-                        bits &= !mask_of(board.values()[peer]);
-                    }
-                }
-            }
-            CandidateMask::from_computed_bits(bits)
-        })
+        unit_candidates(board, rules)
     } else {
         base_candidates(board, rules)
     };
 
     LogicalWorkspace {
+        positions: std::cell::OnceCell::new(),
         board: board.clone(),
         candidates,
         rules: rules.clone(),
@@ -113,6 +100,7 @@ pub fn apply_step(state: &mut LogicalWorkspace, step: &LogicalStep) -> CoreResul
 
 /// The detector or proof validator has already established this step for the current state.
 pub(crate) fn apply_established_step(state: &mut LogicalWorkspace, step: &LogicalStep) {
+    state.positions.take();
     match &step.action {
         LogicalAction::Elimination { removals } => {
             for removal in removals {

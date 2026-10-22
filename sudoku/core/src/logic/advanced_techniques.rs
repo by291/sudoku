@@ -159,7 +159,10 @@ fn find_naked_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) -
 
 fn find_hidden_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) -> StepOutcome {
     let all_digits: [u8; UNIT_SIZE] = std::array::from_fn(|index| (index + 1) as u8);
-    for unit in &state.rules.context().units {
+    let global_positions = state.digit_positions();
+    for (index, unit) in state.rules.context().units.iter().enumerate() {
+        let positions =
+            global_positions.map(|positions| positions & state.rules.unit_masks()[index]);
         // Hidden triples visit all lexicographic digit triples, even in sparse/contradictory states.
         for selected_digits in combinations::<_, 3>(&all_digits) {
             if !control.check() {
@@ -168,30 +171,19 @@ fn find_hidden_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) 
             let digits = selected_digits
                 .iter()
                 .fold(0, |bits, &digit| bits | mask_of(digit));
-            let mut selected_cells = [false; BOARD_SIZE];
-            let mut possible = true;
-            for digit in selected_digits {
-                let positions = candidate_position_iter(state, &unit.cells, digit);
-                if positions.clone().count() < 2 {
-                    possible = false;
-                }
-                for cell in positions {
-                    selected_cells[cell] = true;
-                }
-            }
-            if !possible || selected_cells.iter().filter(|&&present| present).count() != 3 {
+            let selected = selected_digits.map(|digit| positions[usize::from(digit - 1)]);
+            let mut mask = selected
+                .iter()
+                .fold(0_u128, |mask, positions| mask | positions);
+            if selected.iter().any(|positions| positions.count_ones() < 2) || mask.count_ones() != 3
+            {
                 continue;
             }
-
-            let mut cells = [0; 3];
-            for (position, cell) in selected_cells
-                .iter()
-                .enumerate()
-                .filter_map(|(cell, &present)| present.then_some(cell))
-                .enumerate()
-            {
-                cells[position] = cell;
-            }
+            let cells: [usize; 3] = std::array::from_fn(|_| {
+                let cell = mask.trailing_zeros() as usize;
+                mask &= mask - 1;
+                cell
+            });
             if let Some(action) = elimination_action(state, cells, ALL_DIGITS_MASK & !digits) {
                 return selected_step(
                     state,

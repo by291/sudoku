@@ -9,21 +9,27 @@ use crate::rules::evaluation::satisfies_constraint;
 use crate::rules::types::{PreparedRules, RuleConstraint};
 use crate::types::{Board, Bounded};
 
-fn add_duplicates(board: &Board, id: String, cells: &[usize], violations: &mut Vec<RuleViolation>) {
-    let duplicates: Vec<usize> = cells
-        .iter()
-        .copied()
-        .filter(|&cell| {
-            board.values()[cell] != 0
-                && cells
-                    .iter()
-                    .any(|&other| other != cell && board.values()[other] == board.values()[cell])
-        })
-        .collect();
-
-    if !duplicates.is_empty() {
+fn add_duplicates(
+    board: &Board,
+    id: impl FnOnce() -> String,
+    cells: &[usize],
+    violations: &mut Vec<RuleViolation>,
+) {
+    let mut seen = 0_u16;
+    let mut repeated = 0_u16;
+    for &cell in cells {
+        let bit = (1_u16 << board.values()[cell]) >> 1;
+        repeated |= seen & bit;
+        seen |= bit;
+    }
+    if repeated != 0 {
+        let duplicates = cells
+            .iter()
+            .copied()
+            .filter(|&cell| repeated & ((1_u16 << board.values()[cell]) >> 1) != 0)
+            .collect();
         violations.push(RuleViolation {
-            constraint_id: id,
+            constraint_id: id(),
             cells: duplicates,
             code: ViolationCode::Duplicate,
         });
@@ -59,7 +65,7 @@ fn evaluate(
     for unit in &context.units {
         add_duplicates(
             board,
-            format!("{}:{}", unit.kind.as_str(), unit.index),
+            || format!("{}:{}", unit.kind.as_str(), unit.index),
             &unit.cells,
             &mut violations,
         );
@@ -67,7 +73,7 @@ fn evaluate(
 
     for constraint in &context.constraints {
         if let RuleConstraint::Cage { id, cells, .. } = constraint {
-            add_duplicates(board, id.clone(), cells, &mut violations);
+            add_duplicates(board, || id.clone(), cells, &mut violations);
         }
     }
 
@@ -124,14 +130,14 @@ pub fn preview_conflicts(board: &Board, rules: &PreparedRules) -> ConflictResult
     for unit in &context.units {
         add_duplicates(
             board,
-            format!("{}:{}", unit.kind.as_str(), unit.index),
+            || format!("{}:{}", unit.kind.as_str(), unit.index),
             &unit.cells,
             &mut violations,
         );
     }
     for constraint in &context.constraints {
         if let RuleConstraint::Cage { id, cells, .. } = constraint {
-            add_duplicates(board, id.clone(), cells, &mut violations);
+            add_duplicates(board, || id.clone(), cells, &mut violations);
         }
     }
     for constraint in &context.constraints {

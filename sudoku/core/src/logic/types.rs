@@ -126,6 +126,7 @@ pub(crate) struct CageMemo {
 /// Only immutable preparation may be shared between workspaces. Use checked construction and
 /// step application to preserve their coupled invariants; returned evidence owns its snapshots.
 pub struct LogicalWorkspace {
+    pub(crate) positions: std::cell::OnceCell<[u128; 9]>,
     pub(crate) board: Board,
     pub(crate) candidates: [CandidateMask; BOARD_SIZE],
     pub(crate) rules: PreparedRules,
@@ -135,6 +136,19 @@ pub struct LogicalWorkspace {
 }
 
 impl LogicalWorkspace {
+    /// Candidate positions belong to this exact board/domain revision and never cross workspaces.
+    pub(crate) fn digit_positions(&self) -> &[u128; 9] {
+        self.positions.get_or_init(|| {
+            let mut positions = [0; 9];
+            for (cell, mask) in self.candidates.iter().enumerate() {
+                for digit in mask.digits() {
+                    positions[usize::from(digit.value() - 1)] |= 1_u128 << cell;
+                }
+            }
+            positions
+        })
+    }
+
     /// Borrow the current board; mutations must preserve candidate and premise invariants.
     pub fn board(&self) -> &Board {
         &self.board

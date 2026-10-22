@@ -152,32 +152,77 @@ pub struct RuleMetadata {
 /// Immutable compiled layout, shared without sharing board domains or returned evidence.
 #[derive(Clone, Debug)]
 pub struct PreparedRules {
-    data: Arc<RuleMetadata>,
+    data: Arc<PreparedLayout>,
+}
+
+#[derive(Debug)]
+struct PreparedLayout {
+    metadata: RuleMetadata,
+    unit_masks: Vec<u128>,
+    single_cells: Vec<(usize, usize)>,
+    duplicate_groups: Vec<Vec<usize>>,
 }
 
 impl PreparedRules {
-    pub(crate) fn new(data: RuleMetadata) -> Self {
+    pub(crate) fn new(metadata: RuleMetadata, duplicate_groups: Vec<Vec<usize>>) -> Self {
+        let unit_masks = metadata
+            .units
+            .iter()
+            .map(|unit| {
+                unit.cells
+                    .iter()
+                    .fold(0, |mask, &cell| mask | (1_u128 << cell))
+            })
+            .collect();
+        let mut visited = 0_u128;
+        let mut single_cells = Vec::with_capacity(81);
+        for (index, unit) in metadata.units.iter().enumerate() {
+            for &cell in &unit.cells {
+                let bit = 1_u128 << cell;
+                if visited & bit == 0 {
+                    single_cells.push((cell, index));
+                    visited |= bit;
+                }
+            }
+        }
         Self {
-            data: Arc::new(data),
+            data: Arc::new(PreparedLayout {
+                metadata,
+                unit_masks,
+                single_cells,
+                duplicate_groups,
+            }),
         }
     }
 
+    pub(crate) fn single_cells(&self) -> &[(usize, usize)] {
+        &self.data.single_cells
+    }
+
+    pub(crate) fn unit_masks(&self) -> &[u128] {
+        &self.data.unit_masks
+    }
+
+    pub(crate) fn duplicate_groups(&self) -> &[Vec<usize>] {
+        &self.data.duplicate_groups
+    }
+
     pub(crate) fn context(&self) -> &RuleMetadata {
-        &self.data
+        &self.data.metadata
     }
 
     /// Borrow immutable layout metadata without allocating an intermediate snapshot.
     pub fn metadata_ref(&self) -> &RuleMetadata {
-        &self.data
+        &self.data.metadata
     }
 
     /// Return an owned display snapshot; caller mutations cannot alter later computation.
     pub fn metadata(&self) -> RuleMetadata {
-        (*self.data).clone()
+        self.data.metadata.clone()
     }
 
     pub fn rules(&self) -> &PuzzleRules {
-        &self.data.rules
+        &self.data.metadata.rules
     }
 
     /// Test shared prepared-instance identity, not structural rule equality.

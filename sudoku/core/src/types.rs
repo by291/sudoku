@@ -142,13 +142,6 @@ impl CandidateMask {
     pub const EMPTY: Self = Self(0);
     pub const ALL: Self = Self(ALL_DIGITS_MASK);
 
-    // Only validated Board values reach this internal operation; zero removes no digit.
-    pub(crate) fn exclude_board_value(&mut self, value: u8) {
-        if value != 0 {
-            self.0 &= !(1 << (value - 1));
-        }
-    }
-
     pub fn contains(self, digit: Digit) -> bool {
         self.0 & (1 << (digit.0 - 1)) != 0
     }

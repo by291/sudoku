@@ -102,3 +102,39 @@ fn authored_candidates_own_reduced_and_empty_domains_without_claiming_a_proof() 
     assert_eq!(state.candidates()[1].bits(), 3);
     assert!(state.premises().is_empty());
 }
+
+#[test]
+fn detectors_observe_eliminations_and_placements_without_leaking_to_another_workspace() {
+    use sudoku_core::logic::basic_techniques::find_basic_step;
+
+    let rules = compile_rules(&PuzzleRules::Classic).unwrap();
+    let mut candidates = [CandidateMask::ALL; 81];
+    for candidate in &mut candidates[2..9] {
+        *candidate = CandidateMask::try_from(510).unwrap();
+    }
+    let mut workspace =
+        LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap();
+    let other =
+        LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap();
+    assert!(find_basic_step(&workspace, Technique::HiddenSingle).is_none());
+
+    apply_step(
+        &mut workspace,
+        &step(LogicalAction::Elimination {
+            removals: vec![Removal { cell: 1, digit: 1 }],
+        }),
+    )
+    .unwrap();
+    let single = find_basic_step(&workspace, Technique::HiddenSingle).unwrap();
+
+    assert_eq!(
+        single.action,
+        LogicalAction::Placement { cell: 0, digit: 1 }
+    );
+    assert!(find_basic_step(&other, Technique::HiddenSingle).is_none());
+
+    apply_step(&mut workspace, &single).unwrap();
+
+    assert!(find_basic_step(&workspace, Technique::HiddenSingle).is_none());
+    assert_eq!(workspace.board().values()[0], 1);
+}

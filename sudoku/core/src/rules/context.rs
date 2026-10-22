@@ -94,15 +94,18 @@ fn build(rules: &PuzzleRules, mut control: Option<&mut ExecutionControl>) -> Opt
         &mut control,
     )?;
 
-    Some(PreparedRules::new(RuleMetadata {
-        rules: rules.clone(),
-        units: compiled.units,
-        constraints: compiled.constraints,
-        cell_units,
-        cell_constraints,
-        duplicate_peers,
-        related_cells,
-    }))
+    Some(PreparedRules::new(
+        RuleMetadata {
+            rules: rules.clone(),
+            units: compiled.units,
+            constraints: compiled.constraints,
+            cell_units,
+            cell_constraints,
+            duplicate_peers,
+            related_cells,
+        },
+        compiled.duplicate_groups,
+    ))
 }
 
 /// Validate rule geometry without building topology.
