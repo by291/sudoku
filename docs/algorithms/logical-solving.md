@@ -38,6 +38,8 @@ Sources: [`basic_techniques.rs`](../../sudoku/core/src/logic/basic_techniques.rs
 
 Each logical workspace owns its board, candidates, prior rule premises and local memo entries. It starts from the board's initial logical candidates, tries permitted techniques in policy order, applies the first effective deduction, and restarts selection. Eliminations remain in the workspace for subsequent steps.
 
+Prepared layouts retain full-unit cell masks and the first unit occurrence of each cell. A workspace lazily indexes candidate positions by digit, shared by hidden subsets and locked-candidate scans. Every applied placement or elimination invalidates the index; no candidate index or incomplete constraint support is shared across boards. Unit/evidence order and technique priorities remain unchanged.
+
 Killer initialization deliberately excludes candidates using full units only. Cage distinctness is introduced as an explained `cage-distinct` step instead of silently applying it during initialization. This preserves the reason behind later placements and the workload trace.
 
 Classic always follows its canonical catalogue order filtered by the allowed set. Other variants preserve the supplied policy order. Changing traversal or priorities can change the chosen trace and rating, even when all possible deductions remain mathematically sound.

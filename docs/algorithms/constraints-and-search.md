@@ -32,7 +32,9 @@ For example, a two-cell distinct cage totaling 10 with domains `A={1,4,6}` and `
 
 The enumerator prunes repeated peer digits and impossible sum ranges using suffix minimum/maximum bounds. Thermometers enforce increasing order and leave enough larger digits for the remaining path. Arrows enumerate the circle first and accumulate the shaft separately.
 
-Small Killer cages can reuse a complete catalogue of ordered distinct-digit tuples. Current bounds are four cells per catalogue, 512 tuples per clue and 8,192 per layout. Overflow discards partial catalogues and falls back to exact bounded enumeration; previously completed exploration is not replayed. A nearly fixed cage uses enumeration when its domain-product estimate is no larger than the catalogue. Larger cages, thermometers and arrows use enumeration directly.
+Small Killer cages can reuse a complete catalogue of ordered distinct-digit tuples. Current bounds are four cells per catalogue, 512 tuples per clue and 8,192 per layout. Overflow discards partial catalogues and falls back to exact bounded enumeration; previously completed exploration is not replayed. A nearly fixed cage uses enumeration when its domain-product estimate is no larger than the estimated filtering cost. Catalogues with at least 64 tuples also index each position/digit in blocks of 64 tuple bits. Filtering intersects those indexes before collecting supported digits; small catalogues keep a direct scan. Each index has at most eight blocks, bounded by the same tuple caps. Larger cages and arrows use enumeration directly.
+
+Strictly increasing thermometers use a forward earliest-feasible prefix and a backward latest-feasible suffix. A digit is supported exactly when it belongs to its original domain and can join those two witnesses. This handles gaps in domains without enumerating every increasing assignment; an infeasible prefix or suffix yields empty support for the whole path.
 
 Only complete support can eliminate candidates. An interrupted enumeration may simply not have reached an assignment containing a particular digit. Treating its partial union as complete would produce false deductions. Logical cage memoization therefore stores only complete support keyed by all effective local domains, within one workspace.
 
@@ -51,7 +53,7 @@ At each search node:
 5. If every cell is assigned, validate the complete board against all rules and record a solution.
 6. Otherwise choose a non-singleton domain with the fewest values, try its digits and recurse.
 
-Cell work uses a stack; affected units and constraints use deduplicated FIFO queues. Cells and units take priority over arithmetic support. MRV ties retain the first cell in board order, and exact-search digits are tried in ascending order. Terminal generation has a different, randomized branching policy described in [generation](generation.md).
+Initial peer exclusions already account for every given, so root cell propagation starts with empty cells only; all units and arithmetic constraints are still queued. Cell work uses a stack; affected units and constraints use deduplicated FIFO queues. Cells and units take priority over arithmetic support. Each full-unit visit builds digit-position masks once and updates them after forced reductions. MRV ties retain the first cell in board order; the first two-candidate domain is already minimal. Public exact-search digits are tried in ascending order. Terminal generation has a different, randomized branching policy described in [generation](generation.md).
 
 Each domain reduction appends the old mask to a trail. A branch remembers its starting trail length and restores all later changes on exit, including exhaustion. Queue membership is reset before the next branch. This avoids copying the complete workspace at every choice while ensuring one failed branch cannot constrain its sibling.
 
@@ -82,6 +84,6 @@ Sources: [`exact.rs`](../../sudoku/core/src/search/exact.rs), [`propagation.rs`]
 | Complete, count 2 | At least two solutions; counting deliberately stops at two |
 | Budget exhausted  | The operation did not establish a complete capped count    |
 
-A known terminal proves that generated givens have at least one solution, but another solution may exist. Generation therefore still performs exact counting.
+A known terminal proves that generated givens have at least one solution, but another solution may exist. Generation therefore still performs exact counting. Its private alternative search binds a validated completion to the exact prepared layout and checks every given against it. It tries values different from the known solution first and must exhaust every alternative before declaring uniqueness. Final delivery retains ordinary exact counting and terminal comparison; public first-solution ordering is unchanged.
 
 The portable core checks caller-owned cancellation at bounded cooperative checkpoints. Work-unit accounting has been removed. Host adapters enforce the 3,000 ms request deadline; local exact-search node limits remain explicit and an incomplete count cannot establish uniqueness. Fixed board size does not make exhaustive search cheap: difficult domains can still create a large search tree. See [engine contracts](../engine.md) for cancellation, ownership and platform execution requirements.
