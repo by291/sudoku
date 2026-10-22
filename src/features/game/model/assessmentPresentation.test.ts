@@ -66,11 +66,11 @@ it('projects ungraded and incomplete outcomes into their existing unavailable re
   ).toEqual({ status: 'unavailable', reason: 'ungraded', issues: [] })
   expect(
     toStoredAssessment({
-      status: 'budget-exhausted',
+      status: 'incomplete',
       ratingVersion: 'sudoku-rating-v2',
       variant: 'classic',
       stage: 'validation',
       difficulty: null,
     }),
-  ).toEqual({ status: 'unavailable', reason: 'budget-exhausted', issues: [] })
+  ).toEqual({ status: 'unavailable', reason: 'incomplete', issues: [] })
 })

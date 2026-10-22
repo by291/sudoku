@@ -1,5 +1,5 @@
 use crate::board::is_complete;
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::rules::context::{compile_rules, prepare_rules};
 use crate::rules::types::{PreparedRules, PuzzleRules, SudokuVariant};
 use crate::types::{Board, Bounded, CoreResult, Difficulty, EngineError};
@@ -49,11 +49,11 @@ pub fn validate_puzzle(puzzle: &Puzzle) -> CoreResult<()> {
 /// Incomplete preparation cannot classify a stored snapshot as corrupt; no partial layout escapes.
 pub fn validate_puzzle_bounded(
     puzzle: &Puzzle,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<Bounded<()>> {
     validate_difficulty(puzzle)?;
-    let Bounded::Complete(prepared) = prepare_rules(&puzzle.rules, budget)? else {
-        return Ok(Bounded::BudgetExhausted);
+    let Bounded::Complete(prepared) = prepare_rules(&puzzle.rules, control)? else {
+        return Ok(Bounded::Cancelled);
     };
     validate_prepared_content(puzzle, &prepared)?;
     Ok(Bounded::Complete(()))

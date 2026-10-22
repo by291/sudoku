@@ -49,7 +49,7 @@ export function createSession(...args: Parameters<typeof create>) {
   )
 }
 
-export function applySessionAction(session: GameSession, action: GameAction, maxWork?: number) {
+export function applySessionAction(session: GameSession, action: GameAction) {
   const prepared = testEngine.prepare(session.puzzle.rules)
   try {
     const result =
@@ -64,7 +64,6 @@ export function applySessionAction(session: GameSession, action: GameAction, max
               entries: [...session.entries],
               notes: [...session.notes],
               action,
-              ...(maxWork === undefined ? {} : { work: { maxWork } }),
             }).result,
             action,
           )

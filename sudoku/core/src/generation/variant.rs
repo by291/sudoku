@@ -140,13 +140,13 @@ pub fn transform_board(
 /// Rule necessity is a separate exact fact; incomplete counting cannot establish it.
 pub fn variant_rules_matter(
     puzzle: &crate::puzzle::Puzzle,
-    budget: &mut crate::budget::WorkBudget,
+    control: &mut crate::control::ExecutionControl,
 ) -> CoreResult<crate::types::Bounded<bool>> {
     use crate::types::Bounded;
     let Bounded::Complete(classic) =
-        crate::rules::context::prepare_rules(&PuzzleRules::Classic, budget)?
+        crate::rules::context::prepare_rules(&PuzzleRules::Classic, control)?
     else {
-        return Ok(Bounded::BudgetExhausted);
+        return Ok(Bounded::Cancelled);
     };
     if matches!(puzzle.rules, PuzzleRules::Jigsaw { .. })
         && !crate::board::is_complete(&puzzle.solution, &classic)
@@ -157,11 +157,11 @@ pub fn variant_rules_matter(
     let result = crate::search::exact::count_with_rules(
         &puzzle.givens,
         &PuzzleRules::Classic,
-        budget,
-        budget.remaining(),
+        control,
+        u64::MAX,
     )?;
     Ok(match result {
         crate::search::types::SearchResult::Complete { count, .. } => Bounded::Complete(count != 1),
-        crate::search::types::SearchResult::BudgetExhausted { .. } => Bounded::BudgetExhausted,
+        crate::search::types::SearchResult::Incomplete { .. } => Bounded::Cancelled,
     })
 }

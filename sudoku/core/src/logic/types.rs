@@ -158,7 +158,7 @@ impl LogicalWorkspace {
 pub enum LogicStatus {
     Solved,
     Stalled,
-    WorkLimit,
+    Cancelled,
     StepLimit,
 }
 

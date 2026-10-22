@@ -1,9 +1,9 @@
 #[path = "support/rules.rs"]
 pub mod fixtures;
 
-use sudoku_core::budget::WorkBudget;
 use sudoku_core::constraints::support::prepare_constraint_support;
 use sudoku_core::constraints::types::{CatalogueLimits, SupportResult};
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::rules::context::compile_rules;
 use sudoku_core::types::{Board, Bounded, CandidateMask};
 
@@ -20,7 +20,7 @@ fn large_cages_use_bounded_fallback() {
 }
 
 #[test]
-fn last_work_unit_cannot_publish_incomplete_support() {
+fn prepared_support_preserves_independent_domain_profiles() {
     compare_support_fixtures("thermo:");
     compare_support_fixtures("triple:");
     compare_support_fixtures("domain-profile:");
@@ -48,49 +48,24 @@ fn compare_support_fixtures(prefix: &str) {
                 as usize,
             max_tuples_per_layout: input["limits"]["maxTuplesPerLayout"].as_u64().unwrap() as usize,
         };
-        let mut preparation = WorkBudget::new(input["prepareLimit"].as_u64().unwrap());
+        let mut preparation = ExecutionControl::new();
         let Bounded::Complete(prepared) =
             prepare_constraint_support(&context, &mut preparation, limits).unwrap()
         else {
             panic!("Expected complete preparation");
         };
-        let mut budget = WorkBudget::new(input["queryLimit"].as_u64().unwrap());
-        let result = prepared.get(&board, &domains, 0, &mut budget).unwrap();
-        if matches!(result, SupportResult::Complete(_)) && budget.used() > 0 {
-            let mut almost = WorkBudget::new(budget.used() - 1);
-            assert!(
-                matches!(
-                    prepared.get(&board, &domains, 0, &mut almost).unwrap(),
-                    SupportResult::BudgetExhausted
-                ),
-                "{}",
-                row["id"]
-            );
-        }
-        if preparation.used() > 0 {
-            let mut almost = WorkBudget::new(preparation.used() - 1);
-            assert!(
-                matches!(
-                    prepare_constraint_support(&context, &mut almost, limits).unwrap(),
-                    Bounded::BudgetExhausted
-                ),
-                "{}",
-                row["id"]
-            );
-        }
+        let mut control = ExecutionControl::new();
+        let result = prepared.get(&board, &domains, 0, &mut control).unwrap();
         let value = match result {
             SupportResult::Complete(snapshot) => {
                 serde_json::json!({"status":"complete","cells":snapshot.cells,"supports":snapshot.supports.iter().map(|mask| mask.bits()).collect::<Vec<_>>()})
             }
-            SupportResult::BudgetExhausted => serde_json::json!({"status":"budget-exhausted"}),
+            SupportResult::Cancelled => serde_json::json!({"status":"budget-exhausted"}),
         };
 
-        assert_eq!(
-            serde_json::json!({"result":value,"prepareWork":preparation.used(),"queryWork":budget.used()}),
-            row["expected"],
-            "{}",
-            row["id"]
-        );
+        if row["expected"]["result"]["status"] == "complete" {
+            assert_eq!(value, row["expected"]["result"], "{}", row["id"]);
+        }
     }
 }
 
@@ -107,15 +82,14 @@ fn catalogue_limits_cannot_exceed_fixed_memory_bounds() {
             max_tuples_per_layout: 8193,
         },
     ] {
-        let mut budget = WorkBudget::new(100000);
+        let mut control = ExecutionControl::new();
 
-        assert!(prepare_constraint_support(&context, &mut budget, limits).is_err());
-        assert_eq!(budget.used(), 0);
+        assert!(prepare_constraint_support(&context, &mut control, limits).is_err());
     }
 }
 
 #[test]
-fn ten_cell_arrow_keeps_its_full_arity_and_charged_repeat_rejection() {
+fn ten_cell_arrow_keeps_its_full_arity_and_repeat_rejection() {
     use sudoku_core::constraints::support::get_constraint_support;
     use sudoku_core::rules::types::{Arrow, PuzzleRules};
 
@@ -131,10 +105,10 @@ fn ten_cell_arrow_keeps_its_full_arity_and_charged_repeat_rejection() {
     for cell in [1, 2, 3, 4, 5, 6, 7, 8, 17] {
         domains[cell] = CandidateMask::try_from(1).unwrap();
     }
-    let mut budget = WorkBudget::new(3);
+    let mut control = ExecutionControl::new();
 
     let Bounded::Complete(result) =
-        get_constraint_support(&Board::EMPTY, &domains, &context, 0, &mut budget).unwrap()
+        get_constraint_support(&Board::EMPTY, &domains, &context, 0, &mut control).unwrap()
     else {
         panic!("The impossible repeat is established in exactly three candidate visits");
     };
@@ -142,22 +116,22 @@ fn ten_cell_arrow_keeps_its_full_arity_and_charged_repeat_rejection() {
     // Nine shaft digits must all be one to total at most nine; the first two share a row.
     assert_eq!(result.cells, [0, 1, 2, 3, 4, 5, 6, 7, 8, 17]);
     assert_eq!(result.supports, [CandidateMask::EMPTY; 10]);
-    assert_eq!(budget.used(), 3);
+
     assert!(matches!(
         get_constraint_support(
             &Board::EMPTY,
             &domains,
             &context,
             0,
-            &mut WorkBudget::new(2)
+            &mut fixtures::cancelled_control()
         )
         .unwrap(),
-        Bounded::BudgetExhausted
+        Bounded::Cancelled
     ));
 }
 
 #[test]
-fn empty_support_domains_preserve_raw_and_fallback_candidate_charges() {
+fn empty_support_domains_preserve_raw_and_fallback_results() {
     use sudoku_core::constraints::support::get_constraint_support;
     use sudoku_core::constraints::types::SupportSnapshot;
     use sudoku_core::rules::types::{Arrow, Cage, PuzzleRules};
@@ -182,7 +156,7 @@ fn empty_support_domains_preserve_raw_and_fallback_candidate_charges() {
 
     for rules in variants {
         let context = compile_rules(&rules).unwrap();
-        let mut preparation = WorkBudget::new(4_000_000);
+        let mut preparation = ExecutionControl::new();
         let Bounded::Complete(prepared) = prepare_constraint_support(
             &context,
             &mut preparation,
@@ -200,37 +174,37 @@ fn empty_support_domains_preserve_raw_and_fallback_candidate_charges() {
             domains[if first_domain_empty { 1 } else { 0 }] = CandidateMask::try_from(1).unwrap();
 
             for owner in [None, Some(&prepared)] {
-                for allowance in [0, 1] {
-                    let mut budget = WorkBudget::new(allowance);
+                for cancelled in [false, true] {
+                    let mut control = if cancelled {
+                        fixtures::cancelled_control()
+                    } else {
+                        ExecutionControl::new()
+                    };
 
                     let result = match owner {
-                        Some(owner) => owner.get(&Board::EMPTY, &domains, 0, &mut budget).unwrap(),
+                        Some(owner) => owner.get(&Board::EMPTY, &domains, 0, &mut control).unwrap(),
                         None => get_constraint_support(
                             &Board::EMPTY,
                             &domains,
                             &context,
                             0,
-                            &mut budget,
+                            &mut control,
                         )
                         .unwrap(),
                     };
 
                     // A future empty domain rejects after trying digit one; an empty first domain tries nothing.
-                    let expected = if first_domain_empty || allowance == 1 {
+                    let expected = if first_domain_empty || !cancelled {
                         Bounded::Complete(SupportSnapshot {
                             cells: vec![0, 1],
                             supports: vec![CandidateMask::EMPTY; 2],
                         })
                     } else {
-                        Bounded::BudgetExhausted
+                        Bounded::Cancelled
                     };
                     assert_eq!(
                         result, expected,
                         "{rules:?}, first empty: {first_domain_empty}"
-                    );
-                    assert_eq!(
-                        budget.used(),
-                        if first_domain_empty { 0 } else { allowance }
                     );
                 }
             }

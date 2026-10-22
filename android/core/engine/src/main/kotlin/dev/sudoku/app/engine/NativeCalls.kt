@@ -14,9 +14,9 @@ import kotlinx.coroutines.withTimeout
 
 /** Deadlines cover queueing and execution, including result conversion inside the lane.
  * Input snapshots are captured before dispatch and are outside this execution deadline. */
-data class NativeExecutionLimits(val generationDeadlineMs: Long = 3_000, val analysisDeadlineMs: Long = 15_000) {
+data class NativeExecutionLimits(val requestDeadlineMs: Long = 3_000) {
     init {
-        require(generationDeadlineMs > 0 && analysisDeadlineMs > 0)
+        require(requestDeadlineMs > 0)
     }
 }
 
@@ -51,8 +51,8 @@ internal object NativeCalls {
                             EngineOutcome.InvalidInput(failure.reason)
                         } catch (failure: NativeException.Cancelled) {
                             EngineOutcome.Cancelled
-                        } catch (failure: NativeException.BudgetExhausted) {
-                            EngineOutcome.BudgetExhausted(failure.workUsed.toLong())
+                        } catch (failure: NativeException.Incomplete) {
+                            EngineOutcome.Incomplete
                         } catch (failure: Exception) {
                             EngineOutcome.Failed(failure.message ?: "Native engine operation failed")
                         } catch (failure: LinkageError) {

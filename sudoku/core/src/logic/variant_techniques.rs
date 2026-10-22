@@ -5,9 +5,9 @@ use super::types::{
     Removal, RuleEvidence, RuleEvidenceKind, StepOutcome,
 };
 use super::workspace::{all_digits, local_domains};
-use crate::budget::WorkBudget;
 use crate::constraints::support::raw_for_constraint;
 use crate::constraints::types::{MAX_CONSTRAINT_CELLS, SupportMasksResult};
+use crate::control::ExecutionControl;
 use crate::rules::types::RuleConstraint;
 use crate::types::{Bounded, CandidateMask};
 
@@ -28,7 +28,7 @@ pub(crate) fn matches_rule_technique(technique: Technique, constraint: &RuleCons
 fn combination_support(
     state: &mut LogicalWorkspace,
     index: usize,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> SupportMasksResult {
     let constraint = &state.rules.context().constraints[index];
     let cage = matches!(constraint, RuleConstraint::Cage { .. });
@@ -47,19 +47,19 @@ fn combination_support(
         && let Some(previous) = &state.cage_memo[index]
         && previous.domains == domains
     {
-        // Geometry is immutable and private to this workspace. The caller still charges each visit.
+        // Geometry is immutable and private to this workspace.
         return Bounded::Complete(previous.supports);
     }
 
     let result = if let Some(support) = &state.support {
-        support.query_at(&state.board, &state.candidates, index, budget)
+        support.query_at(&state.board, &state.candidates, index, control)
     } else {
         raw_for_constraint(
             &state.board,
             &state.candidates,
             &state.rules,
             constraint,
-            budget,
+            control,
         )
     };
     if cage && let Bounded::Complete(support) = &result {
@@ -256,7 +256,7 @@ fn simple_step(
 pub fn find_variant_step(
     state: &mut LogicalWorkspace,
     techniques: &[Technique],
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> StepOutcome {
     for &technique in techniques {
         for index in 0..state.rules.context().constraints.len() {
@@ -269,8 +269,8 @@ pub fn find_variant_step(
             {
                 continue;
             }
-            if !budget.consume(1) {
-                return Bounded::BudgetExhausted;
+            if !control.check() {
+                return Bounded::Cancelled;
             }
             if let Some(step) = simple_step(state, constraint, technique) {
                 return Bounded::Complete(Some(Box::new(step)));
@@ -282,8 +282,8 @@ pub fn find_variant_step(
                 continue;
             }
 
-            let Bounded::Complete(support) = combination_support(state, index, budget) else {
-                return Bounded::BudgetExhausted;
+            let Bounded::Complete(support) = combination_support(state, index, control) else {
+                return Bounded::Cancelled;
             };
             let constraint = &state.rules.context().constraints[index];
             if let Some(action) = deduction_action(state, constraint.cells(), support.as_slice()) {

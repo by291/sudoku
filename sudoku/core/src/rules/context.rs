@@ -2,28 +2,27 @@ use std::sync::OnceLock;
 
 use super::definitions;
 use super::types::{PreparedRules, PuzzleRules, RuleMetadata};
-use crate::budget::{WorkBudget, WorkStage};
+use crate::control::ExecutionControl;
 use crate::types::{BOARD_SIZE, Bounded, CoreResult, EngineError};
 
-fn charge(budget: &mut Option<&mut WorkBudget>) -> bool {
-    match budget {
-        Some(budget) => budget.consume(1),
+fn checkpoint(control: &mut Option<&mut ExecutionControl>) -> bool {
+    match control {
+        Some(control) => control.check(),
         None => true,
     }
 }
 
 fn memberships<'a>(
     groups: impl IntoIterator<Item = &'a [usize]>,
-    budget: &mut Option<&mut WorkBudget>,
+    control: &mut Option<&mut ExecutionControl>,
 ) -> Option<Vec<Vec<usize>>> {
     let mut result = vec![vec![]; BOARD_SIZE];
 
     for (index, cells) in groups.into_iter().enumerate() {
+        if !checkpoint(control) {
+            return None;
+        }
         for &cell in cells {
-            if !charge(budget) {
-                return None;
-            }
-
             result[cell].push(index);
         }
     }
@@ -33,19 +32,17 @@ fn memberships<'a>(
 
 fn relationships<'a>(
     groups: impl IntoIterator<Item = &'a [usize]>,
-    budget: &mut Option<&mut WorkBudget>,
+    control: &mut Option<&mut ExecutionControl>,
 ) -> Option<Vec<Vec<usize>>> {
     // Two machine words cover the finite board without tree nodes or target-dependent u128 shifts.
     let mut result = [[0_u64; 2]; BOARD_SIZE];
 
     for cells in groups {
+        if !checkpoint(control) {
+            return None;
+        }
         for &cell in cells {
             for &peer in cells {
-                // Self visits are charged too, matching the deterministic topology work model.
-                if !charge(budget) {
-                    return None;
-                }
-
                 if cell != peer {
                     result[cell][peer / 64] |= 1_u64 << (peer % 64);
                 }
@@ -65,27 +62,27 @@ fn relationships<'a>(
     )
 }
 
-fn build(rules: &PuzzleRules, mut budget: Option<&mut WorkBudget>) -> Option<PreparedRules> {
-    if !charge(&mut budget) {
+fn build(rules: &PuzzleRules, mut control: Option<&mut ExecutionControl>) -> Option<PreparedRules> {
+    if !checkpoint(&mut control) {
         return None;
     }
 
     let compiled = definitions::compile(rules);
     let cell_units = memberships(
         compiled.units.iter().map(|unit| unit.cells.as_slice()),
-        &mut budget,
+        &mut control,
     )?;
     let cell_constraints = memberships(
         compiled
             .constraints
             .iter()
             .map(|constraint| constraint.cells()),
-        &mut budget,
+        &mut control,
     )?;
 
     let duplicate_peers = relationships(
         compiled.duplicate_groups.iter().map(Vec::as_slice),
-        &mut budget,
+        &mut control,
     )?;
     let related_cells = relationships(
         compiled.duplicate_groups.iter().map(Vec::as_slice).chain(
@@ -94,7 +91,7 @@ fn build(rules: &PuzzleRules, mut budget: Option<&mut WorkBudget>) -> Option<Pre
                 .iter()
                 .map(|constraint| constraint.cells()),
         ),
-        &mut budget,
+        &mut control,
     )?;
 
     Some(PreparedRules::new(RuleMetadata {
@@ -108,12 +105,12 @@ fn build(rules: &PuzzleRules, mut budget: Option<&mut WorkBudget>) -> Option<Pre
     }))
 }
 
-/// Validate rule geometry without building or charging topology.
+/// Validate rule geometry without building topology.
 pub fn validate_rules(rules: &PuzzleRules) -> CoreResult<()> {
     definitions::validate(rules)
 }
 
-/// Reuse static Classic topology without charging per-board validation or preparation.
+/// Reuse static Classic topology across board validation and preparation.
 pub(super) fn classic_prepared_rules() -> CoreResult<PreparedRules> {
     static CLASSIC: OnceLock<CoreResult<PreparedRules>> = OnceLock::new();
 
@@ -130,21 +127,22 @@ pub fn compile_rules(rules: &PuzzleRules) -> CoreResult<PreparedRules> {
         .ok_or_else(|| EngineError::invalid("Unbounded rule compilation unexpectedly exhausted"))
 }
 
-/// Charged compilation returns no partial topology. Static Classic geometry is prepared for free.
+/// Cancellable compilation returns no partial topology. Classic geometry is shared.
 pub fn prepare_rules(
     rules: &PuzzleRules,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<Bounded<PreparedRules>> {
     definitions::validate(rules)?;
+    if !control.check() {
+        return Ok(Bounded::Cancelled);
+    }
 
     if matches!(rules, PuzzleRules::Classic) {
         return classic_prepared_rules().map(Bounded::Complete);
     }
 
-    Ok(budget.with_stage(WorkStage::Preparation, |budget| {
-        match build(rules, Some(budget)) {
-            Some(prepared) => Bounded::Complete(prepared),
-            None => Bounded::BudgetExhausted,
-        }
-    }))
+    Ok(match build(rules, Some(control)) {
+        Some(prepared) => Bounded::Complete(prepared),
+        None => Bounded::Cancelled,
+    })
 }

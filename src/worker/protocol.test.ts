@@ -205,7 +205,6 @@ it.each(['killer', 'thermo', 'arrow'] as const)(
       rules: copyRules(fixture.rules),
       allowed: [technique],
       maxSteps: 1,
-      maxWork: 1000000,
     })
     const step = analysis.steps[0]
     if (

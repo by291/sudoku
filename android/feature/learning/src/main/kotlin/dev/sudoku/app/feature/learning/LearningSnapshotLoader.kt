@@ -89,7 +89,7 @@ internal class LearningSnapshotLoader @Inject constructor(
 }
 
 private fun contentFailure(result: EngineOutcome<*>): String = when (result) {
-    is EngineOutcome.BudgetExhausted -> "课程校验尚未完成，请重试。"
+    is EngineOutcome.Incomplete -> "课程校验尚未完成，请重试。"
     EngineOutcome.Cancelled -> "课程加载已取消，可以重试。"
     EngineOutcome.TimedOut -> "课程校验超时，请重试。"
     is EngineOutcome.InvalidInput -> "课程数据校验未通过。"

@@ -20,38 +20,26 @@ pub fn search_to_dto(result: SearchResult) -> CoreResult<SearchResultDto> {
             count,
             solution,
             nodes_visited,
-            work_used,
         } => SearchResultDto::Complete {
             count,
             solution: solution.as_ref().map(Into::into),
             nodes_visited: counter(nodes_visited)?,
-            work_used: counter(work_used)?,
         },
-        SearchResult::BudgetExhausted {
-            nodes_visited,
-            work_used,
-        } => SearchResultDto::BudgetExhausted {
+        SearchResult::Incomplete { nodes_visited } => SearchResultDto::Incomplete {
             nodes_visited: counter(nodes_visited)?,
-            work_used: counter(work_used)?,
         },
     })
 }
 
 /// Own one immutable compiled layout and return independent metadata and operation results.
-/// Live operations retain raw-support work; exact queries reuse charged preparation.
+/// Exact queries reuse immutable prepared constraints.
 #[derive(uniffi::Object)]
 pub struct PreparedPuzzle {
     computation: PreparedComputation,
-    preparation_work: u32,
 }
 
 #[uniffi::export]
 impl PreparedPuzzle {
-    /// Deterministic core work units spent compiling this layout, not elapsed time.
-    pub fn preparation_work(&self) -> u32 {
-        self.preparation_work
-    }
-
     pub fn live_execution(&self) -> Result<crate::dto::operations::LiveExecutionDto, NativeError> {
         use crate::dto::operations::LiveExecutionDto;
         use sudoku_core::constraints::types::LiveComputationCost;
@@ -96,42 +84,37 @@ impl PreparedPuzzle {
         &self,
         input: BoardQueryDto,
         token: Arc<CancellationToken>,
-    ) -> Result<crate::dto::operations::CandidateWorkDto, NativeError> {
+    ) -> Result<crate::dto::operations::CandidateComputationDto, NativeError> {
         let board: Board = input.board.try_into()?;
-        let options = input.work.unwrap_or_default();
-        let mut work = control::budget(options.max_work, options.initial_work, token)?;
+        let mut execution_control = control::execution(token)?;
 
         let result = match sudoku_core::constraints::candidates::evaluate_candidates(
             &board,
             self.computation.rules(),
-            &mut work,
+            &mut execution_control,
         ) {
             Bounded::Complete(candidates) => CandidateResultDto::Complete {
                 candidates: candidates.iter().map(|mask| mask.bits()).collect(),
             },
-            Bounded::BudgetExhausted => CandidateResultDto::BudgetExhausted,
+            Bounded::Cancelled => CandidateResultDto::Incomplete,
         };
-        control::check(&work)?;
+        control::check(&execution_control)?;
 
-        Ok(crate::dto::operations::CandidateWorkDto {
-            result,
-            work_used: counter(work.used())?,
-        })
+        Ok(crate::dto::operations::CandidateComputationDto { result })
     }
 
     pub fn conflicts(
         &self,
         input: BoardQueryDto,
         token: Arc<CancellationToken>,
-    ) -> Result<crate::dto::operations::ConflictWorkDto, NativeError> {
+    ) -> Result<crate::dto::operations::ConflictComputationDto, NativeError> {
         let board: Board = input.board.try_into()?;
-        let options = input.work.unwrap_or_default();
-        let mut work = control::budget(options.max_work, options.initial_work, token)?;
+        let mut execution_control = control::execution(token)?;
 
         let conflicts = sudoku_core::constraints::conflicts::evaluate_conflicts(
             &board,
             self.computation.rules(),
-            &mut work,
+            &mut execution_control,
         );
         let violations = conflicts
             .violations
@@ -140,40 +123,33 @@ impl PreparedPuzzle {
             .collect::<CoreResult<_>>()?;
         let result = match conflicts.status {
             ConflictStatus::Complete => ConflictResultDto::Complete { violations },
-            ConflictStatus::BudgetExhausted => ConflictResultDto::BudgetExhausted { violations },
+            ConflictStatus::Incomplete => ConflictResultDto::Incomplete { violations },
         };
-        control::check(&work)?;
+        control::check(&execution_control)?;
 
-        Ok(crate::dto::operations::ConflictWorkDto {
-            result,
-            work_used: counter(work.used())?,
-        })
+        Ok(crate::dto::operations::ConflictComputationDto { result })
     }
 
     pub fn count_solutions(
         &self,
         input: PreparedCountInputDto,
         token: Arc<CancellationToken>,
-    ) -> Result<crate::dto::operations::SearchWorkDto, NativeError> {
+    ) -> Result<crate::dto::operations::SearchComputationDto, NativeError> {
         let board: Board = input.board.try_into()?;
-        let options = input.work.unwrap_or_default();
-        let mut work = control::budget(options.max_work, options.initial_work, token)?;
-        let nodes = options
-            .node_limit
-            .map(u64::from)
-            .unwrap_or(work.remaining());
+        let options = input.options.unwrap_or_default();
+        let mut execution_control = control::execution(token)?;
+        let nodes = options.node_limit.map(u64::from).unwrap_or(u64::MAX);
 
         let result = sudoku_core::search::exact::count_solutions(
             &board,
             &self.computation,
-            &mut work,
+            &mut execution_control,
             nodes,
         );
-        control::check(&work)?;
+        control::check(&execution_control)?;
 
-        Ok(crate::dto::operations::SearchWorkDto {
+        Ok(crate::dto::operations::SearchComputationDto {
             result: search_to_dto(result)?,
-            work_used: counter(work.used())?,
         })
     }
 
@@ -181,22 +157,21 @@ impl PreparedPuzzle {
         &self,
         input: EditInputDto,
         token: Arc<CancellationToken>,
-    ) -> Result<crate::dto::operations::EditWorkDto, NativeError> {
+    ) -> Result<crate::dto::operations::EditComputationDto, NativeError> {
         let PreparedEditInput {
             givens,
             before,
             action,
-            work: options,
         } = input.try_into()?;
 
-        let mut work = control::budget(options.max_work, options.initial_work, token)?;
+        let mut execution_control = control::execution(token)?;
 
         let result = match sudoku_core::editing::edit_board(
             &givens,
             &before,
             &action,
             self.computation.rules(),
-            &mut work,
+            &mut execution_control,
         )? {
             EditOutcome::Complete(result) => EditResultDto::Complete {
                 entries: (&result.layers.entries).into(),
@@ -204,14 +179,11 @@ impl PreparedPuzzle {
                 changed: result.changed,
                 board_complete: result.board_complete,
             },
-            EditOutcome::BudgetExhausted => EditResultDto::BudgetExhausted,
+            EditOutcome::Incomplete => EditResultDto::Incomplete,
         };
-        control::check(&work)?;
+        control::check(&execution_control)?;
 
-        Ok(crate::dto::operations::EditWorkDto {
-            result,
-            work_used: counter(work.used())?,
-        })
+        Ok(crate::dto::operations::EditComputationDto { result })
     }
 }
 
@@ -221,20 +193,18 @@ impl PreparedPuzzle {
         token: Arc<CancellationToken>,
     ) -> Result<PreparedPuzzle, NativeError> {
         let rules = input.rules.try_into()?;
-        let mut work = control::budget(input.max_work, None, token)?;
+        let mut execution_control = control::execution(token)?;
         let Bounded::Complete(computation) =
-            sudoku_core::constraints::computation::prepare_computation(&rules, &mut work)?
+            sudoku_core::constraints::computation::prepare_computation(
+                &rules,
+                &mut execution_control,
+            )?
         else {
-            control::check(&work)?;
-            return Err(NativeError::BudgetExhausted {
-                work_used: work.used(),
-            });
+            control::check(&execution_control)?;
+            return Err(NativeError::Cancelled);
         };
-        control::check(&work)?;
+        control::check(&execution_control)?;
 
-        Ok(Self {
-            computation,
-            preparation_work: counter(work.used())?,
-        })
+        Ok(Self { computation })
     }
 }

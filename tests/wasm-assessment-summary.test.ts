@@ -11,7 +11,7 @@ beforeAll(async () => {
   await bindings.default({ module_or_path: getTestModule() })
 })
 
-it.each(RATING_FIXTURES)('returns the full assessment summary and work for $id', (fixture) => {
+it.each(RATING_FIXTURES)('returns the full assessment summary for $id', (fixture) => {
   const input = { board: [...fixture.board], rules: copyRules(fixture.rules) }
 
   const full = bindings.assess(input)
@@ -22,7 +22,6 @@ it.each(RATING_FIXTURES)('returns the full assessment summary and work for $id',
 
   expect(summary).toEqual({
     result: { status: 'rated', summary: full.result.summary },
-    workUsed: full.workUsed,
   })
   expect(summary.result).not.toHaveProperty('trace')
 })
@@ -35,29 +34,14 @@ duplicate[1] = 1
 const boundedCases: { name: string; input: AssessmentInputDto; status: string }[] = [
   { name: 'stalled', input: { board: empty, rules: { kind: 'classic' } }, status: 'ungraded' },
   {
-    name: 'variant preparation limit',
-    input: { board: empty, rules: { kind: 'diagonal' }, maxWork: 0 },
-    status: 'budget-exhausted',
-  },
-  {
     name: 'contradictory',
     input: { board: duplicate, rules: { kind: 'classic' } },
     status: 'invalid',
   },
   {
-    name: 'work limit',
-    input: { board: empty, rules: { kind: 'classic' }, maxWork: 0 },
-    status: 'budget-exhausted',
-  },
-  {
     name: 'step limit',
-    input: { board: empty, rules: { kind: 'classic' }, limits: { maxSteps: 0, maxWork: 4000000 } },
-    status: 'budget-exhausted',
-  },
-  {
-    name: 'initial work overflow',
-    input: { board: empty, rules: { kind: 'classic' }, maxWork: 0, initialWork: 1 },
-    status: 'invalid',
+    input: { board: empty, rules: { kind: 'classic' }, limits: { maxSteps: 0 } },
+    status: 'incomplete',
   },
   {
     name: 'unknown rating version',
@@ -66,7 +50,7 @@ const boundedCases: { name: string; input: AssessmentInputDto; status: string }[
   },
 ]
 
-it.each(boundedCases)('preserves the $name outcome and exact work', ({ input, status }) => {
+it.each(boundedCases)('preserves the $name outcome', ({ input, status }) => {
   const full = bindings.assess(input)
   const summary = bindings.assess_summary(input)
 
@@ -74,17 +58,8 @@ it.each(boundedCases)('preserves the $name outcome and exact work', ({ input, st
   expect(summary).toEqual(full)
 })
 
-it('retains explicit null difficulty when variant preparation is incomplete', () => {
-  const result = bindings.assess_summary({ board: empty, rules: { kind: 'diagonal' }, maxWork: 0 })
-
-  expect(result).toEqual({
-    result: {
-      status: 'budget-exhausted',
-      ratingVersion: 'sudoku-rating-v2',
-      variant: 'diagonal',
-      stage: 'validation',
-      difficulty: null,
-    },
-    workUsed: 0,
-  })
+it('does not expose removed work fields in completed results', () => {
+  const result = bindings.assess_summary({ board: empty, rules: { kind: 'classic' } })
+  expect(result).not.toHaveProperty('workUsed')
+  expect(result.result.status).toBe('ungraded')
 })

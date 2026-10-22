@@ -5,9 +5,9 @@ import kotlinx.serialization.Serializable
 
 /** Incomplete computation cannot be mistaken for a valid empty result. */
 sealed interface EngineOutcome<out T> {
-    data class Completed<T>(val value: T, val workUsed: Long = 0) : EngineOutcome<T>
+    data class Completed<T>(val value: T) : EngineOutcome<T>
 
-    data class BudgetExhausted(val workUsed: Long = 0) : EngineOutcome<Nothing>
+    data object Incomplete : EngineOutcome<Nothing>
 
     data object Cancelled : EngineOutcome<Nothing>
 

@@ -2,29 +2,17 @@
 use crate::assessment_projection::project_summary;
 use crate::fixtures::project_rule_value;
 use serde_json::{Value, json};
-use sudoku_core::budget::WorkStage;
 use sudoku_core::generation::types::{
     GenerationExhaustionCause, GenerationOutcome, GenerationResult,
 };
 
 pub fn project_result(result: &GenerationResult) -> Value {
     let metrics = &result.metrics;
-    let stages: serde_json::Map<String, Value> = WorkStage::ALL
-        .into_iter()
-        .map(|stage| {
-            (
-                stage.name().to_string(),
-                json!(metrics.work_by_stage.used(stage)),
-            )
-        })
-        .collect();
     let mut value = json!({
         "metrics": {
-            "constructionWork": metrics.construction_work,
             "layouts": metrics.layouts,
             "completedLayouts": metrics.completed_layouts,
             "candidateVisits": metrics.candidate_visits,
-            "workByStage": stages,
         }
     });
 
@@ -49,11 +37,11 @@ pub fn project_result(result: &GenerationResult) -> Value {
                 "puzzleVersion": puzzle.puzzle_version.as_str(),
             });
         }
-        GenerationOutcome::BudgetExhausted { cause } => {
+        GenerationOutcome::Incomplete { cause } => {
             value["status"] = json!("budget-exhausted");
             value["stage"] = json!("construction");
             value["cause"] = json!(match cause {
-                GenerationExhaustionCause::WorkLimit => "work-limit",
+                GenerationExhaustionCause::Cancelled => "work-limit",
                 GenerationExhaustionCause::LogicalStepLimit => "logical-step-limit",
                 GenerationExhaustionCause::LayoutLimit => "layout-limit",
                 GenerationExhaustionCause::ExhaustedFrontier => "exhausted-frontier",

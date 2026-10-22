@@ -25,13 +25,13 @@ Source: [`policies.rs`](../../sudoku/core/src/rating/policies.rs).
 2. Run the lowest policy, keeping its effective deductions and final candidate state.
 3. If solved, return that difficulty and the complete successful trace.
 4. If stalled, continue with the next policy only when its actual priority order extends the previous order as an unchanged prefix. Otherwise restart from the original board and clear the trace.
-5. Stop explicitly on invalid input, a work/step limit, or failure of all supported policies to finish.
+5. Stop explicitly on invalid input, cancellation or a step limit, or failure of all supported policies to finish.
 
 The prefix condition is stronger than set inclusion. If a newly permitted technique moves ahead of an old one, it can change the earlier path. Reusing the old workspace would then describe a different policy execution. Current policy lists are nested prefixes, but the implementation checks the actual execution order rather than assuming this will always remain true.
 
-The default allowance is 500 logical steps per policy and 4,000,000 shared work units. Reused steps count toward the step limit; work is not reset between policies. Each new clue mask gets a fresh workspace even if it shares immutable layout preparation.
+The local limit is 500 logical steps per policy. Reused steps count toward that limit. The application request has a single 3,000 ms deadline; policy transitions share cancellation and never renew it. Each new clue mask gets a fresh workspace even if it shares immutable layout preparation.
 
-Target screening for generation evaluates only up to the requested policy. It returns a matching grade, a lower grade, a target stall, invalid input or exhaustion. A target stall is not proof of a higher grade. Completing a successful trial summarizes its owned trace without another solve or extra charged search work.
+Target screening for generation evaluates only up to the requested policy. It returns a matching grade, a lower grade, a target stall, invalid input or exhaustion. A target stall is not proof of a higher grade. Completing a successful trial summarizes its owned trace without another solve or another search.
 
 Source: [`assessment.rs`](../../sudoku/core/src/rating/assessment.rs), [`input.rs`](../../sudoku/core/src/rating/input.rs).
 

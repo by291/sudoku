@@ -1,18 +1,16 @@
 use super::terminal_construction::{TerminalConstructionResult, construct_unit_terminal};
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::context::prepare_rules;
 use crate::rules::types::PuzzleRules;
-use crate::types::{Bounded, CoreResult, EngineError};
+use crate::types::{Bounded, CoreResult};
 
 pub fn construct_classic_terminal(
     random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<TerminalConstructionResult> {
-    let Bounded::Complete(rules) = prepare_rules(&PuzzleRules::Classic, budget)? else {
-        return Err(EngineError::invalid(
-            "Static Classic preparation unexpectedly exhausted",
-        ));
+    let Bounded::Complete(rules) = prepare_rules(&PuzzleRules::Classic, control)? else {
+        return Ok(TerminalConstructionResult::Incomplete);
     };
-    Ok(construct_unit_terminal(&rules, random, budget, None))
+    Ok(construct_unit_terminal(&rules, random, control, None))
 }

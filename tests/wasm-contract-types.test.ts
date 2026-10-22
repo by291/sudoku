@@ -8,7 +8,7 @@ import type {
   hint,
   parse_assessment_summary,
   PreparedPuzzle,
-  WorkResultDto,
+  ComputationResultDto,
   AssessmentResultDto,
   AssessmentOutcomeDto,
   LiveAssessmentOutcomeDto,
@@ -27,9 +27,11 @@ test('generated_exports_preserve_concrete_result_types', () => {
   expectTypeOf<Parameters<typeof generate>[0]>().toEqualTypeOf<Uint8Array>()
   expectTypeOf<Parameters<typeof derive_seed>[0]>().toEqualTypeOf<Uint8Array>()
   expectTypeOf<Parameters<typeof parse_assessment_summary>[0]>().toBeUnknown()
-  expectTypeOf<ReturnType<typeof assess>>().toEqualTypeOf<WorkResultDto<AssessmentResultDto>>()
+  expectTypeOf<ReturnType<typeof assess>>().toEqualTypeOf<
+    ComputationResultDto<AssessmentResultDto>
+  >()
   expectTypeOf<ReturnType<typeof assess_summary>>().toEqualTypeOf<
-    WorkResultDto<LiveAssessmentOutcomeDto>
+    ComputationResultDto<LiveAssessmentOutcomeDto>
   >()
   expectTypeOf<
     Extract<ReturnType<typeof assess_summary>['result'], { status: 'rated' }>
@@ -40,10 +42,12 @@ test('generated_exports_preserve_concrete_result_types', () => {
   expectTypeOf<ReturnType<typeof parse_assessment_outcome>>().toEqualTypeOf<
     ParsedAssessmentDto<AssessmentOutcomeDto>
   >()
-  expectTypeOf<ReturnType<typeof hint>>().toEqualTypeOf<WorkResultDto<HintResultDto>>()
-  expectTypeOf<ReturnType<typeof count_solutions>>().toEqualTypeOf<WorkResultDto<SearchResultDto>>()
+  expectTypeOf<ReturnType<typeof hint>>().toEqualTypeOf<ComputationResultDto<HintResultDto>>()
+  expectTypeOf<ReturnType<typeof count_solutions>>().toEqualTypeOf<
+    ComputationResultDto<SearchResultDto>
+  >()
   expectTypeOf<ReturnType<PreparedPuzzle['candidates']>>().toEqualTypeOf<
-    WorkResultDto<CandidateResultDto>
+    ComputationResultDto<CandidateResultDto>
   >()
   expectTypeOf<ReturnType<typeof parse_assessment_summary>>().toEqualTypeOf<
     ParsedAssessmentDto<AssessmentSummaryDto>
@@ -56,9 +60,6 @@ test('nested_records_and_nulls_match_the_actual_js_values', () => {
   >()
   expectTypeOf<import('@sudoku/wasm').WorkloadDto['highestTier']>().toEqualTypeOf<
     import('@sudoku/wasm').DifficultyDto | null
-  >()
-  expectTypeOf<import('@sudoku/wasm').GenerationMetricsDto['workByStage']>().toEqualTypeOf<
-    Record<'preparation' | 'arithmetic' | 'exact' | 'logic' | 'proposals', number>
   >()
 })
 

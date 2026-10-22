@@ -1,7 +1,7 @@
 //! Pure board-layer edits; session history, assistance, clocks and completion records belong to callers.
 use crate::board::is_complete;
-use crate::budget::WorkBudget;
 use crate::constraints::candidates::evaluate_candidates;
+use crate::control::ExecutionControl;
 use crate::rules::types::PreparedRules;
 use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask, CellIndex, CoreResult, Digit};
 
@@ -30,7 +30,7 @@ pub struct EditResult {
 #[derive(Clone, Debug)]
 pub enum EditOutcome {
     Complete(Box<EditResult>),
-    BudgetExhausted,
+    Incomplete,
 }
 
 pub fn merged_board(givens: &Board, layers: &BoardLayers) -> Board {
@@ -64,7 +64,7 @@ pub fn edit_board(
     before: &BoardLayers,
     edit: &BoardEdit,
     rules: &PreparedRules,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<EditOutcome> {
     let cell = match edit {
         BoardEdit::Enter { cell, .. }
@@ -105,9 +105,9 @@ pub fn edit_board(
         }
         BoardEdit::GenerateNotes => {
             let Bounded::Complete(candidates) =
-                evaluate_candidates(&merged_board(givens, before), rules, budget)
+                evaluate_candidates(&merged_board(givens, before), rules, control)
             else {
-                return Ok(EditOutcome::BudgetExhausted);
+                return Ok(EditOutcome::Incomplete);
             };
             notes = candidates;
         }

@@ -1,4 +1,4 @@
-import type { ConflictWorkDto, EditWorkDto, Board } from '@/sudoku/contracts'
+import type { ConflictComputationDto, EditComputationDto, Board } from '@/sudoku/contracts'
 import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
 import type { AssessmentInput, LiveAssessmentOutcome } from '@/sudoku/contracts'
@@ -19,8 +19,7 @@ import type {
   WorkerInitialize,
 } from '@/worker/protocol'
 
-const GENERATION_TIMEOUT_MILLISECONDS = 3000
-const COMPUTATION_TIMEOUT_MILLISECONDS = 15000
+const REQUEST_TIMEOUT_MILLISECONDS = 3000
 
 type StartupResult = { status: 'ready' } | { status: 'failed'; message: string }
 
@@ -37,11 +36,11 @@ export interface SudokuWorkerClient {
     board: Board,
     rules: PuzzleRules,
     signal?: AbortSignal,
-  ): Promise<WorkerOutcome<LiveComputation<ConflictWorkDto>>>
+  ): Promise<WorkerOutcome<LiveComputation<ConflictComputationDto>>>
   generateNotes(
     input: GenerateNotesInput,
     signal?: AbortSignal,
-  ): Promise<WorkerOutcome<LiveComputation<EditWorkDto>>>
+  ): Promise<WorkerOutcome<LiveComputation<EditComputationDto>>>
 
   generate(input: GenerationInput, signal?: AbortSignal): Promise<GenerateOutcome>
   assess(
@@ -178,13 +177,14 @@ export function createSudokuWorkerClient(
     request: WorkerRequest,
     decode: (value: unknown) => WorkerOutcome<T> | null,
     signal?: AbortSignal,
-    timeoutMilliseconds = COMPUTATION_TIMEOUT_MILLISECONDS,
+    timeoutMilliseconds = REQUEST_TIMEOUT_MILLISECONDS,
   ): Promise<WorkerOutcome<T>> {
     if (disposed || signal?.aborted) {
       return Promise.resolve({ status: 'cancelled' })
     }
 
     return new Promise((resolve) => {
+      const deadline = performance.now() + timeoutMilliseconds
       let prepared: PreparedWorker
       try {
         prepared = takeWorker()
@@ -208,6 +208,10 @@ export function createSudokuWorkerClient(
           return
         }
 
+        // Timers can be delayed by a busy event loop or synchronous reply validation.
+        if (outcome.status === 'completed' && performance.now() >= deadline) {
+          outcome = { status: 'timed-out' }
+        }
         settled = true
         window.clearTimeout(timeout)
         signal?.removeEventListener('abort', cancel)
@@ -224,15 +228,24 @@ export function createSudokuWorkerClient(
           return
         }
 
+        if (performance.now() >= deadline) {
+          finish({ status: 'timed-out' })
+          return
+        }
         try {
           finish(
             decode(event.data) ?? { status: 'failed', message: 'Worker returned malformed data' },
           )
         } catch (error: unknown) {
-          finish({
-            status: 'failed',
-            message: error instanceof Error ? error.message : 'Worker returned malformed data',
-          })
+          finish(
+            error instanceof Error && error.message === 'Computation timed out'
+              ? { status: 'timed-out' }
+              : {
+                  status: 'failed',
+                  message:
+                    error instanceof Error ? error.message : 'Worker returned malformed data',
+                },
+          )
         }
       }
 
@@ -242,6 +255,10 @@ export function createSudokuWorkerClient(
 
       function send() {
         if (settled) {
+          return
+        }
+        if (performance.now() >= deadline) {
+          finish({ status: 'timed-out' })
           return
         }
         if (prepared.failure) {
@@ -349,7 +366,7 @@ export function createSudokuWorkerClient(
           return outcome
         },
         signal,
-        GENERATION_TIMEOUT_MILLISECONDS,
+        REQUEST_TIMEOUT_MILLISECONDS,
       )
     },
     assess(input, signal) {

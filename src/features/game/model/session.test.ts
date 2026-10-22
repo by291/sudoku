@@ -1,3 +1,4 @@
+import { commitBoardEdit } from '@/features/game/model/session'
 import {
   applySessionAction,
   completeSession,
@@ -131,18 +132,17 @@ it('clears only proven duplicate-peer notes and restores them atomically for Arr
   ).toEqual(result.session.notes)
 })
 
-it('generates rule-aware notes and retains all state when the candidate budget exhausts', () => {
+it('generates rule-aware notes and retains all state when the candidate computation is incomplete', () => {
   const fixture = VARIANT_FIXTURES.thermo
   const session = makeSession({
     puzzle: { ...makeSession().puzzle, ...fixture, givens: emptyBoard },
   })
-  const exhausted = applySessionAction(session, { kind: 'generate-notes' }, 0)
+  const exhausted = commitBoardEdit(session, { status: 'incomplete' }, { kind: 'generate-notes' })
 
   expect(exhausted).toEqual({
-    status: 'budget-exhausted',
+    status: 'incomplete',
     session,
     changed: false,
-    boardComplete: false,
   })
   expect(exhausted.session).toBe(session)
   const result = applySessionAction(session, { kind: 'generate-notes' })

@@ -127,3 +127,42 @@ pub fn decode_puzzle(value: &Value) -> CoreResult<Puzzle> {
         difficulty,
     })
 }
+
+/// Ignore retired work telemetry while preserving sealed mathematical expectations.
+pub fn without_work(mut value: Value) -> Value {
+    match &mut value {
+        Value::Object(object) => {
+            for key in [
+                "workUsed",
+                "used",
+                "prepareWork",
+                "queryWork",
+                "constructionWork",
+                "workByStage",
+            ] {
+                object.remove(key);
+            }
+            for child in object.values_mut() {
+                *child = without_work(child.take());
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                *item = without_work(item.take());
+            }
+        }
+        _ => {}
+    }
+    value
+}
+
+pub fn cancelled_control() -> sudoku_core::control::ExecutionControl {
+    #[derive(Debug)]
+    struct Cancelled;
+    impl sudoku_core::control::CancellationProbe for Cancelled {
+        fn is_cancelled(&self) -> bool {
+            true
+        }
+    }
+    sudoku_core::control::ExecutionControl::with_cancellation(std::sync::Arc::new(Cancelled))
+}

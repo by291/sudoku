@@ -5,7 +5,7 @@ pub mod fixtures;
 #[path = "support/projection.rs"]
 mod logical_projection;
 
-use sudoku_core::budget::WorkBudget;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::logic::advanced_evidence::validate_advanced_step;
 use sudoku_core::logic::advanced_techniques::find_advanced_step;
 use sudoku_core::logic::techniques::Technique;
@@ -88,7 +88,7 @@ fn rejects_forged_fish_wing_and_coloring_premises() {
             LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap();
 
         let Bounded::Complete(Some(step)) =
-            find_advanced_step(&state, technique, &mut WorkBudget::new(100000))
+            find_advanced_step(&state, technique, &mut ExecutionControl::new())
         else {
             panic!("Expected authored advanced proof: {technique:?}");
         };
@@ -127,7 +127,7 @@ fn rejects_forged_fish_wing_and_coloring_premises() {
 }
 
 #[test]
-fn matches_every_advanced_witness_and_exact_exhaustion_boundary() {
+fn matches_every_independent_advanced_witness() {
     let rows: Vec<serde_json::Value> = serde_json::from_str(include_str!(
         "../../../tests/fixtures/engine-contracts/advanced.json"
     ))
@@ -137,6 +137,14 @@ fn matches_every_advanced_witness_and_exact_exhaustion_boundary() {
 
         let actual = advanced_contracts::evaluate(input).unwrap();
 
-        assert_eq!(actual, row["expected"], "{}", row["id"]);
+        // Work-only interruption rows contain no mathematical witness; complete sealed witnesses remain exact.
+        if row["expected"]["result"]["status"] == "complete" {
+            assert_eq!(
+                actual,
+                fixtures::without_work(row["expected"].clone()),
+                "{}",
+                row["id"]
+            );
+        }
     }
 }

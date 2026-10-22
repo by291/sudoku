@@ -1,27 +1,28 @@
 #![forbid(unsafe_code)]
 
+mod control;
 mod conversion;
 mod dto;
 mod prepared;
 
+use crate::control::execution;
 use conversion::generation::{input as generation_input, result_to_dto};
 use conversion::logic::{hint_to_core, hint_to_dto, logic_to_dto};
 use conversion::rating::{assessment_summary_to_dto, assessment_to_dto};
 use conversion::rules::rules_to_dto;
-use conversion::values::{DEFAULT_QUERY_WORK, budget, counter};
 use dto::EngineInfo;
 use dto::generation::{GenerationOptionsDto, GenerationResultDto};
 use dto::logic::{
     HintInputDto, HintResultDto, HintValidationDto, HintValidationInputDto, LogicInputDto,
 };
-use dto::operations::{CountInputDto, WorkResultDto};
+use dto::operations::{ComputationResultDto, CountInputDto};
 use dto::rating::AssessmentInputDto;
 use dto::rules::{PuzzleContentDto, RulesDto, TransformInputDto, ValidationDto};
 use js_sys::{ArrayBuffer, Uint8Array};
 use sudoku_core::generation::types::{PUZZLE_VERSION, VARIANT_PUZZLE_VERSION};
 use sudoku_core::random::Seed;
 use sudoku_core::rating::types::{
-    AssessmentInput, AssessmentIssue, AssessmentLimits, AssessmentResult, RATING_VERSION,
+    AssessmentInput, AssessmentLimits, AssessmentResult, RATING_VERSION,
 };
 use sudoku_core::types::{Board, Bounded, EngineError};
 use tsify::{Ts, Tsify};
@@ -59,7 +60,7 @@ fn owned_bytes(value: &Uint8Array) -> Result<Vec<u8>, JsError> {
 #[wasm_bindgen]
 pub fn engine_info() -> Result<Ts<EngineInfo>, JsError> {
     Ok(EngineInfo {
-        bridge_version: 3,
+        bridge_version: 4,
         puzzle_version: PUZZLE_VERSION,
         variant_puzzle_version: VARIANT_PUZZLE_VERSION,
         rating_version: RATING_VERSION,
@@ -79,65 +80,78 @@ pub fn generate(
 ) -> Result<Ts<GenerationResultDto>, JsError> {
     let seed = Seed::try_from(owned_bytes(&seed)?.as_slice()).map_err(js_error)?;
     let (input, limits) = generation_input(seed, options.to_rust()?).map_err(js_error)?;
-    let result =
-        sudoku_core::generation::generate::generate_puzzle(&input, &limits).map_err(js_error)?;
-    Ok(result_to_dto(result).map_err(js_error)?.into_ts()?)
+    let mut execution_control = execution();
+    let result = sudoku_core::generation::generate::generate_puzzle_with_control(
+        &input,
+        &limits,
+        &mut execution_control,
+    );
+    // Cancellation must settle before a stopped inner operation becomes an input error.
+    control::check(&execution_control)?;
+    Ok(result_to_dto(result.map_err(js_error)?)
+        .map_err(js_error)?
+        .into_ts()?)
 }
 
 #[wasm_bindgen]
 pub fn analyze_logic(
     input: Ts<LogicInputDto>,
-) -> Result<Ts<crate::dto::operations::LogicWorkDto>, JsError> {
+) -> Result<Ts<crate::dto::operations::LogicComputationDto>, JsError> {
     let input = input.to_rust()?;
     let board: Board = input.board.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
     let rules = sudoku_core::rules::context::compile_rules(&rules).map_err(js_error)?;
     let allowed: Vec<_> = input.allowed.into_iter().map(Into::into).collect();
-    let mut work = budget(Some(input.max_work), None, DEFAULT_QUERY_WORK).map_err(js_error)?;
+    let mut execution_control = execution();
     let result = sudoku_core::logic::solver::analyze_logic(
         &board,
         &rules,
         &allowed,
         checked_steps(Some(input.max_steps))?,
-        &mut work,
+        &mut execution_control,
     );
-    Ok(crate::dto::operations::LogicWorkDto(WorkResultDto {
-        result: logic_to_dto(&result).map_err(js_error)?,
-        work_used: counter(work.used()).map_err(js_error)?,
-    })
-    .into_ts()?)
+    control::check(&execution_control)?;
+    Ok(
+        crate::dto::operations::LogicComputationDto(ComputationResultDto {
+            result: logic_to_dto(&result).map_err(js_error)?,
+        })
+        .into_ts()?,
+    )
 }
 
 #[wasm_bindgen]
-pub fn hint(input: Ts<HintInputDto>) -> Result<Ts<crate::dto::operations::HintWorkDto>, JsError> {
+pub fn hint(
+    input: Ts<HintInputDto>,
+) -> Result<Ts<crate::dto::operations::HintComputationDto>, JsError> {
     let input = input.to_rust()?;
     let board: Board = input.board.try_into().map_err(js_error)?;
     let solution: Board = input.solution.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
     let rules = sudoku_core::rules::context::compile_rules(&rules).map_err(js_error)?;
-    let mut work = budget(input.max_work, None, DEFAULT_QUERY_WORK).map_err(js_error)?;
+    let mut execution_control = execution();
     let result = sudoku_core::hint::analyze_hint(
         &board,
         &solution,
         &rules,
         checked_steps(input.max_steps)?,
-        &mut work,
+        &mut execution_control,
     );
-    Ok(crate::dto::operations::HintWorkDto(WorkResultDto {
-        result: hint_to_dto(&result).map_err(js_error)?,
-        work_used: counter(work.used()).map_err(js_error)?,
-    })
-    .into_ts()?)
+    control::check(&execution_control)?;
+    Ok(
+        crate::dto::operations::HintComputationDto(ComputationResultDto {
+            result: hint_to_dto(&result).map_err(js_error)?,
+        })
+        .into_ts()?,
+    )
 }
 
-fn run_assessment(input: AssessmentInputDto) -> Result<(AssessmentResult, u32), JsError> {
+fn run_assessment(input: AssessmentInputDto) -> Result<AssessmentResult, JsError> {
     let board: Board = input.board.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
     let limits = input
         .limits
         .map_or_else(AssessmentLimits::default, |limits| AssessmentLimits {
             max_steps: limits.max_steps,
-            max_work: u64::from(limits.max_work),
         });
     let snapshot = AssessmentInput {
         board,
@@ -147,42 +161,37 @@ fn run_assessment(input: AssessmentInputDto) -> Result<(AssessmentResult, u32), 
             .unwrap_or_else(|| RATING_VERSION.to_string()),
         limits,
     };
-    let maximum = input.max_work.map(u64::from).unwrap_or(limits.max_work);
-    let mut work = sudoku_core::budget::WorkBudget::new(maximum);
-    let result = if work.consume(u64::from(input.initial_work.unwrap_or(0))) {
-        sudoku_core::rating::assessment::assess_puzzle_with_budget(&snapshot, &mut work)
-    } else {
-        AssessmentResult::Unrated(sudoku_core::rating::types::AssessmentFailure::Invalid {
-            issues: vec![AssessmentIssue::Message(
-                "Invalid caller-owned assessment budget".to_string(),
-            )],
-        })
-    };
-    Ok((result, counter(work.used()).map_err(js_error)?))
+    let mut execution_control = execution();
+    let result = sudoku_core::rating::assessment::assess_puzzle_with_control(
+        &snapshot,
+        &mut execution_control,
+    );
+    control::check(&execution_control)?;
+    Ok(result)
 }
 
 #[wasm_bindgen]
 pub fn assess(
     input: Ts<AssessmentInputDto>,
-) -> Result<Ts<crate::dto::operations::AssessmentWorkDto>, JsError> {
-    let (result, work_used) = run_assessment(input.to_rust()?)?;
-    Ok(crate::dto::operations::AssessmentWorkDto(WorkResultDto {
-        result: assessment_to_dto(&result).map_err(js_error)?,
-        work_used,
-    })
-    .into_ts()?)
+) -> Result<Ts<crate::dto::operations::AssessmentComputationDto>, JsError> {
+    let result = run_assessment(input.to_rust()?)?;
+    Ok(
+        crate::dto::operations::AssessmentComputationDto(ComputationResultDto {
+            result: assessment_to_dto(&result).map_err(js_error)?,
+        })
+        .into_ts()?,
+    )
 }
 
 /// Compute the same assessment while keeping its transient proof trace inside Rust.
 #[wasm_bindgen]
 pub fn assess_summary(
     input: Ts<AssessmentInputDto>,
-) -> Result<Ts<crate::dto::operations::AssessmentSummaryWorkDto>, JsError> {
-    let (result, work_used) = run_assessment(input.to_rust()?)?;
+) -> Result<Ts<crate::dto::operations::AssessmentSummaryComputationDto>, JsError> {
+    let result = run_assessment(input.to_rust()?)?;
     Ok(
-        crate::dto::operations::AssessmentSummaryWorkDto(WorkResultDto {
+        crate::dto::operations::AssessmentSummaryComputationDto(ComputationResultDto {
             result: assessment_summary_to_dto(&result).map_err(js_error)?,
-            work_used,
         })
         .into_ts()?,
     )
@@ -191,24 +200,22 @@ pub fn assess_summary(
 #[wasm_bindgen]
 pub fn count_solutions(
     input: Ts<CountInputDto>,
-) -> Result<Ts<crate::dto::operations::SearchWorkDto>, JsError> {
+) -> Result<Ts<crate::dto::operations::SearchComputationDto>, JsError> {
     let input = input.to_rust()?;
     let board: Board = input.board.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
-    let options = input.work.unwrap_or_default();
-    let mut work =
-        budget(options.max_work, options.initial_work, DEFAULT_QUERY_WORK).map_err(js_error)?;
-    let nodes = options
-        .node_limit
-        .map(u64::from)
-        .unwrap_or(work.remaining());
-    let result = sudoku_core::search::exact::count_with_rules(&board, &rules, &mut work, nodes)
-        .map_err(js_error)?;
-    Ok(crate::dto::operations::SearchWorkDto(WorkResultDto {
-        result: prepared::search_to_dto(result).map_err(js_error)?,
-        work_used: counter(work.used()).map_err(js_error)?,
-    })
-    .into_ts()?)
+    let options = input.options.unwrap_or_default();
+    let mut execution_control = execution();
+    let nodes = options.node_limit.map(u64::from).unwrap_or(u64::MAX);
+    let result =
+        sudoku_core::search::exact::count_with_rules(&board, &rules, &mut execution_control, nodes);
+    control::check(&execution_control)?;
+    Ok(
+        crate::dto::operations::SearchComputationDto(ComputationResultDto {
+            result: prepared::search_to_dto(result.map_err(js_error)?).map_err(js_error)?,
+        })
+        .into_ts()?,
+    )
 }
 
 #[wasm_bindgen]
@@ -218,15 +225,14 @@ pub fn validate_puzzle(
     let content = serde_wasm_bindgen::from_value::<PuzzleContentDto>(input.to_rust()?.0)
         .map_err(|_| EngineError::invalid("Invalid puzzle board or rules"))
         .and_then(|value| value.try_into());
+    let mut execution_control = execution();
     let outcome = content.and_then(|content| {
-        sudoku_core::puzzle::validate_puzzle_bounded(
-            &content,
-            &mut sudoku_core::budget::WorkBudget::new(u64::from(DEFAULT_QUERY_WORK)),
-        )
+        sudoku_core::puzzle::validate_puzzle_bounded(&content, &mut execution_control)
     });
+    control::check(&execution_control)?;
     let result = match outcome {
         Ok(Bounded::Complete(())) => ValidationDto::Valid,
-        Ok(Bounded::BudgetExhausted) => ValidationDto::BudgetExhausted,
+        Ok(Bounded::Cancelled) => ValidationDto::Incomplete,
         Err(error) => ValidationDto::Invalid {
             issues: issues(error),
         },
@@ -245,12 +251,19 @@ pub fn validate_hint_evidence(
                     EngineError::invalid("Hint evidence does not match the requested rules")
                 })
             });
+    let mut execution_control = execution();
     let outcome = parsed.and_then(|input| {
         let hint = hint_to_core(input.hint)?;
         let rules = input.rules.try_into()?;
         let board: Option<Board> = input.board.map(TryInto::try_into).transpose()?;
-        sudoku_core::hint::validation::validate_hint_evidence(&hint, &rules, board.as_ref())
+        sudoku_core::hint::validation::validate_hint_evidence_with_control(
+            &hint,
+            &rules,
+            board.as_ref(),
+            &mut execution_control,
+        )
     });
+    control::check(&execution_control)?;
     let result = match outcome {
         Ok(hint) => HintValidationDto::Valid {
             hint: hint_to_dto(&hint).map_err(js_error)?,
@@ -376,6 +389,7 @@ pub fn validate_teaching_step(
                 serde_wasm_bindgen::from_value::<dto::logic::TeachingStepInputDto>(value)
                     .map_err(|_| EngineError::invalid("Invalid teaching step envelope"))
             });
+    let mut execution_control = execution();
     let outcome = parsed.and_then(|input| {
         let board = input.board.try_into()?;
         let rules = input.rules.try_into()?;
@@ -388,8 +402,15 @@ pub fn validate_teaching_step(
             .try_into()
             .map_err(|_| EngineError::invalid("Teaching candidate state must contain 81 masks"))?;
         let step = conversion::logic::step_to_core(input.step)?;
-        sudoku_core::logic::teaching::validate_teaching_step(&board, candidates, &rules, &step)
+        sudoku_core::logic::teaching::validate_teaching_step_with_control(
+            &board,
+            candidates,
+            &rules,
+            &step,
+            &mut execution_control,
+        )
     });
+    control::check(&execution_control)?;
     Ok(match outcome {
         Ok(()) => ValidationDto::Valid,
         Err(error) => ValidationDto::Invalid {

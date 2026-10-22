@@ -1,10 +1,11 @@
+use crate::control::execution;
 use crate::conversion::editing::PreparedEditInput;
 use crate::conversion::rules::metadata_to_dto;
-use crate::conversion::values::{DEFAULT_QUERY_WORK, budget, counter, indices};
+use crate::conversion::values::{counter, indices};
 use crate::conversion::violations::violation_to_dto;
 use crate::dto::operations::{
-    BoardQueryDto, CandidateResultDto, ConflictResultDto, EditInputDto, EditResultDto,
-    PreparedCountInputDto, SearchResultDto, WorkResultDto,
+    BoardQueryDto, CandidateResultDto, ComputationResultDto, ConflictResultDto, EditInputDto,
+    EditResultDto, PreparedCountInputDto, SearchResultDto,
 };
 use crate::dto::rules::{MetadataDto, PrepareInputDto};
 use crate::dto::values::BoardDto;
@@ -22,29 +23,22 @@ pub fn search_to_dto(result: SearchResult) -> CoreResult<SearchResultDto> {
             count,
             solution,
             nodes_visited,
-            work_used,
         } => SearchResultDto::Complete {
             count,
             solution: solution.as_ref().map(Into::into),
             nodes_visited: counter(nodes_visited)?,
-            work_used: counter(work_used)?,
         },
-        SearchResult::BudgetExhausted {
-            nodes_visited,
-            work_used,
-        } => SearchResultDto::BudgetExhausted {
+        SearchResult::Incomplete { nodes_visited } => SearchResultDto::Incomplete {
             nodes_visited: counter(nodes_visited)?,
-            work_used: counter(work_used)?,
         },
     })
 }
 
 /// Own one immutable compiled layout and return independent metadata and operation results.
-/// Live operations retain raw-support work; exact queries reuse charged preparation.
+/// Exact queries reuse immutable prepared constraints.
 #[wasm_bindgen]
 pub struct PreparedPuzzle {
     computation: PreparedComputation,
-    preparation_work: u32,
 }
 
 #[wasm_bindgen]
@@ -53,24 +47,17 @@ impl PreparedPuzzle {
     pub fn new(input: Ts<PrepareInputDto>) -> Result<PreparedPuzzle, JsError> {
         let input = input.to_rust()?;
         let rules = input.rules.try_into().map_err(js_error)?;
-        let mut work = budget(input.max_work, None, DEFAULT_QUERY_WORK).map_err(js_error)?;
-        let Bounded::Complete(computation) =
-            sudoku_core::constraints::computation::prepare_computation(&rules, &mut work)
-                .map_err(js_error)?
-        else {
-            return Err(JsError::new("Prepared layout work budget exhausted"));
+        let mut execution_control = execution();
+        let result = sudoku_core::constraints::computation::prepare_computation(
+            &rules,
+            &mut execution_control,
+        );
+        crate::control::check(&execution_control)?;
+        let Bounded::Complete(computation) = result.map_err(js_error)? else {
+            return Err(JsError::new("Computation timed out"));
         };
 
-        Ok(Self {
-            computation,
-            preparation_work: counter(work.used()).map_err(js_error)?,
-        })
-    }
-
-    /// Deterministic core work units spent compiling this layout, not elapsed time.
-    #[wasm_bindgen(getter, js_name = preparationWork)]
-    pub fn preparation_work(&self) -> u32 {
-        self.preparation_work
+        Ok(Self { computation })
     }
 
     #[wasm_bindgen(getter, js_name = liveExecution)]
@@ -121,45 +108,40 @@ impl PreparedPuzzle {
     pub fn candidates(
         &self,
         input: Ts<BoardQueryDto>,
-    ) -> Result<Ts<crate::dto::operations::CandidateWorkDto>, JsError> {
+    ) -> Result<Ts<crate::dto::operations::CandidateComputationDto>, JsError> {
         let input = input.to_rust()?;
         let board: Board = input.board.try_into().map_err(js_error)?;
-        let options = input.work.unwrap_or_default();
-        let mut work =
-            budget(options.max_work, options.initial_work, DEFAULT_QUERY_WORK).map_err(js_error)?;
+        let mut execution_control = execution();
 
-        let result = match sudoku_core::constraints::candidates::evaluate_candidates(
+        let candidates = sudoku_core::constraints::candidates::evaluate_candidates(
             &board,
             self.computation.rules(),
-            &mut work,
-        ) {
+            &mut execution_control,
+        );
+        crate::control::check(&execution_control)?;
+        let result = match candidates {
             Bounded::Complete(candidates) => CandidateResultDto::Complete {
                 candidates: candidates.iter().map(|mask| mask.bits()).collect(),
             },
-            Bounded::BudgetExhausted => CandidateResultDto::BudgetExhausted,
+            Bounded::Cancelled => CandidateResultDto::Incomplete,
         };
 
-        Ok(crate::dto::operations::CandidateWorkDto(WorkResultDto {
-            result,
-            work_used: counter(work.used()).map_err(js_error)?,
-        })
-        .into_ts()?)
+        Ok(
+            crate::dto::operations::CandidateComputationDto(ComputationResultDto { result })
+                .into_ts()?,
+        )
     }
 
-    pub fn conflicts(
+    /// Return sound direct conflicts without enumerating partial arithmetic constraints.
+    /// An incomplete preview must not establish that the board is valid.
+    pub fn preview_conflicts(
         &self,
-        input: Ts<BoardQueryDto>,
-    ) -> Result<Ts<crate::dto::operations::ConflictWorkDto>, JsError> {
-        let input = input.to_rust()?;
-        let board: Board = input.board.try_into().map_err(js_error)?;
-        let options = input.work.unwrap_or_default();
-        let mut work =
-            budget(options.max_work, options.initial_work, DEFAULT_QUERY_WORK).map_err(js_error)?;
-
-        let conflicts = sudoku_core::constraints::conflicts::evaluate_conflicts(
+        board: Ts<BoardDto>,
+    ) -> Result<Ts<crate::dto::operations::ConflictComputationDto>, JsError> {
+        let board: Board = board.to_rust()?.try_into().map_err(js_error)?;
+        let conflicts = sudoku_core::constraints::conflicts::preview_conflicts(
             &board,
             self.computation.rules(),
-            &mut work,
         );
         let violations = conflicts
             .violations
@@ -169,80 +151,104 @@ impl PreparedPuzzle {
             .map_err(js_error)?;
         let result = match conflicts.status {
             ConflictStatus::Complete => ConflictResultDto::Complete { violations },
-            ConflictStatus::BudgetExhausted => ConflictResultDto::BudgetExhausted { violations },
+            ConflictStatus::Incomplete => ConflictResultDto::Incomplete { violations },
+        };
+        Ok(
+            crate::dto::operations::ConflictComputationDto(ComputationResultDto { result })
+                .into_ts()?,
+        )
+    }
+
+    pub fn conflicts(
+        &self,
+        input: Ts<BoardQueryDto>,
+    ) -> Result<Ts<crate::dto::operations::ConflictComputationDto>, JsError> {
+        let input = input.to_rust()?;
+        let board: Board = input.board.try_into().map_err(js_error)?;
+        let mut execution_control = execution();
+
+        let conflicts = sudoku_core::constraints::conflicts::evaluate_conflicts(
+            &board,
+            self.computation.rules(),
+            &mut execution_control,
+        );
+        crate::control::check(&execution_control)?;
+        let violations = conflicts
+            .violations
+            .iter()
+            .map(violation_to_dto)
+            .collect::<CoreResult<_>>()
+            .map_err(js_error)?;
+        let result = match conflicts.status {
+            ConflictStatus::Complete => ConflictResultDto::Complete { violations },
+            ConflictStatus::Incomplete => ConflictResultDto::Incomplete { violations },
         };
 
-        Ok(crate::dto::operations::ConflictWorkDto(WorkResultDto {
-            result,
-            work_used: counter(work.used()).map_err(js_error)?,
-        })
-        .into_ts()?)
+        Ok(
+            crate::dto::operations::ConflictComputationDto(ComputationResultDto { result })
+                .into_ts()?,
+        )
     }
 
     pub fn count_solutions(
         &self,
         input: Ts<PreparedCountInputDto>,
-    ) -> Result<Ts<crate::dto::operations::SearchWorkDto>, JsError> {
+    ) -> Result<Ts<crate::dto::operations::SearchComputationDto>, JsError> {
         let input = input.to_rust()?;
         let board: Board = input.board.try_into().map_err(js_error)?;
-        let options = input.work.unwrap_or_default();
-        let mut work =
-            budget(options.max_work, options.initial_work, DEFAULT_QUERY_WORK).map_err(js_error)?;
-        let nodes = options
-            .node_limit
-            .map(u64::from)
-            .unwrap_or(work.remaining());
+        let options = input.options.unwrap_or_default();
+        let mut execution_control = execution();
+        let nodes = options.node_limit.map(u64::from).unwrap_or(u64::MAX);
 
         let result = sudoku_core::search::exact::count_solutions(
             &board,
             &self.computation,
-            &mut work,
+            &mut execution_control,
             nodes,
         );
 
-        Ok(crate::dto::operations::SearchWorkDto(WorkResultDto {
-            result: search_to_dto(result).map_err(js_error)?,
-            work_used: counter(work.used()).map_err(js_error)?,
-        })
-        .into_ts()?)
+        crate::control::check(&execution_control)?;
+        Ok(
+            crate::dto::operations::SearchComputationDto(ComputationResultDto {
+                result: search_to_dto(result).map_err(js_error)?,
+            })
+            .into_ts()?,
+        )
     }
 
     pub fn edit(
         &self,
         input: Ts<EditInputDto>,
-    ) -> Result<Ts<crate::dto::operations::EditWorkDto>, JsError> {
+    ) -> Result<Ts<crate::dto::operations::EditComputationDto>, JsError> {
         let PreparedEditInput {
             givens,
             before,
             action,
-            work: options,
         } = input.to_rust()?.try_into().map_err(js_error)?;
 
-        let mut work =
-            budget(options.max_work, options.initial_work, DEFAULT_QUERY_WORK).map_err(js_error)?;
+        let mut execution_control = execution();
 
-        let result = match sudoku_core::editing::edit_board(
+        let result = sudoku_core::editing::edit_board(
             &givens,
             &before,
             &action,
             self.computation.rules(),
-            &mut work,
-        )
-        .map_err(js_error)?
-        {
+            &mut execution_control,
+        );
+        crate::control::check(&execution_control)?;
+        let result = match result.map_err(js_error)? {
             EditOutcome::Complete(result) => EditResultDto::Complete {
                 entries: (&result.layers.entries).into(),
                 notes: result.layers.notes.iter().map(|mask| mask.bits()).collect(),
                 changed: result.changed,
                 board_complete: result.board_complete,
             },
-            EditOutcome::BudgetExhausted => EditResultDto::BudgetExhausted,
+            EditOutcome::Incomplete => EditResultDto::Incomplete,
         };
 
-        Ok(crate::dto::operations::EditWorkDto(WorkResultDto {
-            result,
-            work_used: counter(work.used()).map_err(js_error)?,
-        })
-        .into_ts()?)
+        Ok(
+            crate::dto::operations::EditComputationDto(ComputationResultDto { result })
+                .into_ts()?,
+        )
     }
 }

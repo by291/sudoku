@@ -6,10 +6,10 @@ import type {
   PuzzleRules,
   RuleMetadata,
   BoardQueryDto,
-  CandidateWorkDto,
-  ConflictWorkDto,
+  CandidateComputationDto,
+  ConflictComputationDto,
   EditInputDto,
-  EditWorkDto,
+  EditComputationDto,
   PuzzleValidation,
   AssessmentValidationInputDto,
   AssessmentValidationDto,
@@ -24,13 +24,12 @@ type Bindings = ReturnType<typeof createBindings>
 /** Owns a prepared layout. Returned DTOs are independent copies; disposal is idempotent. */
 export interface PreparedPuzzle {
   readonly liveExecution: 'immediate' | 'worker'
-  readonly preparationWork: number
   baseCandidates(board: Board): readonly number[]
   metadata(): RuleMetadata
-  candidates(input: BoardQueryDto): CandidateWorkDto
-  previewConflicts(board: Board): ConflictWorkDto
-  conflicts(input: BoardQueryDto): ConflictWorkDto
-  edit(input: EditInputDto): EditWorkDto
+  candidates(input: BoardQueryDto): CandidateComputationDto
+  previewConflicts(board: Board): ConflictComputationDto
+  conflicts(input: BoardQueryDto): ConflictComputationDto
+  edit(input: EditInputDto): EditComputationDto
   reviewEntries(board: Board, solution: Board): readonly number[]
   isComplete(board: Board): boolean
   dispose(): void
@@ -43,8 +42,8 @@ export interface MainSudokuEngine {
   validatePuzzle(content: unknown): PuzzleValidation
   validateRules(rules: unknown): PuzzleValidation
   validateTeachingStep(value: unknown): PuzzleValidation
-  parseConflicts(value: unknown): ConflictWorkDto
-  parseEdit(value: unknown): EditWorkDto
+  parseConflicts(value: unknown): ConflictComputationDto
+  parseEdit(value: unknown): EditComputationDto
   parseHint(value: unknown): HintValidationDto
   validateAssessment(input: AssessmentValidationInputDto): AssessmentValidationDto
   validateLiveAssessmentOutcome(value: unknown): ParsedLiveOutcomeDto
@@ -88,17 +87,13 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
         get liveExecution() {
           return prepared().liveExecution
         },
-        get preparationWork() {
-          return prepared().preparationWork
-        },
         baseCandidates: (board) => Array.from(prepared().base_candidates([...board])),
         metadata: () => prepared().metadata(),
         candidates(input) {
           requireImmediate()
           return prepared().candidates(input)
         },
-        previewConflicts: (board) =>
-          prepared().conflicts({ board: [...board], work: { maxWork: 0 } }),
+        previewConflicts: (board) => prepared().preview_conflicts([...board]),
         conflicts(input) {
           requireImmediate()
           return prepared().conflicts(input)

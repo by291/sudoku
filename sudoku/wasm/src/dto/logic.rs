@@ -180,7 +180,7 @@ pub struct PlacementDto {
 pub enum HintUnavailableDto {
     Complete,
     Unsupported,
-    BudgetExhausted,
+    Incomplete,
 }
 
 #[derive(Serialize, Deserialize, Tsify)]
@@ -207,8 +207,6 @@ pub struct HintInputDto {
     pub rules: super::rules::RulesDto,
     #[serde(default)]
     pub max_steps: Option<u32>,
-    #[serde(default)]
-    pub max_work: Option<u32>,
 }
 
 #[derive(Deserialize, Tsify)]
@@ -227,7 +225,6 @@ pub struct LogicInputDto {
     pub rules: super::rules::RulesDto,
     pub allowed: Vec<TechniqueDto>,
     pub max_steps: u32,
-    pub max_work: u32,
 }
 
 #[derive(Serialize, Tsify)]
@@ -242,7 +239,7 @@ pub enum LogicResultDto {
         board: BoardDto,
         steps: Vec<LogicalStepDto>,
     },
-    BudgetExhausted {
+    Incomplete {
         board: BoardDto,
         steps: Vec<LogicalStepDto>,
         cause: super::rating::ExhaustionCauseDto,

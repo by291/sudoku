@@ -189,8 +189,8 @@ pub fn parse_outcome(value: &JsValue) -> CoreResult<AssessmentOutcomeDto> {
     } else {
         false
     };
-    if equals(&status, "budget-exhausted") && valid_stage {
-        return Ok(AssessmentOutcomeDto::BudgetExhausted {
+    if (equals(&status, "incomplete") || equals(&status, "budget-exhausted")) && valid_stage {
+        return Ok(AssessmentOutcomeDto::Incomplete {
             rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: variant.into(),
             stage: if equals(&stage, "validation") {
@@ -207,7 +207,7 @@ pub fn parse_outcome(value: &JsValue) -> CoreResult<AssessmentOutcomeDto> {
 fn reason(value: &JsValue) -> Option<UnavailableReason> {
     match value.as_string()?.as_str() {
         "ungraded" => Some(UnavailableReason::Ungraded),
-        "budget-exhausted" => Some(UnavailableReason::BudgetExhausted),
+        "incomplete" | "budget-exhausted" => Some(UnavailableReason::Incomplete),
         "invalid-input" => Some(UnavailableReason::InvalidInput),
         "invalid-summary" => Some(UnavailableReason::InvalidSummary),
         "unsupported-version" => Some(UnavailableReason::UnsupportedVersion),
@@ -220,7 +220,7 @@ impl From<UnavailableReason> for UnavailableReasonDto {
     fn from(value: UnavailableReason) -> Self {
         match value {
             UnavailableReason::Ungraded => Self::Ungraded,
-            UnavailableReason::BudgetExhausted => Self::BudgetExhausted,
+            UnavailableReason::Incomplete => Self::Incomplete,
             UnavailableReason::InvalidInput => Self::InvalidInput,
             UnavailableReason::InvalidSummary => Self::InvalidSummary,
             UnavailableReason::UnsupportedVersion => Self::UnsupportedVersion,
@@ -229,18 +229,40 @@ impl From<UnavailableReason> for UnavailableReasonDto {
     }
 }
 
-fn parse_stored(value: &JsValue) -> CoreResult<StoredAssessment> {
+fn parse_stored(value: &JsValue) -> CoreResult<(StoredAssessment, Option<PuzzleAssessmentDto>)> {
     if !record(value) {
-        return Ok(StoredAssessment::Malformed {
-            issues: vec!["Invalid assessment outcome".to_string()],
-        });
+        return Ok((
+            StoredAssessment::Malformed {
+                issues: vec!["Invalid assessment outcome".to_string()],
+            },
+            None,
+        ));
     }
     let status = get(value, "status")?;
-    if equals(&status, "unavailable")
-        && let Some(reason) = reason(&get(value, "reason")?)
-        && let Some(issues) = issue_strings(&get(value, "issues")?)
-    {
-        return Ok(StoredAssessment::Unavailable { reason, issues });
+    if equals(&status, "unavailable") {
+        let original_reason = get(value, "reason")?;
+        let original_issues = get(value, "issues")?;
+        if let Some(reason) = reason(&original_reason)
+            && Array::is_array(&original_issues)
+        {
+            // Snapshot JS strings before validation so historical UTF-16, including isolated
+            // surrogates, never round-trips through Rust's UTF-8 strings when returned.
+            let preserved_issues: JsValue = Array::from(&original_issues).into();
+            if let Some(issues) = issue_strings(&preserved_issues) {
+                let preserved = PuzzleAssessmentDto::Unavailable {
+                    reason: if equals(&original_reason, "budget-exhausted") {
+                        UnavailableReasonDto::BudgetExhausted
+                    } else {
+                        reason.into()
+                    },
+                    issues: preserved_issues,
+                };
+                return Ok((
+                    StoredAssessment::Unavailable { reason, issues },
+                    Some(preserved),
+                ));
+            }
+        }
     }
     if equals(&status, "rated") {
         let summary = get(value, "summary")?;
@@ -254,18 +276,24 @@ fn parse_stored(value: &JsValue) -> CoreResult<StoredAssessment> {
             } else {
                 Err(vec!["Unsupported rating version".to_owned()])
             };
-            return Ok(StoredAssessment::Rated {
-                rating_version,
-                summary: parsed,
-            });
+            return Ok((
+                StoredAssessment::Rated {
+                    rating_version,
+                    summary: parsed,
+                },
+                None,
+            ));
         }
     }
-    Ok(match parse_outcome(value) {
-        Ok(_) => StoredAssessment::OtherOutcome,
-        Err(error) => StoredAssessment::Malformed {
-            issues: crate::issues(error),
+    Ok((
+        match parse_outcome(value) {
+            Ok(_) => StoredAssessment::OtherOutcome,
+            Err(error) => StoredAssessment::Malformed {
+                issues: crate::issues(error),
+            },
         },
-    })
+        None,
+    ))
 }
 
 pub fn decode(input: AssessmentValidationInputDto) -> CoreResult<AssessmentValidationDto> {
@@ -273,8 +301,13 @@ pub fn decode(input: AssessmentValidationInputDto) -> CoreResult<AssessmentValid
         return Ok(AssessmentValidationDto::Absent);
     }
 
-    let stored = parse_stored(&input.value).unwrap_or_else(|error| StoredAssessment::Malformed {
-        issues: crate::issues(error),
+    let (stored, preserved_unavailable) = parse_stored(&input.value).unwrap_or_else(|error| {
+        (
+            StoredAssessment::Malformed {
+                issues: crate::issues(error),
+            },
+            None,
+        )
     });
     let identity = AssessmentIdentity {
         variant: input.identity.variant.into(),
@@ -292,10 +325,14 @@ pub fn decode(input: AssessmentValidationInputDto) -> CoreResult<AssessmentValid
         },
         Some(PuzzleAssessment::Unavailable { reason, issues }) => {
             AssessmentValidationDto::Present {
-                value: PuzzleAssessmentDto::Unavailable {
+                value: preserved_unavailable.unwrap_or_else(|| PuzzleAssessmentDto::Unavailable {
                     reason: reason.into(),
-                    issues,
-                },
+                    issues: issues
+                        .into_iter()
+                        .map(JsValue::from)
+                        .collect::<Array>()
+                        .into(),
+                }),
             }
         }
     })

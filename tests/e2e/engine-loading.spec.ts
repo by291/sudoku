@@ -54,7 +54,7 @@ for (const root of ['http://127.0.0.1:4173/', 'http://127.0.0.1:4174/sudoku/']) 
         return
       }
       const bytes = Buffer.from(await response.body())
-      const original = Buffer.from('sudoku-v11')
+      const original = Buffer.from('sudoku-v12')
       const replacement = Buffer.from('sudoku-x11')
       let changed = 0
       for (

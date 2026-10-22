@@ -22,7 +22,7 @@ These rules supplement the [repository guidelines](../AGENTS.md) for `sudoku/`. 
 
 - Keep orchestration with its domain owner and extract coherent private operations. Use straightforward control flow for search and accounting; iterators are useful for simple transformations. Apply the root guide's logical blank lines as well as rustfmt.
 - Rustdoc explains borrowing, ownership, mutation, cancellation lifetime, identity comparisons, units, incomplete outcomes and relevant `Errors`/`Panics`. Link related contracts instead of repeating them on every accessor.
-- Name version-owned exploration limits. Explain deterministic ordering, budget charges, abandoned work, queue priority and restoration immediately beside the operation.
+- Name version-owned exploration limits. Explain deterministic ordering, cancellation checkpoints, abandoned exploration, queue priority and restoration immediately beside the operation.
 - Preserve independent proof validators and sealed fixtures. Public-boundary regressions exercise malformed input and observable atomicity; private extraction/formatting alone needs no mirror tests. Never refresh independent expected results from Rust to make a test pass.
 
 ## Verification

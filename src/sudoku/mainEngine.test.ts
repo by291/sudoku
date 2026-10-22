@@ -64,7 +64,7 @@ it('heavy_layouts_only_allow_cheap_preview_on_the_main_thread', async () => {
   board[1] = 1
 
   expect(layout.liveExecution).toBe('worker')
-  expect(layout.previewConflicts(board).result.status).toBe('budget-exhausted')
+  expect(layout.previewConflicts(board).result.status).toBe('incomplete')
   expect(layout.previewConflicts(board).result.violations[0]?.cells).toEqual([0, 1])
   expect(() => layout.conflicts({ board })).toThrow(/Worker/)
   expect(() => layout.candidates({ board })).toThrow(/Worker/)
@@ -91,14 +91,13 @@ it('live_result_parsers_reject_invalid_values_and_preserve_partial_results', asy
   const engine = await createMainEngine(compiled)
   const partial = {
     result: {
-      status: 'budget-exhausted',
+      status: 'incomplete',
       violations: [{ constraintId: 'row:0', cells: [0, 1], code: { kind: 'duplicate' } }],
     },
-    workUsed: 1000000,
   }
 
   expect(engine.parseConflicts(partial)).toEqual(partial)
-  expect(() => engine.parseConflicts({ ...partial, workUsed: 1000001 })).toThrow()
+  expect(() => engine.parseConflicts({ result: null })).toThrow()
   expect(() =>
     engine.parseConflicts({
       ...partial,
@@ -116,7 +115,6 @@ it('live_result_parsers_reject_invalid_values_and_preserve_partial_results', asy
       changed: false,
       boardComplete: false,
     },
-    workUsed: 0,
   }
   expect(engine.parseEdit(complete)).toEqual(complete)
   expect(() =>
@@ -125,8 +123,6 @@ it('live_result_parsers_reject_invalid_values_and_preserve_partial_results', asy
   expect(() =>
     engine.parseEdit({ ...complete, result: { ...complete.result, entries: Array(81).fill(10) } }),
   ).toThrow()
-  expect(
-    engine.parseEdit({ result: { status: 'budget-exhausted' }, workUsed: 1000000 }).result.status,
-  ).toBe('budget-exhausted')
+  expect(engine.parseEdit({ result: { status: 'incomplete' } }).result.status).toBe('incomplete')
   engine.dispose()
 })

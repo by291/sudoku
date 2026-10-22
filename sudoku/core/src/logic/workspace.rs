@@ -40,7 +40,7 @@ pub fn create_workspace(board: &Board, rules: &PreparedRules) -> LogicalWorkspac
     }
 }
 
-/// Reuse only the already charged layout; every board still owns its complete mutable state.
+/// Reuse the immutable layout; every board still owns its complete mutable state.
 pub fn create_prepared_workspace(
     board: &Board,
     computation: &PreparedComputation,

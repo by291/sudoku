@@ -65,14 +65,14 @@ it('proves every guided and exercise stage with the actual Rust/WASM validator',
   }
 })
 
-it.each(['invalid', 'budget-exhausted'] as const)(
+it.each(['invalid', 'incomplete'] as const)(
   'rejects %s evidence instead of approving a build',
   (status) => {
     expect(() =>
       validateLessonCatalogueMath(catalogue, () =>
         status === 'invalid' ? { status, issues: ['Fixture rejection'] } : { status },
       ),
-    ).toThrow(/rules.*guided.*(Fixture rejection|budget-exhausted)/)
+    ).toThrow(/rules.*guided.*(Fixture rejection|incomplete)/)
   },
 )
 

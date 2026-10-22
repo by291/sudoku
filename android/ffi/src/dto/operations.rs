@@ -1,22 +1,18 @@
 use super::rules::RulesDto;
-use super::values::{BoardDto, DigitDto, SearchOptionsDto, WorkOptionsDto};
+use super::values::{BoardDto, DigitDto, SearchOptionsDto};
 use serde::{Deserialize, Serialize};
 
-/// An owned result with deterministic core work units, including any initial charge.
-/// Work units are algorithm operations, not elapsed time; exhaustion remains explicit in the result.
+/// An owned computation result; incomplete outcomes never imply success.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct WorkResultDto<T> {
+pub struct ComputationResultDto<T> {
     pub result: T,
-    pub work_used: u32,
 }
 
 #[derive(Deserialize, uniffi::Record)]
 #[serde(deny_unknown_fields)]
 pub struct BoardQueryDto {
     pub board: BoardDto,
-    #[serde(default)]
-    pub work: Option<WorkOptionsDto>,
 }
 
 #[derive(Deserialize, uniffi::Record)]
@@ -25,7 +21,7 @@ pub struct CountInputDto {
     pub board: BoardDto,
     pub rules: RulesDto,
     #[serde(default)]
-    pub work: Option<SearchOptionsDto>,
+    pub options: Option<SearchOptionsDto>,
 }
 
 /// An exhausted search is incomplete and establishes neither a solution count nor uniqueness.
@@ -37,14 +33,10 @@ pub enum SearchResultDto {
         solution: Option<BoardDto>,
         #[serde(rename = "nodesVisited")]
         nodes_visited: u32,
-        #[serde(rename = "workUsed")]
-        work_used: u32,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "nodesVisited")]
         nodes_visited: u32,
-        #[serde(rename = "workUsed")]
-        work_used: u32,
     },
 }
 
@@ -53,7 +45,7 @@ pub enum SearchResultDto {
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum CandidateResultDto {
     Complete { candidates: Vec<u16> },
-    BudgetExhausted,
+    Incomplete,
 }
 
 #[derive(Serialize, Deserialize, uniffi::Enum)]
@@ -78,7 +70,7 @@ pub struct ViolationDto {
 #[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ConflictResultDto {
     Complete { violations: Vec<ViolationDto> },
-    BudgetExhausted { violations: Vec<ViolationDto> },
+    Incomplete { violations: Vec<ViolationDto> },
 }
 
 #[derive(Deserialize, uniffi::Enum)]
@@ -97,8 +89,6 @@ pub struct EditInputDto {
     pub entries: BoardDto,
     pub notes: Vec<u16>,
     pub action: BoardEditDto,
-    #[serde(default)]
-    pub work: Option<WorkOptionsDto>,
 }
 
 /// Complete edits return independent layers; exhaustion has no layers to commit.
@@ -112,7 +102,7 @@ pub enum EditResultDto {
         #[serde(rename = "boardComplete")]
         board_complete: bool,
     },
-    BudgetExhausted,
+    Incomplete,
 }
 
 #[derive(Deserialize, uniffi::Record)]
@@ -120,7 +110,7 @@ pub enum EditResultDto {
 pub struct PreparedCountInputDto {
     pub board: BoardDto,
     #[serde(default)]
-    pub work: Option<SearchOptionsDto>,
+    pub options: Option<SearchOptionsDto>,
 }
 
 #[derive(Deserialize, uniffi::Record)]
@@ -137,23 +127,22 @@ pub enum LiveExecutionDto {
     Worker,
 }
 
-macro_rules! work_record {
+macro_rules! computation_record {
     ($name:ident, $result:ty) => {
         #[derive(uniffi::Record)]
         pub struct $name {
             pub result: $result,
-            pub work_used: u32,
         }
     };
 }
-work_record!(CandidateWorkDto, CandidateResultDto);
-work_record!(ConflictWorkDto, ConflictResultDto);
-work_record!(SearchWorkDto, SearchResultDto);
-work_record!(EditWorkDto, EditResultDto);
-work_record!(HintWorkDto, super::logic::HintResultDto);
-work_record!(LogicWorkDto, super::logic::LogicResultDto);
-work_record!(AssessmentWorkDto, super::rating::AssessmentResultDto);
-work_record!(
-    AssessmentSummaryWorkDto,
+computation_record!(CandidateComputationDto, CandidateResultDto);
+computation_record!(ConflictComputationDto, ConflictResultDto);
+computation_record!(SearchComputationDto, SearchResultDto);
+computation_record!(EditComputationDto, EditResultDto);
+computation_record!(HintComputationDto, super::logic::HintResultDto);
+computation_record!(LogicComputationDto, super::logic::LogicResultDto);
+computation_record!(AssessmentComputationDto, super::rating::AssessmentResultDto);
+computation_record!(
+    AssessmentSummaryComputationDto,
     super::rating::LiveAssessmentOutcomeDto
 );

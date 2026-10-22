@@ -5,7 +5,7 @@ use super::types::{LogicResult, LogicStatus, LogicalStep, LogicalWorkspace, Step
 use super::variant_techniques::find_variant_step;
 use super::workspace::{apply_established_step, create_workspace};
 use crate::board::is_complete;
-use crate::budget::{WorkBudget, WorkStage};
+use crate::control::ExecutionControl;
 use crate::rules::types::PreparedRules;
 use crate::types::{Board, Bounded};
 
@@ -13,37 +13,35 @@ use crate::types::{Board, Bounded};
 pub fn find_step(
     state: &mut LogicalWorkspace,
     allowed: &[Technique],
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> StepOutcome {
-    budget.with_stage(WorkStage::Logic, |budget| {
-        let order = execution_order(state.rules.rules().variant(), allowed);
+    let order = execution_order(state.rules.rules().variant(), allowed);
 
-        // Charge every attempt before visiting techniques, including an empty allowed policy.
-        if !budget.consume(1) {
-            return Bounded::BudgetExhausted;
-        }
+    // Check cancellation before scanning techniques, including an empty policy.
+    if !control.check() {
+        return Bounded::Cancelled;
+    }
 
-        for technique in order {
-            // Incomplete detector work must stop the scan rather than fall through to another technique.
-            if technique.is_advanced() {
-                let result = find_advanced_step(state, technique, budget);
-                if !matches!(result, Bounded::Complete(None)) {
-                    return result;
-                }
-            } else if technique.is_classic() {
-                if let Some(step) = find_basic_step(state, technique) {
-                    return Bounded::Complete(Some(Box::new(step)));
-                }
-            } else {
-                let result = find_variant_step(state, &[technique], budget);
-                if !matches!(result, Bounded::Complete(None)) {
-                    return result;
-                }
+    for technique in order {
+        // Incomplete detector work must stop the scan rather than fall through to another technique.
+        if technique.is_advanced() {
+            let result = find_advanced_step(state, technique, control);
+            if !matches!(result, Bounded::Complete(None)) {
+                return result;
+            }
+        } else if technique.is_classic() {
+            if let Some(step) = find_basic_step(state, technique) {
+                return Bounded::Complete(Some(Box::new(step)));
+            }
+        } else {
+            let result = find_variant_step(state, &[technique], control);
+            if !matches!(result, Bounded::Complete(None)) {
+                return result;
             }
         }
+    }
 
-        Bounded::Complete(None)
-    })
+    Bounded::Complete(None)
 }
 
 pub fn analyze_logic(
@@ -51,10 +49,10 @@ pub fn analyze_logic(
     rules: &PreparedRules,
     allowed: &[Technique],
     max_steps: u32,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> LogicResult {
     let mut state = create_workspace(board, rules);
-    analyze_workspace(&mut state, allowed, max_steps, budget, &[])
+    analyze_workspace(&mut state, allowed, max_steps, control, &[])
 }
 
 /// Resume only a workspace described by previous_steps under a policy retaining its priority prefix.
@@ -63,10 +61,10 @@ pub fn analyze_workspace(
     state: &mut LogicalWorkspace,
     allowed: &[Technique],
     max_steps: u32,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
     previous_steps: &[LogicalStep],
 ) -> LogicResult {
-    analyze_workspace_owned(state, allowed, max_steps, budget, previous_steps.to_vec())
+    analyze_workspace_owned(state, allowed, max_steps, control, previous_steps.to_vec())
 }
 
 /// Continues a private workspace by moving its existing trace instead of copying evidence.
@@ -74,7 +72,7 @@ pub(crate) fn analyze_workspace_owned(
     state: &mut LogicalWorkspace,
     allowed: &[Technique],
     max_steps: u32,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
     mut steps: Vec<LogicalStep>,
 ) -> LogicResult {
     let status = loop {
@@ -85,8 +83,8 @@ pub(crate) fn analyze_workspace_owned(
             break LogicStatus::StepLimit;
         }
 
-        let step = match find_step(state, allowed, budget) {
-            Bounded::BudgetExhausted => break LogicStatus::WorkLimit,
+        let step = match find_step(state, allowed, control) {
+            Bounded::Cancelled => break LogicStatus::Cancelled,
             Bounded::Complete(None) => break LogicStatus::Stalled,
             Bounded::Complete(Some(step)) => step,
         };

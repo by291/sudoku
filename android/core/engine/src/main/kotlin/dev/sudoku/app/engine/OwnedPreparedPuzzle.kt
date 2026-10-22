@@ -54,7 +54,7 @@ internal class OwnedPreparedPuzzle(
     private suspend fun <T> use(
         lane: NativeLane,
         operation: (NativePreparedPuzzle, CancellationToken) -> EngineOutcome<T>
-    ): EngineOutcome<T> = NativeCalls.run(lane, limits.analysisDeadlineMs) { token ->
+    ): EngineOutcome<T> = NativeCalls.run(lane, limits.requestDeadlineMs) { token ->
         val handle = acquire()
         try {
             operation(handle, token)
@@ -82,8 +82,7 @@ internal class OwnedPreparedPuzzle(
                     layers.notes.map {
                         it.nativeMask()
                     },
-                    nativeAction,
-                    null
+                    nativeAction
                 )
             use(
                 if (action == BoardEdit.GenerateNotes) {
@@ -102,42 +101,39 @@ internal class OwnedPreparedPuzzle(
                             },
                             result.changed,
                             result.boardComplete
-                        ),
-                        response.workUsed.toLong()
+                        )
                     )
-                    EditResultDto.BudgetExhausted -> EngineOutcome.BudgetExhausted(response.workUsed.toLong())
+                    EditResultDto.Incomplete -> EngineOutcome.Incomplete
                 }
             }
         }
 
     override suspend fun candidates(board: List<Int>): EngineOutcome<List<Int>> = guarded {
-        val input = BoardQueryDto(board.nativeBoard(), null)
+        val input = BoardQueryDto(board.nativeBoard())
         use(NativeLane.ANALYSIS) { handle, token ->
             val response = handle.candidates(input, token)
             when (val result = response.result) {
                 is CandidateResultDto.Complete -> EngineOutcome.Completed(
                     result.candidates.map {
                         it.toInt()
-                    },
-                    response.workUsed.toLong()
+                    }
                 )
-                CandidateResultDto.BudgetExhausted -> EngineOutcome.BudgetExhausted(response.workUsed.toLong())
+                CandidateResultDto.Incomplete -> EngineOutcome.Incomplete
             }
         }
     }
 
     override suspend fun conflicts(board: List<Int>): EngineOutcome<List<RuleViolation>> = guarded {
-        val input = BoardQueryDto(board.nativeBoard(), null)
+        val input = BoardQueryDto(board.nativeBoard())
         use(NativeLane.ANALYSIS) { handle, token ->
             val response = handle.conflicts(input, token)
             when (val result = response.result) {
                 is ConflictResultDto.Complete -> EngineOutcome.Completed(
                     result.violations.map {
                         it.player()
-                    },
-                    response.workUsed.toLong()
+                    }
                 )
-                is ConflictResultDto.BudgetExhausted -> EngineOutcome.BudgetExhausted(response.workUsed.toLong())
+                is ConflictResultDto.Incomplete -> EngineOutcome.Incomplete
             }
         }
     }
@@ -155,14 +151,14 @@ internal class OwnedPreparedPuzzle(
     }
 
     override suspend fun hint(board: List<Int>, solution: List<Int>): EngineOutcome<HintResult> = guarded {
-        val input = HintInputDto(board.nativeBoard(), solution.nativeBoard(), metadata.rules.native(), null, null)
+        val input = HintInputDto(board.nativeBoard(), solution.nativeBoard(), metadata.rules.native(), null)
         use(NativeLane.ANALYSIS) { _, token ->
             val response = hint(input, token)
             val result = response.result
-            if (result is HintResultDto.Unavailable && result.reason == HintUnavailableDto.BUDGET_EXHAUSTED) {
-                EngineOutcome.BudgetExhausted(response.workUsed.toLong())
+            if (result is HintResultDto.Unavailable && result.reason == HintUnavailableDto.INCOMPLETE) {
+                EngineOutcome.Incomplete
             } else {
-                EngineOutcome.Completed(result.player(), response.workUsed.toLong())
+                EngineOutcome.Completed(result.player())
             }
         }
     }

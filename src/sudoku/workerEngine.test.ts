@@ -1,8 +1,8 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { createWorkerEngine } from '@/sudoku/workerEngine'
 import { getTestModule } from '../../tests/support/wasm'
 
-it('heavy_live_work_preserves_the_full_allowance_and_atomic_exhaustion', async () => {
+it('heavy_live_work_stops_on_deadline_without_mutating_input', async () => {
   const engine = await createWorkerEngine(getTestModule())
   const rules = {
     kind: 'killer' as const,
@@ -14,15 +14,14 @@ it('heavy_live_work_preserves_the_full_allowance_and_atomic_exhaustion', async (
   const empty = Array<0>(81).fill(0)
   const notes = Array<number>(81).fill(7)
 
-  const conflicts = engine.conflicts(empty, rules)
-  const editing = engine.generateNotes({ givens: empty, entries: empty, notes, rules })
-
-  expect(conflicts.preparationWork).toBeGreaterThan(0)
-  expect(conflicts.preparationWork).toBeLessThanOrEqual(1000000)
-  expect(conflicts.computation).toEqual({
-    result: { status: 'budget-exhausted', violations: [] },
-    workUsed: 1000000,
-  })
-  expect(editing.computation).toEqual({ result: { status: 'budget-exhausted' }, workUsed: 1000000 })
-  expect(notes).toEqual(Array(81).fill(7))
+  const clock = vi.spyOn(performance, 'now')
+  clock.mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValue(3001)
+  try {
+    expect(() => engine.generateNotes({ givens: empty, entries: empty, notes, rules })).toThrow(
+      'Computation timed out',
+    )
+    expect(notes).toEqual(Array(81).fill(7))
+  } finally {
+    clock.mockRestore()
+  }
 })

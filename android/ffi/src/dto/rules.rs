@@ -88,8 +88,6 @@ pub struct MetadataDto {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct PrepareInputDto {
     pub rules: RulesDto,
-    #[serde(default)]
-    pub max_work: Option<u32>,
 }
 
 #[derive(Deserialize, uniffi::Record)]
@@ -115,5 +113,5 @@ pub struct PuzzleContentDto {
 pub enum ValidationDto {
     Valid,
     Invalid { issues: Vec<String> },
-    BudgetExhausted,
+    Incomplete,
 }

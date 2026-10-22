@@ -16,7 +16,7 @@ export function toStoredAssessment(outcome: LiveAssessmentOutcome): PuzzleAssess
     case 'rated':
       return { status: 'rated', summary: outcome.summary }
     case 'ungraded':
-    case 'budget-exhausted':
+    case 'incomplete':
       return { status: 'unavailable', reason: outcome.status, issues: [] }
     case 'invalid':
       return {

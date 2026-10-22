@@ -2,7 +2,7 @@
 pub mod fixtures;
 
 use sudoku_core::board::{base_candidates, is_complete};
-use sudoku_core::budget::WorkBudget;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::rules::context::{compile_rules, prepare_rules};
 use sudoku_core::rules::types::{Arrow, Cage, PuzzleRules, UnitKind};
 use sudoku_core::types::{Board, Bounded};
@@ -117,30 +117,24 @@ fn malformed_geometry_and_sums_are_rejected() {
 }
 
 #[test]
-fn preparation_is_charged_without_exposing_partial_geometry() {
-    let mut empty = WorkBudget::new(0);
+fn cancelled_preparation_never_exposes_partial_geometry() {
+    let mut empty = ExecutionControl::new();
     assert!(matches!(
         prepare_rules(&PuzzleRules::Classic, &mut empty).unwrap(),
         Bounded::Complete(_)
     ));
-    assert_eq!(empty.used(), 0);
 
-    // One initial charge, 29*9 memberships, and two ordered 29*9*9 relationship walks.
-    let full_cost = 1 + 29 * 9 + 2 * 29 * 9 * 9;
-    let mut short = WorkBudget::new(full_cost - 1);
+    let mut short = fixtures::cancelled_control();
     assert!(matches!(
         prepare_rules(&PuzzleRules::Diagonal, &mut short).unwrap(),
-        Bounded::BudgetExhausted
+        Bounded::Cancelled
     ));
-    assert_eq!(short.used(), full_cost - 1);
 
-    let mut complete = WorkBudget::new(full_cost);
+    let mut complete = ExecutionControl::new();
     assert!(matches!(
         prepare_rules(&PuzzleRules::Diagonal, &mut complete).unwrap(),
         Bounded::Complete(_)
     ));
-    assert_eq!(complete.used(), full_cost);
-    assert_eq!(complete.accounting().total(), full_cost);
 }
 
 #[test]

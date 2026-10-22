@@ -103,7 +103,7 @@ test('keeps historical type-and-tier latency inputs within the current Worker de
       } else {
         expect(response).toMatchObject({
           valid: true,
-          value: { kind: 'generate', outcome: { status: 'budget-exhausted' } },
+          value: { kind: 'generate', outcome: { status: 'incomplete' } },
         })
         expect(response).not.toHaveProperty('value.outcome.value')
         expect(response).not.toHaveProperty('value.outcome.assessment')

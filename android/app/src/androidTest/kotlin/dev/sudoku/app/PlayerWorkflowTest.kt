@@ -774,8 +774,7 @@ private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEn
                         }
                         result.value.conflicts(board)
                     }
-                },
-                result.workUsed
+                }
             )
             else -> result
         }

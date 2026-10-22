@@ -44,7 +44,7 @@ All paths below are portable core owners; Web and Android call adapters around t
 
 | Responsibility                                       | Source                                                                                                       |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Checked values and work allowance                    | [`types.rs`](../../sudoku/core/src/types.rs), [`budget.rs`](../../sudoku/core/src/budget.rs)                 |
+| Checked values and cancellation                      | [`types.rs`](../../sudoku/core/src/types.rs), [`control.rs`](../../sudoku/core/src/control.rs)               |
 | Rule definitions and compiled topology               | [`rules/`](../../sudoku/core/src/rules)                                                                      |
 | Arithmetic support and prepared catalogues           | [`constraints/`](../../sudoku/core/src/constraints)                                                          |
 | Exact counting and reversible propagation            | [`search/`](../../sudoku/core/src/search)                                                                    |

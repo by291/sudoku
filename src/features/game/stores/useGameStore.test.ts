@@ -283,7 +283,7 @@ it('reports deterministic generation exhaustion while keeping the old save and r
   const original = makeSession()
   await test.database.put('sessions', { formatVersion: 2, revision: 1, session: original })
   test.runtime.worker.generate = async () => ({
-    status: 'budget-exhausted',
+    status: 'incomplete',
     message: 'No qualifying puzzle found within the generation limits',
   })
   const game = test.app.runWithContext(() => useGameStore(test.pinia))
@@ -354,13 +354,11 @@ it('heavy_conflicts_use_preview_and_reject_results_after_a_new_board', async () 
   replies[0]?.({
     status: 'completed',
     value: {
-      preparationWork: 1,
       computation: {
         result: {
           status: 'complete',
           violations: [{ constraintId: 'old', cells: [80], code: { kind: 'duplicate' } }],
         },
-        workUsed: 1,
       },
     },
   })
@@ -421,7 +419,6 @@ it.each([
   reply?.({
     status: 'completed',
     value: {
-      preparationWork: 1,
       computation: {
         result: {
           status: 'complete',
@@ -430,7 +427,6 @@ it.each([
           changed: true,
           boardComplete: false,
         },
-        workUsed: 100,
       },
     },
   })
@@ -462,7 +458,6 @@ it('heavy_notes_commit_atomically_with_latest_assistance_and_keep_no_change_poli
   reply?.({
     status: 'completed',
     value: {
-      preparationWork: 1,
       computation: {
         result: {
           status: 'complete',
@@ -471,7 +466,6 @@ it('heavy_notes_commit_atomically_with_latest_assistance_and_keep_no_change_poli
           changed: false,
           boardComplete: false,
         },
-        workUsed: 100,
       },
     },
   })
@@ -482,7 +476,7 @@ it('heavy_notes_commit_atomically_with_latest_assistance_and_keep_no_change_poli
   test.store.dispose()
 })
 
-it.each(['failed', 'budget-exhausted'] as const)(
+it.each(['failed', 'incomplete'] as const)(
   'heavy_notes_preserve_every_layer_and_assistance_on_%s',
   async (status) => {
     const test = setup(true)
@@ -494,8 +488,7 @@ it.each(['failed', 'budget-exhausted'] as const)(
         : {
             status: 'completed',
             value: {
-              preparationWork: 1,
-              computation: { result: { status: 'budget-exhausted' }, workUsed: 1000000 },
+              computation: { result: { status: 'incomplete' } },
             },
           }
     const before = test.store.session
@@ -519,7 +512,7 @@ it('heavy_conflicts_keep_sound_preview_on_failure_without_clock_or_assistance_re
   await test.store.resume()
   await Promise.resolve()
   expect(test.store.conflictAnalysisState).toBe('failed')
-  expect(test.store.conflictEvaluation.status).toBe('budget-exhausted')
+  expect(test.store.conflictEvaluation.status).toBe('incomplete')
   test.store.dispatch({ kind: 'check' })
   test.advance(1000)
   await test.store.periodicSave()

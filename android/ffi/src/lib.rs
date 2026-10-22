@@ -6,7 +6,6 @@ pub use dto::{generation::*, logic::*, operations::*, rating::*, rules::*, value
 mod control;
 mod prepared;
 pub use control::{CancellationToken, NativeError};
-use conversion::values::counter;
 pub use prepared::PreparedPuzzle;
 use std::sync::Arc;
 use sudoku_core::{
@@ -25,7 +24,7 @@ pub struct EngineInfo {
 #[uniffi::export]
 pub fn engine_info() -> EngineInfo {
     EngineInfo {
-        bridge_version: 2,
+        bridge_version: 3,
         puzzle_version: sudoku_core::generation::types::PUZZLE_VERSION.into(),
         variant_puzzle_version: sudoku_core::generation::types::VARIANT_PUZZLE_VERSION.into(),
         rating_version: sudoku_core::rating::types::RATING_VERSION.into(),
@@ -54,12 +53,10 @@ pub fn generate(
     let seed = Seed::try_from(seed.as_slice())?;
     let (input, limits) = conversion::generation::input(seed, options)?;
     match sudoku_core::generation::generate::generate_puzzle_controlled(&input, &limits, token)? {
-        sudoku_core::budget::Controlled::Complete(result) => {
+        sudoku_core::control::Controlled::Complete(result) => {
             Ok(conversion::generation::result_to_dto(result)?)
         }
-        sudoku_core::budget::Controlled::Cancelled { work_used } => {
-            Err(NativeError::Cancelled { work_used })
-        }
+        sudoku_core::control::Controlled::Cancelled => Err(NativeError::Cancelled),
     }
 }
 
@@ -77,18 +74,18 @@ fn checked_steps(steps: Option<u32>) -> Result<u32, NativeError> {
 pub fn hint(
     input: HintInputDto,
     token: Arc<CancellationToken>,
-) -> Result<HintWorkDto, NativeError> {
+) -> Result<HintComputationDto, NativeError> {
     let board: Board = input.board.try_into()?;
     let solution: Board = input.solution.try_into()?;
     let rules = input.rules.try_into()?;
     let rules = sudoku_core::rules::context::compile_rules(&rules)?;
     let steps = checked_steps(input.max_steps)?;
-    let mut work = control::budget(input.max_work, None, token)?;
-    let result = sudoku_core::hint::analyze_hint(&board, &solution, &rules, steps, &mut work);
-    control::check(&work)?;
-    Ok(HintWorkDto {
+    let mut execution_control = control::execution(token)?;
+    let result =
+        sudoku_core::hint::analyze_hint(&board, &solution, &rules, steps, &mut execution_control);
+    control::check(&execution_control)?;
+    Ok(HintComputationDto {
         result: conversion::logic::hint_to_dto(&result)?,
-        work_used: counter(work.used())?,
     })
 }
 
@@ -96,26 +93,30 @@ pub fn hint(
 pub fn analyze_logic(
     input: LogicInputDto,
     token: Arc<CancellationToken>,
-) -> Result<LogicWorkDto, NativeError> {
+) -> Result<LogicComputationDto, NativeError> {
     let board: Board = input.board.try_into()?;
     let rules = input.rules.try_into()?;
     let rules = sudoku_core::rules::context::compile_rules(&rules)?;
     let allowed: Vec<_> = input.allowed.into_iter().map(Into::into).collect();
     let steps = checked_steps(Some(input.max_steps))?;
-    let mut work = control::budget(Some(input.max_work), None, token)?;
-    let result =
-        sudoku_core::logic::solver::analyze_logic(&board, &rules, &allowed, steps, &mut work);
-    control::check(&work)?;
-    Ok(LogicWorkDto {
+    let mut execution_control = control::execution(token)?;
+    let result = sudoku_core::logic::solver::analyze_logic(
+        &board,
+        &rules,
+        &allowed,
+        steps,
+        &mut execution_control,
+    );
+    control::check(&execution_control)?;
+    Ok(LogicComputationDto {
         result: conversion::logic::logic_to_dto(&result)?,
-        work_used: counter(work.used())?,
     })
 }
 
 fn run_assessment(
     input: AssessmentInputDto,
     token: Arc<CancellationToken>,
-) -> Result<(sudoku_core::rating::types::AssessmentResult, u32), NativeError> {
+) -> Result<sudoku_core::rating::types::AssessmentResult, NativeError> {
     use sudoku_core::rating::types::{AssessmentInput, AssessmentLimits, RATING_VERSION};
     let board: Board = input.board.try_into()?;
     let rules = input.rules.try_into()?;
@@ -123,7 +124,6 @@ fn run_assessment(
         .limits
         .map_or_else(AssessmentLimits::default, |v| AssessmentLimits {
             max_steps: v.max_steps,
-            max_work: u64::from(v.max_work),
         });
     let snapshot = AssessmentInput {
         board,
@@ -133,26 +133,23 @@ fn run_assessment(
             .unwrap_or_else(|| RATING_VERSION.into()),
         limits,
     };
-    let maximum = input
-        .max_work
-        .or(Some(u32::try_from(limits.max_work).map_err(|_| {
-            EngineError::invalid("Assessment budget exceeds fixed bounds")
-        })?));
-    let mut work = control::budget(maximum, input.initial_work, token)?;
-    let result = sudoku_core::rating::assessment::assess_puzzle_with_budget(&snapshot, &mut work);
-    control::check(&work)?;
-    Ok((result, counter(work.used())?))
+    let mut execution_control = control::execution(token)?;
+    let result = sudoku_core::rating::assessment::assess_puzzle_with_control(
+        &snapshot,
+        &mut execution_control,
+    );
+    control::check(&execution_control)?;
+    Ok(result)
 }
 
 #[uniffi::export]
 pub fn assess(
     input: AssessmentInputDto,
     token: Arc<CancellationToken>,
-) -> Result<AssessmentWorkDto, NativeError> {
-    let (result, work_used) = run_assessment(input, token)?;
-    Ok(AssessmentWorkDto {
+) -> Result<AssessmentComputationDto, NativeError> {
+    let result = run_assessment(input, token)?;
+    Ok(AssessmentComputationDto {
         result: conversion::rating::assessment_to_dto(&result)?,
-        work_used,
     })
 }
 
@@ -160,11 +157,10 @@ pub fn assess(
 pub fn assess_summary(
     input: AssessmentInputDto,
     token: Arc<CancellationToken>,
-) -> Result<AssessmentSummaryWorkDto, NativeError> {
-    let (result, work_used) = run_assessment(input, token)?;
-    Ok(AssessmentSummaryWorkDto {
+) -> Result<AssessmentSummaryComputationDto, NativeError> {
+    let result = run_assessment(input, token)?;
+    Ok(AssessmentSummaryComputationDto {
         result: conversion::rating::assessment_summary_to_dto(&result)?,
-        work_used,
     })
 }
 
@@ -174,12 +170,12 @@ pub fn validate_puzzle(
     token: Arc<CancellationToken>,
 ) -> Result<ValidationDto, NativeError> {
     let content = input.try_into()?;
-    let mut work = control::budget(None, None, token)?;
-    let result = sudoku_core::puzzle::validate_puzzle_bounded(&content, &mut work);
-    control::check(&work)?;
+    let mut execution_control = control::execution(token)?;
+    let result = sudoku_core::puzzle::validate_puzzle_bounded(&content, &mut execution_control);
+    control::check(&execution_control)?;
     Ok(match result {
         Ok(Bounded::Complete(())) => ValidationDto::Valid,
-        Ok(Bounded::BudgetExhausted) => ValidationDto::BudgetExhausted,
+        Ok(Bounded::Cancelled) => ValidationDto::Incomplete,
         Err(error) => ValidationDto::Invalid {
             issues: vec![error.to_string()],
         },
@@ -194,19 +190,14 @@ pub fn validate_hint_evidence(
     let hint = conversion::logic::hint_to_core(input.hint)?;
     let rules = input.rules.try_into()?;
     let board: Option<Board> = input.board.map(TryInto::try_into).transpose()?;
-    let mut work = control::budget(None, None, token)?;
-    let result = sudoku_core::hint::validation::validate_hint_evidence_with_budget(
+    let mut execution_control = control::execution(token)?;
+    let result = sudoku_core::hint::validation::validate_hint_evidence_with_control(
         &hint,
         &rules,
         board.as_ref(),
-        &mut work,
+        &mut execution_control,
     );
-    control::check(&work)?;
-    if work.is_exhausted() {
-        return Err(NativeError::BudgetExhausted {
-            work_used: work.used(),
-        });
-    }
+    control::check(&execution_control)?;
     Ok(match result {
         Ok(hint) => HintValidationDto::Valid {
             hint: conversion::logic::hint_to_dto(&hint)?,
@@ -241,14 +232,15 @@ pub fn validate_teaching_step(
         .try_into()
         .map_err(|_| EngineError::invalid("Teaching state requires 81 masks"))?;
     let step = conversion::logic::step_to_core(input.step)?;
-    let mut work = control::budget(None, None, token)?;
-    let result = sudoku_core::logic::teaching::validate_teaching_step_with_budget(
-        &board, candidates, &rules, &step, &mut work,
+    let mut execution_control = control::execution(token)?;
+    let result = sudoku_core::logic::teaching::validate_teaching_step_with_control(
+        &board,
+        candidates,
+        &rules,
+        &step,
+        &mut execution_control,
     );
-    control::check(&work)?;
-    if work.is_exhausted() {
-        return Ok(ValidationDto::BudgetExhausted);
-    }
+    control::check(&execution_control)?;
     Ok(match result {
         Ok(()) => ValidationDto::Valid,
         Err(error) => ValidationDto::Invalid {

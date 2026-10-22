@@ -2,8 +2,8 @@ use std::collections::VecDeque;
 
 use super::types::SearchResult;
 use crate::board::{base_candidates, is_complete};
-use crate::budget::WorkBudget;
 use crate::constraints::types::PreparedComputation;
+use crate::control::ExecutionControl;
 use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask, UNIT_SIZE};
 
 // JS Set semantics: pop removes membership immediately; reinsertion appends to the tail.
@@ -78,7 +78,7 @@ enum DigitPositions {
 
 struct SearchState<'a> {
     computation: &'a PreparedComputation,
-    budget: &'a mut WorkBudget,
+    control: &'a mut ExecutionControl,
     domains: [CandidateMask; BOARD_SIZE],
     trail: Vec<DomainChange>,
     unassigned: Board,
@@ -106,8 +106,8 @@ impl SearchState<'_> {
         }
     }
 
-    fn charge(&mut self) -> bool {
-        if !self.budget.consume(1) {
+    fn checkpoint(&mut self) -> bool {
+        if !self.control.check() {
             self.exhausted = true;
             return false;
         }
@@ -182,7 +182,7 @@ impl SearchState<'_> {
     }
 
     fn propagate_cell(&mut self, cell: usize, queues: &mut Queues) -> bool {
-        if !self.charge() {
+        if !self.checkpoint() {
             return false;
         }
         let mask = self.domains[cell].bits();
@@ -202,7 +202,7 @@ impl SearchState<'_> {
 
     fn propagate_unit(&mut self, index: usize, queues: &mut Queues) -> bool {
         // Only full nine-digit units require every digit; arithmetic clues use their own queue.
-        if !self.charge() {
+        if !self.checkpoint() {
             return false;
         }
         for digit in 1..=UNIT_SIZE {
@@ -235,13 +235,13 @@ impl SearchState<'_> {
     }
 
     fn propagate_constraint(&mut self, index: usize, queues: &mut Queues) -> bool {
-        if !self.charge() {
+        if !self.checkpoint() {
             return false;
         }
         let result =
             self.computation
                 .support
-                .query_at(&self.unassigned, &self.domains, index, self.budget);
+                .query_at(&self.unassigned, &self.domains, index, self.control);
         let Bounded::Complete(support) = result else {
             self.exhausted = true;
             return false;
@@ -259,7 +259,7 @@ impl SearchState<'_> {
     }
 
     fn visit(&mut self, changed_cell: Option<usize>, queues: &mut Queues) {
-        if self.nodes_visited >= self.node_limit || !self.charge() {
+        if self.nodes_visited >= self.node_limit || !self.checkpoint() {
             self.exhausted = true;
             return;
         }
@@ -324,10 +324,9 @@ impl Drop for TrailGuard<'_, '_> {
 pub(super) fn count_propagation_solutions(
     board: &Board,
     computation: &PreparedComputation,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
     node_limit: u64,
 ) -> SearchResult {
-    let started = budget.used();
     let base = base_candidates(board, &computation.rules);
     // Search uses singleton domains for givens; presentation candidates use zero for filled cells.
     let domains = std::array::from_fn(|cell| {
@@ -339,7 +338,7 @@ pub(super) fn count_propagation_solutions(
     });
     let mut state = SearchState {
         computation,
-        budget,
+        control,
         domains,
         trail: vec![],
         unassigned: Board::EMPTY,
@@ -357,18 +356,15 @@ pub(super) fn count_propagation_solutions(
         };
         guard.state.visit(None, &mut queues);
     }
-    let work_used = state.budget.used() - started;
     if state.exhausted {
-        SearchResult::BudgetExhausted {
+        SearchResult::Incomplete {
             nodes_visited: state.nodes_visited,
-            work_used,
         }
     } else {
         SearchResult::Complete {
             count: state.count,
             solution: state.solution,
             nodes_visited: state.nodes_visited,
-            work_used,
         }
     }
 }

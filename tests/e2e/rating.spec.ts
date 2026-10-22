@@ -54,10 +54,10 @@ test('assesses authored fixtures and explicit outcomes through real production w
       input: createAssessmentInput(
         solvedBoard.map((digit, cell) => (cell === 40 ? 0 : digit)),
         { kind: 'classic' },
-        { maxSteps: 0, maxWork: 1000000 },
+        { maxSteps: 0 },
       ),
       expected: {
-        status: 'budget-exhausted',
+        status: 'incomplete',
         ratingVersion: RATING_VERSION,
         variant: 'classic',
         stage: 'logic',
@@ -86,12 +86,13 @@ test('assesses authored fixtures and explicit outcomes through real production w
   }
 })
 
-test('honors assessment work limits for every type at the subpath deployment', async ({ page }) => {
+test('honors assessment logical step limits for every type at the subpath deployment', async ({
+  page,
+}) => {
   await page.goto('http://127.0.0.1:4174/sudoku/#/')
   for (const fixture of RATING_FIXTURES.filter((fixture) => fixture.difficulty === 'medium')) {
     const input = createAssessmentInput(fixture.board, fixture.rules, {
       maxSteps: 300,
-      maxWork: 800000,
     })
     const actual = parseWorkerResponse(
       await runWorker(page, { kind: 'assess', requestId: fixture.id, input }, '/sudoku/'),
@@ -112,15 +113,15 @@ test('honors assessment work limits for every type at the subpath deployment', a
       },
     })
 
-    // These incomplete boards cannot be rated with zero work; this detects a dropped request budget.
-    const exhaustedId = `${fixture.id}-zero-work`
+    // These incomplete boards cannot be rated with zero logical steps; preserve the local policy limit.
+    const exhaustedId = `${fixture.id}-zero-steps`
     const exhausted = parseWorkerResponse(
       await runWorker(
         page,
         {
           kind: 'assess',
           requestId: exhaustedId,
-          input: createAssessmentInput(fixture.board, fixture.rules, { maxSteps: 300, maxWork: 0 }),
+          input: createAssessmentInput(fixture.board, fixture.rules, { maxSteps: 0 }),
         },
         '/sudoku/',
       ),
@@ -134,7 +135,7 @@ test('honors assessment work limits for every type at the subpath deployment', a
         outcome: {
           status: 'completed',
           value: {
-            status: 'budget-exhausted',
+            status: 'incomplete',
             ratingVersion: RATING_VERSION,
             variant: fixture.rules.kind,
           },

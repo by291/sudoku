@@ -1,31 +1,30 @@
-use crate::budget::WorkAccounting;
 use crate::puzzle::Puzzle;
 use crate::random::Seed;
 use crate::rating::types::DifficultyAssessment;
 use crate::rules::types::{PuzzleRules, SudokuVariant};
 use crate::types::{Board, CoreResult, Difficulty, EngineError};
 
-pub const PUZZLE_VERSION: &str = "sudoku-v11";
-pub const VARIANT_PUZZLE_VERSION: &str = "sudoku-variants-v11";
+pub const PUZZLE_VERSION: &str = "sudoku-v12";
+pub const VARIANT_PUZZLE_VERSION: &str = "sudoku-variants-v12";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GenerationVersion {
-    ClassicV11,
-    VariantsV11,
+    ClassicV12,
+    VariantsV12,
 }
 
 impl GenerationVersion {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::ClassicV11 => PUZZLE_VERSION,
-            Self::VariantsV11 => VARIANT_PUZZLE_VERSION,
+            Self::ClassicV12 => PUZZLE_VERSION,
+            Self::VariantsV12 => VARIANT_PUZZLE_VERSION,
         }
     }
 
     pub fn parse(value: &str) -> CoreResult<Self> {
         match value {
-            PUZZLE_VERSION => Ok(Self::ClassicV11),
-            VARIANT_PUZZLE_VERSION => Ok(Self::VariantsV11),
+            PUZZLE_VERSION => Ok(Self::ClassicV12),
+            VARIANT_PUZZLE_VERSION => Ok(Self::VariantsV12),
             _ => Err(EngineError::invalid(
                 "Unsupported generation version for this type",
             )),
@@ -34,9 +33,9 @@ impl GenerationVersion {
 
     pub(crate) fn for_variant(variant: SudokuVariant) -> Self {
         if variant == SudokuVariant::Classic {
-            Self::ClassicV11
+            Self::ClassicV12
         } else {
-            Self::VariantsV11
+            Self::VariantsV12
         }
     }
 }
@@ -107,7 +106,6 @@ impl GenerationInput {
 #[derive(Clone, Copy, Debug)]
 pub struct GenerationLimits {
     pub max_layouts: u32,
-    pub max_work: u64,
     pub max_steps: u32,
 }
 
@@ -115,7 +113,6 @@ impl Default for GenerationLimits {
     fn default() -> Self {
         Self {
             max_layouts: 40,
-            max_work: 4_000_000,
             max_steps: 500,
         }
     }
@@ -123,16 +120,14 @@ impl Default for GenerationLimits {
 
 #[derive(Clone, Debug, Default)]
 pub struct GenerationMetrics {
-    pub construction_work: u64,
     pub layouts: u32,
     pub completed_layouts: u32,
     pub candidate_visits: u32,
-    pub work_by_stage: WorkAccounting,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GenerationExhaustionCause {
-    WorkLimit,
+    Cancelled,
     LogicalStepLimit,
     LayoutLimit,
     ExhaustedFrontier,
@@ -151,7 +146,7 @@ pub enum GenerationOutcome {
         puzzle: Box<GeneratedPuzzle>,
         assessment: Box<DifficultyAssessment>,
     },
-    BudgetExhausted {
+    Incomplete {
         cause: GenerationExhaustionCause,
     },
     Failed {
@@ -167,7 +162,7 @@ pub struct GenerationResult {
 
 pub enum LayoutConstructionResult {
     Ready { terminal: Board, rules: PuzzleRules },
-    BudgetExhausted,
+    Incomplete,
     AttemptExhausted,
     Failed { reason: String },
 }

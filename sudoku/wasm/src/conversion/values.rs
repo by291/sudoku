@@ -1,10 +1,6 @@
 use crate::dto::values::{BoardDto, DifficultyDto, VariantDto};
-use sudoku_core::budget::WorkBudget;
 use sudoku_core::rules::types::SudokuVariant;
 use sudoku_core::types::{Board, CoreResult, Difficulty, EngineError};
-
-pub const DEFAULT_QUERY_WORK: u32 = 1000000;
-pub const MAX_BROWSER_WORK: u32 = 4000000;
 
 impl TryFrom<BoardDto> for Board {
     type Error = EngineError;
@@ -89,24 +85,4 @@ pub fn core_indices(values: Vec<u32>) -> CoreResult<Vec<usize>> {
                 .map_err(|_| EngineError::invalid("Cell index exceeds platform bounds"))
         })
         .collect()
-}
-
-pub fn budget(
-    max_work: Option<u32>,
-    initial_work: Option<u32>,
-    default_work: u32,
-) -> CoreResult<WorkBudget> {
-    let limit = max_work.unwrap_or(default_work);
-    if limit > MAX_BROWSER_WORK {
-        return Err(EngineError::invalid(
-            "Browser work limits may only lower the fixed bounds",
-        ));
-    }
-    let mut budget = WorkBudget::new(u64::from(limit));
-    if !budget.consume(u64::from(initial_work.unwrap_or(0))) {
-        return Err(EngineError::invalid(
-            "Initial work exceeds the supplied budget",
-        ));
-    }
-    Ok(budget)
 }

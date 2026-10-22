@@ -449,7 +449,7 @@ it('preserves legacy payloads and pending coverage after inconclusive validation
     'summaries',
   )
   const repository = createGameRepository(() => Promise.resolve(database), {
-    validatePuzzle: () => ({ status: 'budget-exhausted' }),
+    validatePuzzle: () => ({ status: 'incomplete' }),
     validateAssessment: testEngine.validateAssessment.bind(testEngine),
   })
 

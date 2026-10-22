@@ -3,9 +3,9 @@ import { isSudokuVariant } from '@/sudoku/catalogue'
 import type { EngineInfo } from '@sudoku/wasm'
 import type { PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
 
-export const BRIDGE_VERSION = 3
-export const PUZZLE_VERSION = 'sudoku-v11'
-export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v11'
+export const BRIDGE_VERSION = 4
+export const PUZZLE_VERSION = 'sudoku-v12'
+export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v12'
 export const RATING_VERSION = 'sudoku-rating-v2'
 const REQUIRED_EXPORTS = [
   'engine_info',

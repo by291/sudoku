@@ -5,7 +5,7 @@ use super::types::{
     CatalogueLimits, MAX_CATALOGUE_CELLS, MAX_CONSTRAINT_CELLS, PreparedConstraintSupport,
     SupportLayout, SupportMasks, SupportMasksResult, SupportResult,
 };
-use crate::budget::{WorkBudget, WorkStage};
+use crate::control::ExecutionControl;
 use crate::rules::types::{PreparedRules, RuleConstraint};
 use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask, CoreResult, EngineError, UNIT_SIZE};
 
@@ -19,7 +19,7 @@ struct Enumerator<'a> {
     suffix_maximum: [u16; MAX_CONSTRAINT_CELLS + 1],
     suffix_empty: [bool; MAX_CONSTRAINT_CELLS + 1],
     exhausted: bool,
-    budget: &'a mut WorkBudget,
+    control: &'a mut ExecutionControl,
 }
 
 impl Enumerator<'_> {
@@ -62,7 +62,7 @@ impl Enumerator<'_> {
         while remaining != 0 {
             let candidate = (remaining.trailing_zeros() + 1) as u8;
             remaining &= remaining - 1;
-            if !self.budget.consume(1) {
+            if !self.control.check() {
                 self.exhausted = true;
                 return;
             }
@@ -96,7 +96,7 @@ fn enumerate(
     candidates: &[CandidateMask; BOARD_SIZE],
     rules: &PreparedRules,
     constraint: &RuleConstraint,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> SupportMasksResult {
     let cells = constraint.cells();
     let mut state = Enumerator {
@@ -112,7 +112,7 @@ fn enumerate(
         suffix_maximum: [0; MAX_CONSTRAINT_CELLS + 1],
         suffix_empty: [false; MAX_CONSTRAINT_CELLS + 1],
         exhausted: false,
-        budget,
+        control,
     };
     for (position, &cell) in cells.iter().enumerate() {
         state.domains[position] = effective_domain(board, candidates, cell);
@@ -138,11 +138,11 @@ fn enumerate(
         state.suffix_minimum[position] = minimum + state.suffix_minimum[position + 1];
         state.suffix_maximum[position] = maximum + state.suffix_maximum[position + 1];
     }
-    // Empty future domains still reject only after the first charged candidate, as in the original DFS.
+    // Visit order preserves the existing DFS support enumeration.
     state.visit(0, 0);
 
     if state.exhausted {
-        Bounded::BudgetExhausted
+        Bounded::Cancelled
     } else {
         Bounded::Complete(state.supports)
     }
@@ -153,11 +153,9 @@ pub(crate) fn raw_for_constraint(
     candidates: &[CandidateMask; BOARD_SIZE],
     rules: &PreparedRules,
     constraint: &RuleConstraint,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> SupportMasksResult {
-    budget.with_stage(WorkStage::Arithmetic, |budget| {
-        enumerate(board, candidates, rules, constraint, budget)
-    })
+    enumerate(board, candidates, rules, constraint, control)
 }
 
 /// The index names a constraint in this prepared layout; unknown indices are explicit input errors.
@@ -166,55 +164,56 @@ pub fn get_constraint_support(
     candidates: &[CandidateMask; BOARD_SIZE],
     rules: &PreparedRules,
     index: usize,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<SupportResult> {
     let constraint = rules.context().constraints.get(index).ok_or_else(|| {
         EngineError::invalid("Constraint belongs to a different prepared context")
     })?;
     Ok(
-        match raw_for_constraint(board, candidates, rules, constraint, budget) {
+        match raw_for_constraint(board, candidates, rules, constraint, control) {
             Bounded::Complete(masks) => Bounded::Complete(masks.into_snapshot(constraint.cells())),
-            Bounded::BudgetExhausted => Bounded::BudgetExhausted,
+            Bounded::Cancelled => Bounded::Cancelled,
         },
     )
 }
 
-/// Build only complete static support; overflow selects exact enumeration without refund.
+/// Build complete static support; memory overflow selects exact enumeration.
 pub fn prepare_constraint_support(
     rules: &PreparedRules,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
     limits: CatalogueLimits,
 ) -> CoreResult<Bounded<PreparedConstraintSupport>> {
     limits.validate()?;
-    Ok(budget.with_stage(WorkStage::Arithmetic, |budget| {
-        let mut catalogues = Vec::with_capacity(rules.context().constraints.len());
-        let mut retained = 0;
-        for constraint in &rules.context().constraints {
-            let mut catalogue = None;
-            if let RuleConstraint::Cage { cells, sum, .. } = constraint
-                && cells.len() <= MAX_CATALOGUE_CELLS
-            {
-                let capacity = limits
-                    .max_tuples_per_constraint
-                    .min(limits.max_tuples_per_layout - retained);
-                match cage_catalogue::compile(cells.len(), *sum, capacity, budget) {
-                    CatalogueResult::BudgetExhausted => return Bounded::BudgetExhausted,
-                    CatalogueResult::Complete(complete) => {
-                        retained += complete.tuples.len();
-                        catalogue = Some(complete);
-                    }
-                    // Overflow drops every partial tuple and retains the already spent work.
-                    CatalogueResult::Fallback => {}
+    if !control.check() {
+        return Ok(Bounded::Cancelled);
+    }
+    let mut catalogues = Vec::with_capacity(rules.context().constraints.len());
+    let mut retained = 0;
+    for constraint in &rules.context().constraints {
+        let mut catalogue = None;
+        if let RuleConstraint::Cage { cells, sum, .. } = constraint
+            && cells.len() <= MAX_CATALOGUE_CELLS
+        {
+            let capacity = limits
+                .max_tuples_per_constraint
+                .min(limits.max_tuples_per_layout - retained);
+            match cage_catalogue::compile(cells.len(), *sum, capacity, control) {
+                CatalogueResult::Incomplete => return Ok(Bounded::Cancelled),
+                CatalogueResult::Complete(complete) => {
+                    retained += complete.tuples.len();
+                    catalogue = Some(complete);
                 }
+                // Overflow drops every partial tuple before selecting exact enumeration.
+                CatalogueResult::Fallback => {}
             }
-            catalogues.push(catalogue);
         }
-        Bounded::Complete(PreparedConstraintSupport {
-            layout: Arc::new(SupportLayout {
-                rules: rules.clone(),
-                catalogues,
-            }),
-        })
+        catalogues.push(catalogue);
+    }
+    Ok(Bounded::Complete(PreparedConstraintSupport {
+        layout: Arc::new(SupportLayout {
+            rules: rules.clone(),
+            catalogues,
+        }),
     }))
 }
 
@@ -224,18 +223,18 @@ impl PreparedConstraintSupport {
         board: &Board,
         candidates: &[CandidateMask; BOARD_SIZE],
         index: usize,
-        budget: &mut WorkBudget,
+        control: &mut ExecutionControl,
     ) -> CoreResult<SupportResult> {
         if index >= self.layout.rules.context().constraints.len() {
             return Err(EngineError::invalid(
                 "Constraint belongs to a different prepared context",
             ));
         }
-        Ok(match self.query_at(board, candidates, index, budget) {
+        Ok(match self.query_at(board, candidates, index, control) {
             Bounded::Complete(masks) => Bounded::Complete(
                 masks.into_snapshot(self.layout.rules.context().constraints[index].cells()),
             ),
-            Bounded::BudgetExhausted => Bounded::BudgetExhausted,
+            Bounded::Cancelled => Bounded::Cancelled,
         })
     }
 
@@ -245,33 +244,31 @@ impl PreparedConstraintSupport {
         board: &Board,
         candidates: &[CandidateMask; BOARD_SIZE],
         index: usize,
-        budget: &mut WorkBudget,
+        control: &mut ExecutionControl,
     ) -> SupportMasksResult {
-        budget.with_stage(WorkStage::Arithmetic, |budget| {
-            let rules = &self.layout.rules;
-            let constraint = &rules.context().constraints[index];
-            let Some(catalogue) = &self.layout.catalogues[index] else {
-                return enumerate(board, candidates, rules, constraint, budget);
-            };
-            let cells = constraint.cells();
-            let mut local_domains = [0; MAX_CONSTRAINT_CELLS];
-            for (position, &cell) in cells.iter().enumerate() {
-                local_domains[position] = effective_domain(board, candidates, cell);
-            }
-            let domains = &local_domains[..cells.len()];
-            if !budget.consume(1) {
-                return Bounded::BudgetExhausted;
-            }
+        let rules = &self.layout.rules;
+        let constraint = &rules.context().constraints[index];
+        let Some(catalogue) = &self.layout.catalogues[index] else {
+            return enumerate(board, candidates, rules, constraint, control);
+        };
+        let cells = constraint.cells();
+        let mut local_domains = [0; MAX_CONSTRAINT_CELLS];
+        for (position, &cell) in cells.iter().enumerate() {
+            local_domains[position] = effective_domain(board, candidates, cell);
+        }
+        let domains = &local_domains[..cells.len()];
+        if !control.check() {
+            return Bounded::Cancelled;
+        }
 
-            // A nearly fixed cage is cheaper to enumerate; static preparation is never refunded.
-            let combinations: usize = domains
-                .iter()
-                .map(|mask| mask.count_ones() as usize)
-                .product();
-            if combinations <= catalogue.tuples.len() {
-                return enumerate(board, candidates, rules, constraint, budget);
-            }
-            cage_catalogue::filter(cells.len(), domains, catalogue, budget)
-        })
+        // A nearly fixed cage is cheaper to enumerate than to filter the complete catalogue.
+        let combinations: usize = domains
+            .iter()
+            .map(|mask| mask.count_ones() as usize)
+            .product();
+        if combinations <= catalogue.tuples.len() {
+            return enumerate(board, candidates, rules, constraint, control);
+        }
+        cage_catalogue::filter(cells.len(), domains, catalogue, control)
     }
 }

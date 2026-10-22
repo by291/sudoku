@@ -1,24 +1,20 @@
 use super::rules::RulesDto;
-use super::values::{BoardDto, DigitDto, SearchOptionsDto, WorkOptionsDto};
+use super::values::{BoardDto, DigitDto, SearchOptionsDto};
 use serde::{Deserialize, Serialize};
 use tsify::Tsify;
 
-/// An owned result with deterministic core work units, including any initial charge.
-/// Work units are algorithm operations, not elapsed time; exhaustion remains explicit in the result.
+/// An owned computation result; incomplete outcomes never imply success.
 #[derive(Serialize, Deserialize, Tsify)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[tsify(hashmap_as_object, missing_as_null)]
-pub struct WorkResultDto<T> {
+pub struct ComputationResultDto<T> {
     pub result: T,
-    pub work_used: u32,
 }
 
 #[derive(Deserialize, Tsify)]
 #[serde(deny_unknown_fields)]
 pub struct BoardQueryDto {
     pub board: BoardDto,
-    #[serde(default)]
-    pub work: Option<WorkOptionsDto>,
 }
 
 #[derive(Deserialize, Tsify)]
@@ -27,7 +23,7 @@ pub struct CountInputDto {
     pub board: BoardDto,
     pub rules: RulesDto,
     #[serde(default)]
-    pub work: Option<SearchOptionsDto>,
+    pub options: Option<SearchOptionsDto>,
 }
 
 /// An exhausted search is incomplete and establishes neither a solution count nor uniqueness.
@@ -40,14 +36,10 @@ pub enum SearchResultDto {
         solution: Option<BoardDto>,
         #[serde(rename = "nodesVisited")]
         nodes_visited: u32,
-        #[serde(rename = "workUsed")]
-        work_used: u32,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "nodesVisited")]
         nodes_visited: u32,
-        #[serde(rename = "workUsed")]
-        work_used: u32,
     },
 }
 
@@ -56,7 +48,7 @@ pub enum SearchResultDto {
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum CandidateResultDto {
     Complete { candidates: Vec<u16> },
-    BudgetExhausted,
+    Incomplete,
 }
 
 #[derive(Serialize, Deserialize, Tsify)]
@@ -81,7 +73,7 @@ pub struct ViolationDto {
 #[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum ConflictResultDto {
     Complete { violations: Vec<ViolationDto> },
-    BudgetExhausted { violations: Vec<ViolationDto> },
+    Incomplete { violations: Vec<ViolationDto> },
 }
 
 #[derive(Deserialize, Tsify)]
@@ -100,8 +92,6 @@ pub struct EditInputDto {
     pub entries: BoardDto,
     pub notes: Vec<u16>,
     pub action: BoardEditDto,
-    #[serde(default)]
-    pub work: Option<WorkOptionsDto>,
 }
 
 /// Complete edits return independent layers; exhaustion has no layers to commit.
@@ -115,7 +105,7 @@ pub enum EditResultDto {
         #[serde(rename = "boardComplete")]
         board_complete: bool,
     },
-    BudgetExhausted,
+    Incomplete,
 }
 
 #[derive(Deserialize, Tsify)]
@@ -123,27 +113,27 @@ pub enum EditResultDto {
 pub struct PreparedCountInputDto {
     pub board: BoardDto,
     #[serde(default)]
-    pub work: Option<SearchOptionsDto>,
+    pub options: Option<SearchOptionsDto>,
 }
 
 // Tsify 0.5.8's ABI names erase generic arguments. Concrete transparent responses keep generated signatures sound.
-macro_rules! work_response {
+macro_rules! computation_response {
     ($name:ident, $result:ty) => {
         #[derive(Serialize, Tsify)]
         #[serde(transparent)]
         #[tsify(hashmap_as_object, missing_as_null)]
-        pub struct $name(pub WorkResultDto<$result>);
+        pub struct $name(pub ComputationResultDto<$result>);
     };
 }
-work_response!(CandidateWorkDto, CandidateResultDto);
+computation_response!(CandidateComputationDto, CandidateResultDto);
 
-work_response!(SearchWorkDto, SearchResultDto);
+computation_response!(SearchComputationDto, SearchResultDto);
 
-work_response!(LogicWorkDto, super::logic::LogicResultDto);
-work_response!(HintWorkDto, super::logic::HintResultDto);
-work_response!(AssessmentWorkDto, super::rating::AssessmentResultDto);
-work_response!(
-    AssessmentSummaryWorkDto,
+computation_response!(LogicComputationDto, super::logic::LogicResultDto);
+computation_response!(HintComputationDto, super::logic::HintResultDto);
+computation_response!(AssessmentComputationDto, super::rating::AssessmentResultDto);
+computation_response!(
+    AssessmentSummaryComputationDto,
     super::rating::LiveAssessmentOutcomeDto
 );
 
@@ -157,12 +147,12 @@ pub struct ReviewInputDto {
 #[derive(Serialize, Deserialize, Tsify)]
 #[serde(transparent)]
 #[tsify(hashmap_as_object, missing_as_null)]
-pub struct ConflictWorkDto(pub WorkResultDto<ConflictResultDto>);
+pub struct ConflictComputationDto(pub ComputationResultDto<ConflictResultDto>);
 
 #[derive(Serialize, Deserialize, Tsify)]
 #[serde(transparent)]
 #[tsify(hashmap_as_object, missing_as_null)]
-pub struct EditWorkDto(pub WorkResultDto<EditResultDto>);
+pub struct EditComputationDto(pub ComputationResultDto<EditResultDto>);
 
 #[derive(Serialize, Tsify)]
 #[serde(rename_all = "kebab-case")]

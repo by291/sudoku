@@ -229,7 +229,7 @@ pub(crate) fn parse(value: &JsValue) -> CoreResult<LiveAssessmentOutcomeDto> {
             });
         }
         "ungraded" => record(value, &["status", "ratingVersion", "variant"])?,
-        "budget-exhausted" => record(
+        "incomplete" => record(
             value,
             &["status", "ratingVersion", "variant", "stage", "difficulty"],
         )?,
@@ -249,12 +249,12 @@ pub(crate) fn parse(value: &JsValue) -> CoreResult<LiveAssessmentOutcomeDto> {
             rating_version,
             variant,
         }),
-        AssessmentOutcomeDto::BudgetExhausted {
+        AssessmentOutcomeDto::Incomplete {
             rating_version,
             variant,
             stage,
             difficulty,
-        } => Ok(LiveAssessmentOutcomeDto::BudgetExhausted {
+        } => Ok(LiveAssessmentOutcomeDto::Incomplete {
             rating_version,
             variant,
             stage,

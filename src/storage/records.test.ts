@@ -212,3 +212,21 @@ it('owns decoded board layers independently of the untrusted snapshot', () => {
   expect(parsed.value.session.notes).not.toBe(session.notes)
   expect(parsed.value.session.puzzle.givens).not.toBe(session.puzzle.givens)
 })
+
+it('preserves a historical budget-exhausted assessment when reading and saving', () => {
+  const original = {
+    formatVersion: 2,
+    revision: 5,
+    session: {
+      ...makeSession(),
+      assessment: { status: 'unavailable', reason: 'budget-exhausted', issues: ['历史说明\ud800'] },
+    },
+  }
+
+  const parsed = parseSessionRecord(original)
+
+  expect(parsed).toEqual({ valid: true, value: original })
+  if (parsed.valid) {
+    expect(parseSessionRecord(JSON.parse(JSON.stringify(parsed.value)))).toEqual(parsed)
+  }
+})

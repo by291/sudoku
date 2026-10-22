@@ -2,7 +2,7 @@ use crate::fixtures::decode_rules;
 use crate::logical_projection::project_step;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sudoku_core::budget::WorkBudget;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::logic::advanced_evidence::validate_advanced_step;
 use sudoku_core::logic::advanced_techniques::find_advanced_step;
 use sudoku_core::logic::techniques::Technique;
@@ -13,11 +13,12 @@ use sudoku_core::types::{Board, Bounded, CandidateMask};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AdvancedInput {
+    #[serde(rename = "limit")]
+    _legacy_limit: u64,
     board: Vec<u8>,
     rules: Value,
     domains: Vec<u16>,
     technique: String,
-    limit: u64,
 }
 
 pub fn evaluate(input: AdvancedInput) -> Result<Value, Box<dyn std::error::Error>> {
@@ -33,10 +34,10 @@ pub fn evaluate(input: AdvancedInput) -> Result<Value, Box<dyn std::error::Error
         .map_err(|_| "Expected 81 fixture domains")?;
     let state = LogicalWorkspace::from_authored_candidates(&board, candidates, &rules)?;
     let technique = Technique::parse(&input.technique).ok_or("Unknown fixture technique")?;
-    let mut budget = WorkBudget::new(input.limit);
-    let result = find_advanced_step(&state, technique, &mut budget);
+    let mut control = ExecutionControl::new();
+    let result = find_advanced_step(&state, technique, &mut control);
     let (result, valid) = match result {
-        Bounded::BudgetExhausted => (json!({"status":"budget-exhausted"}), None),
+        Bounded::Cancelled => (json!({"status":"budget-exhausted"}), None),
         Bounded::Complete(step) => {
             let valid = step
                 .as_ref()
@@ -47,5 +48,5 @@ pub fn evaluate(input: AdvancedInput) -> Result<Value, Box<dyn std::error::Error
             )
         }
     };
-    Ok(json!({"result":result,"valid":valid,"workUsed":budget.used()}))
+    Ok(json!({"result":result,"valid":valid}))
 }

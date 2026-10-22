@@ -47,19 +47,19 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
     return
   }
 
-  const parsed = parseWorkerRequest(event.data, engine)
-  if (!parsed.valid) {
-    if (isRecord(event.data) && typeof event.data.requestId === 'string') {
-      postMessage({
-        kind: event.data.kind,
-        requestId: event.data.requestId,
-        outcome: { status: 'failed', message: parsed.issues.join('; ') },
-      })
-    }
-    return
-  }
-  const request = parsed.value
   try {
+    const parsed = parseWorkerRequest(event.data, engine)
+    if (!parsed.valid) {
+      if (isRecord(event.data) && typeof event.data.requestId === 'string') {
+        postMessage({
+          kind: event.data.kind,
+          requestId: event.data.requestId,
+          outcome: { status: 'failed', message: parsed.issues.join('; ') },
+        })
+      }
+      return
+    }
+    const request = parsed.value
     let response: WorkerResponse
     if (request.kind === 'generate') {
       const result = engine.generate(request.input)
@@ -73,12 +73,12 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
             assessment: { status: 'rated', summary: result.assessment },
           },
         }
-      } else if (result.status === 'budget-exhausted') {
+      } else if (result.status === 'incomplete') {
         response = {
           kind: 'generate',
           requestId: request.requestId,
           outcome: {
-            status: 'budget-exhausted',
+            status: 'incomplete',
             message: 'No qualifying puzzle found within the generation limits',
           },
         }
@@ -119,12 +119,19 @@ addEventListener('message', (event: MessageEvent<unknown>) => {
     }
     postMessage(response)
   } catch (error: unknown) {
+    if (!isRecord(event.data) || typeof event.data.requestId !== 'string') {
+      return
+    }
     postMessage({
-      kind: request.kind,
-      requestId: request.requestId,
+      kind: event.data.kind,
+      requestId: event.data.requestId,
       outcome: {
-        status: 'failed',
-        message: error instanceof Error ? error.message : 'Computation failed',
+        ...(error instanceof Error && error.message === 'Computation timed out'
+          ? { status: 'timed-out' as const }
+          : {
+              status: 'failed' as const,
+              message: error instanceof Error ? error.message : 'Computation failed',
+            }),
       },
     })
   }

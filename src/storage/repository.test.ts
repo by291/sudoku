@@ -360,7 +360,7 @@ it('upgrades a legacy completed save on write and quarantines unsupported bytes 
   }
 })
 
-it('keeps saved records when synchronous semantic validation exhausts its budget', async () => {
+it('keeps saved records when synchronous semantic validation cannot complete', async () => {
   const { database } = await setup()
   const record = { formatVersion: 2, revision: 7, session: makeSession() }
   await database.put('sessions', record)
@@ -369,10 +369,10 @@ it('keeps saved records when synchronous semantic validation exhausts its budget
   const { createGameRepository: createRepository } = await import('@/storage/repository')
   const repository = createRepository(() => Promise.resolve(database), {
     ...engine,
-    validatePuzzle: () => ({ status: 'budget-exhausted' }),
+    validatePuzzle: () => ({ status: 'incomplete' }),
   })
   const owner = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
-  const lease = await owner.acquireOwnership(record.session.id, 'budget-test')
+  const lease = await owner.acquireOwnership(record.session.id, 'incomplete-test')
   if (!lease.ok || !lease.value) {
     throw new Error('Fixture lease failed')
   }
@@ -382,7 +382,7 @@ it('keeps saved records when synchronous semantic validation exhausts its budget
       ok: false,
       error: { kind: 'unavailable' },
     })
-    // A semantic budget failure must outrank the write-failed policy and preserve the saved revision.
+    // A incomplete semantic validation must outrank the write-failed policy and preserve the saved revision.
     expect(
       await repository.writeSession(record.session, record.revision, lease.value),
     ).toMatchObject({

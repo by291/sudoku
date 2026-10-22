@@ -26,8 +26,8 @@ const unavailableMessage = computed(() => {
     if (props.hint.reason === 'complete') {
       return '棋盘已经完成。'
     }
-    if (props.hint.reason === 'budget-exhausted') {
-      return '提示计算超出预算，未应用任何推理。请稍后重试。'
+    if (props.hint.reason === 'incomplete') {
+      return '提示计算未完成，未应用任何推理。请稍后重试。'
     }
   }
 

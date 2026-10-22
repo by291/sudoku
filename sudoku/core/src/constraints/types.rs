@@ -140,7 +140,7 @@ impl PreparedComputation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConflictStatus {
     Complete,
-    BudgetExhausted,
+    Incomplete,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

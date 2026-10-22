@@ -5,7 +5,7 @@ pub mod fixtures;
 #[path = "support/projection.rs"]
 mod logical_projection;
 
-use sudoku_core::budget::WorkBudget;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::logic::solver::{analyze_workspace, find_step};
 use sudoku_core::logic::techniques::Technique;
 use sudoku_core::logic::types::{Evidence, LogicStatus, LogicalAction, LogicalWorkspace, Removal};
@@ -40,10 +40,10 @@ fn basic_and_variant_steps_match_ordered_evidence() {
     candidates[2..9].fill(CandidateMask::try_from(508).unwrap());
     let mut state =
         LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap();
-    let mut budget = WorkBudget::new(1);
+    let mut control = ExecutionControl::new();
 
     let Bounded::Complete(Some(step)) =
-        find_step(&mut state, &[Technique::HiddenPair], &mut budget)
+        find_step(&mut state, &[Technique::HiddenPair], &mut control)
     else {
         panic!("Expected independently known hidden pair");
     };
@@ -67,13 +67,12 @@ fn basic_and_variant_steps_match_ordered_evidence() {
             units: Some(vec![])
         }
     );
-    assert_eq!(budget.used(), 1);
 
     let mut state = sum_three_workspace();
     let Bounded::Complete(Some(mut first)) = find_variant_step(
         &mut state,
         &[Technique::CageCombination],
-        &mut WorkBudget::new(100),
+        &mut ExecutionControl::new(),
     ) else {
         panic!("Expected distinct sum-three proof");
     };
@@ -91,7 +90,7 @@ fn basic_and_variant_steps_match_ordered_evidence() {
     let repeated = find_variant_step(
         &mut state,
         &[Technique::CageCombination],
-        &mut WorkBudget::new(1),
+        &mut ExecutionControl::new(),
     );
     assert_eq!(repeated, Bounded::Complete(Some(original.clone())));
 
@@ -108,22 +107,22 @@ fn incomplete_support_is_never_memoized() {
         find_variant_step(
             &mut state,
             &[Technique::CageCombination],
-            &mut WorkBudget::new(2)
+            &mut fixtures::cancelled_control()
         ),
-        Bounded::BudgetExhausted
+        Bounded::Cancelled
     );
     assert_eq!(
         find_variant_step(
             &mut state,
             &[Technique::CageCombination],
-            &mut WorkBudget::new(1)
+            &mut fixtures::cancelled_control()
         ),
-        Bounded::BudgetExhausted
+        Bounded::Cancelled
     );
     let Bounded::Complete(Some(step)) = find_variant_step(
         &mut state,
         &[Technique::CageCombination],
-        &mut WorkBudget::new(100),
+        &mut ExecutionControl::new(),
     ) else {
         panic!("Expected complete support");
     };
@@ -134,9 +133,9 @@ fn incomplete_support_is_never_memoized() {
         removals: vec![Removal { cell: 0, digit: 3 }],
     };
     apply_step(&mut state, &narrowed).unwrap();
-    let mut budget = WorkBudget::new(100);
+    let mut control = ExecutionControl::new();
     let Bounded::Complete(Some(step)) =
-        find_variant_step(&mut state, &[Technique::CageCombination], &mut budget)
+        find_variant_step(&mut state, &[Technique::CageCombination], &mut control)
     else {
         panic!("Expected recomputed support");
     };
@@ -146,7 +145,6 @@ fn incomplete_support_is_never_memoized() {
             removals: vec![Removal { cell: 1, digit: 3 }]
         }
     );
-    assert!(budget.used() > 1);
 }
 
 #[test]
@@ -155,7 +153,7 @@ fn new_clue_masks_never_reuse_reduced_domains() {
     let Bounded::Complete(Some(step)) = find_variant_step(
         &mut first,
         &[Technique::CageCombination],
-        &mut WorkBudget::new(100),
+        &mut ExecutionControl::new(),
     ) else {
         panic!("Expected complete support");
     };
@@ -172,16 +170,16 @@ fn new_clue_masks_never_reuse_reduced_domains() {
         find_variant_step(
             &mut second,
             &[Technique::CageCombination],
-            &mut WorkBudget::new(1)
+            &mut fixtures::cancelled_control()
         ),
-        Bounded::BudgetExhausted
+        Bounded::Cancelled
     );
     assert!(second.premises().is_empty());
     let result = analyze_workspace(
         &mut second,
         &[Technique::CageCombination],
         0,
-        &mut WorkBudget::new(100),
+        &mut ExecutionControl::new(),
         &[],
     );
     assert_eq!(result.status, LogicStatus::StepLimit);
@@ -190,10 +188,10 @@ fn new_clue_masks_never_reuse_reduced_domains() {
         &mut second,
         &[Technique::CageCombination],
         500,
-        &mut WorkBudget::new(0),
+        &mut fixtures::cancelled_control(),
         &[],
     );
-    assert_eq!(result.status, LogicStatus::WorkLimit);
+    assert_eq!(result.status, LogicStatus::Cancelled);
 }
 
 #[test]
@@ -219,7 +217,12 @@ fn authored_basic_and_variant_traces_match_every_evidence_field() {
 
         let actual = contracts::evaluate(input).unwrap();
 
-        assert_eq!(actual, row["expected"], "{}", row["id"]);
+        assert_eq!(
+            actual,
+            fixtures::without_work(row["expected"].clone()),
+            "{}",
+            row["id"]
+        );
         let solution = &row["input"]["solution"];
         for step in actual["steps"].as_array().unwrap() {
             if step["kind"] == "placement" {

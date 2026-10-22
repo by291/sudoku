@@ -15,6 +15,24 @@ class PortableCodecTest {
             EngineOutcome.Completed(value)
     }
 
+    @Test fun `versioned identities validate without rewriting historical saves`() = runTest {
+        val codec = PortableCodec(validator)
+        for (version in listOf("sudoku-v11", "sudoku-v12")) {
+            val puzzle = puzzleFixture().copy(seed = "ab".repeat(32), puzzleVersion = version)
+            val session = createSession(puzzle, SessionMetadata.Free, "identity", "2026-10-16T01:02:03.004Z")
+
+            assertEquals(puzzle, codec.validateSession(session).puzzle)
+            assertFailsWith<InvalidPortableData> {
+                codec.validateSession(session.copy(puzzle = puzzle.copy(seed = "AB".repeat(32))))
+            }
+            assertFailsWith<InvalidPortableData> {
+                codec.validateSession(
+                    session.copy(puzzle = puzzle.copy(puzzleVersion = version.replace("sudoku-", "sudoku-variants-")))
+                )
+            }
+        }
+    }
+
     @Test fun `portable and local records preserve legacy surrogate code units and millisecond instants`() = runTest {
         val codec = PortableCodec(validator)
         val puzzle = puzzleFixture().copy(seed = "legacy\uD800text", puzzleVersion = "old\uDC00")
@@ -96,12 +114,12 @@ class PortableCodecTest {
         assertFailsWith<InvalidPortableData> { PortableCodec(invalid).validateSession(session) }
     }
 
-    @Test fun `exhausted validator preserves data as unavailable`() = runTest {
-        val exhausted = object : MathematicalValidator by validator {
+    @Test fun `incomplete validator preserves data as unavailable`() = runTest {
+        val incomplete = object : MathematicalValidator by validator {
             override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> =
-                EngineOutcome.BudgetExhausted()
+                EngineOutcome.Incomplete
         }
-        val codec = PortableCodec(exhausted)
+        val codec = PortableCodec(incomplete)
         val session = createSession(puzzleFixture(), SessionMetadata.Free, "retry", "2026-10-16T01:02:03.004Z")
 
         assertFailsWith<SnapshotValidationUnavailable> { codec.validateSession(session) }

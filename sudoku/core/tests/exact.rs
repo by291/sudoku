@@ -1,8 +1,8 @@
 #[path = "support/rules.rs"]
 pub mod fixtures;
 
-use sudoku_core::budget::WorkBudget;
 use sudoku_core::constraints::computation::prepare_computation;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::search::exact::{count_solutions, count_with_rules};
 use sudoku_core::search::types::SearchResult;
 use sudoku_core::types::{Board, Bounded};
@@ -13,27 +13,45 @@ fn counts_zero_one_two_and_preserves_first_solution() {
         "../../../tests/fixtures/engine-contracts/exact.json"
     ))
     .unwrap();
-    for row in rows {
+    for row in &rows {
         let input = &row["input"];
         let rules = fixtures::decode_rules(&input["rules"]).unwrap();
         let values: Vec<u8> = serde_json::from_value(input["board"].clone()).unwrap();
         let board = Board::try_from(values.as_slice()).unwrap();
-        let mut budget = WorkBudget::new(input["limit"].as_u64().unwrap());
+        let mut control = ExecutionControl::new();
 
         let result = count_with_rules(
             &board,
             &rules,
-            &mut budget,
+            &mut control,
             input["nodes"].as_u64().unwrap(),
         )
         .unwrap();
 
-        assert_eq!(project_result(result), row["expected"], "{}", row["id"]);
+        let expected = if matches!(result, SearchResult::Complete { .. }) {
+            // Legacy work-only cutoffs now run to completion; use the sealed complete sibling for this board.
+            &rows
+                .iter()
+                .find(|candidate| {
+                    candidate["input"]["board"] == input["board"]
+                        && candidate["input"]["rules"] == input["rules"]
+                        && candidate["expected"]["status"] == "complete"
+                })
+                .expect("Every search case has a sealed complete sibling")["expected"]
+        } else {
+            &row["expected"]
+        };
+        assert_eq!(
+            project_result(result),
+            fixtures::without_work(expected.clone()),
+            "{}",
+            row["id"]
+        );
     }
 }
 
 #[test]
-fn insertion_order_preserves_work_and_nodes() {
+fn insertion_order_preserves_solutions_and_nodes() {
     compare_prepared(false);
 }
 
@@ -47,34 +65,53 @@ fn compare_prepared(repeat_after_exhaustion: bool) {
         "../../../tests/fixtures/engine-contracts/exact-prepared.json"
     ))
     .unwrap();
-    for row in rows {
+    for row in &rows {
         let input = &row["input"];
         let rules = fixtures::decode_rules(&input["rules"]).unwrap();
         let values: Vec<u8> = serde_json::from_value(input["board"].clone()).unwrap();
         let board = Board::try_from(values.as_slice()).unwrap();
-        let mut setup = WorkBudget::new(4000000);
+        let mut setup = ExecutionControl::new();
         let Bounded::Complete(prepared) = prepare_computation(&rules, &mut setup).unwrap() else {
             panic!("Expected immutable prepared layout");
         };
-        let mut budget = WorkBudget::new(input["workLimit"].as_u64().unwrap());
-        assert!(budget.consume(input["initialWork"].as_u64().unwrap()));
+        let mut control = ExecutionControl::new();
 
         let result = count_solutions(
             &board,
             &prepared,
-            &mut budget,
+            &mut control,
             input["nodeLimit"].as_u64().unwrap(),
         );
 
-        assert_eq!(
-            serde_json::json!({"result":project_result(result),"used":budget.used()}),
-            row["expected"],
-            "{}",
-            row["id"]
-        );
+        match &result {
+            SearchResult::Complete { .. } => {
+                let expected = &rows
+                    .iter()
+                    .find(|candidate| {
+                        candidate["input"]["board"] == input["board"]
+                            && candidate["input"]["rules"] == input["rules"]
+                            && candidate["expected"]["result"]["status"] == "complete"
+                    })
+                    .expect("Every prepared case has a sealed complete sibling")["expected"]["result"];
+                assert_eq!(
+                    project_result(result),
+                    fixtures::without_work(expected.clone()),
+                    "{}",
+                    row["id"]
+                );
+            }
+            SearchResult::Incomplete { nodes_visited } => {
+                assert_eq!(
+                    *nodes_visited,
+                    input["nodeLimit"].as_u64().unwrap(),
+                    "{}",
+                    row["id"]
+                );
+            }
+        }
         if repeat_after_exhaustion {
-            let mut first = WorkBudget::new(4000000);
-            let mut second = WorkBudget::new(4000000);
+            let mut first = ExecutionControl::new();
+            let mut second = ExecutionControl::new();
             assert_eq!(
                 count_solutions(&board, &prepared, &mut first, 1000000),
                 count_solutions(&board, &prepared, &mut second, 1000000)
@@ -89,21 +126,17 @@ fn project_result(result: SearchResult) -> serde_json::Value {
             count,
             solution,
             nodes_visited,
-            work_used,
         } => {
-            serde_json::json!({"status":"complete","count":count,"solution":solution.map(|board|board.values().to_vec()),"nodesVisited":nodes_visited,"workUsed":work_used})
+            serde_json::json!({"status":"complete","count":count,"solution":solution.map(|board|board.values().to_vec()),"nodesVisited":nodes_visited})
         }
-        SearchResult::BudgetExhausted {
-            nodes_visited,
-            work_used,
-        } => {
-            serde_json::json!({"status":"budget-exhausted","nodesVisited":nodes_visited,"workUsed":work_used})
+        SearchResult::Incomplete { nodes_visited } => {
+            serde_json::json!({"status":"budget-exhausted","nodesVisited":nodes_visited})
         }
     }
 }
 
 #[test]
-fn standalone_validation_precedes_free_contradiction_and_charged_preparation() {
+fn standalone_validation_precedes_contradiction_and_preparation() {
     use sudoku_core::rules::types::PuzzleRules;
     let mut values = [0_u8; 81];
     values[0] = 1;
@@ -112,30 +145,32 @@ fn standalone_validation_precedes_free_contradiction_and_charged_preparation() {
     let invalid_rules = PuzzleRules::Thermo {
         paths: vec![vec![0, 80]],
     };
-    let mut budget = WorkBudget::new(0);
+    let mut control = ExecutionControl::new();
 
-    assert!(count_with_rules(&duplicate, &invalid_rules, &mut budget, 100).is_err());
+    assert!(count_with_rules(&duplicate, &invalid_rules, &mut control, 100).is_err());
     assert_eq!(
-        count_with_rules(&duplicate, &PuzzleRules::Diagonal, &mut budget, 100).unwrap(),
+        count_with_rules(&duplicate, &PuzzleRules::Diagonal, &mut control, 100).unwrap(),
         SearchResult::Complete {
             count: 0,
             solution: None,
             nodes_visited: 0,
-            work_used: 0
         }
     );
-    assert_eq!(budget.used(), 0);
+
     assert_eq!(
-        count_with_rules(&Board::EMPTY, &PuzzleRules::Diagonal, &mut budget, 100).unwrap(),
-        SearchResult::BudgetExhausted {
-            nodes_visited: 0,
-            work_used: 0
-        }
+        count_with_rules(
+            &Board::EMPTY,
+            &PuzzleRules::Diagonal,
+            &mut fixtures::cancelled_control(),
+            100
+        )
+        .unwrap(),
+        SearchResult::Incomplete { nodes_visited: 0 }
     );
 }
 
 #[test]
-fn completed_invalid_arithmetic_retains_zero_budget_rejection() {
+fn completed_invalid_arithmetic_is_rejected_without_search() {
     use sudoku_core::rules::types::{Arrow, PuzzleRules};
     let values: [u8; 81] =
         std::array::from_fn(|cell| ((cell / 9 * 3 + cell / 27 + cell % 9) % 9 + 1) as u8);
@@ -146,19 +181,17 @@ fn completed_invalid_arithmetic_retains_zero_budget_rejection() {
             shaft: vec![1],
         }],
     };
-    let mut budget = WorkBudget::new(0);
+    let mut control = ExecutionControl::new();
 
     // The completed Classic board has 1 in the circle and 2 on its shaft.
     assert_eq!(
-        count_with_rules(&board, &rules, &mut budget, 100).unwrap(),
+        count_with_rules(&board, &rules, &mut control, 100).unwrap(),
         SearchResult::Complete {
             count: 0,
             solution: None,
             nodes_visited: 0,
-            work_used: 0
         }
     );
-    assert_eq!(budget.used(), 0);
 }
 
 #[test]
@@ -168,12 +201,12 @@ fn contradictory_arithmetic_siblings_discard_pending_propagation() {
     ))
     .unwrap();
     let cases = [
-        ("generated:killer-hard:0:0", 3, 15444),
-        ("generated:thermo-medium:0:0", 7, 793),
-        ("authored:arrow-hard:0", 7, 596),
+        ("generated:killer-hard:0:0", 3),
+        ("generated:thermo-medium:0:0", 7),
+        ("authored:arrow-hard:0", 7),
     ];
 
-    for (id, nodes_visited, work_used) in cases {
+    for (id, nodes_visited) in cases {
         let row = rows.iter().find(|row| row["id"] == id).unwrap();
         let input = &row["input"];
         let rules = fixtures::decode_rules(&input["rules"]).unwrap();
@@ -182,14 +215,14 @@ fn contradictory_arithmetic_siblings_discard_pending_propagation() {
         let expected_values: Vec<u8> =
             serde_json::from_value(row["expected"]["result"]["solution"].clone()).unwrap();
         let expected_solution = Board::try_from(expected_values.as_slice()).unwrap();
-        let mut preparation = WorkBudget::new(4_000_000);
+        let mut preparation = ExecutionControl::new();
         let Bounded::Complete(computation) = prepare_computation(&rules, &mut preparation).unwrap()
         else {
             panic!("Expected immutable arithmetic layout");
         };
-        let mut budget = WorkBudget::new(4_000_000);
+        let mut control = ExecutionControl::new();
 
-        let result = count_solutions(&board, &computation, &mut budget, 1_000_000);
+        let result = count_solutions(&board, &computation, &mut control, 1_000_000);
 
         // Sealed independent fixtures pin unique solutions after failed sibling branches, including queue work.
         assert_eq!(
@@ -198,10 +231,8 @@ fn contradictory_arithmetic_siblings_discard_pending_propagation() {
                 count: 1,
                 solution: Some(expected_solution),
                 nodes_visited,
-                work_used,
             },
             "{id}"
         );
-        assert_eq!(budget.used(), work_used, "{id}");
     }
 }

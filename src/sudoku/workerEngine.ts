@@ -4,7 +4,6 @@ import type { AssessmentInput, LiveAssessmentOutcome } from '@/sudoku/contracts'
 import type { GenerationInput } from '@/sudoku/generationInput'
 import { validateEngineInfo, validateModuleExports } from '@/sudoku/guards'
 import { copyRules } from '@/sudoku/ruleInput'
-import { LIVE_WORK_ALLOWANCE } from '@/worker/protocol'
 import type { GenerateNotesInput } from '@/worker/protocol'
 
 /** One isolated Worker owns this instance until the client terminates it. */
@@ -20,11 +19,9 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
   ) {
     const layout = new bindings.PreparedPuzzle({
       rules: copyRules(rules),
-      maxWork: LIVE_WORK_ALLOWANCE,
     })
     try {
-      // Preparation has its own allowance; it never contributes to or refunds action work.
-      return { preparationWork: layout.preparationWork, computation: compute(layout) }
+      return { computation: compute(layout) }
     } finally {
       layout.free()
     }
@@ -32,9 +29,7 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
 
   return {
     conflicts(board: Board, rules: PuzzleRules) {
-      return withPrepared(rules, (layout) =>
-        layout.conflicts({ board: [...board], work: { maxWork: LIVE_WORK_ALLOWANCE } }),
-      )
+      return withPrepared(rules, (layout) => layout.conflicts({ board: [...board] }))
     },
     generateNotes(input: GenerateNotesInput) {
       return withPrepared(input.rules, (layout) =>
@@ -43,7 +38,6 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
           entries: [...input.entries],
           notes: [...input.notes],
           action: { kind: 'generate-notes' },
-          work: { maxWork: LIVE_WORK_ALLOWANCE },
         }),
       )
     },
@@ -71,7 +65,6 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
         solution: [...solution],
         rules: copyRules(rules),
         maxSteps: 500,
-        maxWork: 1000000,
       }).result
     },
   }

@@ -2,7 +2,7 @@ use crate::fixtures::decode_rules;
 use crate::logical_projection::project_step;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sudoku_core::budget::WorkBudget;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::logic::solver::analyze_logic;
 use sudoku_core::logic::techniques::{ALL_CLASSIC_TECHNIQUES, Technique};
 use sudoku_core::logic::types::{LogicResult, LogicStatus};
@@ -14,9 +14,10 @@ type FixtureResult = Result<Value, Box<dyn std::error::Error>>;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct LogicInput {
+    #[serde(rename = "limit")]
+    _legacy_limit: u64,
     board: Vec<u8>,
     rules: Value,
-    limit: u64,
     #[serde(rename = "solution")]
     _solution: Vec<u8>,
     #[serde(rename = "difficulty")]
@@ -32,9 +33,9 @@ fn default_step_limit() -> u32 {
 }
 
 pub fn project_result(result: &LogicResult) -> Value {
-    let mut value = json!({"status":match result.status { LogicStatus::Solved => "solved", LogicStatus::Stalled => "stalled", LogicStatus::WorkLimit | LogicStatus::StepLimit => "budget-exhausted" },"board":result.board.values().to_vec(),"steps":result.steps.iter().map(project_step).collect::<Vec<_>>()});
+    let mut value = json!({"status":match result.status { LogicStatus::Solved => "solved", LogicStatus::Stalled => "stalled", LogicStatus::Cancelled | LogicStatus::StepLimit => "budget-exhausted" },"board":result.board.values().to_vec(),"steps":result.steps.iter().map(project_step).collect::<Vec<_>>()});
     match result.status {
-        LogicStatus::WorkLimit => value["cause"] = json!("work-limit"),
+        LogicStatus::Cancelled => value["cause"] = json!("work-limit"),
         LogicStatus::StepLimit => value["cause"] = json!("logical-step-limit"),
         LogicStatus::Solved | LogicStatus::Stalled => {}
     }
@@ -53,7 +54,7 @@ pub fn evaluate(input: LogicInput) -> FixtureResult {
     } else if matches!(rules.rules(), PuzzleRules::Classic) {
         ALL_CLASSIC_TECHNIQUES.to_vec()
     }
-    // Test-only hard policy superset: inapplicable clue techniques perform no visits or charges.
+    // Test-only hard policy superset: inapplicable clue techniques perform no enumeration.
     else {
         vec![
             Technique::NakedSingle,
@@ -69,9 +70,8 @@ pub fn evaluate(input: LogicInput) -> FixtureResult {
             Technique::HiddenPair,
         ]
     };
-    let mut budget = WorkBudget::new(input.limit);
-    let result = analyze_logic(&board, &rules, &allowed, input.max_steps, &mut budget);
-    let mut value = project_result(&result);
-    value["workUsed"] = json!(budget.used());
+    let mut control = ExecutionControl::new();
+    let result = analyze_logic(&board, &rules, &allowed, input.max_steps, &mut control);
+    let value = project_result(&result);
     Ok(value)
 }

@@ -1,10 +1,8 @@
 //! Validate authored candidate-relative deductions independently of live detector ordering.
 use super::step_shape::valid_step_shape;
-use super::step_validation::{
-    HINT_VALIDATION_WORK_LIMIT, ValidationMode, invalid, validate_step_and_apply,
-};
+use super::step_validation::{ValidationMode, invalid, validate_step_and_apply};
 use super::types::{LogicalStep, LogicalWorkspace};
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::rules::context::compile_rules;
 use crate::rules::types::PuzzleRules;
 use crate::types::{BOARD_SIZE, Board, CandidateMask, CoreResult};
@@ -18,22 +16,22 @@ pub fn validate_teaching_step(
     rules: &PuzzleRules,
     step: &LogicalStep,
 ) -> CoreResult<()> {
-    validate_teaching_step_with_budget(
+    validate_teaching_step_with_control(
         board,
         candidates,
         rules,
         step,
-        &mut WorkBudget::new(HINT_VALIDATION_WORK_LIMIT),
+        &mut ExecutionControl::new(),
     )
 }
 
-/// Validate one owned teaching snapshot with a caller-owned cancellation/work budget.
-pub fn validate_teaching_step_with_budget(
+/// Validate one owned teaching snapshot with a caller-owned cancellation control.
+pub fn validate_teaching_step_with_control(
     board: &Board,
     candidates: [CandidateMask; BOARD_SIZE],
     rules: &PuzzleRules,
     step: &LogicalStep,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<()> {
     if !valid_step_shape(step)
         || board
@@ -52,7 +50,7 @@ pub fn validate_teaching_step_with_budget(
         &mut step,
         &context,
         &mut state,
-        budget,
+        control,
         ValidationMode::Teaching,
     )
 }

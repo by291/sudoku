@@ -1,4 +1,4 @@
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::topology::cells_touch;
 use crate::rules::types::{Arrow, PuzzleRules};
@@ -17,9 +17,9 @@ fn shaft(
     total: u16,
     solution: &Board,
     random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> Option<Vec<usize>> {
-    if !budget.consume(1) {
+    if !control.check() {
         return None;
     }
     if total == u16::from(solution.values()[circle]) {
@@ -52,13 +52,13 @@ fn shaft(
             total + u16::from(solution.values()[cell]),
             solution,
             random,
-            budget,
+            control,
         );
         path.pop();
         if result.is_some() {
             return result;
         }
-        if budget.remaining() == 0 {
+        if control.is_cancelled() {
             return None;
         }
     }
@@ -69,7 +69,7 @@ pub fn create_geometry(
     arrows: &[Arrow],
     solution: &Board,
     random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> Option<PuzzleRules> {
     let mut arrows = arrows.to_vec();
     for _ in 0..GEOMETRY_ATTEMPTS {
@@ -88,10 +88,10 @@ pub fn create_geometry(
             0,
             solution,
             random,
-            budget,
+            control,
         );
-        // Preserve the conservative boundary: a last-unit success still leaves no geometry allowance.
-        if budget.remaining() == 0 {
+        // Cancellation must not publish a partially constructed geometry.
+        if control.is_cancelled() {
             return None;
         }
         if let Some(path) = path {

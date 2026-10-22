@@ -49,9 +49,10 @@ pub fn phase_seed(
     layout_index: u32,
     proposal_index: u32,
 ) -> Seed {
+    // V12 changes scheduling, but intentionally reuses the V11 stream recipe and byte vectors.
     let context = match input.puzzle_version {
-        GenerationVersion::ClassicV11 => "sudoku 2026-10-16 streams sudoku-v11",
-        GenerationVersion::VariantsV11 => "sudoku 2026-10-16 streams sudoku-variants-v11",
+        GenerationVersion::ClassicV12 => "sudoku 2026-10-16 streams sudoku-v11",
+        GenerationVersion::VariantsV12 => "sudoku 2026-10-16 streams sudoku-variants-v11",
     };
     Seed::from_bytes(blake3::derive_key(
         context,

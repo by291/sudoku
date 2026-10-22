@@ -104,7 +104,7 @@ test('reports exhausted generation without replacing a save or offering an ident
               kind: 'generate',
               requestId: message.requestId,
               outcome: {
-                status: 'budget-exhausted',
+                status: 'incomplete',
                 message: 'No qualifying puzzle found within the generation limits',
               },
             },

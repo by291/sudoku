@@ -1,7 +1,7 @@
 import type { Board, Digit, NoteMask } from '@/sudoku/contracts'
 import type { Puzzle } from '@/sudoku/contracts'
 import type { PuzzleAssessment } from '@/sudoku/contracts'
-import type { EditWorkDto } from '@/sudoku/contracts'
+import type { EditComputationDto } from '@/sudoku/contracts'
 import { copyRules } from '@/sudoku/ruleInput'
 
 export type GameMode = 'free' | 'learning' | 'daily'
@@ -52,7 +52,7 @@ export type GameAction =
 
 export type SessionActionResult =
   | { status: 'complete'; session: GameSession; changed: boolean }
-  | { status: 'budget-exhausted'; session: GameSession; changed: false }
+  | { status: 'incomplete'; session: GameSession; changed: false }
 
 export type BoardEditAction = Extract<
   GameAction,
@@ -116,14 +116,14 @@ function unchanged(session: GameSession): SessionActionResult {
 /** Commits owned Rust edit results. Assistance is permanent; history contains board layers only. */
 export function commitBoardEdit(
   session: GameSession,
-  outcome: EditWorkDto['result'],
+  outcome: EditComputationDto['result'],
   action: BoardEditAction,
 ): SessionActionResult {
   if (session.completion) {
     return unchanged(session)
   }
-  if (outcome.status === 'budget-exhausted') {
-    return { status: 'budget-exhausted', session, changed: false }
+  if (outcome.status === 'incomplete') {
+    return { status: 'incomplete', session, changed: false }
   }
 
   const before = layers(session)

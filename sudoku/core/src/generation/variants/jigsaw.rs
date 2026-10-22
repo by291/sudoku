@@ -1,10 +1,10 @@
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::context::validate_rules;
 use crate::rules::types::PuzzleRules;
 use crate::types::{BOARD_SIZE, Board, UNIT_SIZE};
 
-// Each v11 swap attempt charges once and draws two cells, including rejected swaps.
+// Each swap attempt draws two cells, including rejected swaps.
 const REGION_SWAP_ATTEMPTS: usize = 20;
 
 // Canonical geometry from the independently sealed geometry.json; no teaching board is used to generate puzzles.
@@ -43,11 +43,11 @@ pub fn create_geometry(
     regions: &[Vec<usize>],
     solution: &Board,
     random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> Option<PuzzleRules> {
     let mut regions = regions.to_vec();
     for _ in 0..REGION_SWAP_ATTEMPTS {
-        if !budget.consume(1) {
+        if !control.check() {
             return None;
         }
 

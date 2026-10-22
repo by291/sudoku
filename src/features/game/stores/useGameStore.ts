@@ -325,8 +325,8 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function commitAction(outcome: SessionActionResult, action: GameAction, layout: PreparedPuzzle) {
-    if (outcome.status === 'budget-exhausted') {
-      error.value = '候选计算超出预算，原有笔记已保留。请减少空格后重试。'
+    if (outcome.status === 'incomplete') {
+      error.value = '候选数暂时无法生成，原有笔记已保留。请重试。'
 
       return
     }

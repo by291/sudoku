@@ -412,14 +412,14 @@ function erase() {
       <NAlert
         v-if="
           hasSession &&
-          presentation.conflictEvaluation.status === 'budget-exhausted' &&
+          presentation.conflictEvaluation.status === 'incomplete' &&
           presentation.conflictAnalysisState === 'ready' &&
           presentation.phase === 'playing'
         "
         class="feedback-message"
         type="warning"
         :show-icon="false"
-        >冲突检查超出预算，仅显示已确认的冲突，尚不能保证其他线索有效。</NAlert
+        >冲突检查未完成，仅显示已确认的冲突，尚不能保证其他线索有效。</NAlert
       >
       <NCard
         v-if="hasSession && presentation.readOnly"

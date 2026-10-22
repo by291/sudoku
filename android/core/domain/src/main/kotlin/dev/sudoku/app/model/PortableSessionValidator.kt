@@ -130,12 +130,16 @@ internal class PortableSessionValidator(private val json: Json, private val vali
         requireData(board(puzzle.givens) && board(puzzle.solution), "Invalid board values")
         requireData(puzzle.difficulty in puzzle.rules.variant.difficulties, "Unsupported variant difficulty")
         requireData(puzzle.seed.isNotEmpty() && puzzle.puzzleVersion.isNotEmpty(), "Missing puzzle metadata")
-        val current = puzzle.puzzleVersion in setOf("sudoku-v11", "sudoku-variants-v11")
-        if (current) {
+        val version = when (puzzle.puzzleVersion) {
+            "sudoku-v11", "sudoku-variants-v11" -> "v11"
+            "sudoku-v12", "sudoku-variants-v12" -> "v12"
+            else -> null
+        }
+        if (version != null) {
             requireData(
                 puzzle.seed.matches(Regex("[0-9a-f]{64}")) &&
                     puzzle.puzzleVersion ==
-                    if (puzzle.rules == PuzzleRules.Classic) "sudoku-v11" else "sudoku-variants-v11",
+                    if (puzzle.rules == PuzzleRules.Classic) "sudoku-$version" else "sudoku-variants-$version",
                 "Invalid current-generation identity"
             )
         }
@@ -169,8 +173,8 @@ internal class PortableSessionValidator(private val json: Json, private val vali
 
     private fun <T> completeOrUnavailable(outcome: EngineOutcome<T>): T = when (outcome) {
         is EngineOutcome.Completed -> outcome.value
-        is EngineOutcome.BudgetExhausted ->
-            throw SnapshotValidationUnavailable("Semantic validation exhausted its budget")
+        is EngineOutcome.Incomplete ->
+            throw SnapshotValidationUnavailable("Semantic validation did not complete")
         EngineOutcome.Cancelled -> throw SnapshotValidationUnavailable("Semantic validation cancelled")
         EngineOutcome.TimedOut -> throw SnapshotValidationUnavailable("Semantic validation timed out")
         is EngineOutcome.InvalidInput -> throw InvalidPortableData(outcome.message)

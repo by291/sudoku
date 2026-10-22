@@ -48,7 +48,7 @@ impl std::error::Error for EngineError {}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Bounded<T> {
     Complete(T),
-    BudgetExhausted,
+    Cancelled,
 }
 
 /// Owns validated values in the range 0..=9, where zero denotes an empty cell.

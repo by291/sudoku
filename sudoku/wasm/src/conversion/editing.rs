@@ -1,6 +1,5 @@
-//! Validate platform edit data before the prepared handle allocates an operation budget.
+//! Validate platform edit data before the prepared handle starts an operation.
 use crate::dto::operations::{BoardEditDto, EditInputDto};
-use crate::dto::values::WorkOptionsDto;
 use sudoku_core::editing::{BoardEdit, BoardLayers};
 use sudoku_core::types::{
     BOARD_SIZE, Board, CandidateMask, CellIndex, CoreResult, Digit, EngineError,
@@ -10,7 +9,6 @@ pub(crate) struct PreparedEditInput {
     pub givens: Board,
     pub before: BoardLayers,
     pub action: BoardEdit,
-    pub work: WorkOptionsDto,
 }
 
 impl TryFrom<EditInputDto> for PreparedEditInput {
@@ -57,7 +55,6 @@ impl TryFrom<EditInputDto> for PreparedEditInput {
             givens,
             before,
             action,
-            work: input.work.unwrap_or_default(),
         })
     }
 }

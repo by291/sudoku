@@ -1,4 +1,6 @@
-use sudoku_core::budget::WorkBudget;
+#[path = "support/rules.rs"]
+pub mod fixtures;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::editing::{BoardEdit, BoardLayers, EditOutcome, edit_board};
 use sudoku_core::rules::context::compile_rules;
 use sudoku_core::rules::types::{Arrow, PuzzleRules};
@@ -22,10 +24,10 @@ fn editing_cleans_only_duplicate_peer_notes() {
         cell: CellIndex::try_from(12_usize).unwrap(),
         digit: Digit::try_from(2).unwrap(),
     };
-    let mut budget = WorkBudget::new(100000);
+    let mut control = ExecutionControl::new();
 
     let EditOutcome::Complete(outcome) =
-        edit_board(&givens, &before, &action, &prepared, &mut budget).unwrap()
+        edit_board(&givens, &before, &action, &prepared, &mut control).unwrap()
     else {
         panic!("Expected complete edit");
     };
@@ -50,18 +52,18 @@ fn exhausted_generate_notes_preserves_layers() {
         paths: vec![vec![0, 10, 20]],
     })
     .unwrap();
-    let mut budget = WorkBudget::new(0);
+    let mut control = fixtures::cancelled_control();
 
     let result = edit_board(
         &givens,
         &before,
         &BoardEdit::GenerateNotes,
         &prepared,
-        &mut budget,
+        &mut control,
     )
     .unwrap();
 
-    assert!(matches!(result, EditOutcome::BudgetExhausted));
+    assert!(matches!(result, EditOutcome::Incomplete));
     assert_eq!(before, original);
     assert_eq!(givens.values(), &[0; 81]);
 }
@@ -79,14 +81,14 @@ fn completed_givens_cannot_be_edited_and_completion_is_a_board_fact() {
         notes: [CandidateMask::EMPTY; 81],
     };
     let rules = compile_rules(&PuzzleRules::Classic).unwrap();
-    let mut budget = WorkBudget::new(0);
+    let mut control = ExecutionControl::new();
     let action = BoardEdit::Enter {
         cell: CellIndex::try_from(0_usize).unwrap(),
         digit: Digit::try_from(9).unwrap(),
     };
 
     let EditOutcome::Complete(mut result) =
-        edit_board(&givens, &before, &action, &rules, &mut budget).unwrap()
+        edit_board(&givens, &before, &action, &rules, &mut control).unwrap()
     else {
         panic!("A fixed given is a completed no-op");
     };

@@ -1,13 +1,13 @@
 import type { Puzzle } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
 import { isBoard, isDifficulty, isRecord } from '@/sudoku/values'
-import { isRulesShape, PUZZLE_VERSION, VARIANT_PUZZLE_VERSION } from '@/sudoku/guards'
+import { isRulesShape } from '@/sudoku/guards'
 import { copyRules } from '@/sudoku/ruleInput'
 
 export type PuzzleSnapshotResult =
   | { status: 'valid'; value: Puzzle }
   | { status: 'invalid'; issues: readonly string[] }
-  | { status: 'budget-exhausted' }
+  | { status: 'incomplete' }
 
 /** Historical text metadata stays in JS; only mathematical content crosses into Rust. */
 export function validatePuzzleSnapshot(
@@ -27,16 +27,14 @@ export function validatePuzzleSnapshot(
   if (!isBoard(value.givens) || !isBoard(value.solution) || !isRulesShape(value.rules)) {
     return { status: 'invalid', issues: ['Invalid puzzle board or rules'] }
   }
-  const current =
-    value.puzzleVersion === PUZZLE_VERSION || value.puzzleVersion === VARIANT_PUZZLE_VERSION
+  const version = /^sudoku-(?:variants-)?(v11|v12)$/.exec(value.puzzleVersion)?.[1]
   if (
-    current &&
+    version &&
     (!/^[0-9a-f]{64}$/.test(value.seed) ||
-      value.seed.length !== 64 ||
       value.puzzleVersion !==
-        (value.rules.kind === 'classic' ? PUZZLE_VERSION : VARIANT_PUZZLE_VERSION))
+        (value.rules.kind === 'classic' ? `sudoku-${version}` : `sudoku-variants-${version}`))
   ) {
-    return { status: 'invalid', issues: ['Invalid current-generation identity'] }
+    return { status: 'invalid', issues: ['Invalid versioned puzzle identity'] }
   }
   const content = {
     givens: [...value.givens],

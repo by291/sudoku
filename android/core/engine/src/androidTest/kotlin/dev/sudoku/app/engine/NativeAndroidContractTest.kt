@@ -53,8 +53,8 @@ class NativeAndroidContractTest {
     fun packagedNativeLibraryLoadsAndOwnsSixPreparedVariants() = runBlocking<Unit> {
         val engine = RustSudokuEngine()
         val information = (engine.information() as EngineOutcome.Completed<EngineInformation>).value
-        assertEquals("2", information.bridgeVersion)
-        assertEquals("sudoku-v11", information.puzzleVersion)
+        assertEquals("3", information.bridgeVersion)
+        assertEquals("sudoku-v12", information.puzzleVersion)
         val rules = listOf(
             PuzzleRules.Classic,
             PuzzleRules.Diagonal,
@@ -192,20 +192,19 @@ class NativeAndroidContractTest {
             3
         )
         assertEquals(expected, response.value.puzzle.givens)
-        assertEquals(7216L, response.workUsed)
         assertEquals(seedHex, response.value.puzzle.seed)
     }
 
     @Test
-    fun independentCancellationRemainsDistinctFromExhaustion() {
+    fun independentCancellationPreventsPreparation() {
         val token = CancellationToken()
         try {
             token.cancel()
             try {
-                preparePuzzle(PrepareInputDto(RulesDto.Classic, 0u), token)
+                preparePuzzle(PrepareInputDto(RulesDto.Classic), token)
                 throw AssertionError("Cancelled preparation must not succeed")
             } catch (expected: NativeException.Cancelled) {
-                assertEquals(0UL, expected.workUsed)
+                assertTrue(token.isCancelled())
             }
         } finally {
             token.close()

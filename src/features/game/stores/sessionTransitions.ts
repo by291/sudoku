@@ -447,7 +447,7 @@ export function createSessionTransitions(
     if (validated.status !== 'valid') {
       phase.value = session.value ? 'paused' : 'failed'
       error.value =
-        validated.status === 'budget-exhausted'
+        validated.status === 'incomplete'
           ? '题目校验暂时无法完成，请重试。'
           : '题目数据无效，请重新选择。'
       return { status: 'blocked', reason: 'load' }
@@ -841,13 +841,13 @@ export function createSessionTransitions(
     if (result.status !== 'completed') {
       // Work-bound exhaustion repeats deterministically for the same input. A new choice
       // can start a new request; timeout and transport failure still support identical retry.
-      if (result.status !== 'cancelled' && result.status !== 'budget-exhausted') {
+      if (result.status !== 'cancelled' && result.status !== 'incomplete') {
         failedGeneration.value = { input, metadata, id }
       }
 
       if (result.status === 'timed-out') {
         error.value = '出题超时，请重试。'
-      } else if (result.status === 'budget-exhausted') {
+      } else if (result.status === 'incomplete') {
         error.value = '未能生成符合要求的题目，请重新选择。'
       } else if (result.status === 'cancelled') {
         error.value = '已取消出题。'

@@ -1,4 +1,6 @@
-use sudoku_core::budget::WorkBudget;
+#[path = "support/rules.rs"]
+pub mod fixtures;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::generation::candidates::{
     CandidateCheckpoint, CandidateFrontier, CheckpointStatus, GivenMask, SolvedExact, StalledExact,
 };
@@ -56,14 +58,14 @@ fn checkpoint_capacity_is_shared_without_forgetting_seen_masks() {
         owner
             .next(
                 &mut SeededRandom::new(&Seed::from_bytes([0; 32])),
-                &mut WorkBudget::new(1000)
+                &mut ExecutionControl::new()
             )
             .is_none()
     );
 }
 
 #[test]
-fn owns_all_81_bits_and_never_publishes_uncharged_proposals() {
+fn owns_all_81_bits_and_never_publishes_cancelled_proposals() {
     let mask = GivenMask::try_from(1_u128 | (1_u128 << 80)).unwrap();
     let board = mask.materialize(&terminal()).unwrap();
     assert_eq!(GivenMask::from_board(&board), mask);
@@ -84,7 +86,7 @@ fn owns_all_81_bits_and_never_publishes_uncharged_proposals() {
         owner
             .next(
                 &mut SeededRandom::new(&Seed::from_bytes([0; 32])),
-                &mut WorkBudget::new(0)
+                &mut fixtures::cancelled_control()
             )
             .is_none()
     );
@@ -106,7 +108,9 @@ fn never_revisits_proposals_after_closing_the_edit_allowance() {
     let mut random = SeededRandom::new(&Seed::from_bytes([0; 32]));
     let mut seen = std::collections::BTreeSet::from([GivenMask::FULL]);
     for _ in 0..32 {
-        let proposal = owner.next(&mut random, &mut WorkBudget::new(1000)).unwrap();
+        let proposal = owner
+            .next(&mut random, &mut ExecutionControl::new())
+            .unwrap();
 
         assert!(seen.insert(proposal.mask));
         assert_eq!(proposal.mask.clue_count(), 80);
@@ -127,7 +131,7 @@ fn never_revisits_proposals_after_closing_the_edit_allowance() {
     }
     assert!(
         owner
-            .next(&mut random, &mut WorkBudget::new(1000))
+            .next(&mut random, &mut ExecutionControl::new())
             .is_none()
     );
     assert!(owner.exhausted());
@@ -139,8 +143,12 @@ fn continues_removal_sweeps_through_a_temporary_tier_decrease() {
     let mut owner = CandidateFrontier::new(0, &terminal(), Difficulty::Hard).unwrap();
     owner.retain(checkpoint(parent, true)).unwrap();
     let mut random = SeededRandom::new(&Seed::from_bytes([0; 32]));
-    let rejected = owner.next(&mut random, &mut WorkBudget::new(1000)).unwrap();
-    let accepted = owner.next(&mut random, &mut WorkBudget::new(1000)).unwrap();
+    let rejected = owner
+        .next(&mut random, &mut ExecutionControl::new())
+        .unwrap();
+    let accepted = owner
+        .next(&mut random, &mut ExecutionControl::new())
+        .unwrap();
     let rejected_cell = parent ^ rejected.mask.bits();
     let mut child = checkpoint(accepted.mask.bits(), true);
     child.status = CheckpointStatus::Solved {
@@ -149,7 +157,9 @@ fn continues_removal_sweeps_through_a_temporary_tier_decrease() {
     };
 
     assert!(owner.retain(child).unwrap());
-    let continued = owner.next(&mut random, &mut WorkBudget::new(1000)).unwrap();
+    let continued = owner
+        .next(&mut random, &mut ExecutionControl::new())
+        .unwrap();
 
     assert_eq!(
         continued.kind,
@@ -178,7 +188,7 @@ fn closes_old_checkpoint_slots_before_retaining_lower_tier_neighbours() {
     }
     let mut random = SeededRandom::new(&Seed::from_bytes([0; 32]));
     while owner
-        .next(&mut random, &mut WorkBudget::new(10000))
+        .next(&mut random, &mut ExecutionControl::new())
         .is_some()
     {}
     let mut lower = checkpoint((1_u128 << 30) - 1, true);
@@ -188,7 +198,7 @@ fn closes_old_checkpoint_slots_before_retaining_lower_tier_neighbours() {
     };
 
     owner.retain(lower).unwrap();
-    let proposal = owner.next(&mut random, &mut WorkBudget::new(10000));
+    let proposal = owner.next(&mut random, &mut ExecutionControl::new());
 
     assert!(proposal.is_some());
     assert_eq!(owner.checkpoint_count(), 1);
@@ -213,7 +223,7 @@ fn ranks_stalled_progress_before_total_deductions() {
     let proposal = owner
         .next(
             &mut SeededRandom::new(&Seed::from_bytes([0; 32])),
-            &mut WorkBudget::new(1000),
+            &mut ExecutionControl::new(),
         )
         .unwrap();
 
@@ -238,7 +248,7 @@ fn completed_lower_tier_progress_prefers_fewer_clues_before_longer_traces() {
     let proposal = owner
         .next(
             &mut SeededRandom::new(&Seed::from_bytes([0; 32])),
-            &mut WorkBudget::new(1000),
+            &mut ExecutionControl::new(),
         )
         .unwrap();
 
@@ -259,7 +269,7 @@ fn tier_distance_precedes_clue_count_and_both_checkpoint_kinds_get_capacity() {
     let proposal = owner
         .next(
             &mut SeededRandom::new(&Seed::from_bytes([0; 32])),
-            &mut WorkBudget::new(1000),
+            &mut ExecutionControl::new(),
         )
         .unwrap();
 
@@ -278,7 +288,7 @@ fn tier_distance_precedes_clue_count_and_both_checkpoint_kinds_get_capacity() {
     let mut removal = false;
     let mut restore = false;
     for _ in 0..256 {
-        let Some(proposal) = mixed.next(&mut random, &mut WorkBudget::new(1000)) else {
+        let Some(proposal) = mixed.next(&mut random, &mut ExecutionControl::new()) else {
             break;
         };
         removal |= proposal.kind == sudoku_core::generation::candidates::ProposalKind::Remove;
@@ -288,21 +298,22 @@ fn tier_distance_precedes_clue_count_and_both_checkpoint_kinds_get_capacity() {
 }
 
 #[test]
-fn failed_edit_charges_do_not_publish_partial_proposals() {
+fn cancelled_edits_do_not_publish_partial_proposals() {
     let mut owner = CandidateFrontier::new(0, &terminal(), Difficulty::Hard).unwrap();
     owner
         .retain(checkpoint(GivenMask::FULL.bits(), true))
         .unwrap();
     let mut random = SeededRandom::new(&Seed::from_bytes([0; 32]));
     for _ in 0..2 {
-        let mut budget = WorkBudget::new(1);
+        let mut control = fixtures::cancelled_control();
 
-        assert!(owner.next(&mut random, &mut budget).is_none());
+        assert!(owner.next(&mut random, &mut control).is_none());
 
-        assert_eq!(budget.used(), 1);
         assert_eq!(owner.seen_count(), 1);
     }
-    let proposal = owner.next(&mut random, &mut WorkBudget::new(2)).unwrap();
+    let proposal = owner
+        .next(&mut random, &mut ExecutionControl::new())
+        .unwrap();
     assert_eq!(proposal.mask.clue_count(), 80);
     assert_eq!(owner.seen_count(), 2);
 }
@@ -317,7 +328,9 @@ fn removal_child_inherits_the_sweep_when_its_parent_closes() {
     let mut removed_cells = 0_u128;
     let mut last_proposal = None;
     for _ in 0..32 {
-        let proposal = owner.next(&mut random, &mut WorkBudget::new(1000)).unwrap();
+        let proposal = owner
+            .next(&mut random, &mut ExecutionControl::new())
+            .unwrap();
         removed_cells |= GivenMask::FULL.bits() ^ proposal.mask.bits();
         last_proposal = Some(proposal);
     }
@@ -326,8 +339,8 @@ fn removal_child_inherits_the_sweep_when_its_parent_closes() {
 
     // Retaining this child evicts its parent at the 32-proposal cap. The pending owner must survive.
     owner.retain(checkpoint(child_mask.bits(), true)).unwrap();
-    let mut budget = WorkBudget::new(2);
-    let continued = owner.next(&mut random, &mut budget).unwrap();
+    let mut control = ExecutionControl::new();
+    let continued = owner.next(&mut random, &mut control).unwrap();
 
     assert_eq!(owner.checkpoint_count(), 1);
     assert_eq!(continued.mask.clue_count(), 79);
@@ -337,6 +350,6 @@ fn removal_child_inherits_the_sweep_when_its_parent_closes() {
     );
     let removed_from_child = child_mask.bits() ^ continued.mask.bits();
     assert_eq!(removed_from_child & removed_cells, 0);
-    assert_eq!(budget.used(), 2);
+
     assert_eq!(random.next_u32(), unchanged_random.next_u32());
 }

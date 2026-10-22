@@ -7,13 +7,9 @@ use super::types::{
 };
 use super::unit_evidence::valid_authored_unit_action;
 use super::workspace::apply_established_step;
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::rules::types::{PreparedRules, RuleConstraint};
-use crate::types::{BOARD_SIZE, Bounded, CoreResult, EngineError};
-
-/// Default single-step/chain proof budget, matching the transport validator.
-pub const HINT_VALIDATION_WORK_LIMIT: u64 = 1_000_000;
-const ADVANCED_PROOF_WORK: u64 = (BOARD_SIZE * BOARD_SIZE) as u64;
+use crate::types::{Bounded, CoreResult, EngineError};
 
 pub(crate) fn invalid() -> EngineError {
     EngineError::invalid("Hint evidence does not match the requested rules")
@@ -54,7 +50,7 @@ pub(crate) fn validate_step_and_apply(
     step: &mut LogicalStep,
     context: &PreparedRules,
     state: &mut Option<LogicalWorkspace>,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
     mode: ValidationMode,
 ) -> CoreResult<()> {
     match &mut step.evidence {
@@ -62,7 +58,7 @@ pub(crate) fn validate_step_and_apply(
             let Some(state) = state.as_ref() else {
                 return Err(invalid());
             };
-            if !budget.consume(ADVANCED_PROOF_WORK) || !validate_advanced_step(state, step) {
+            if !control.check() || !validate_advanced_step(state, step) {
                 return Err(invalid());
             }
         }
@@ -135,7 +131,8 @@ pub(crate) fn validate_step_and_apply(
                     return Err(invalid());
                 }
             } else {
-                let Bounded::Complete(Some(expected)) = find_step(state, &[step.technique], budget)
+                let Bounded::Complete(Some(expected)) =
+                    find_step(state, &[step.technique], control)
                 else {
                     return Err(invalid());
                 };

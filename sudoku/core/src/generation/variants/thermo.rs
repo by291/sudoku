@@ -1,4 +1,4 @@
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::topology::cells_touch;
 use crate::rules::types::PuzzleRules;
@@ -13,13 +13,13 @@ pub fn create_geometry(
     paths: &[Vec<usize>],
     solution: &Board,
     random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> Option<PuzzleRules> {
     let mut paths = paths.to_vec();
     for _ in 0..GEOMETRY_ATTEMPTS {
         let mut path = vec![(random.next_f64() * BOARD_SIZE as f64) as usize];
         while path.len() < MAX_PATH_LENGTH {
-            if !budget.consume(1) {
+            if !control.check() {
                 return None;
             }
 

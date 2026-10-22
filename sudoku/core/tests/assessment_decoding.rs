@@ -15,7 +15,7 @@ fn summary_absence_is_not_corruption() {
     assert_eq!(decode_puzzle_assessment(None, identity), None);
     for reason in [
         UnavailableReason::Ungraded,
-        UnavailableReason::BudgetExhausted,
+        UnavailableReason::Incomplete,
         UnavailableReason::InvalidInput,
         UnavailableReason::InvalidSummary,
         UnavailableReason::UnsupportedVersion,

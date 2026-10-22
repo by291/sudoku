@@ -18,8 +18,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         GenerationOutcome::Ready { puzzle, assessment } => {
             println!("{:?}: {:?}", assessment.difficulty, puzzle.content.givens);
         }
-        GenerationOutcome::BudgetExhausted { cause } => {
-            eprintln!("No qualifying puzzle within the allowance: {cause:?}");
+        GenerationOutcome::Incomplete { cause } => {
+            eprintln!("No qualifying puzzle within the local search limits: {cause:?}");
         }
         GenerationOutcome::Failed { reason } => eprintln!("Generation failed: {reason}"),
     }
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-`Seed::try_from(&bytes[..])` accepts exactly 32 arbitrary bytes. `Seed::derive(material)` uses the versioned BLAKE3 root context. Generation uses explicit version-owned binary framing and ChaCha8; current versions are `sudoku-v11` and `sudoku-variants-v11`. There is no old string-seeded generator. Hex encoding and historical text preservation belong to an adapter/application boundary.
+`Seed::try_from(&bytes[..])` accepts exactly 32 arbitrary bytes. `Seed::derive(material)` uses the versioned BLAKE3 root context. Generation uses explicit version-owned binary framing and ChaCha8; current versions are `sudoku-v12` and `sudoku-variants-v12`. There is no old string-seeded generator. Hex encoding and historical text preservation belong to an adapter/application boundary.
 
 Use checked `Board`, `Digit`, `CellIndex` and `CandidateMask` values. `Puzzle` contains mathematical content only; generated identity is separate. Rules/topology and prepared support are immutable owned layout data. A caller may reuse that preparation across boards, but every search/logical workspace owns fresh domains, queues, trails, premises and domain-dependent caches. Returned boards/evidence are owned snapshots.
 
@@ -37,7 +37,7 @@ Logical workspaces expose read-only board/candidate borrows through `board()` an
 
 `hint` owns hint result contracts and complete chain replay. `logic` owns individual step shape, clue binding, evidence proofs and teaching validation. Independent proof checks must not call a detector and treat its answer as the proof. Prepared-layout identity checks compare the shared immutable instance, not structural equality between independently compiled rules.
 
-`WorkBudget` charges before work, retains abandoned work and reports stage consumption. Expected incompleteness uses explicit bounded outcomes; exhaustion never means zero solutions, contradiction, uniqueness or success. Default generation limits are 40 layouts, 4,000,000 shared work units and 500 logical steps. Live arithmetic can consume its full allowance even on an 81-cell board: a UI must honor its measured execution policy rather than assuming every synchronous operation fits one frame.
+`ExecutionControl` checks a host-owned cancellation signal without reading clocks or counting work. Hosts enforce their three-second deadline and settle cancellation only after the synchronous operation unwinds. Expected incompleteness uses explicit outcomes; cancellation and local limit exhaustion never mean zero solutions, contradiction, uniqueness or success. Default generation limits retain 40 layouts and 500 logical steps, alongside local node and memory caps. The V12 scheduler uses candidate visits and stable layout IDs; its random streams intentionally reuse the V11 derivation context to preserve the independent byte vectors.
 
 The public owners are `rules/`, `constraints/`, `search/`, `editing`, `logic/`, `rating/`, `generation/`, `hint` and `puzzle`. See the [algorithm guide](../../docs/algorithms/README.md) for principles, technique policies and research references; see the workspace [architecture](../../docs/architecture.md), [extension checklist](../../docs/variant-extension.md) and [testing guide](../../docs/testing.md) for integration requirements.
 

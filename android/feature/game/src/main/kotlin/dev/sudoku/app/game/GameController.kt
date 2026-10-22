@@ -1188,7 +1188,7 @@ internal class GameController(
     }
 
     private fun engineMessage(result: EngineOutcome<*>): String = when (result) {
-        is EngineOutcome.BudgetExhausted -> "计算已达到工作上限，当前进度保持不变。"
+        is EngineOutcome.Incomplete -> "计算尚未完成，当前进度保持不变。"
         EngineOutcome.Cancelled -> "计算已取消，当前进度保持不变。"
         EngineOutcome.TimedOut -> "计算超时，请重试；重试会使用同一题目种子。"
         is EngineOutcome.InvalidInput -> "数独数据无效：${result.message}"

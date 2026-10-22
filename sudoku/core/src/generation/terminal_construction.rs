@@ -1,15 +1,15 @@
 use crate::board::is_complete;
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::types::{PreparedRules, PuzzleRules};
 use crate::types::{ALL_DIGITS_MASK, BOARD_SIZE, Board, UNIT_SIZE};
 
-// The v11 regional attempt cap is 6,561 visits; exhausting it retires the layout without refunding work.
+// The regional attempt cap is 6,561 visits; exhausting it retires the layout.
 const REGIONAL_TERMINAL_NODE_LIMIT: u64 = (BOARD_SIZE * BOARD_SIZE) as u64;
 
 pub enum TerminalConstructionResult {
     Ready { solution: Board },
-    BudgetExhausted,
+    Incomplete,
     AttemptExhausted,
     Failed { reason: String },
 }
@@ -17,7 +17,7 @@ pub enum TerminalConstructionResult {
 struct Construction<'a> {
     rules: &'a PreparedRules,
     random: &'a mut SeededRandom,
-    budget: &'a mut WorkBudget,
+    control: &'a mut ExecutionControl,
     board: [u8; BOARD_SIZE],
     unit_masks: Vec<u16>,
     regional: bool,
@@ -60,7 +60,7 @@ impl Construction<'_> {
             self.attempt_exhausted = true;
             return false;
         }
-        if !self.budget.consume(1) {
+        if !self.control.check() {
             self.exhausted = true;
             return false;
         }
@@ -150,7 +150,7 @@ impl Construction<'_> {
 pub fn construct_unit_terminal(
     rules: &PreparedRules,
     random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
     node_limit: Option<u64>,
 ) -> TerminalConstructionResult {
     if !matches!(
@@ -178,7 +178,7 @@ pub fn construct_unit_terminal(
     let mut state = Construction {
         rules,
         random,
-        budget,
+        control,
         board: [0; BOARD_SIZE],
         unit_masks: vec![0; rules.context().units.len()],
         regional,
@@ -192,8 +192,8 @@ pub fn construct_unit_terminal(
         let mut digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
         state.random.shuffle(&mut digits);
         for (&cell, digit) in rules.context().units[0].cells.iter().zip(digits) {
-            if !state.budget.consume(1) {
-                return TerminalConstructionResult::BudgetExhausted;
+            if !state.control.check() {
+                return TerminalConstructionResult::Incomplete;
             }
             state.assign(cell, digit);
         }
@@ -207,7 +207,7 @@ pub fn construct_unit_terminal(
         return TerminalConstructionResult::AttemptExhausted;
     }
     if state.exhausted {
-        TerminalConstructionResult::BudgetExhausted
+        TerminalConstructionResult::Incomplete
     } else {
         TerminalConstructionResult::Failed {
             reason: "No complete terminal satisfies these units".to_string(),

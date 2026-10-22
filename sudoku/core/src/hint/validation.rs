@@ -1,6 +1,6 @@
 //! Whole-chain structure, normalization and ordered live replay.
 use super::HintResult;
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::logic::step_shape::{STEP_COUNT_LIMIT, valid_step_shape};
 use crate::logic::step_validation::{ValidationMode, invalid, validate_step_and_apply};
 use crate::logic::types::{Evidence, LogicalAction};
@@ -8,8 +8,6 @@ use crate::logic::workspace::create_workspace;
 use crate::rules::context::compile_rules;
 use crate::rules::types::PuzzleRules;
 use crate::types::{BOARD_SIZE, Board, CoreResult};
-
-pub use crate::logic::step_validation::HINT_VALIDATION_WORK_LIMIT;
 
 /// Clone a hint and normalize omitted related-unit lists to `Some([])`.
 /// This validates chain shape only; it does not bind clues or replay mathematical proofs.
@@ -53,20 +51,15 @@ pub fn validate_hint_evidence(
     rules: &PuzzleRules,
     board: Option<&Board>,
 ) -> CoreResult<HintResult> {
-    validate_hint_evidence_with_budget(
-        hint,
-        rules,
-        board,
-        &mut WorkBudget::new(HINT_VALIDATION_WORK_LIMIT),
-    )
+    validate_hint_evidence_with_control(hint, rules, board, &mut ExecutionControl::new())
 }
 
-/// Replay owns its state while the caller retains work and cancellation accounting.
-pub fn validate_hint_evidence_with_budget(
+/// Replay owns its state while the caller supplies cooperative cancellation.
+pub fn validate_hint_evidence_with_control(
     hint: &HintResult,
     rules: &PuzzleRules,
     board: Option<&Board>,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<HintResult> {
     let mut parsed = validate_hint_shape(hint)?;
     let HintResult::Deduction { steps, .. } = &mut parsed else {
@@ -76,7 +69,7 @@ pub fn validate_hint_evidence_with_budget(
     let context = compile_rules(rules)?;
     let mut state = board.map(|board| create_workspace(board, &context));
     for step in steps {
-        validate_step_and_apply(step, &context, &mut state, budget, ValidationMode::Hint)?;
+        validate_step_and_apply(step, &context, &mut state, control, ValidationMode::Hint)?;
     }
     Ok(parsed)
 }

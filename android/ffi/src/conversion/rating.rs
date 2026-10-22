@@ -77,12 +77,12 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
             rating_version,
             variant,
         },
-        LiveAssessmentOutcomeDto::BudgetExhausted {
+        LiveAssessmentOutcomeDto::Incomplete {
             rating_version,
             variant,
             stage,
             difficulty,
-        } => AssessmentResultDto::BudgetExhausted {
+        } => AssessmentResultDto::Incomplete {
             rating_version,
             variant,
             stage,
@@ -105,11 +105,11 @@ pub fn assessment_summary_to_dto(
                 variant: (*variant).into(),
             }
         }
-        AssessmentResult::Unrated(AssessmentFailure::BudgetExhausted {
+        AssessmentResult::Unrated(AssessmentFailure::Incomplete {
             variant,
             stage,
             difficulty,
-        }) => LiveAssessmentOutcomeDto::BudgetExhausted {
+        }) => LiveAssessmentOutcomeDto::Incomplete {
             rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: (*variant).into(),
             stage: match stage {
@@ -129,7 +129,7 @@ impl From<UnavailableReason> for UnavailableReasonDto {
     fn from(value: UnavailableReason) -> Self {
         match value {
             UnavailableReason::Ungraded => Self::Ungraded,
-            UnavailableReason::BudgetExhausted => Self::BudgetExhausted,
+            UnavailableReason::Incomplete => Self::Incomplete,
             UnavailableReason::InvalidInput => Self::InvalidInput,
             UnavailableReason::InvalidSummary => Self::InvalidSummary,
             UnavailableReason::UnsupportedVersion => Self::UnsupportedVersion,
@@ -142,7 +142,7 @@ impl From<UnavailableReasonDto> for UnavailableReason {
     fn from(value: UnavailableReasonDto) -> Self {
         match value {
             UnavailableReasonDto::Ungraded => Self::Ungraded,
-            UnavailableReasonDto::BudgetExhausted => Self::BudgetExhausted,
+            UnavailableReasonDto::Incomplete => Self::Incomplete,
             UnavailableReasonDto::InvalidInput => Self::InvalidInput,
             UnavailableReasonDto::InvalidSummary => Self::InvalidSummary,
             UnavailableReasonDto::UnsupportedVersion => Self::UnsupportedVersion,

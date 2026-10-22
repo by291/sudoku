@@ -37,7 +37,7 @@ The sealed teaching fixture has its own hash assertion in `tests/teaching-contra
 
 ## Compatibility and changes
 
-Preserve existing version-owned seeds, puzzle identities, random-call order and budget accounting. A deliberate incompatible algorithm change requires an explicit version and compatibility decision. Do not refresh expected results from the Rust implementation to make a regression pass. Establish new expected facts independently, document their provenance and update fixture hashes only after reviewing the intended change.
+Preserve existing version-owned seeds, puzzle identities, random-call order, cancellation restoration and local exploration bounds. A deliberate incompatible algorithm change requires an explicit version and compatibility decision. Do not refresh expected results from the Rust implementation to make a regression pass. Establish new expected facts independently, document their provenance and update fixture hashes only after reviewing the intended change.
 
 Add focused Rust regressions for algorithm changes. Add WASM or worker tests when the changed contract crosses those boundaries. Keep browser coverage centered on conversion, ownership and player behavior rather than replaying every native algorithm case. The retired TypeScript engine, full migration comparison runners and fixture-generation tooling are intentionally absent.
 
@@ -61,3 +61,5 @@ PLAYWRIGHT_USE_PREBUILT=1 pnpm test:e2e
 `pnpm test:rust` runs the native workspace suite and is the first step of `pnpm check`. The package commands rebuild WASM before checking frontend consumers. The normal core dependency tree must remain free of browser bindings, async runtimes and OS entropy dependencies. CI runs native checks first, then Web checks and builds, followed by Chromium desktop/mobile, Firefox and WebKit jobs using the verified build artifacts. Browser jobs retain the WASM contract suite; there is no separate full-engine comparison job.
 
 For setup, browser installation and disposable test output locations, see [development](development.md). For Android checks and the opt-in backup reimport test, see [Android build](android/build.md).
+
+Deadline regressions use controlled clocks or cancellation signals rather than CPU speed assumptions. Keep queueing, initialization, execution, late-result disposal and input atomicity observable. Sealed V11 generation fixtures continue to validate historical puzzle mathematics; V12 generation tests use independent solution/trace checks and deterministic repeat comparisons, without regenerating old expected outputs.

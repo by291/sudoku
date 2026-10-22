@@ -38,7 +38,7 @@ pub struct AssessmentSummaryDto {
 #[derive(Clone, Copy, Serialize, Deserialize, uniffi::Enum)]
 #[serde(rename_all = "kebab-case")]
 pub enum ExhaustionCauseDto {
-    WorkLimit,
+    Cancelled,
     LogicalStepLimit,
 }
 
@@ -69,7 +69,7 @@ pub enum AssessmentResultDto {
         rating_version: RatingVersionDto,
         variant: VariantDto,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "ratingVersion")]
         rating_version: RatingVersionDto,
         variant: VariantDto,
@@ -90,10 +90,6 @@ pub struct AssessmentInputDto {
     pub rating_version: Option<String>,
     #[serde(default)]
     pub limits: Option<AssessmentLimitsDto>,
-    #[serde(default)]
-    pub max_work: Option<u32>,
-    #[serde(default)]
-    pub initial_work: Option<u32>,
 }
 
 /// Expected variant and difficulty for stored metadata; this does not identify a board or seed.
@@ -108,7 +104,8 @@ pub struct AssessmentIdentityDto {
 #[serde(rename_all = "kebab-case")]
 pub enum UnavailableReasonDto {
     Ungraded,
-    BudgetExhausted,
+    #[serde(alias = "budget-exhausted")]
+    Incomplete,
     InvalidInput,
     InvalidSummary,
     UnsupportedVersion,
@@ -146,7 +143,7 @@ pub enum LiveAssessmentOutcomeDto {
         rating_version: RatingVersionDto,
         variant: VariantDto,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "ratingVersion")]
         rating_version: RatingVersionDto,
         variant: VariantDto,
@@ -170,7 +167,7 @@ pub enum AssessmentOutcomeDto {
         rating_version: RatingVersionDto,
         variant: VariantDto,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "ratingVersion")]
         rating_version: RatingVersionDto,
         variant: VariantDto,

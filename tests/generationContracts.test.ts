@@ -24,7 +24,11 @@ it('covers the nineteen supported generation identities', () => {
 it.each([...requests])(
   'independently checks generated solution and trace safety for %s',
   (_, raw) => {
-    const parsed = parseGenerationInput({ ...raw, seed: Uint8Array.from(raw.seed) })
+    const parsed = parseGenerationInput({
+      ...raw,
+      puzzleVersion: raw.variant === 'classic' ? 'sudoku-v12' : 'sudoku-variants-v12',
+      seed: Uint8Array.from(raw.seed),
+    })
     if (!parsed.valid) {
       throw new Error('Invalid sealed generation input')
     }

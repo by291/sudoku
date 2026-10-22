@@ -15,7 +15,7 @@
     "format:check": "prettier --check .",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "test:rust": "cargo test --workspace --locked",
-    "test:unit": "pnpm wasm:build && vitest run",
+    "test:unit": "pnpm wasm:build && node --test sudoku/wasm/tests/*.test.mjs && vitest run",
     "build": "pnpm wasm:build && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "build:subpath": "pnpm wasm:build && vite build --base /sudoku/ --outDir dist-subpath",

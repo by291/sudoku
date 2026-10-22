@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 pub mod board;
-pub mod budget;
 pub mod constraints;
+pub mod control;
 pub mod editing;
 pub mod generation;
 pub mod hint;

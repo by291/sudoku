@@ -573,7 +573,7 @@ class RoomGameRepositoryTest {
         val canonical = requireNotNull(database.sudokuDao().session(session.id))
         val outcomes =
             listOf(
-                EngineOutcome.BudgetExhausted(),
+                EngineOutcome.Incomplete,
                 EngineOutcome.Cancelled,
                 EngineOutcome.TimedOut,
                 EngineOutcome.Failed("Temporarily unavailable")

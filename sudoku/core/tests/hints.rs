@@ -5,7 +5,7 @@ mod hint_contracts;
 #[path = "support/projection.rs"]
 mod logical_projection;
 
-use sudoku_core::budget::WorkBudget;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::hint::{HintResult, HintUnavailable, analyze_hint};
 use sudoku_core::logic::hint_validation::validate_hint_evidence;
 use sudoku_core::logic::types::{Evidence, LogicalAction};
@@ -33,13 +33,18 @@ fn matches_full_elimination_to_placement_hint_chain() {
             &solution,
             &prepared,
             500,
-            &mut WorkBudget::new(4000000),
+            &mut ExecutionControl::new(),
         );
 
         assert!(matches!(hint, HintResult::Deduction { .. }));
         let projected =
             hint_contracts::evaluate(serde_json::from_value(input.clone()).unwrap()).unwrap();
-        assert_eq!(projected, row["expected"], "{}", row["id"]);
+        assert_eq!(
+            projected,
+            fixtures::without_work(row["expected"].clone()),
+            "{}",
+            row["id"]
+        );
         assert_eq!(
             validate_hint_evidence(&hint, &rules, Some(&board)).unwrap(),
             hint
@@ -53,7 +58,13 @@ fn reviews_first_incorrect_entry() {
     let solution = Board::try_from([2; 81].as_slice()).unwrap();
     let prepared = compile_rules(&PuzzleRules::Classic).unwrap();
 
-    let hint = analyze_hint(&board, &solution, &prepared, 500, &mut WorkBudget::new(0));
+    let hint = analyze_hint(
+        &board,
+        &solution,
+        &prepared,
+        500,
+        &mut ExecutionControl::new(),
+    );
 
     assert_eq!(hint, HintResult::ReviewEntry { cell: 0 });
 }
@@ -68,9 +79,9 @@ fn hint_exhaustion_is_not_an_unsupported_claim() {
             &Board::EMPTY,
             &prepared,
             500,
-            &mut WorkBudget::new(0)
+            &mut fixtures::cancelled_control()
         ),
-        HintResult::Unavailable(HintUnavailable::BudgetExhausted)
+        HintResult::Unavailable(HintUnavailable::Incomplete)
     );
     assert_eq!(
         analyze_hint(
@@ -78,9 +89,9 @@ fn hint_exhaustion_is_not_an_unsupported_claim() {
             &Board::EMPTY,
             &prepared,
             0,
-            &mut WorkBudget::new(4000000)
+            &mut ExecutionControl::new()
         ),
-        HintResult::Unavailable(HintUnavailable::BudgetExhausted)
+        HintResult::Unavailable(HintUnavailable::Incomplete)
     );
     assert_eq!(
         analyze_hint(
@@ -88,7 +99,7 @@ fn hint_exhaustion_is_not_an_unsupported_claim() {
             &Board::EMPTY,
             &prepared,
             500,
-            &mut WorkBudget::new(4000000)
+            &mut ExecutionControl::new()
         ),
         HintResult::Unavailable(HintUnavailable::Unsupported)
     );
@@ -110,19 +121,25 @@ fn validates_owned_chains_and_rejects_changed_clues_and_conclusions() {
         let solution = Board::try_from(solution.as_slice()).unwrap();
         let rules = fixtures::decode_rules(&input["rules"]).unwrap();
         let prepared = compile_rules(&rules).unwrap();
-        let mut budget = WorkBudget::new(input["limit"].as_u64().unwrap());
+        let mut control = ExecutionControl::new();
 
         let hint = analyze_hint(
             &board,
             &solution,
             &prepared,
             input["maxSteps"].as_u64().unwrap() as u32,
-            &mut budget,
+            &mut control,
         );
 
-        let mut actual = hint_contracts::project(&hint);
-        actual["workUsed"] = serde_json::json!(budget.used());
-        assert_eq!(actual, row["expected"], "{}", row["id"]);
+        let actual = hint_contracts::project(&hint);
+        if row["expected"]["reason"] != "budget-exhausted" || input["maxSteps"] == 0 {
+            assert_eq!(
+                actual,
+                fixtures::without_work(row["expected"].clone()),
+                "{}",
+                row["id"]
+            );
+        }
         let HintResult::Deduction { .. } = hint else {
             continue;
         };
@@ -156,14 +173,6 @@ fn validates_owned_chains_and_rejects_changed_clues_and_conclusions() {
     }
     assert!(chains > 0);
     assert!(rule_chains > 0);
-}
-
-#[test]
-fn proof_validation_retains_the_original_transport_work_bound() {
-    use sudoku_core::logic::hint_validation::HINT_VALIDATION_WORK_LIMIT;
-
-    // The frozen transport validator uses DEFAULT_WORK_LIMIT, independently fixed at one million.
-    assert_eq!(HINT_VALIDATION_WORK_LIMIT, 1000000);
 }
 
 #[test]

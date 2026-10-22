@@ -42,7 +42,7 @@ pub struct AssessmentSummaryDto {
 #[derive(Clone, Copy, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "kebab-case")]
 pub enum ExhaustionCauseDto {
-    WorkLimit,
+    Cancelled,
     LogicalStepLimit,
 }
 
@@ -74,7 +74,7 @@ pub enum AssessmentResultDto {
         rating_version: RatingVersionDto,
         variant: VariantDto,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "ratingVersion")]
         rating_version: RatingVersionDto,
         variant: VariantDto,
@@ -95,10 +95,6 @@ pub struct AssessmentInputDto {
     pub rating_version: Option<String>,
     #[serde(default)]
     pub limits: Option<AssessmentLimitsDto>,
-    #[serde(default)]
-    pub max_work: Option<u32>,
-    #[serde(default)]
-    pub initial_work: Option<u32>,
 }
 
 /// Expected variant and difficulty for stored metadata; this does not identify a board or seed.
@@ -123,6 +119,8 @@ pub struct AssessmentValidationInputDto {
 #[serde(rename_all = "kebab-case")]
 pub enum UnavailableReasonDto {
     Ungraded,
+    Incomplete,
+    /// Historical persisted metadata retains its original reason text.
     BudgetExhausted,
     InvalidInput,
     InvalidSummary,
@@ -139,7 +137,9 @@ pub enum PuzzleAssessmentDto {
     },
     Unavailable {
         reason: UnavailableReasonDto,
-        issues: Vec<String>,
+        #[serde(with = "serde_wasm_bindgen::preserve")]
+        #[tsify(type = "string[]")]
+        issues: JsValue,
     },
 }
 
@@ -164,7 +164,7 @@ pub enum LiveAssessmentOutcomeDto {
         rating_version: RatingVersionDto,
         variant: VariantDto,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "ratingVersion")]
         rating_version: RatingVersionDto,
         variant: VariantDto,
@@ -189,7 +189,7 @@ pub enum AssessmentOutcomeDto {
         rating_version: RatingVersionDto,
         variant: VariantDto,
     },
-    BudgetExhausted {
+    Incomplete {
         #[serde(rename = "ratingVersion")]
         rating_version: RatingVersionDto,
         variant: VariantDto,

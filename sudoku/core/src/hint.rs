@@ -1,7 +1,7 @@
 pub mod validation;
 
 use crate::board::is_complete;
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::logic::solver::find_step;
 use crate::logic::types::{LogicalAction, LogicalStep};
 use crate::logic::workspace::{apply_established_step, create_workspace};
@@ -19,7 +19,7 @@ pub struct Placement {
 pub enum HintUnavailable {
     Complete,
     Unsupported,
-    BudgetExhausted,
+    Incomplete,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,13 +34,13 @@ pub enum HintResult {
     Unavailable(HintUnavailable),
 }
 
-/// Return the first incorrect entry or an owned elimination-to-placement chain using one caller budget.
+/// Return the first incorrect entry or an owned elimination-to-placement chain using one caller control.
 pub fn analyze_hint(
     board: &Board,
     solution: &Board,
     rules: &PreparedRules,
     max_steps: u32,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> HintResult {
     if let Some(cell) = board
         .values()
@@ -58,9 +58,9 @@ pub fn analyze_hint(
     let techniques = hint_techniques_slice(rules.rules().variant());
     let mut steps = vec![];
     for _ in 0..max_steps {
-        let step = match find_step(&mut state, techniques, budget) {
-            Bounded::BudgetExhausted => {
-                return HintResult::Unavailable(HintUnavailable::BudgetExhausted);
+        let step = match find_step(&mut state, techniques, control) {
+            Bounded::Cancelled => {
+                return HintResult::Unavailable(HintUnavailable::Incomplete);
             }
             Bounded::Complete(None) => {
                 return HintResult::Unavailable(HintUnavailable::Unsupported);
@@ -80,5 +80,5 @@ pub fn analyze_hint(
             return HintResult::Deduction { steps, placement };
         }
     }
-    HintResult::Unavailable(HintUnavailable::BudgetExhausted)
+    HintResult::Unavailable(HintUnavailable::Incomplete)
 }

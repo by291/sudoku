@@ -54,15 +54,15 @@ test('loads the generated WASM library and reports typed algorithm identities', 
   })
 
   const expected: EngineInfo = {
-    bridgeVersion: 3,
-    puzzleVersion: 'sudoku-v11',
-    variantPuzzleVersion: 'sudoku-variants-v11',
+    bridgeVersion: 4,
+    puzzleVersion: 'sudoku-v12',
+    variantPuzzleVersion: 'sudoku-variants-v12',
     ratingVersion: 'sudoku-rating-v2',
   }
   expect(info).toEqual(expected)
 })
 
-test('summary assessment preserves full outcomes and work in the browser', async ({ page }) => {
+test('summary assessment preserves full outcomes in the browser', async ({ page }) => {
   await page.goto(`${origin}/tests/browser/wasm-smoke.html`)
 
   const comparisons = await page.evaluate(async (board) => {
@@ -90,8 +90,8 @@ test('summary assessment preserves full outcomes and work in the browser', async
       { board, rules: { kind: 'classic' } },
       { board: empty, rules: { kind: 'classic' } },
       { board: duplicate, rules: { kind: 'classic' } },
-      { board, rules: { kind: 'classic' }, maxWork: 0 },
-      { board, rules: { kind: 'diagonal' }, maxWork: 0 },
+      { board, rules: { kind: 'classic' }, limits: { maxSteps: 0 } },
+      { board: empty, rules: { kind: 'diagonal' }, limits: { maxSteps: 0 } },
     ]
     return requests.map((input) => {
       const full: unknown = assess(input)
@@ -101,7 +101,7 @@ test('summary assessment preserves full outcomes and work in the browser', async
       }
       const expected =
         full.result.status === 'rated'
-          ? { result: { status: 'rated', summary: full.result.summary }, workUsed: full.workUsed }
+          ? { result: { status: 'rated', summary: full.result.summary } }
           : full
       return { expected, summary, status: summary.result.status }
     })
@@ -111,8 +111,8 @@ test('summary assessment preserves full outcomes and work in the browser', async
     'rated',
     'ungraded',
     'invalid',
-    'budget-exhausted',
-    'budget-exhausted',
+    'incomplete',
+    'incomplete',
   ])
   for (const row of comparisons) {
     expect(row.summary).toEqual(row.expected)
@@ -148,8 +148,8 @@ test('rejects_text_wrong_seed_lengths_and_v10_requests', async ({ page }) => {
     const options = {
       variant: 'classic',
       difficulty: 'easy',
-      puzzleVersion: 'sudoku-v11',
-      limits: { maxLayouts: 40, maxWork: 4000000, maxSteps: 500 },
+      puzzleVersion: 'sudoku-v12',
+      limits: { maxLayouts: 40, maxSteps: 500 },
     }
     const rejected: boolean[] = []
     for (const seed of [
@@ -216,7 +216,7 @@ test('preserves_all_32_seed_bytes_and_hex_output', async ({ page }) => {
       const generated: unknown = generate(seed, {
         variant: 'classic',
         difficulty: 'easy',
-        puzzleVersion: 'sudoku-v11',
+        puzzleVersion: 'sudoku-v12',
       })
       if (
         !generated ||
@@ -455,7 +455,6 @@ test('edit validates every note mask before length and action failures', async (
             entries: Array(81).fill(0),
             notes,
             action: { kind: 'enter', cell: 81, digit: 0 },
-            work: { maxWork: 4000001 },
           })
           errors.push('accepted invalid edit')
         } catch (error) {
@@ -638,7 +637,7 @@ test('live assessment preserves typed violations and rejects malformed diagnosti
         ],
       },
       {
-        status: 'budget-exhausted',
+        status: 'incomplete',
         ratingVersion: 'sudoku-rating-v2',
         variant: 'classic',
         stage: 'validation',

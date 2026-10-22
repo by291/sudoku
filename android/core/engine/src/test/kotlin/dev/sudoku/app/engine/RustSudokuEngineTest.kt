@@ -69,27 +69,22 @@ class RustSudokuEngineTest {
 
     @Test
     fun historicalUnavailableStringsRemainUnchanged() = runBlocking<Unit> {
-        val value = PuzzleAssessment.Unavailable(
-            "invalid-input",
-            listOf("原始历史文本", "  keep whitespace  ")
-        )
+        for (reason in listOf("invalid-input", "budget-exhausted", "incomplete")) {
+            val value = PuzzleAssessment.Unavailable(reason, listOf("原始历史文本", "  keep whitespace  "))
 
-        val response = RustSudokuEngine().validateAssessment(
-            value,
-            Variant.CLASSIC,
-            Difficulty.EASY
-        )
+            val response = RustSudokuEngine().validateAssessment(value, Variant.CLASSIC, Difficulty.EASY)
 
-        assertEquals(value, assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(response).value)
+            assertEquals(value, assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(response).value)
+        }
     }
 
     @Test
     fun immediatelyPreviousNativeBridgeIsRejected() {
         val current = dev.sudoku.app.ffi.engineInfo()
 
-        assertEquals(2u, compatibleInformation(current).bridgeVersion)
+        assertEquals(3u, compatibleInformation(current).bridgeVersion)
         assertFailsWith<IllegalStateException> {
-            compatibleInformation(current.copy(bridgeVersion = 1u))
+            compatibleInformation(current.copy(bridgeVersion = 2u))
         }
     }
 
@@ -149,7 +144,7 @@ class RustSudokuEngineTest {
     fun actualNativeLibraryReportsVersionsAndRejectsMalformedBoards() = runBlocking<Unit> {
         val engine = RustSudokuEngine()
         val information = assertIs<EngineOutcome.Completed<*>>(engine.information()).value
-        assertEquals("sudoku-v11", (information as EngineInformation).puzzleVersion)
+        assertEquals("sudoku-v12", (information as EngineInformation).puzzleVersion)
         val prepared = assertIs<EngineOutcome.Completed<PreparedPuzzle>>(
             engine.prepare(PuzzleRules.Classic)
         ).value
@@ -242,7 +237,7 @@ class NativeCancellationTest {
                     GenerationOptionsDto(
                         VariantDto.KILLER,
                         DifficultyDto.HARD,
-                        GenerationVersionDto.VARIANTS_V11,
+                        GenerationVersionDto.VARIANTS_V12,
                         null
                     ),
                     token
@@ -264,9 +259,9 @@ class NativeCancellationTest {
     }
 
     @Test
-    fun generationDeadlineIsDistinctAndTheLaneDrains() = runBlocking<Unit> {
-        val engine = RustSudokuEngine(NativeExecutionLimits(generationDeadlineMs = 1))
-        assertIs<EngineOutcome.Completed<*>>(engine.information())
+    fun requestDeadlineIsDistinctAndTheLaneDrains() = runBlocking<Unit> {
+        val engine = RustSudokuEngine(NativeExecutionLimits(requestDeadlineMs = 1))
+        assertIs<EngineOutcome.Completed<*>>(RustSudokuEngine().information())
         val result = engine.generate(
             GenerationRequest(
                 Variant.KILLER,
@@ -277,7 +272,7 @@ class NativeCancellationTest {
 
         assertIs<EngineOutcome.TimedOut>(result)
         val prepared = assertIs<EngineOutcome.Completed<PreparedPuzzle>>(
-            engine.prepare(PuzzleRules.Classic)
+            RustSudokuEngine().prepare(PuzzleRules.Classic)
         ).value
         prepared.close()
     }

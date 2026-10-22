@@ -1,13 +1,13 @@
 use super::types::{
     CageCatalogue, MAX_CATALOGUE_CELLS, MAX_CONSTRAINT_CELLS, SupportMasks, SupportMasksResult,
 };
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::types::{Bounded, UNIT_SIZE};
 
 pub(super) enum CatalogueResult {
     Complete(CageCatalogue),
     Fallback,
-    BudgetExhausted,
+    Incomplete,
 }
 
 struct CatalogueBuilder<'a> {
@@ -21,7 +21,7 @@ struct CatalogueBuilder<'a> {
     tuples: Vec<[u16; MAX_CATALOGUE_CELLS]>,
     exhausted: bool,
     overflow: bool,
-    budget: &'a mut WorkBudget,
+    control: &'a mut ExecutionControl,
 }
 
 impl CatalogueBuilder<'_> {
@@ -45,7 +45,7 @@ impl CatalogueBuilder<'_> {
             if used & bit != 0 {
                 continue;
             }
-            if !self.budget.consume(1) {
+            if !self.control.check() {
                 self.exhausted = true;
                 return;
             }
@@ -74,7 +74,7 @@ impl CatalogueBuilder<'_> {
             if digit < start || value > UNIT_SIZE as i32 + 1 - remaining {
                 continue;
             }
-            if !self.budget.consume(1) {
+            if !self.control.check() {
                 self.exhausted = true;
                 return;
             }
@@ -102,7 +102,7 @@ pub(super) fn compile(
     arity: usize,
     target: u16,
     capacity: usize,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CatalogueResult {
     let mut builder = CatalogueBuilder {
         arity,
@@ -115,12 +115,12 @@ pub(super) fn compile(
         tuples: vec![],
         exhausted: false,
         overflow: false,
-        budget,
+        control,
     };
     builder.combine(1, 0);
 
     if builder.exhausted {
-        return CatalogueResult::BudgetExhausted;
+        return CatalogueResult::Incomplete;
     }
     if builder.overflow {
         return CatalogueResult::Fallback;
@@ -135,18 +135,18 @@ pub(super) fn filter(
     arity: usize,
     domains: &[u16],
     catalogue: &CageCatalogue,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> SupportMasksResult {
     let mut supports = SupportMasks {
         bits: [0; MAX_CONSTRAINT_CELLS],
         len: arity,
     };
     for tuple in &catalogue.tuples {
+        if !control.check() {
+            return Bounded::Cancelled;
+        }
         let mut compatible = true;
         for index in 0..catalogue.arity {
-            if !budget.consume(1) {
-                return Bounded::BudgetExhausted;
-            }
             if tuple[index] & domains[index] == 0 {
                 compatible = false;
                 break;

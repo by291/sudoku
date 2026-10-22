@@ -134,7 +134,7 @@ it('assesses with the same timeout, stale reply fence, cancellation, and disposa
   expect(await pending).toEqual(reply.outcome)
   expect(worker.terminated).toBe(true)
   const timed = client.assess(assessmentInput)
-  await vi.advanceTimersByTimeAsync(14999)
+  await vi.advanceTimersByTimeAsync(2999)
 
   expect(latestWorker().terminated).toBe(false)
   await vi.advanceTimersByTimeAsync(1)
@@ -257,7 +257,7 @@ it('retains cancellation and timeout outcomes for variants', async () => {
   const client = createSudokuWorkerClient(getTestModule(), engine)
   const variantInput = generationInput('arrow', 'medium', 'variant-worker')
   const pending = client.generate(variantInput)
-  await vi.advanceTimersByTimeAsync(15000)
+  await vi.advanceTimersByTimeAsync(3000)
 
   expect(await pending).toEqual({ status: 'timed-out' })
   const controller = new AbortController()
@@ -273,11 +273,11 @@ it('retains cancellation and timeout outcomes for variants', async () => {
   client.dispose()
 })
 
-it('ignores stale variant replies and preserves budget exhaustion', async () => {
+it('ignores stale variant replies and preserves incomplete results', async () => {
   const client = createSudokuWorkerClient(getTestModule(), engine)
   const pending = client.generate(generationInput('thermo', 'hard', 'variant-worker'))
   const worker = latestWorker()
-  const outcome = { status: 'budget-exhausted', message: 'Bounded work exhausted' }
+  const outcome = { status: 'incomplete', message: 'Bounded work exhausted' }
   worker.reply({ kind: 'generate', requestId: 'stale-variant', outcome })
 
   expect(worker.terminated).toBe(false)
@@ -320,16 +320,16 @@ it('live_jobs_preserve_owned_snapshots_partial_results_and_original_deadlines', 
   board.fill(0)
 
   expect(request).toMatchObject({ kind: 'conflicts', board: uniqueBoard })
-  const computation = { result: { status: 'budget-exhausted', violations: [] }, workUsed: 1000000 }
+  const computation = { result: { status: 'incomplete', violations: [] } }
   worker.reply({
     kind: 'conflicts',
     requestId: request.requestId,
-    outcome: { status: 'completed', value: { preparationWork: 100, computation } },
+    outcome: { status: 'completed', value: { computation } },
   })
 
   expect(await pending).toEqual({
     status: 'completed',
-    value: { preparationWork: 100, computation },
+    value: { computation },
   })
   const notes = Array<number>(81).fill(0)
   const editing = client.generateNotes({
@@ -345,7 +345,7 @@ it('live_jobs_preserve_owned_snapshots_partial_results_and_original_deadlines', 
     kind: 'generate-notes',
     input: { notes: Array(81).fill(0) },
   })
-  await vi.advanceTimersByTimeAsync(15000)
+  await vi.advanceTimersByTimeAsync(3000)
   expect(await editing).toEqual({ status: 'timed-out' })
   expect(editingWorker.terminated).toBe(true)
   client.dispose()
@@ -358,7 +358,7 @@ it('live_jobs_reject_malformed_results_and_terminate_cancelled_or_disposed_owner
   worker.reply({
     kind: 'conflicts',
     requestId: worker.requests[0].requestId,
-    outcome: { status: 'completed', value: { preparationWork: 1000001, computation: {} } },
+    outcome: { status: 'completed', value: { computation: {} } },
   })
   expect((await pending).status).toBe('failed')
 
@@ -393,12 +393,53 @@ it('live_jobs_snapshot_before_delayed_readiness_and_keep_the_initial_deadline', 
   })
   const worker = latestWorker()
   notes.fill(511)
-  await vi.advanceTimersByTimeAsync(14000)
+  await vi.advanceTimersByTimeAsync(2000)
   expect(worker.requests).toEqual([])
-  worker.reply({ kind: 'ready', bridgeVersion: 3 })
+  worker.reply({ kind: 'ready', bridgeVersion: 4 })
   await Promise.resolve()
   expect(worker.requests[0]).toMatchObject({ input: { notes: Array(81).fill(0) } })
   await vi.advanceTimersByTimeAsync(1000)
   expect(await pending).toEqual({ status: 'timed-out' })
   client.dispose()
+})
+
+it('stops every analysis request at the shared three-second deadline', async () => {
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  let settled = false
+  const pending = client.assess(createAssessmentInput(uniqueBoard, { kind: 'classic' }))
+  void pending.then(() => {
+    settled = true
+  })
+  const worker = latestWorker()
+
+  await vi.advanceTimersByTimeAsync(2999)
+  expect(settled).toBe(false)
+  await vi.advanceTimersByTimeAsync(1)
+
+  expect(settled).toBe(true)
+  expect(await pending).toEqual({ status: 'timed-out' })
+  expect(worker.terminated).toBe(true)
+  client.dispose()
+})
+
+it('rejects a late reply even when the timeout callback has not run', async () => {
+  const clock = vi.spyOn(performance, 'now').mockReturnValue(0)
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const pending = client.assess(createAssessmentInput(uniqueBoard, { kind: 'classic' }))
+  const worker = latestWorker()
+
+  clock.mockReturnValue(3001)
+  worker.reply({
+    kind: 'assess',
+    requestId: worker.requests[0].requestId,
+    outcome: {
+      status: 'completed',
+      value: { status: 'ungraded', ratingVersion: 'sudoku-rating-v2', variant: 'classic' },
+    },
+  })
+
+  expect(await pending).toEqual({ status: 'timed-out' })
+  expect(worker.terminated).toBe(true)
+  client.dispose()
+  clock.mockRestore()
 })

@@ -7,7 +7,6 @@ fn rejects_invalid_boards_and_keeps_prepared_snapshots_owned() {
     let prepared = prepare_puzzle(
         PrepareInputDto {
             rules: RulesDto::Classic,
-            max_work: None,
         },
         token.clone(),
     )
@@ -23,29 +22,28 @@ fn rejects_invalid_boards_and_keeps_prepared_snapshots_owned() {
 }
 
 #[test]
-fn cancellation_is_independent_and_not_budget_exhaustion() {
+fn cancellation_is_an_explicit_error() {
     let token = Arc::new(CancellationToken::new());
     token.cancel();
     let error = prepare_puzzle(
         PrepareInputDto {
             rules: RulesDto::Classic,
-            max_work: Some(0),
         },
         token,
     )
     .err()
     .unwrap();
-    assert!(matches!(error, NativeError::Cancelled { .. }));
+    assert!(matches!(error, NativeError::Cancelled));
 }
 
 #[test]
 fn seed_and_bridge_are_current_and_checked() {
-    assert_eq!(engine_info().bridge_version, 2);
+    assert_eq!(engine_info().bridge_version, 3);
     assert_eq!(derive_seed(b"daily:2026-10-16".to_vec()).len(), 32);
     let options = GenerationOptionsDto {
         variant: VariantDto::Classic,
         difficulty: DifficultyDto::Easy,
-        puzzle_version: GenerationVersionDto::ClassicV11,
+        puzzle_version: GenerationVersionDto::ClassicV12,
         limits: None,
     };
     assert!(matches!(
@@ -89,7 +87,6 @@ fn edit_validates_every_mask_before_note_length_and_action() {
     let prepared = prepare_puzzle(
         PrepareInputDto {
             rules: RulesDto::Classic,
-            max_work: None,
         },
         Arc::new(CancellationToken::new()),
     )
@@ -109,10 +106,6 @@ fn edit_validates_every_mask_before_note_length_and_action() {
                         cell: 81,
                         digit: DigitDto(0),
                     },
-                    work: Some(WorkOptionsDto {
-                        max_work: Some(4_000_001),
-                        initial_work: None,
-                    }),
                 },
                 Arc::new(CancellationToken::new()),
             )
@@ -131,7 +124,6 @@ fn edit_validates_every_mask_before_note_length_and_action() {
                 entries: BoardDto(vec![0; 81]),
                 notes: vec![0; 80],
                 action: BoardEditDto::Erase { cell: 81 },
-                work: None,
             },
             Arc::new(CancellationToken::new()),
         )
@@ -200,4 +192,44 @@ fn assessment_version_precedes_malformed_summary_and_summary_precedes_identity()
             }
         } if issues == ["Assessment technique counts must include every known technique"]
     ));
+}
+
+#[test]
+fn cancelled_prepared_query_does_not_poison_the_owned_handle() {
+    let prepared = prepare_puzzle(
+        PrepareInputDto {
+            rules: RulesDto::Classic,
+        },
+        Arc::new(CancellationToken::new()),
+    )
+    .unwrap();
+    let cancelled = Arc::new(CancellationToken::new());
+    cancelled.cancel();
+
+    let stopped = prepared.candidates(
+        BoardQueryDto {
+            board: BoardDto(vec![0; 81]),
+        },
+        cancelled,
+    );
+    let completed = prepared
+        .candidates(
+            BoardQueryDto {
+                board: BoardDto(vec![0; 81]),
+            },
+            Arc::new(CancellationToken::new()),
+        )
+        .unwrap();
+
+    assert!(matches!(stopped, Err(NativeError::Cancelled)));
+    assert!(
+        matches!(completed.result, CandidateResultDto::Complete { candidates } if candidates == vec![511; 81])
+    );
+}
+
+#[test]
+fn obsolete_caller_work_fields_are_rejected_at_the_dto_boundary() {
+    let input = serde_json::json!({ "rules": { "kind": "classic" }, "maxWork": 1 });
+
+    assert!(serde_json::from_value::<PrepareInputDto>(input).is_err());
 }

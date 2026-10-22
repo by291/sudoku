@@ -4,7 +4,7 @@ use super::types::{GenerationInput, LayoutConstructionResult};
 use super::variant::{SpatialSymmetry, transform_rules};
 use super::variant_strategies::capabilities;
 use super::variants::{arrow, diagonal, jigsaw, killer, thermo};
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::context::{prepare_rules, validate_rules};
 use crate::rules::types::{PuzzleRules, SudokuVariant};
@@ -14,24 +14,24 @@ pub fn construct_generation_layout(
     input: &GenerationInput,
     terminal_random: &mut SeededRandom,
     geometry_random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<LayoutConstructionResult> {
     if input.variant == SudokuVariant::Classic {
-        return Ok(match construct_classic_terminal(terminal_random, budget)? {
-            TerminalConstructionResult::Ready { solution } => LayoutConstructionResult::Ready {
-                terminal: solution,
-                rules: PuzzleRules::Classic,
+        return Ok(
+            match construct_classic_terminal(terminal_random, control)? {
+                TerminalConstructionResult::Ready { solution } => LayoutConstructionResult::Ready {
+                    terminal: solution,
+                    rules: PuzzleRules::Classic,
+                },
+                TerminalConstructionResult::Incomplete => LayoutConstructionResult::Incomplete,
+                TerminalConstructionResult::AttemptExhausted => {
+                    LayoutConstructionResult::AttemptExhausted
+                }
+                TerminalConstructionResult::Failed { reason } => {
+                    LayoutConstructionResult::Failed { reason }
+                }
             },
-            TerminalConstructionResult::BudgetExhausted => {
-                LayoutConstructionResult::BudgetExhausted
-            }
-            TerminalConstructionResult::AttemptExhausted => {
-                LayoutConstructionResult::AttemptExhausted
-            }
-            TerminalConstructionResult::Failed { reason } => {
-                LayoutConstructionResult::Failed { reason }
-            }
-        });
+        );
     }
 
     // Each v11 variant/tier has one geometry example. Its selection draw remains part of seed identity.
@@ -64,13 +64,13 @@ pub fn construct_generation_layout(
         | SudokuVariant::Thermo
         | SudokuVariant::Arrow => PuzzleRules::Classic,
     };
-    let Bounded::Complete(context) = prepare_rules(&terminal_rules, budget)? else {
-        return Ok(LayoutConstructionResult::BudgetExhausted);
+    let Bounded::Complete(context) = prepare_rules(&terminal_rules, control)? else {
+        return Ok(LayoutConstructionResult::Incomplete);
     };
-    let terminal = match construct_unit_terminal(&context, terminal_random, budget, None) {
+    let terminal = match construct_unit_terminal(&context, terminal_random, control, None) {
         TerminalConstructionResult::Ready { solution } => solution,
-        TerminalConstructionResult::BudgetExhausted => {
-            return Ok(LayoutConstructionResult::BudgetExhausted);
+        TerminalConstructionResult::Incomplete => {
+            return Ok(LayoutConstructionResult::Incomplete);
         }
         TerminalConstructionResult::AttemptExhausted => {
             return Ok(LayoutConstructionResult::AttemptExhausted);
@@ -83,21 +83,23 @@ pub fn construct_generation_layout(
     let rules = match &terminal_rules {
         PuzzleRules::Diagonal => Some(diagonal::create_geometry()),
         PuzzleRules::Jigsaw { regions } => {
-            jigsaw::create_geometry(regions, &terminal, geometry_random, budget)
+            jigsaw::create_geometry(regions, &terminal, geometry_random, control)
         }
         PuzzleRules::Classic => match input.variant {
-            SudokuVariant::Killer => killer::create_geometry(&terminal, geometry_random, budget),
+            SudokuVariant::Killer => killer::create_geometry(&terminal, geometry_random, control),
             SudokuVariant::Thermo => {
-                thermo::create_geometry(&[], &terminal, geometry_random, budget)
+                thermo::create_geometry(&[], &terminal, geometry_random, control)
             }
-            SudokuVariant::Arrow => arrow::create_geometry(&[], &terminal, geometry_random, budget),
+            SudokuVariant::Arrow => {
+                arrow::create_geometry(&[], &terminal, geometry_random, control)
+            }
             SudokuVariant::Classic | SudokuVariant::Diagonal | SudokuVariant::Jigsaw => None,
         },
         PuzzleRules::Killer { .. } | PuzzleRules::Thermo { .. } | PuzzleRules::Arrow { .. } => None,
     };
     let Some(rules) = rules else {
-        return Ok(if budget.remaining() == 0 {
-            LayoutConstructionResult::BudgetExhausted
+        return Ok(if control.is_cancelled() {
+            LayoutConstructionResult::Incomplete
         } else {
             LayoutConstructionResult::AttemptExhausted
         });

@@ -5,7 +5,7 @@ import { RATING_VERSION } from '@/sudoku/guards'
 export function createAssessmentInput(
   board: Board,
   rules: PuzzleRules,
-  limits: AssessmentLimits = { maxSteps: 500, maxWork: 4000000 },
+  limits: AssessmentLimits = { maxSteps: 500 },
 ): AssessmentInput {
   return { board, rules, ratingVersion: RATING_VERSION, limits: { ...limits } }
 }

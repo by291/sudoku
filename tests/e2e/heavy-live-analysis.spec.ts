@@ -21,7 +21,9 @@ const rules: PuzzleRules = {
 const empty = Array<0>(81).fill(0)
 
 for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
-  test(`heavy live jobs retain full work and atomic notes at ${base}`, async ({ page }) => {
+  test(`heavy live jobs complete or time out without partial notes at ${base}`, async ({
+    page,
+  }) => {
     await page.goto(base)
     const assetBase = base === '/' ? '/' : '/sudoku/'
     const response = await runWorker(
@@ -30,17 +32,15 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
       assetBase,
     )
     const parsed = parseWorkerResponse(response)
-    expect(parsed.valid && parsed.value.kind === 'conflicts' && parsed.value.outcome).toMatchObject(
-      {
-        status: 'completed',
-        value: {
-          computation: {
-            result: { status: 'budget-exhausted', violations: [] },
-            workUsed: 1000000,
-          },
-        },
-      },
-    )
+    expect(parsed.valid).toBe(true)
+    if (!parsed.valid) throw new Error('Invalid worker response')
+    if (parsed.value.outcome.status === 'completed') {
+      expect(parsed.value.outcome).toMatchObject({
+        value: { computation: { result: { status: 'complete', violations: [] } } },
+      })
+    } else {
+      expect(parsed.value.outcome).toEqual({ status: 'timed-out' })
+    }
     const notes = await runWorker(
       page,
       {
@@ -50,19 +50,24 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
       },
       assetBase,
     )
-    expect(parseWorkerResponse(notes)).toMatchObject({
-      valid: true,
-      value: {
-        outcome: {
-          status: 'completed',
-          value: { computation: { result: { status: 'budget-exhausted' }, workUsed: 1000000 } },
+    const decoded = parseWorkerResponse(notes)
+    expect(decoded.valid).toBe(true)
+    if (!decoded.valid) throw new Error('Invalid notes response')
+    if (decoded.value.outcome.status === 'completed') {
+      expect(decoded.value.outcome).toMatchObject({
+        value: {
+          computation: {
+            result: { status: 'complete', entries: empty, notes: Array(81).fill(511) },
+          },
         },
-      },
-    })
+      })
+    } else {
+      expect(decoded.value.outcome).toEqual({ status: 'timed-out' })
+    }
   })
 
   test(`heavy player input cancels pending notes at ${base}`, async ({ page }) => {
-    // Delay delivery only, keeping the emitted Worker and its full Rust allowance real.
+    // Delay dispatch past the request deadline to make cancellation and timeout deterministic.
     await page.addInitScript(() => {
       const OriginalWorker = Worker
       window.Worker = class extends OriginalWorker {
@@ -73,7 +78,7 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
             'kind' in message &&
             (message.kind === 'conflicts' || message.kind === 'generate-notes')
           ) {
-            setTimeout(() => super.postMessage(message), 1500)
+            setTimeout(() => super.postMessage(message), 4000)
           } else {
             super.postMessage(message)
           }
@@ -109,7 +114,7 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
       .poll(async () => (await readSessions(page))[0]?.session.assistance.candidateCount)
       .toBe(0)
     await selectGameMenuAction(page, '生成候选数')
-    await expect(page.getByText(/候选计算超出预算，原有笔记已保留/)).toBeVisible()
+    await expect(page.getByText(/候选数暂时无法生成，原有笔记已保留/)).toBeVisible()
     const saved = (await readSessions(page))[0]?.session
     expect(saved?.assistance.candidateCount).toBe(0)
     expect(saved?.notes[1]).toBe(7)

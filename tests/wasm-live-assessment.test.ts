@@ -216,7 +216,7 @@ it('catches throwing reflective reads without crashing response handling', () =>
 
 it('requires explicit null validation difficulty and a supported logic tier', () => {
   const base = {
-    status: 'budget-exhausted',
+    status: 'incomplete',
     ratingVersion: 'sudoku-rating-v2',
     variant: 'classic',
     stage: 'validation',

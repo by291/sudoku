@@ -11,9 +11,9 @@ use super::types::{
 };
 use super::variant::variant_rules_matter;
 use crate::board::is_complete;
-use crate::budget::{WorkBudget, WorkStage};
 use crate::constraints::computation::prepare_computation;
 use crate::constraints::types::PreparedComputation;
+use crate::control::ExecutionControl;
 use crate::puzzle::Puzzle;
 use crate::rating::assessment::prepare_assessment_with_computation;
 use crate::rating::types::{
@@ -33,7 +33,6 @@ struct ActiveLayout {
     frontier: CandidateFrontier,
     visits: u32,
     expanded_at: u32,
-    work_used: u64,
     best_tier: u8,
     best_progress: usize,
 }
@@ -58,20 +57,20 @@ enum CandidateEvaluation {
     Failed {
         reason: String,
     },
-    WorkLimit,
+    Cancelled,
 }
 
 enum Acceptance {
     Accepted(AcceptedCandidate),
     Failed { reason: String },
     Rejected,
-    WorkLimit,
+    Cancelled,
 }
 
 enum LayoutPreparation {
     Ready(Box<ActiveLayout>),
     AttemptExhausted,
-    WorkLimit,
+    Cancelled,
     Failed { reason: String },
 }
 
@@ -99,7 +98,7 @@ fn try_accept_candidate(
     board: Board,
     trial: RatedTrial,
     input: &GenerationInput,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<Acceptance> {
     if !meets_clue_policy(input, &board) {
         return Ok(Acceptance::Rejected);
@@ -126,12 +125,12 @@ fn try_accept_candidate(
         });
     }
 
-    let exact = count_solutions(&board, &layout.computation, budget, budget.remaining());
+    let exact = count_solutions(&board, &layout.computation, control, u64::MAX);
     let SearchResult::Complete {
         count, solution, ..
     } = exact
     else {
-        return Ok(Acceptance::WorkLimit);
+        return Ok(Acceptance::Cancelled);
     };
     if count == 0 || (count == 1 && solution.as_ref() != Some(&layout.terminal)) {
         return Ok(Acceptance::Failed {
@@ -149,8 +148,8 @@ fn try_accept_candidate(
         difficulty: input.difficulty,
     };
     if input.variant != SudokuVariant::Classic {
-        let Bounded::Complete(matters) = variant_rules_matter(&content, budget)? else {
-            return Ok(Acceptance::WorkLimit);
+        let Bounded::Complete(matters) = variant_rules_matter(&content, control)? else {
+            return Ok(Acceptance::Cancelled);
         };
         if !matters {
             return Ok(Acceptance::Rejected);
@@ -171,15 +170,15 @@ fn evaluate_candidate(
     layout: &mut ActiveLayout,
     mask: GivenMask,
     input: &GenerationInput,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<CandidateEvaluation> {
     let board = mask.materialize(&layout.terminal)?;
     let mut exact = SolvedExact::Unchecked;
     if !screening_first(input) {
         let SearchResult::Complete { count, .. } =
-            count_solutions(&board, &layout.computation, budget, budget.remaining())
+            count_solutions(&board, &layout.computation, control, u64::MAX)
         else {
-            return Ok(CandidateEvaluation::WorkLimit);
+            return Ok(CandidateEvaluation::Cancelled);
         };
         if count == 0 {
             return Ok(CandidateEvaluation::Failed {
@@ -197,7 +196,7 @@ fn evaluate_candidate(
 
     let trial = layout
         .assessor
-        .screen_target(&board, input.difficulty, budget);
+        .screen_target(&board, input.difficulty, control);
     let (trial, feedback, matching) = match trial {
         TargetScreenResult::Invalid { issues } => {
             let reason = issues
@@ -212,10 +211,10 @@ fn evaluate_candidate(
                 .join("; ");
             return Ok(CandidateEvaluation::Failed { reason });
         }
-        TargetScreenResult::BudgetExhausted {
-            cause: ExhaustionCause::WorkLimit,
-        } => return Ok(CandidateEvaluation::WorkLimit),
-        TargetScreenResult::BudgetExhausted {
+        TargetScreenResult::Incomplete {
+            cause: ExhaustionCause::Cancelled,
+        } => return Ok(CandidateEvaluation::Cancelled),
+        TargetScreenResult::Incomplete {
             cause: ExhaustionCause::LogicalStepLimit,
         } => {
             return Ok(CandidateEvaluation::Continue {
@@ -259,10 +258,10 @@ fn evaluate_candidate(
     }
 
     if matching && meets_clue_policy(input, &board) {
-        match try_accept_candidate(layout, board, trial, input, budget)? {
+        match try_accept_candidate(layout, board, trial, input, control)? {
             Acceptance::Accepted(candidate) => return Ok(CandidateEvaluation::Accepted(candidate)),
             Acceptance::Failed { reason } => return Ok(CandidateEvaluation::Failed { reason }),
-            Acceptance::WorkLimit => return Ok(CandidateEvaluation::WorkLimit),
+            Acceptance::Cancelled => return Ok(CandidateEvaluation::Cancelled),
             Acceptance::Rejected => {}
         }
     }
@@ -277,17 +276,15 @@ fn prepare_layout(
     id: u32,
     input: &GenerationInput,
     limits: &GenerationLimits,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<LayoutPreparation> {
-    let layout_started = budget.used();
     let mut terminal_random = for_phase(input, RandomPhase::Terminal, id, 0);
     let mut geometry_random = for_phase(input, RandomPhase::Geometry, id, 0);
-    let constructed = budget.with_stage(WorkStage::Preparation, |budget| {
-        construct_generation_layout(input, &mut terminal_random, &mut geometry_random, budget)
-    })?;
+    let constructed =
+        construct_generation_layout(input, &mut terminal_random, &mut geometry_random, control)?;
     let (terminal, rules) = match constructed {
-        LayoutConstructionResult::BudgetExhausted => {
-            return Ok(LayoutPreparation::WorkLimit);
+        LayoutConstructionResult::Incomplete => {
+            return Ok(LayoutPreparation::Cancelled);
         }
         LayoutConstructionResult::Failed { reason } => {
             return Ok(LayoutPreparation::Failed { reason });
@@ -298,8 +295,8 @@ fn prepare_layout(
         LayoutConstructionResult::Ready { terminal, rules } => (terminal, rules),
     };
 
-    let Bounded::Complete(computation) = prepare_computation(&rules, budget)? else {
-        return Ok(LayoutPreparation::WorkLimit);
+    let Bounded::Complete(computation) = prepare_computation(&rules, control)? else {
+        return Ok(LayoutPreparation::Cancelled);
     };
     if rules.variant() != input.variant || !is_complete(&terminal, computation.rules()) {
         return Ok(LayoutPreparation::Failed {
@@ -324,7 +321,6 @@ fn prepare_layout(
         &computation,
         AssessmentLimits {
             max_steps: limits.max_steps,
-            max_work: limits.max_work,
         },
     )?;
     let layout = ActiveLayout {
@@ -335,7 +331,6 @@ fn prepare_layout(
         frontier,
         visits: 0,
         expanded_at: 0,
-        work_used: budget.used() - layout_started,
         best_tier: 0,
         best_progress: 0,
     };
@@ -348,21 +343,17 @@ fn execute_proposal(
     layout: &mut ActiveLayout,
     input: &GenerationInput,
     metrics: &mut GenerationMetrics,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<Option<CandidateEvaluation>> {
-    let proposal_started = budget.used();
     let mut random = for_phase(input, RandomPhase::Candidate, layout.id, layout.visits);
-    let proposal = layout.frontier.next(&mut random, budget);
-    layout.work_used += budget.used() - proposal_started;
+    let proposal = layout.frontier.next(&mut random, control);
     let Some(proposal) = proposal else {
         return Ok(None);
     };
 
     layout.visits += 1;
     metrics.candidate_visits += 1;
-    let evaluation_started = budget.used();
-    let result = evaluate_candidate(layout, proposal.mask, input, budget)?;
-    layout.work_used += budget.used() - evaluation_started;
+    let result = evaluate_candidate(layout, proposal.mask, input, control)?;
 
     Ok(Some(result))
 }
@@ -371,7 +362,7 @@ pub(super) fn search_generation(
     input: &GenerationInput,
     limits: &GenerationLimits,
     metrics: &mut GenerationMetrics,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> CoreResult<GenerationOutcome> {
     let mut active: Vec<ActiveLayout> = vec![];
 
@@ -379,9 +370,9 @@ pub(super) fn search_generation(
     let mut expansion_requested_by = None;
     let mut logical_screens = 0;
     let mut step_limited_screens = 0;
-    let mut work_exhausted = false;
+    let mut cancelled = false;
 
-    while budget.remaining() > 0 && !budget.is_cancelled() {
+    while control.check() {
         active.retain(|layout| !layout.frontier.exhausted());
         if expansion_requested_by.is_some_and(|id| !active.iter().any(|layout| layout.id == id)) {
             expansion_requested_by = None;
@@ -408,11 +399,11 @@ pub(super) fn search_generation(
             // Failed terminal/geometry attempts consume a layout slot; candidate edits do not.
             let id = metrics.layouts;
             metrics.layouts += 1;
-            let layout = match prepare_layout(id, input, limits, budget)? {
+            let layout = match prepare_layout(id, input, limits, control)? {
                 LayoutPreparation::Ready(layout) => *layout,
                 LayoutPreparation::AttemptExhausted => continue,
-                LayoutPreparation::WorkLimit => {
-                    work_exhausted = true;
+                LayoutPreparation::Cancelled => {
+                    cancelled = true;
                     break;
                 }
                 LayoutPreparation::Failed { reason } => {
@@ -433,15 +424,15 @@ pub(super) fn search_generation(
             break;
         }
 
-        // Equal calls can cost very different work; give the least-served owner the next turn.
+        // Visit count and stable IDs determine scheduling independently of host timing.
         active.sort_by(|left, right| {
-            left.work_used
-                .cmp(&right.work_used)
+            left.visits
+                .cmp(&right.visits)
                 .then_with(|| left.id.cmp(&right.id))
         });
         let layout = &mut active[0];
-        let Some(result) = execute_proposal(layout, input, metrics, budget)? else {
-            if budget.remaining() == 0 {
+        let Some(result) = execute_proposal(layout, input, metrics, control)? else {
+            if control.is_cancelled() {
                 break;
             }
             continue;
@@ -457,8 +448,8 @@ pub(super) fn search_generation(
             CandidateEvaluation::Failed { reason } => {
                 return Ok(GenerationOutcome::Failed { reason });
             }
-            CandidateEvaluation::WorkLimit => {
-                work_exhausted = true;
+            CandidateEvaluation::Cancelled => {
+                cancelled = true;
                 break;
             }
             CandidateEvaluation::Continue {
@@ -483,8 +474,8 @@ pub(super) fn search_generation(
         }
     }
 
-    let cause = if work_exhausted || budget.remaining() == 0 {
-        GenerationExhaustionCause::WorkLimit
+    let cause = if cancelled || control.is_cancelled() {
+        GenerationExhaustionCause::Cancelled
     } else if step_limited_screens > 0 && step_limited_screens == logical_screens {
         GenerationExhaustionCause::LogicalStepLimit
     } else if metrics.layouts >= limits.max_layouts {
@@ -492,5 +483,5 @@ pub(super) fn search_generation(
     } else {
         GenerationExhaustionCause::ExhaustedFrontier
     };
-    Ok(GenerationOutcome::BudgetExhausted { cause })
+    Ok(GenerationOutcome::Incomplete { cause })
 }

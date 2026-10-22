@@ -7,7 +7,7 @@ use super::types::{
     AdvancedEvidence, AdvancedEvidenceKind, CandidateDomain, ColoringLink, ColoringMode, Evidence,
     LogicalAction, LogicalStep, LogicalWorkspace, Removal, StepOutcome,
 };
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::rules::types::{PuzzleRules, SudokuUnit, UnitKind};
 use crate::types::{ALL_DIGITS_MASK, BOARD_SIZE, Bounded, CandidateMask, UNIT_SIZE};
 
@@ -106,7 +106,7 @@ fn elimination_action(
     }
 }
 
-fn find_naked_triple(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
+fn find_naked_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) -> StepOutcome {
     for unit in &state.rules.context().units {
         let mut empty_cells = [0; UNIT_SIZE];
         let mut empty_count = 0;
@@ -125,8 +125,8 @@ fn find_naked_triple(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepO
 
         // Charge each lexicographic cell combination, including rejected patterns.
         for cells in combinations::<_, 3>(&eligible_cells[..eligible_count]) {
-            if !budget.consume(1) {
-                return Bounded::BudgetExhausted;
+            if !control.check() {
+                return Bounded::Cancelled;
             }
             let digits = cells
                 .iter()
@@ -157,13 +157,13 @@ fn find_naked_triple(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepO
     Bounded::Complete(None)
 }
 
-fn find_hidden_triple(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
+fn find_hidden_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) -> StepOutcome {
     let all_digits: [u8; UNIT_SIZE] = std::array::from_fn(|index| (index + 1) as u8);
     for unit in &state.rules.context().units {
         // Hidden triples visit all lexicographic digit triples, even in sparse/contradictory states.
         for selected_digits in combinations::<_, 3>(&all_digits) {
-            if !budget.consume(1) {
-                return Bounded::BudgetExhausted;
+            if !control.check() {
+                return Bounded::Cancelled;
             }
             let digits = selected_digits
                 .iter()
@@ -210,7 +210,10 @@ fn find_hidden_triple(state: &LogicalWorkspace, budget: &mut WorkBudget) -> Step
     Bounded::Complete(None)
 }
 
-fn find_fish<const SIZE: usize>(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
+fn find_fish<const SIZE: usize>(
+    state: &LogicalWorkspace,
+    control: &mut ExecutionControl,
+) -> StepOutcome {
     let units = &state.rules.context().units;
     for kind in [UnitKind::Row, UnitKind::Column] {
         let other_kind = if kind == UnitKind::Row {
@@ -233,8 +236,8 @@ fn find_fish<const SIZE: usize>(state: &LogicalWorkspace, budget: &mut WorkBudge
                 }
             }
             for selected in combinations::<_, SIZE>(&possible[..possible_count]) {
-                if !budget.consume(1) {
-                    return Bounded::BudgetExhausted;
+                if !control.check() {
+                    return Bounded::Cancelled;
                 }
                 let mut cells = [0; UNIT_SIZE];
                 let mut cell_count = 0;
@@ -298,7 +301,7 @@ fn find_fish<const SIZE: usize>(state: &LogicalWorkspace, budget: &mut WorkBudge
     Bounded::Complete(None)
 }
 
-fn find_xy_wing(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
+fn find_xy_wing(state: &LogicalWorkspace, control: &mut ExecutionControl) -> StepOutcome {
     let mut bivalue = [0; BOARD_SIZE];
     let mut bivalue_count = 0;
     for cell in 0..BOARD_SIZE {
@@ -318,8 +321,8 @@ fn find_xy_wing(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcom
             }
         }
         for [first, second] in combinations::<_, 2>(&peers[..peer_count]) {
-            if !budget.consume(1) {
-                return Bounded::BudgetExhausted;
+            if !control.check() {
+                return Bounded::Cancelled;
             }
             let pivot_mask = state.candidates[pivot].bits();
             let first_mask = state.candidates[first].bits();
@@ -370,13 +373,13 @@ struct ColoringGraph<'a> {
 fn build_coloring_graph<'a>(
     state: &'a LogicalWorkspace,
     digit: u8,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> Bounded<ColoringGraph<'a>> {
     let mut links = [None; CLASSIC_UNIT_COUNT];
     let mut link_count = 0;
     for unit in &state.rules.context().units {
-        if !budget.consume(1) {
-            return Bounded::BudgetExhausted;
+        if !control.check() {
+            return Bounded::Cancelled;
         }
         let mut positions = candidate_position_iter(state, &unit.cells, digit);
         if let (Some(first), Some(second), None) =
@@ -410,7 +413,7 @@ fn color_component(
     links: &[Option<StrongLink<'_>>],
     start: usize,
     visited: &mut [bool; BOARD_SIZE],
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> Bounded<ColoringComponent> {
     let mut assignments = [None; BOARD_SIZE];
     assignments[start] = Some(0_usize);
@@ -427,8 +430,8 @@ fn color_component(
             .flatten()
             .filter(|link| link.cells.contains(&cell))
         {
-            if !budget.consume(1) {
-                return Bounded::BudgetExhausted;
+            if !control.check() {
+                return Bounded::Cancelled;
             }
             let other = if link.cells[0] == cell {
                 link.cells[1]
@@ -538,21 +541,21 @@ fn coloring_evidence(
     }
 }
 
-fn find_simple_coloring(state: &LogicalWorkspace, budget: &mut WorkBudget) -> StepOutcome {
+fn find_simple_coloring(state: &LogicalWorkspace, control: &mut ExecutionControl) -> StepOutcome {
     for digit in 1..=9 {
-        let Bounded::Complete(graph) = build_coloring_graph(state, digit, budget) else {
-            return Bounded::BudgetExhausted;
+        let Bounded::Complete(graph) = build_coloring_graph(state, digit, control) else {
+            return Bounded::Cancelled;
         };
         let links = &graph.links[..graph.link_count];
         let mut visited = [false; BOARD_SIZE];
-        // Link order, BFS insertion order and per-edge charges determine the v11 first witness.
+        // Link order and BFS insertion order determine the first witness.
         for start in links.iter().flatten().flat_map(|link| link.cells) {
             if visited[start] {
                 continue;
             }
-            let Bounded::Complete(component) = color_component(links, start, &mut visited, budget)
+            let Bounded::Complete(component) = color_component(links, start, &mut visited, control)
             else {
-                return Bounded::BudgetExhausted;
+                return Bounded::Cancelled;
             };
             if let Some((mode, action)) = coloring_action(state, digit, &component) {
                 return selected_step(
@@ -572,21 +575,21 @@ fn find_simple_coloring(state: &LogicalWorkspace, budget: &mut WorkBudget) -> St
 pub fn find_advanced_step(
     state: &LogicalWorkspace,
     technique: Technique,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> StepOutcome {
-    if !budget.consume(1) {
-        return Bounded::BudgetExhausted;
+    if !control.check() {
+        return Bounded::Cancelled;
     }
     if !matches!(state.rules.rules(), PuzzleRules::Classic) {
         return Bounded::Complete(None);
     }
     match technique {
-        Technique::NakedTriple => find_naked_triple(state, budget),
-        Technique::HiddenTriple => find_hidden_triple(state, budget),
-        Technique::XWing => find_fish::<2>(state, budget),
-        Technique::Swordfish => find_fish::<3>(state, budget),
-        Technique::XYWing => find_xy_wing(state, budget),
-        Technique::SimpleColoring => find_simple_coloring(state, budget),
+        Technique::NakedTriple => find_naked_triple(state, control),
+        Technique::HiddenTriple => find_hidden_triple(state, control),
+        Technique::XWing => find_fish::<2>(state, control),
+        Technique::Swordfish => find_fish::<3>(state, control),
+        Technique::XYWing => find_xy_wing(state, control),
+        Technique::SimpleColoring => find_simple_coloring(state, control),
         _ => Bounded::Complete(None),
     }
 }

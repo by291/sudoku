@@ -531,7 +531,7 @@ pub fn hint_to_dto(hint: &HintResult) -> CoreResult<HintResultDto> {
             reason: match reason {
                 HintUnavailable::Complete => HintUnavailableDto::Complete,
                 HintUnavailable::Unsupported => HintUnavailableDto::Unsupported,
-                HintUnavailable::BudgetExhausted => HintUnavailableDto::BudgetExhausted,
+                HintUnavailable::Incomplete => HintUnavailableDto::Incomplete,
             },
         },
         HintResult::Deduction { steps, placement } => HintResultDto::Deduction {
@@ -553,7 +553,7 @@ pub fn hint_to_core(hint: HintResultDto) -> CoreResult<HintResult> {
         HintResultDto::Unavailable { reason } => HintResult::Unavailable(match reason {
             HintUnavailableDto::Complete => HintUnavailable::Complete,
             HintUnavailableDto::Unsupported => HintUnavailable::Unsupported,
-            HintUnavailableDto::BudgetExhausted => HintUnavailable::BudgetExhausted,
+            HintUnavailableDto::Incomplete => HintUnavailable::Incomplete,
         }),
         HintResultDto::Deduction { steps, placement } => HintResult::Deduction {
             steps: steps
@@ -584,12 +584,12 @@ pub fn logic_to_dto(
     Ok(match result.status {
         LogicStatus::Solved => LogicResultDto::Solved { board, steps },
         LogicStatus::Stalled => LogicResultDto::Stalled { board, steps },
-        LogicStatus::WorkLimit => LogicResultDto::BudgetExhausted {
+        LogicStatus::Cancelled => LogicResultDto::Incomplete {
             board,
             steps,
-            cause: ExhaustionCauseDto::WorkLimit,
+            cause: ExhaustionCauseDto::Cancelled,
         },
-        LogicStatus::StepLimit => LogicResultDto::BudgetExhausted {
+        LogicStatus::StepLimit => LogicResultDto::Incomplete {
             board,
             steps,
             cause: ExhaustionCauseDto::LogicalStepLimit,

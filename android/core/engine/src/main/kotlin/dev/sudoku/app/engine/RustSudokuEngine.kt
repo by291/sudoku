@@ -65,12 +65,12 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
     override suspend fun generate(request: GenerationRequest): EngineOutcome<GeneratedPuzzle> = guarded {
         val seed = request.seed.map { it.toByte() }.toByteArray()
         val version = if (request.variant == Variant.CLASSIC) {
-            GenerationVersionDto.CLASSIC_V11
+            GenerationVersionDto.CLASSIC_V12
         } else {
-            GenerationVersionDto.VARIANTS_V11
+            GenerationVersionDto.VARIANTS_V12
         }
         val options = GenerationOptionsDto(request.variant.native(), request.difficulty.native(), version, null)
-        call(NativeLane.ANALYSIS, limits.generationDeadlineMs) { token ->
+        call(NativeLane.ANALYSIS) { token ->
             when (val result = generate(seed, options, token)) {
                 is GenerationResultDto.Ready -> {
                     val source = result.puzzle
@@ -81,34 +81,30 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
                             source.rules.player(),
                             source.difficulty.player(),
                             source.seed,
-                            if (source.puzzleVersion == GenerationVersionDto.CLASSIC_V11) {
-                                "sudoku-v11"
+                            if (source.puzzleVersion == GenerationVersionDto.CLASSIC_V12) {
+                                "sudoku-v12"
                             } else {
-                                "sudoku-variants-v11"
+                                "sudoku-variants-v12"
                             }
                         )
                     EngineOutcome.Completed(
-                        GeneratedPuzzle(puzzle, PuzzleAssessment.Rated(result.assessment.player())),
-                        result.metrics.constructionWork.toLong()
+                        GeneratedPuzzle(puzzle, PuzzleAssessment.Rated(result.assessment.player()))
                     )
                 }
-                is GenerationResultDto.BudgetExhausted -> EngineOutcome.BudgetExhausted(
-                    result.metrics.constructionWork.toLong()
-                )
+                is GenerationResultDto.Incomplete -> EngineOutcome.Incomplete
                 is GenerationResultDto.Failed -> EngineOutcome.Failed(result.reason)
             }
         }
     }
 
     override suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle> = guarded {
-        val input = PrepareInputDto(rules.native(), null)
-        NativeCalls.run(NativeLane.ANALYSIS, limits.analysisDeadlineMs, discard = { it.discard() }) { token ->
+        val input = PrepareInputDto(rules.native())
+        NativeCalls.run(NativeLane.ANALYSIS, limits.requestDeadlineMs, discard = { it.discard() }) { token ->
             compatibleInformation()
             val native = preparePuzzle(input, token)
             try {
                 EngineOutcome.Completed(
-                    OwnedPreparedPuzzle(native, native.metadata().player(), limits),
-                    native.preparationWork().toLong()
+                    OwnedPreparedPuzzle(native, native.metadata().player(), limits)
                 )
             } catch (failure: Exception) {
                 native.close()
@@ -118,7 +114,7 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
     }
 
     override suspend fun assess(board: List<Int>, rules: PuzzleRules): EngineOutcome<AssessmentResult> = guarded {
-        val input = AssessmentInputDto(board.nativeBoard(), rules.native(), null, null, null, null)
+        val input = AssessmentInputDto(board.nativeBoard(), rules.native(), null, null)
         call(NativeLane.ANALYSIS) { token ->
             val response = assess(input, token)
             when (val result = response.result) {
@@ -128,17 +124,14 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
                         result.trace.map {
                             it.player()
                         }
-                    ),
-                    response.workUsed.toLong()
+                    )
                 )
-                is AssessmentResultDto.BudgetExhausted -> EngineOutcome.BudgetExhausted(response.workUsed.toLong())
+                is AssessmentResultDto.Incomplete -> EngineOutcome.Incomplete
                 is AssessmentResultDto.Ungraded -> EngineOutcome.Completed(
-                    AssessmentResult.Ungraded(result.variant.player()),
-                    response.workUsed.toLong()
+                    AssessmentResult.Ungraded(result.variant.player())
                 )
                 is AssessmentResultDto.Invalid -> EngineOutcome.Completed(
-                    AssessmentResult.Invalid(result.issues.map { it.player() }),
-                    response.workUsed.toLong()
+                    AssessmentResult.Invalid(result.issues.map { it.player() })
                 )
             }
         }
@@ -172,7 +165,18 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
         call(NativeLane.INTERACTIVE) {
             when (val result = validateAssessment(input, identity)) {
                 AssessmentValidationDto.Absent -> EngineOutcome.Completed(null)
-                is AssessmentValidationDto.Present -> EngineOutcome.Completed(result.value.player())
+                is AssessmentValidationDto.Present -> {
+                    val validated = result.value.player()
+                    // Validation accepts the retired reason, but stored history keeps its original spelling.
+                    val preserved = if (value is PuzzleAssessment.Unavailable && value.reason == "budget-exhausted" &&
+                        validated is PuzzleAssessment.Unavailable && validated.reason == "incomplete"
+                    ) {
+                        validated.copy(reason = value.reason)
+                    } else {
+                        validated
+                    }
+                    EngineOutcome.Completed(preserved)
+                }
             }
         }
     }
@@ -218,20 +222,17 @@ class RustSudokuEngine(private val limits: NativeExecutionLimits = NativeExecuti
         call(NativeLane.ANALYSIS) { token -> validateTeachingStep(input, token).playerValidation() }
     }
 
-    private suspend fun <T> call(
-        lane: NativeLane,
-        deadlineMs: Long = limits.analysisDeadlineMs,
-        action: (CancellationToken) -> EngineOutcome<T>
-    ): EngineOutcome<T> = NativeCalls.run(lane, deadlineMs) { token ->
-        compatibleInformation()
-        action(token)
-    }
+    private suspend fun <T> call(lane: NativeLane, action: (CancellationToken) -> EngineOutcome<T>): EngineOutcome<T> =
+        NativeCalls.run(lane, limits.requestDeadlineMs) { token ->
+            compatibleInformation()
+            action(token)
+        }
 }
 
 internal fun compatibleInformation(information: EngineInfo = engineInfo()): EngineInfo {
     check(
-        information.bridgeVersion == 2u && information.puzzleVersion == "sudoku-v11" &&
-            information.variantPuzzleVersion == "sudoku-variants-v11" &&
+        information.bridgeVersion == 3u && information.puzzleVersion == "sudoku-v12" &&
+            information.variantPuzzleVersion == "sudoku-variants-v12" &&
             information.ratingVersion == "sudoku-rating-v2"
     ) { "Native engine version mismatch" }
     return information
@@ -248,7 +249,7 @@ internal suspend fun <T> guarded(action: suspend () -> EngineOutcome<T>): Engine
 private fun ValidationDto.playerValidation(): EngineOutcome<Validation> = when (this) {
     ValidationDto.Valid -> EngineOutcome.Completed(Validation.Valid)
     is ValidationDto.Invalid -> EngineOutcome.Completed(Validation.Invalid(issues.toList()))
-    ValidationDto.BudgetExhausted -> EngineOutcome.BudgetExhausted()
+    ValidationDto.Incomplete -> EngineOutcome.Incomplete
 }
 
 /** Invalid mathematical input is conclusive; execution failures remain retryable. */

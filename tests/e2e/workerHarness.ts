@@ -59,7 +59,7 @@ export async function runWorker(page: Page, request: WorkerRequest, base: '/' | 
             return
           }
           if (data.kind === 'ready') {
-            if (!('bridgeVersion' in data) || data.bridgeVersion !== 3) {
+            if (!('bridgeVersion' in data) || data.bridgeVersion !== 4) {
               fail('Worker bridge mismatch')
               return
             }
@@ -85,7 +85,7 @@ export async function runWorker(page: Page, request: WorkerRequest, base: '/' | 
           resolve(data)
         }
         worker.onerror = (event) => fail(event.message)
-        worker.postMessage({ kind: 'initialize', bridgeVersion: 3, module })
+        worker.postMessage({ kind: 'initialize', bridgeVersion: 4, module })
       })
     },
     { url: `${base}assets/${asset}`, binaryUrl: `${base}assets/${binary}`, request: payload },

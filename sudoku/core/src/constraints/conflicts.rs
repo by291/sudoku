@@ -4,7 +4,7 @@ use super::types::{
     ViolationCode,
 };
 use crate::board::base_candidates;
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::rules::evaluation::satisfies_constraint;
 use crate::rules::types::{PreparedRules, RuleConstraint};
 use crate::types::{Board, Bounded};
@@ -51,7 +51,7 @@ fn evaluate(
     board: &Board,
     rules: &PreparedRules,
     support: Option<&PreparedConstraintSupport>,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> ConflictResult {
     let context = rules.context();
     let mut violations = vec![];
@@ -85,20 +85,20 @@ fn evaluate(
             continue;
         }
 
-        if !budget.consume(1) {
+        if !control.check() {
             return ConflictResult {
-                status: ConflictStatus::BudgetExhausted,
+                status: ConflictStatus::Incomplete,
                 violations,
             };
         }
 
         let result = match support {
-            Some(prepared) => prepared.query_at(board, &candidates, index, budget),
-            None => raw_for_constraint(board, &candidates, rules, constraint, budget),
+            Some(prepared) => prepared.query_at(board, &candidates, index, control),
+            None => raw_for_constraint(board, &candidates, rules, constraint, control),
         };
         let Bounded::Complete(local) = result else {
             return ConflictResult {
-                status: ConflictStatus::BudgetExhausted,
+                status: ConflictStatus::Incomplete,
                 violations,
             };
         };
@@ -114,23 +114,59 @@ fn evaluate(
     }
 }
 
+/// Reports direct violations without enumerating partial arithmetic support.
+/// An incomplete result is a sound preview, not a claim that all constraints were checked.
+pub fn preview_conflicts(board: &Board, rules: &PreparedRules) -> ConflictResult {
+    let context = rules.context();
+    let mut violations = vec![];
+    let mut status = ConflictStatus::Complete;
+
+    for unit in &context.units {
+        add_duplicates(
+            board,
+            format!("{}:{}", unit.kind.as_str(), unit.index),
+            &unit.cells,
+            &mut violations,
+        );
+    }
+    for constraint in &context.constraints {
+        if let RuleConstraint::Cage { id, cells, .. } = constraint {
+            add_duplicates(board, id.clone(), cells, &mut violations);
+        }
+    }
+    for constraint in &context.constraints {
+        if constraint
+            .cells()
+            .iter()
+            .all(|&cell| board.values()[cell] != 0)
+        {
+            if !satisfies_constraint(board, constraint) {
+                violations.push(constraint_violation(constraint));
+            }
+        } else {
+            status = ConflictStatus::Incomplete;
+        }
+    }
+    ConflictResult { status, violations }
+}
+
 pub fn evaluate_conflicts(
     board: &Board,
     rules: &PreparedRules,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> ConflictResult {
-    evaluate(board, rules, None, budget)
+    evaluate(board, rules, None, control)
 }
 
 pub fn evaluate_prepared_conflicts(
     board: &Board,
     computation: &PreparedComputation,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> ConflictResult {
     evaluate(
         board,
         &computation.rules,
         Some(&computation.support),
-        budget,
+        control,
     )
 }

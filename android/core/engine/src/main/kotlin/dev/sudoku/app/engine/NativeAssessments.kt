@@ -65,10 +65,13 @@ internal fun PuzzleAssessment.native(): StoredAssessmentDto = when (this) {
         }
     )
     is PuzzleAssessment.Unavailable -> StoredAssessmentDto.Unavailable(
-        UnavailableReasonDto.entries.firstOrNull {
-            it.name.lowercase().replace('_', '-') == reason
-        }
-            ?: error("Unknown assessment availability"),
+        if (reason == "budget-exhausted") {
+            UnavailableReasonDto.INCOMPLETE
+        } else {
+            UnavailableReasonDto.entries.firstOrNull {
+                it.name.lowercase().replace('_', '-') == reason
+            } ?: error("Unknown assessment availability")
+        },
         issues.toList()
     )
 }

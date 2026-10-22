@@ -35,8 +35,8 @@ function validateSnapshot<T>(operation: () => T): T {
 
 function parsePuzzle(value: unknown, validators: SnapshotValidators): ParseResult<Puzzle> {
   const result = validateSnapshot(() => validatePuzzleSnapshot(value, validators))
-  if (result.status === 'budget-exhausted') {
-    throw new SnapshotValidationUnavailable('Puzzle validation exhausted its work budget')
+  if (result.status === 'incomplete') {
+    throw new SnapshotValidationUnavailable('Puzzle validation could not complete')
   }
   return result.status === 'valid'
     ? { valid: true, value: result.value }
@@ -276,8 +276,8 @@ export function parseSession(
         difficulty: puzzle.value.difficulty,
       }),
     )
-    if (solved.status === 'budget-exhausted') {
-      throw new SnapshotValidationUnavailable('Completion validation exhausted its work budget')
+    if (solved.status === 'incomplete') {
+      throw new SnapshotValidationUnavailable('Completion validation could not complete')
     }
     if (solved.status !== 'valid') {
       return invalid('Completed session is not solved')

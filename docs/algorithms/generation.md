@@ -1,6 +1,6 @@
 # Puzzle generation
 
-Generation searches for a puzzle with the requested variant and exact difficulty under a finite allowance. The current identities are `sudoku-v11` and `sudoku-variants-v11`. A request supplies a 32-byte seed; the portable core never reads a clock or OS randomness.
+Generation searches for a puzzle with the requested variant and exact difficulty under a host-owned deadline. The current identities are `sudoku-v12` and `sudoku-variants-v12`. A request supplies a 32-byte seed; the portable core never reads a clock or OS randomness.
 
 ## Construct a complete terminal
 
@@ -45,7 +45,7 @@ The explorer starts with all givens and searches nearby masks through three edit
 
 Each evaluated mask has fresh logical state. The frontier retains solved and stalled checkpoints separately so that one class does not immediately crowd out the other. Solved checkpoints are ranked by distance from the requested tier, remaining cells, fewer givens and more deductions. Stalled checkpoints prioritize fewer remaining cells, then deductions and clue count. These are exploration heuristics, not delivery criteria.
 
-Current bounds are two active layouts, eight retained checkpoints per frontier, 4,096 seen masks per frontier and 32 proposal selections per checkpoint. Eight non-improving evaluations mark stagnation. The scheduler favors the layout with less accumulated work, and can create another layout after stagnation. Reaching the layout-attempt cap prevents new layouts while allowing existing frontiers to continue.
+Current bounds are two active layouts, eight retained checkpoints per frontier, 4,096 seen masks per frontier and 32 proposal selections per checkpoint. Eight non-improving evaluations mark stagnation. The scheduler favors the layout with fewer proposal visits, breaking ties by stable layout ID, and can create another layout after stagnation. Reaching the layout-attempt cap prevents new layouts while allowing existing frontiers to continue.
 
 Removal descendants can inherit the parent's remaining sweep without consuming a new shuffle. Seen masks remain seen after checkpoint eviction, and a pending proposal retains its parent while evaluation is in progress. These details affect deterministic exploration and are part of the version contract.
 
@@ -65,6 +65,6 @@ Delivery requires all of the following:
 
 For non-Classic variants, the engine compares against Classic rules. For Diagonal, Killer, Thermo and Arrow, removing the extra rules must leave more than one solution. Jigsaw replaces boxes rather than merely adding constraints: a terminal invalid under Classic already establishes that the regional rules matter. Otherwise the Jigsaw check also counts under Classic and requires the result to differ from one. An incomplete comparison establishes nothing.
 
-Successful generation returns both the puzzle and its accepted assessment. The default allowance is 40 layout attempts, 4,000,000 shared work units and 500 logical steps. Terminal construction, geometry, preparation, candidate edits, uniqueness, rating and necessity checks all retain their work charges, including unsuccessful attempts.
+Successful generation returns both the puzzle and its accepted assessment. Each request has one 3,000 ms host deadline. Local exploration limits remain 40 layout attempts and 500 logical steps. Terminal construction, geometry, preparation, candidate edits, uniqueness, rating and necessity checks share cancellation; retries never restart the request timer. V12 reuses the V11 random stream recipe but versions the changed scheduler.
 
 An exhausted request reports the applicable bounded outcome; it does not imply no suitable puzzle exists. There is no authored-board fallback, lower-tier substitution or hidden retry allowance. See [engine contracts](../engine.md) for the exact seed frame, BLAKE3/ChaCha8 recipe and compatibility rules. A change to random-call order, branching, accounting or acceptance can change seeded output and requires deliberate version handling.

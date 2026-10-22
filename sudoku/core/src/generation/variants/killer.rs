@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use crate::budget::WorkBudget;
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::topology::cells_touch;
 use crate::rules::types::{Cage, PuzzleRules};
@@ -31,14 +31,14 @@ fn unused_neighbour_count(cell: usize, present: &[bool; BOARD_SIZE]) -> usize {
 pub fn create_geometry(
     solution: &Board,
     random: &mut SeededRandom,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> Option<PuzzleRules> {
     let mut remaining: Vec<usize> = (0..BOARD_SIZE).collect();
     random.shuffle(&mut remaining);
     let mut present = [true; BOARD_SIZE];
     let mut cages = vec![];
     while !remaining.is_empty() {
-        if !budget.consume(1) {
+        if !control.check() {
             return None;
         }
 
@@ -46,7 +46,7 @@ pub fn create_geometry(
         let mut fewest_open_sides = usize::MAX;
         // Preserve shuffled insertion order while growing from the narrowest free corner.
         for &cell in &remaining {
-            if !budget.consume(1) {
+            if !control.check() {
                 return None;
             }
 
@@ -70,7 +70,7 @@ pub fn create_geometry(
             let mut choices = vec![];
             let mut crowded = vec![];
             for &cell in &remaining {
-                if !budget.consume(1) {
+                if !control.check() {
                     return None;
                 }
                 if !cells

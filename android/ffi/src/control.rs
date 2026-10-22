@@ -2,17 +2,17 @@ use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
-use sudoku_core::budget::{CancellationProbe, WorkBudget};
+use sudoku_core::control::{CancellationProbe, ExecutionControl};
 use sudoku_core::types::EngineError;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum NativeError {
     #[error("Invalid input: {reason}")]
     InvalidInput { reason: String },
-    #[error("Operation cancelled after {work_used} work units")]
-    Cancelled { work_used: u64 },
-    #[error("Preparation exhausted after {work_used} work units")]
-    BudgetExhausted { work_used: u64 },
+    #[error("Operation cancelled")]
+    Cancelled,
+    #[error("Computation incomplete")]
+    Incomplete,
 }
 
 impl From<EngineError> for NativeError {
@@ -27,7 +27,7 @@ impl From<EngineError> for NativeError {
 ///
 /// Cancellation never waits on a prepared handle or computation lock. Once cancelled,
 /// the token stays cancelled for its entire lifetime; use a fresh token for a new job.
-/// Computation observes the signal at work checks and unwinds before returning an error.
+/// Computation observes the signal at cancellation checkpoints and unwinds before returning an error.
 #[derive(Debug, Default, uniffi::Object)]
 pub struct CancellationToken {
     cancelled: AtomicBool,
@@ -55,30 +55,15 @@ impl CancellationProbe for CancellationToken {
     }
 }
 
-pub fn budget(
-    maximum: Option<u32>,
-    initial: Option<u32>,
-    token: Arc<CancellationToken>,
-) -> Result<WorkBudget, NativeError> {
-    let maximum = maximum.unwrap_or(1_000_000);
-    if maximum > 4_000_000 || initial.unwrap_or(0) > maximum {
-        return Err(EngineError::invalid("Work limits may only lower the fixed bounds").into());
-    }
-
-    let mut budget = WorkBudget::with_cancellation(u64::from(maximum), token);
-    check(&budget)?;
-    budget.consume(u64::from(initial.unwrap_or(0)));
-    check(&budget)?;
-
-    Ok(budget)
+pub fn execution(token: Arc<CancellationToken>) -> Result<ExecutionControl, NativeError> {
+    let control = ExecutionControl::with_cancellation(token);
+    check(&control)?;
+    Ok(control)
 }
 
-pub fn check(budget: &WorkBudget) -> Result<(), NativeError> {
-    if budget.is_cancelled() {
-        return Err(NativeError::Cancelled {
-            work_used: budget.used(),
-        });
+pub fn check(control: &ExecutionControl) -> Result<(), NativeError> {
+    if !control.check() {
+        return Err(NativeError::Cancelled);
     }
-
     Ok(())
 }

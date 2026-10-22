@@ -7,9 +7,6 @@ impl GenerationLimits {
         if self.max_layouts > maximum.max_layouts {
             return Err(EngineError::invalid("Invalid generation limit: maxLayouts"));
         }
-        if self.max_work > maximum.max_work {
-            return Err(EngineError::invalid("Invalid generation limit: maxWork"));
-        }
         if self.max_steps > maximum.max_steps {
             return Err(EngineError::invalid("Invalid generation limit: maxSteps"));
         }

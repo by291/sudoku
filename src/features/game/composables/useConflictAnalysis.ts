@@ -1,6 +1,6 @@
 import { onScopeDispose, ref, shallowRef, watch } from 'vue'
 import type { ComputedRef, ShallowRef } from 'vue'
-import type { Board, ConflictWorkDto } from '@/sudoku/contracts'
+import type { Board, ConflictComputationDto } from '@/sudoku/contracts'
 import type { PreparedPuzzle } from '@/sudoku/mainEngine'
 import type { SudokuWorkerClient } from '@/worker/client'
 
@@ -11,7 +11,10 @@ export function useConflictAnalysis(
   enabled: ComputedRef<boolean>,
   worker: SudokuWorkerClient,
 ) {
-  const evaluation = shallowRef<ConflictWorkDto['result']>({ status: 'complete', violations: [] })
+  const evaluation = shallowRef<ConflictComputationDto['result']>({
+    status: 'complete',
+    violations: [],
+  })
   const state = ref<'ready' | 'pending' | 'failed'>('ready')
   let generation = 0
   let controller: AbortController | null = null

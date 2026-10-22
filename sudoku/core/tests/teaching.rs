@@ -1,4 +1,4 @@
-use sudoku_core::budget::WorkBudget;
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::logic::solver::find_step;
 use sudoku_core::logic::teaching::validate_teaching_step;
 use sudoku_core::logic::techniques::Technique;
@@ -50,7 +50,7 @@ fn accepts_an_authored_single_independently_of_detector_order() {
     let Bounded::Complete(Some(first)) = find_step(
         &mut state,
         &[Technique::HiddenSingle],
-        &mut WorkBudget::new(1_000_000),
+        &mut ExecutionControl::new(),
     ) else {
         panic!("Missing independent first pattern")
     };

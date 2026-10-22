@@ -40,11 +40,11 @@ export type {
   BoardQueryDto,
   PreparedCountInputDto,
   EditInputDto,
-  CandidateWorkDto,
-  ConflictWorkDto,
+  CandidateComputationDto,
+  ConflictComputationDto,
   ViolationDto as RuleViolation,
-  EditWorkDto,
-  SearchWorkDto,
+  EditComputationDto,
+  SearchComputationDto,
 } from '@sudoku/wasm'
 
 /** Borrowed requests are read-only; binding conversion produces owned Rust values. */
@@ -95,7 +95,7 @@ export type Puzzle = {
   seed: string
   puzzleVersion: string
 }
-export type AssessmentLimits = { maxSteps: number; maxWork: number }
+export type AssessmentLimits = { maxSteps: number }
 export type AssessmentInput = {
   board: Board
   rules: PuzzleRules

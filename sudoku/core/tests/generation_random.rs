@@ -70,7 +70,7 @@ fn v10_generation_requests_are_rejected() {
             SudokuVariant::Classic,
             Difficulty::Easy,
             Seed::from_bytes([0; 32]),
-            "sudoku-variants-v11"
+            "sudoku-variants-v12"
         )
         .is_err()
     );

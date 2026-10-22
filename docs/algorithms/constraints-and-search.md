@@ -32,7 +32,7 @@ For example, a two-cell distinct cage totaling 10 with domains `A={1,4,6}` and `
 
 The enumerator prunes repeated peer digits and impossible sum ranges using suffix minimum/maximum bounds. Thermometers enforce increasing order and leave enough larger digits for the remaining path. Arrows enumerate the circle first and accumulate the shaft separately.
 
-Small Killer cages can reuse a complete catalogue of ordered distinct-digit tuples. Current bounds are four cells per catalogue, 512 tuples per clue and 8,192 per layout. Overflow discards partial catalogues and falls back to exact bounded enumeration; previously spent work remains charged. A nearly fixed cage uses enumeration when its domain-product estimate is no larger than the catalogue. Larger cages, thermometers and arrows use enumeration directly.
+Small Killer cages can reuse a complete catalogue of ordered distinct-digit tuples. Current bounds are four cells per catalogue, 512 tuples per clue and 8,192 per layout. Overflow discards partial catalogues and falls back to exact bounded enumeration; previously completed exploration is not replayed. A nearly fixed cage uses enumeration when its domain-product estimate is no larger than the catalogue. Larger cages, thermometers and arrows use enumeration directly.
 
 Only complete support can eliminate candidates. An interrupted enumeration may simply not have reached an assignment containing a particular digit. Treating its partial union as complete would produce false deductions. Logical cage memoization therefore stores only complete support keyed by all effective local domains, within one workspace.
 
@@ -40,7 +40,7 @@ Sources: [`support.rs`](../../sudoku/core/src/constraints/support.rs), [`cage_ca
 
 ## Propagation and branching
 
-Exact counting combines propagation with minimum remaining values (MRV) depth-first search. The propagation-plus-search approach is also explained in [Norvig's Sudoku essay](https://www.norvig.com/sudoku.html); this implementation adds variant support, explicit work accounting and reversible state.
+Exact counting combines propagation with minimum remaining values (MRV) depth-first search. The propagation-plus-search approach is also explained in [Norvig's Sudoku essay](https://www.norvig.com/sudoku.html); this implementation adds variant support, cooperative cancellation and reversible state.
 
 At each search node:
 
@@ -55,7 +55,7 @@ Cell work uses a stack; affected units and constraints use deduplicated FIFO que
 
 Each domain reduction appends the old mask to a trail. A branch remembers its starting trail length and restores all later changes on exit, including exhaustion. Queue membership is reset before the next branch. This avoids copying the complete workspace at every choice while ensuring one failed branch cannot constrain its sibling.
 
-Conceptual control flow, omitting queue and budget details:
+Conceptual control flow, omitting queue and cancellation details:
 
 ```text
 count(state):
@@ -84,6 +84,4 @@ Sources: [`exact.rs`](../../sudoku/core/src/search/exact.rs), [`propagation.rs`]
 
 A known terminal proves that generated givens have at least one solution, but another solution may exist. Generation therefore still performs exact counting.
 
-Work units measure defined operations, not milliseconds or one universal CPU-cost unit. Preparation, propagation, arithmetic and search consume the caller's shared allowance. Failed branches and abandoned preparation are not refunded. Fixed board size does not make exhaustive search cheap: difficult domains can still create a large search tree. See [engine contracts](../engine.md) for cancellation, ownership and platform execution requirements.
-
-Algorithm X/Dancing Links is a relevant exact-cover alternative, described in [the research references](references.md). It is not the production counter in this repository.
+The portable core checks caller-owned cancellation at bounded cooperative checkpoints. Work-unit accounting has been removed. Host adapters enforce the 3,000 ms request deadline; local exact-search node limits remain explicit and an incomplete count cannot establish uniqueness. Fixed board size does not make exhaustive search cheap: difficult domains can still create a large search tree. See [engine contracts](../engine.md) for cancellation, ownership and platform execution requirements.

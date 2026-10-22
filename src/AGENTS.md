@@ -16,7 +16,7 @@ These rules supplement the [repository guidelines](../AGENTS.md) for `src/`. The
 ## TypeScript and boundary contracts
 
 - Keep strict type checking and explicit types for domain data, public contracts, worker messages and persisted records. Infer obvious local types. Prefer `unknown` with narrowing to `any`, unchecked casts, double assertions, non-null assertions or diagnostic suppressions.
-- Use discriminated unions for meaningfully different outcomes, including completed, cancelled, failed, unavailable and budget-exhausted results. Validate and narrow rules, generated puzzles, worker messages and persisted data at runtime.
+- Use discriminated unions for meaningfully different outcomes, including completed, cancelled, failed, unavailable and incomplete results. Validate and narrow rules, generated puzzles, worker messages and persisted data at runtime.
 - Use typed, statically assembled definition maps with `satisfies` or equivalent completeness checks. Keep exhaustive narrowing at dispatch boundaries; never fall through to an unrelated variant.
 - Pure engine definitions stay independent of presentation, Vue, storage and workers. Chinese names, rule text, technique/violation explanations and clue rendering belong to presentation definitions with coverage for every variant.
 - Preserve immutable snapshots across `await`, operation generations, ownership/revision/dataset fences and save-before-switch ordering. Read-only TypeScript types do not establish runtime ownership.

@@ -5,21 +5,19 @@ use crate::types::Board;
 use crate::types::{CoreResult, EngineError};
 
 pub const MAX_ASSESSMENT_STEPS: u32 = 500;
-pub const MAX_ASSESSMENT_WORK: u64 = 4000000;
 
 impl Default for AssessmentLimits {
     fn default() -> Self {
         Self {
             max_steps: MAX_ASSESSMENT_STEPS,
-            max_work: MAX_ASSESSMENT_WORK,
         }
     }
 }
 
 impl AssessmentLimits {
     pub(crate) fn validate(self) -> CoreResult<()> {
-        if self.max_steps > MAX_ASSESSMENT_STEPS || self.max_work > MAX_ASSESSMENT_WORK {
-            return Err(EngineError::invalid("Invalid assessment work limits"));
+        if self.max_steps > MAX_ASSESSMENT_STEPS {
+            return Err(EngineError::invalid("Invalid assessment step limit"));
         }
         Ok(())
     }

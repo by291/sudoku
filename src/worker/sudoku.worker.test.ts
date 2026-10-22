@@ -31,30 +31,28 @@ beforeAll(async () => {
   }
   handler(
     new MessageEvent('message', {
-      data: { kind: 'initialize', bridgeVersion: 3, module: getTestModule() },
+      data: { kind: 'initialize', bridgeVersion: 4, module: getTestModule() },
     }),
   )
-  await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ kind: 'ready', bridgeVersion: 3 }))
+  await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ kind: 'ready', bridgeVersion: 4 }))
   post.mockClear()
 })
 afterAll(() => vi.unstubAllGlobals())
 
 it.each<GenerationExhaustionDto>([
-  'work-limit',
+  'cancelled',
   'logical-step-limit',
   'layout-limit',
   'exhausted-frontier',
 ])('maps %s to the existing public exhaustion envelope without diagnostics', (cause) => {
   vi.mocked(engine.generate).mockReturnValue({
-    status: 'budget-exhausted',
+    status: 'incomplete',
     stage: 'construction',
     cause,
     metrics: {
-      constructionWork: 17,
       layouts: 1,
       completedLayouts: 1,
       candidateVisits: 2,
-      workByStage: { preparation: 3, arithmetic: 2, exact: 4, logic: 5, proposals: 3 },
     },
   })
   if (!handler) {
@@ -75,7 +73,7 @@ it.each<GenerationExhaustionDto>([
     kind: 'generate',
     requestId: cause,
     outcome: {
-      status: 'budget-exhausted',
+      status: 'incomplete',
       message: 'No qualifying puzzle found within the generation limits',
     },
   })

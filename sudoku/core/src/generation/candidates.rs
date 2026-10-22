@@ -4,12 +4,12 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
-use crate::budget::{WorkBudget, WorkStage};
+use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rating::types::TargetFeedback;
 use crate::types::{BOARD_SIZE, Board, CoreResult, Difficulty, EngineError};
 
-// These v11 exploration bounds fix selection/draw order; they are not extra work allowances.
+// These local exploration bounds fix selection and random-draw order.
 pub const ACTIVE_LAYOUTS: usize = 2;
 pub const MAX_CHECKPOINTS: usize = 8;
 pub const MAX_SEEN_MASKS: usize = 4096;
@@ -265,7 +265,7 @@ impl FrontierEntry {
     fn neighboring_proposal(
         &mut self,
         random: &mut SeededRandom,
-        budget: &mut WorkBudget,
+        control: &mut ExecutionControl,
     ) -> Option<CandidateProposal> {
         // Partition only after choosing the inherited/shuffled order; inheritance consumes no draws.
         let prepared = self.edit_order.prepare(self.checkpoint.mask, random);
@@ -276,7 +276,7 @@ impl FrontierEntry {
         let mut intermediate_masks = vec![];
         let mut mask = self.checkpoint.mask;
         let mut edit = |cell, restore| {
-            if !budget.consume(1) {
+            if !control.check() {
                 return false;
             }
             intermediate_masks.push(mask);
@@ -489,89 +489,87 @@ impl CandidateFrontier {
     pub fn next(
         &mut self,
         random: &mut SeededRandom,
-        budget: &mut WorkBudget,
+        control: &mut ExecutionControl,
     ) -> Option<CandidateProposal> {
-        budget.with_stage(WorkStage::Proposals, |budget| {
-            while self.seen.len() < MAX_SEEN_MASKS {
-                let eligible = self
-                    .entries
-                    .iter()
-                    .filter(|entry| entry.borrow().cursor < MAX_PROPOSALS);
-                if eligible.clone().next().is_none() || !budget.consume(1) {
+        while self.seen.len() < MAX_SEEN_MASKS {
+            let eligible = self
+                .entries
+                .iter()
+                .filter(|entry| entry.borrow().cursor < MAX_PROPOSALS);
+            if eligible.clone().next().is_none() || !control.check() {
+                return None;
+            }
+
+            let desired_solved = self.selections.is_multiple_of(2);
+            self.selections += 1;
+            let has_desired = eligible
+                .clone()
+                .any(|entry| entry.borrow().checkpoint.status.solved() == desired_solved);
+            let ranked = eligible.clone().filter(|entry| {
+                !has_desired || entry.borrow().checkpoint.status.solved() == desired_solved
+            });
+            let Some(best) = ranked.clone().min_by(|left, right| {
+                compare(
+                    &left.borrow().checkpoint,
+                    &right.borrow().checkpoint,
+                    self.target,
+                )
+            }) else {
+                panic!("Nonempty candidate pool has no best checkpoint");
+            };
+            let tied = ranked.filter(|entry| {
+                compare(
+                    &entry.borrow().checkpoint,
+                    &best.borrow().checkpoint,
+                    self.target,
+                ) == Ordering::Equal
+            });
+            if self.sweep_entry.as_ref().is_some_and(|sweep| {
+                !eligible.clone().any(|entry| Rc::ptr_eq(entry, sweep))
+                    || sweep.borrow().sweep_cursor >= BOARD_SIZE
+            }) {
+                self.sweep_entry = None;
+            }
+
+            // Continuing sweeps skip the tie-selection draw; every other choice consumes one draw.
+            let selected = if let Some(sweep) = &self.sweep_entry {
+                sweep.clone()
+            } else {
+                let index = (random.next_f64() * tied.clone().count() as f64) as usize;
+                let Some(selected) = tied.clone().nth(index) else {
+                    panic!("Nonempty tied checkpoint selection must be in range");
+                };
+                selected.clone()
+            };
+
+            let proposal = {
+                let mut entry = selected.borrow_mut();
+                let proposal = entry.neighboring_proposal(random, control);
+                entry.cursor += 1;
+                proposal
+            };
+            let Some(proposal) = proposal else {
+                if control.is_cancelled() {
                     return None;
                 }
-
-                let desired_solved = self.selections.is_multiple_of(2);
-                self.selections += 1;
-                let has_desired = eligible
-                    .clone()
-                    .any(|entry| entry.borrow().checkpoint.status.solved() == desired_solved);
-                let ranked = eligible.clone().filter(|entry| {
-                    !has_desired || entry.borrow().checkpoint.status.solved() == desired_solved
-                });
-                let Some(best) = ranked.clone().min_by(|left, right| {
-                    compare(
-                        &left.borrow().checkpoint,
-                        &right.borrow().checkpoint,
-                        self.target,
-                    )
-                }) else {
-                    panic!("Nonempty candidate pool has no best checkpoint");
-                };
-                let tied = ranked.filter(|entry| {
-                    compare(
-                        &entry.borrow().checkpoint,
-                        &best.borrow().checkpoint,
-                        self.target,
-                    ) == Ordering::Equal
-                });
-                if self.sweep_entry.as_ref().is_some_and(|sweep| {
-                    !eligible.clone().any(|entry| Rc::ptr_eq(entry, sweep))
-                        || sweep.borrow().sweep_cursor >= BOARD_SIZE
-                }) {
-                    self.sweep_entry = None;
+                continue;
+            };
+            if self.seen.contains(&proposal.mask) {
+                if control.is_cancelled() {
+                    return None;
                 }
-
-                // Continuing sweeps skip the tie-selection draw; every other choice consumes one draw.
-                let selected = if let Some(sweep) = &self.sweep_entry {
-                    sweep.clone()
-                } else {
-                    let index = (random.next_f64() * tied.clone().count() as f64) as usize;
-                    let Some(selected) = tied.clone().nth(index) else {
-                        panic!("Nonempty tied checkpoint selection must be in range");
-                    };
-                    selected.clone()
-                };
-
-                let proposal = {
-                    let mut entry = selected.borrow_mut();
-                    let proposal = entry.neighboring_proposal(random, budget);
-                    entry.cursor += 1;
-                    proposal
-                };
-                let Some(proposal) = proposal else {
-                    if budget.remaining() == 0 {
-                        return None;
-                    }
-                    continue;
-                };
-                if self.seen.contains(&proposal.mask) {
-                    if budget.remaining() == 0 {
-                        return None;
-                    }
-                    continue;
-                }
-
-                self.pending = Some(PendingProposal {
-                    mask: proposal.mask,
-                    parent: selected,
-                    kind: proposal.kind,
-                });
-                self.seen.insert(proposal.mask);
-                return Some(proposal);
+                continue;
             }
-            None
-        })
+
+            self.pending = Some(PendingProposal {
+                mask: proposal.mask,
+                parent: selected,
+                kind: proposal.kind,
+            });
+            self.seen.insert(proposal.mask);
+            return Some(proposal);
+        }
+        None
     }
 
     pub fn record_evaluation(&mut self, improved: bool) {

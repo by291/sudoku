@@ -9,7 +9,6 @@ use crate::types::{Board, Difficulty};
 #[derive(Clone, Copy, Debug)]
 pub struct AssessmentLimits {
     pub max_steps: u32,
-    pub max_work: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -80,7 +79,7 @@ pub enum AssessmentStage {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExhaustionCause {
-    WorkLimit,
+    Cancelled,
     LogicalStepLimit,
 }
 
@@ -89,7 +88,7 @@ pub enum AssessmentFailure {
     Ungraded {
         variant: SudokuVariant,
     },
-    BudgetExhausted {
+    Incomplete {
         variant: SudokuVariant,
         stage: AssessmentStage,
         difficulty: Option<Difficulty>,
@@ -105,7 +104,7 @@ pub enum AssessmentResult {
     Unrated(AssessmentFailure),
 }
 
-/// Completion consumes a successful trial's board and trace; no budget or policy search is retained.
+/// Completion consumes a successful trial's board and trace; no control or policy search is retained.
 pub struct RatedTrial {
     pub(crate) board: Board,
     pub(crate) rules: PreparedRules,
@@ -142,7 +141,7 @@ pub enum TargetScreenResult {
     TargetStalled {
         feedback: TargetFeedback,
     },
-    BudgetExhausted {
+    Incomplete {
         cause: ExhaustionCause,
     },
     Invalid {
@@ -166,7 +165,7 @@ pub struct AssessmentIdentity {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnavailableReason {
     Ungraded,
-    BudgetExhausted,
+    Incomplete,
     InvalidInput,
     InvalidSummary,
     UnsupportedVersion,

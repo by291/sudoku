@@ -1,4 +1,9 @@
-import type { ConflictWorkDto, EditWorkDto, Board, ParseResult } from '@/sudoku/contracts'
+import type {
+  ConflictComputationDto,
+  EditComputationDto,
+  Board,
+  ParseResult,
+} from '@/sudoku/contracts'
 import type { Puzzle } from '@/sudoku/contracts'
 import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
@@ -14,17 +19,16 @@ export type WorkerOutcome<T> =
   | { status: 'completed'; value: T }
   | { status: 'cancelled' }
   | { status: 'timed-out' }
-  | { status: 'budget-exhausted'; message: string }
+  | { status: 'incomplete'; message: string }
   | { status: 'failed'; message: string }
 
-export const LIVE_WORK_ALLOWANCE = 1000000
 export type GenerateNotesInput = {
   givens: Board
   entries: Board
   notes: readonly number[]
   rules: PuzzleRules
 }
-export type LiveComputation<T> = { preparationWork: number; computation: T }
+export type LiveComputation<T> = { computation: T }
 
 export type WorkerRequest =
   | { kind: 'conflicts'; requestId: string; board: Board; rules: PuzzleRules }
@@ -41,12 +45,12 @@ export type WorkerResponse =
   | {
       kind: 'conflicts'
       requestId: string
-      outcome: WorkerOutcome<LiveComputation<ConflictWorkDto>>
+      outcome: WorkerOutcome<LiveComputation<ConflictComputationDto>>
     }
   | {
       kind: 'generate-notes'
       requestId: string
-      outcome: WorkerOutcome<LiveComputation<EditWorkDto>>
+      outcome: WorkerOutcome<LiveComputation<EditComputationDto>>
     }
   | { kind: 'generate'; requestId: string; outcome: GenerateOutcome }
   | { kind: 'assess'; requestId: string; outcome: WorkerOutcome<LiveAssessmentOutcome> }
@@ -145,7 +149,6 @@ export function parseWorkerRequest(
       !isRulesShape(input.rules) ||
       !isRecord(input.limits) ||
       !withinLimit(input.limits.maxSteps, 500) ||
-      !withinLimit(input.limits.maxWork, 4000000) ||
       validator.validateRules(input.rules).status !== 'valid'
     ) {
       return invalid
@@ -159,7 +162,7 @@ export function parseWorkerRequest(
           board: input.board,
           rules: input.rules,
           ratingVersion: RATING_VERSION,
-          limits: { maxSteps: input.limits.maxSteps, maxWork: input.limits.maxWork },
+          limits: { maxSteps: input.limits.maxSteps },
         },
       },
     }
@@ -214,7 +217,7 @@ export function parseWorkerResponse(
     return { valid: true, value: { kind, requestId, outcome: { status: outcome.status } } }
   }
   if (
-    (outcome.status === 'failed' || outcome.status === 'budget-exhausted') &&
+    (outcome.status === 'failed' || outcome.status === 'incomplete') &&
     typeof outcome.message === 'string'
   ) {
     return {
@@ -226,13 +229,9 @@ export function parseWorkerResponse(
     return invalid
   }
   if (kind === 'conflicts' || kind === 'generate-notes') {
-    if (
-      !isRecord(outcome.value) ||
-      !withinLimit(outcome.value.preparationWork, LIVE_WORK_ALLOWANCE)
-    ) {
+    if (!isRecord(outcome.value)) {
       return invalid
     }
-    const preparationWork = outcome.value.preparationWork
     try {
       if (kind === 'conflicts') {
         const computation = validator.parseConflicts(outcome.value.computation)
@@ -241,7 +240,7 @@ export function parseWorkerResponse(
           value: {
             kind,
             requestId,
-            outcome: { status: 'completed', value: { preparationWork, computation } },
+            outcome: { status: 'completed', value: { computation } },
           },
         }
       }
@@ -251,7 +250,7 @@ export function parseWorkerResponse(
         value: {
           kind,
           requestId,
-          outcome: { status: 'completed', value: { preparationWork, computation } },
+          outcome: { status: 'completed', value: { computation } },
         },
       }
     } catch {

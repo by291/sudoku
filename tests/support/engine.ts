@@ -18,7 +18,7 @@ await bindings.default({ module_or_path: getTestModule() })
 
 export const DEFAULT_GENERATION_LIMITS: GenerationLimitsDto = {
   maxLayouts: 40,
-  maxWork: 4000000,
+
   maxSteps: 500,
 }
 

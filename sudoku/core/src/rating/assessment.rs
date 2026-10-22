@@ -9,10 +9,10 @@ use super::types::{
 };
 use super::types::{AssessmentInput, AssessmentLimits};
 use super::workload::summarize_trace;
-use crate::budget::{WorkBudget, WorkStage};
 use crate::constraints::computation::prepare_computation;
 use crate::constraints::conflicts::evaluate_prepared_conflicts;
 use crate::constraints::types::{ConflictStatus, PreparedComputation};
+use crate::control::ExecutionControl;
 use crate::logic::solver::analyze_workspace_owned;
 use crate::logic::techniques::{Technique, execution_order};
 use crate::logic::types::{LogicStatus, LogicalStep};
@@ -21,7 +21,7 @@ use crate::rules::context::validate_rules;
 use crate::rules::types::PuzzleRules;
 use crate::types::{Board, Bounded, CoreResult, Difficulty, EngineError};
 
-/// Validate and own inputs now; charge expensive layout preparation only on the first evaluation.
+/// Validate and own inputs now; defer expensive layout preparation until the first evaluation.
 pub fn prepare_assessment(
     rules: &PuzzleRules,
     limits: AssessmentLimits,
@@ -36,7 +36,7 @@ pub fn prepare_assessment(
     })
 }
 
-/// Share an already charged immutable layout while keeping all assessment workspaces local.
+/// Share an already prepared immutable layout while keeping all assessment workspaces local.
 pub fn prepare_assessment_with_computation(
     computation: &PreparedComputation,
     limits: AssessmentLimits,
@@ -51,18 +51,18 @@ pub fn prepare_assessment_with_computation(
 }
 
 pub fn assess_puzzle(input: &AssessmentInput) -> AssessmentResult {
-    assess_puzzle_with_budget(input, &mut WorkBudget::new(input.limits.max_work))
+    assess_puzzle_with_control(input, &mut ExecutionControl::new())
 }
 
-pub fn assess_puzzle_with_budget(
+pub fn assess_puzzle_with_control(
     input: &AssessmentInput,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
 ) -> AssessmentResult {
     let prepared =
         validate_input(input).and_then(|()| prepare_assessment(&input.rules, input.limits));
 
     match prepared {
-        Ok(owner) => owner.assess(&input.board, budget),
+        Ok(owner) => owner.assess(&input.board, control),
         Err(error) => AssessmentResult::Unrated(AssessmentFailure::Invalid {
             issues: message(error.to_string()),
         }),
@@ -88,13 +88,16 @@ fn message(value: impl Into<String>) -> Vec<AssessmentIssue> {
 }
 
 impl PreparedAssessment {
-    fn prepared(&self, budget: &mut WorkBudget) -> CoreResult<Bounded<&PreparedComputation>> {
+    fn prepared(
+        &self,
+        control: &mut ExecutionControl,
+    ) -> CoreResult<Bounded<&PreparedComputation>> {
         if let Some(computation) = self.computation.get() {
             return Ok(Bounded::Complete(computation));
         }
 
-        let Bounded::Complete(computation) = prepare_computation(&self.rules, budget)? else {
-            return Ok(Bounded::BudgetExhausted);
+        let Bounded::Complete(computation) = prepare_computation(&self.rules, control)? else {
+            return Ok(Bounded::Cancelled);
         };
 
         self.computation
@@ -110,21 +113,18 @@ impl PreparedAssessment {
     fn evaluate(
         &self,
         board: &Board,
-        budget: &mut WorkBudget,
+        control: &mut ExecutionControl,
         target: Option<Difficulty>,
     ) -> PolicyScreen {
-        if budget.used() + budget.remaining() > self.limits.max_work {
-            return PolicyScreen::Invalid(message("Invalid caller-owned assessment budget"));
-        }
         if target.is_some_and(|target| !supports_difficulty(self.rules.variant(), target)) {
             return PolicyScreen::Invalid(message("Unsupported assessment target"));
         }
 
-        let computation = match self.prepared(budget) {
+        let computation = match self.prepared(control) {
             Ok(Bounded::Complete(computation)) => computation,
-            Ok(Bounded::BudgetExhausted) => {
+            Ok(Bounded::Cancelled) => {
                 return PolicyScreen::Exhausted {
-                    cause: ExhaustionCause::WorkLimit,
+                    cause: ExhaustionCause::Cancelled,
                     stage: AssessmentStage::Validation,
                     difficulty: None,
                 };
@@ -132,25 +132,23 @@ impl PreparedAssessment {
             Err(error) => return PolicyScreen::Invalid(message(error.to_string())),
         };
 
-        budget.with_stage(WorkStage::Logic, |budget| {
-            let policies = supported_difficulties(self.rules.variant())
-                .iter()
-                .map(|&difficulty| (difficulty, policy_slice(self.rules.variant(), difficulty)));
-            screen_policies(board, self.limits, computation, budget, target, policies)
-        })
+        let policies = supported_difficulties(self.rules.variant())
+            .iter()
+            .map(|&difficulty| (difficulty, policy_slice(self.rules.variant(), difficulty)));
+        screen_policies(board, self.limits, computation, control, target, policies)
     }
 
-    /// Consume a caller-owned aggregate budget without resetting it between policies or boards.
-    pub fn screen(&self, board: &Board, budget: &mut WorkBudget) -> TrialAssessmentResult {
+    /// Share the caller cancellation signal across policies and boards.
+    pub fn screen(&self, board: &Board, control: &mut ExecutionControl) -> TrialAssessmentResult {
         let variant = self.rules.variant();
-        match self.evaluate(board, budget, None) {
+        match self.evaluate(board, control, None) {
             PolicyScreen::Rated { trial, .. } => TrialAssessmentResult::Rated(trial),
             PolicyScreen::Stalled(_) => {
                 TrialAssessmentResult::Unrated(AssessmentFailure::Ungraded { variant })
             }
             PolicyScreen::Exhausted {
                 stage, difficulty, ..
-            } => TrialAssessmentResult::Unrated(AssessmentFailure::BudgetExhausted {
+            } => TrialAssessmentResult::Unrated(AssessmentFailure::Incomplete {
                 variant,
                 stage,
                 difficulty,
@@ -161,8 +159,8 @@ impl PreparedAssessment {
         }
     }
 
-    pub fn assess(&self, board: &Board, budget: &mut WorkBudget) -> AssessmentResult {
-        match self.screen(board, budget) {
+    pub fn assess(&self, board: &Board, control: &mut ExecutionControl) -> AssessmentResult {
+        match self.screen(board, control) {
             TrialAssessmentResult::Unrated(failure) => AssessmentResult::Unrated(failure),
             TrialAssessmentResult::Rated(trial) => match trial.complete() {
                 Ok(result) => AssessmentResult::Rated(Box::new(result)),
@@ -177,9 +175,9 @@ impl PreparedAssessment {
         &self,
         board: &Board,
         target: Difficulty,
-        budget: &mut WorkBudget,
+        control: &mut ExecutionControl,
     ) -> TargetScreenResult {
-        match self.evaluate(board, budget, Some(target)) {
+        match self.evaluate(board, control, Some(target)) {
             PolicyScreen::Rated { trial, feedback } => {
                 if trial.difficulty() == target {
                     TargetScreenResult::MatchingTarget { trial, feedback }
@@ -188,14 +186,14 @@ impl PreparedAssessment {
                 }
             }
             PolicyScreen::Stalled(feedback) => TargetScreenResult::TargetStalled { feedback },
-            PolicyScreen::Exhausted { cause, .. } => TargetScreenResult::BudgetExhausted { cause },
+            PolicyScreen::Exhausted { cause, .. } => TargetScreenResult::Incomplete { cause },
             PolicyScreen::Invalid(issues) => TargetScreenResult::Invalid { issues },
         }
     }
 }
 
 impl RatedTrial {
-    /// Consume this owned trial and replay statistics without any search or additional charged work.
+    /// Consume this owned trial and replay statistics without repeating search.
     pub fn complete(self) -> CoreResult<RatedAssessment> {
         let workload = summarize_trace(&self.board, &self.rules, &self.trace)?;
 
@@ -221,11 +219,11 @@ fn screen_policies<'policy>(
     board: &Board,
     limits: AssessmentLimits,
     computation: &PreparedComputation,
-    budget: &mut WorkBudget,
+    control: &mut ExecutionControl,
     target: Option<Difficulty>,
     policies: impl IntoIterator<Item = (Difficulty, &'policy [Technique])>,
 ) -> PolicyScreen {
-    let conflicts = evaluate_prepared_conflicts(board, computation, budget);
+    let conflicts = evaluate_prepared_conflicts(board, computation, control);
     if !conflicts.violations.is_empty() {
         return PolicyScreen::Invalid(
             conflicts
@@ -235,9 +233,9 @@ fn screen_policies<'policy>(
                 .collect(),
         );
     }
-    if conflicts.status == ConflictStatus::BudgetExhausted {
+    if conflicts.status == ConflictStatus::Incomplete {
         return PolicyScreen::Exhausted {
-            cause: ExhaustionCause::WorkLimit,
+            cause: ExhaustionCause::Cancelled,
             stage: AssessmentStage::Validation,
             difficulty: None,
         };
@@ -267,15 +265,15 @@ fn screen_policies<'policy>(
             &mut workspace,
             allowed,
             limits.max_steps,
-            budget,
+            control,
             previous_steps,
         );
 
         match result.status {
-            LogicStatus::WorkLimit | LogicStatus::StepLimit => {
+            LogicStatus::Cancelled | LogicStatus::StepLimit => {
                 return PolicyScreen::Exhausted {
-                    cause: if result.status == LogicStatus::WorkLimit {
-                        ExhaustionCause::WorkLimit
+                    cause: if result.status == LogicStatus::Cancelled {
+                        ExhaustionCause::Cancelled
                     } else {
                         ExhaustionCause::LogicalStepLimit
                     },
@@ -348,7 +346,7 @@ mod tests {
             })
             .collect();
         let rules = PuzzleRules::Killer { cages };
-        let mut setup = WorkBudget::new(4000000);
+        let mut setup = ExecutionControl::new();
         let Bounded::Complete(computation) = prepare_computation(&rules, &mut setup).unwrap()
         else {
             panic!("Expected fixture preparation");
@@ -370,7 +368,7 @@ mod tests {
             &board,
             AssessmentLimits::default(),
             &computation,
-            &mut WorkBudget::new(4000000),
+            &mut ExecutionControl::new(),
             None,
             policies
                 .iter()
@@ -383,7 +381,7 @@ mod tests {
             computation.rules(),
             &changed,
             500,
-            &mut WorkBudget::new(4000000),
+            &mut ExecutionControl::new(),
         );
 
         assert_eq!(trial.difficulty(), Difficulty::Medium);
