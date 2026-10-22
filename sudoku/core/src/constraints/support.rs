@@ -91,6 +91,50 @@ fn effective_domain(board: &Board, candidates: &[CandidateMask; BOARD_SIZE], cel
     }
 }
 
+// Strictly increasing paths have no repeat choices. The earliest prefix and latest suffix
+// are sufficient witnesses for each retained digit, including domains with gaps.
+fn thermo_support(
+    board: &Board,
+    candidates: &[CandidateMask; BOARD_SIZE],
+    cells: &[usize],
+    control: &mut ExecutionControl,
+) -> SupportMasksResult {
+    let mut result = SupportMasks {
+        bits: [0; MAX_CONSTRAINT_CELLS],
+        len: cells.len(),
+    };
+    let mut domains = [0_u16; MAX_CONSTRAINT_CELLS];
+    let mut earliest = [0_u32; MAX_CONSTRAINT_CELLS];
+    let mut previous = 0;
+    for (position, &cell) in cells.iter().enumerate() {
+        if !control.check() {
+            return Bounded::Cancelled;
+        }
+        domains[position] = effective_domain(board, candidates, cell);
+        let available = domains[position] & (crate::types::ALL_DIGITS_MASK << previous);
+        if available == 0 {
+            return Bounded::Complete(result);
+        }
+        previous = available.trailing_zeros() + 1;
+        earliest[position] = previous;
+    }
+    let mut next = 10;
+    for position in (0..cells.len()).rev() {
+        if !control.check() {
+            return Bounded::Cancelled;
+        }
+        let available = domains[position] & ((1 << (next - 1)) - 1);
+        if available == 0 {
+            result.bits.fill(0);
+            return Bounded::Complete(result);
+        }
+        next = u16::BITS - available.leading_zeros();
+        let below_minimum = (1 << (earliest[position] - 1)) - 1;
+        result.bits[position] = available & !below_minimum;
+    }
+    Bounded::Complete(result)
+}
+
 fn enumerate(
     board: &Board,
     candidates: &[CandidateMask; BOARD_SIZE],
@@ -99,6 +143,9 @@ fn enumerate(
     control: &mut ExecutionControl,
 ) -> SupportMasksResult {
     let cells = constraint.cells();
+    if matches!(constraint, RuleConstraint::Thermo { .. }) {
+        return thermo_support(board, candidates, cells, control);
+    }
     let mut state = Enumerator {
         constraint,
         domains: [0; MAX_CONSTRAINT_CELLS],

@@ -211,3 +211,94 @@ fn empty_support_domains_preserve_raw_and_fallback_results() {
         }
     }
 }
+
+#[test]
+fn wide_cage_support_keeps_only_compatible_tuple_digits() {
+    use sudoku_core::rules::types::{Cage, PuzzleRules};
+
+    let mut cages = vec![Cage {
+        cells: vec![0, 1, 2, 3],
+        sum: 20,
+    }];
+    cages.extend((4..81).map(|cell| Cage {
+        cells: vec![cell],
+        sum: 1,
+    }));
+    let rules = compile_rules(&PuzzleRules::Killer { cages }).unwrap();
+    let Bounded::Complete(prepared) = prepare_constraint_support(
+        &rules,
+        &mut ExecutionControl::new(),
+        CatalogueLimits::default(),
+    )
+    .unwrap() else {
+        panic!("Expected complete catalogue");
+    };
+    let mut domains = [CandidateMask::ALL; 81];
+    domains[0] = CandidateMask::try_from(1).unwrap();
+
+    let Bounded::Complete(result) = prepared
+        .get(&Board::EMPTY, &domains, 0, &mut ExecutionControl::new())
+        .unwrap()
+    else {
+        panic!("Expected complete support");
+    };
+
+    // With the first digit fixed to one, every digit 2..9 occurs in a distinct triple totaling 19.
+    assert_eq!(
+        result
+            .supports
+            .iter()
+            .map(|mask| mask.bits())
+            .collect::<Vec<_>>(),
+        [1, 510, 510, 510]
+    );
+    domains[1] = CandidateMask::try_from(1).unwrap();
+    let Bounded::Complete(impossible) = prepared
+        .get(&Board::EMPTY, &domains, 0, &mut ExecutionControl::new())
+        .unwrap()
+    else {
+        panic!("Expected complete contradiction");
+    };
+    assert_eq!(impossible.supports, [CandidateMask::EMPTY; 4]);
+}
+
+#[test]
+fn increasing_path_support_retains_feasible_gaps_and_rejects_reversed_domains() {
+    use sudoku_core::constraints::support::get_constraint_support;
+    use sudoku_core::rules::types::PuzzleRules;
+
+    let rules = compile_rules(&PuzzleRules::Thermo {
+        paths: vec![vec![0, 1, 2]],
+    })
+    .unwrap();
+    for (input, expected) in [
+        ([18, 37, 72], [18, 36, 72]), // {2,5}, {1,3,6}, {4,7}: only the middle one is impossible.
+        ([16, 4, 64], [0, 0, 0]),     // Five cannot precede three.
+        ([2, 4, 8], [2, 4, 8]),
+        ([0, 511, 511], [0, 0, 0]),
+    ] {
+        let mut domains = [CandidateMask::ALL; 81];
+        for (cell, mask) in input.into_iter().enumerate() {
+            domains[cell] = CandidateMask::try_from(mask).unwrap();
+        }
+        let Bounded::Complete(result) = get_constraint_support(
+            &Board::EMPTY,
+            &domains,
+            &rules,
+            0,
+            &mut ExecutionControl::new(),
+        )
+        .unwrap() else {
+            panic!("Expected complete path support");
+        };
+
+        assert_eq!(
+            result
+                .supports
+                .iter()
+                .map(|mask| mask.bits())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+}

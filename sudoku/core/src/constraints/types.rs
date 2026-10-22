@@ -76,9 +76,13 @@ pub(crate) type SupportMasksResult = Bounded<SupportMasks>;
 pub type SupportResult = Bounded<SupportSnapshot>;
 pub type CandidateResult = Bounded<[CandidateMask; BOARD_SIZE]>;
 
+// Each block indexes up to 64 complete tuples by position and digit.
+pub(crate) type CageTupleBlock = [[u64; 9]; MAX_CATALOGUE_CELLS];
+
 pub(crate) struct CageCatalogue {
     pub arity: usize,
     pub tuples: Vec<[u16; MAX_CATALOGUE_CELLS]>,
+    pub index: Vec<CageTupleBlock>,
 }
 
 pub(crate) struct SupportLayout {

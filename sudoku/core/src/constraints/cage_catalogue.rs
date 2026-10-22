@@ -1,5 +1,6 @@
 use super::types::{
-    CageCatalogue, MAX_CATALOGUE_CELLS, MAX_CONSTRAINT_CELLS, SupportMasks, SupportMasksResult,
+    CageCatalogue, CageTupleBlock, MAX_CATALOGUE_CELLS, MAX_CONSTRAINT_CELLS, SupportMasks,
+    SupportMasksResult,
 };
 use crate::control::ExecutionControl;
 use crate::types::{Bounded, UNIT_SIZE};
@@ -125,9 +126,27 @@ pub(super) fn compile(
     if builder.overflow {
         return CatalogueResult::Fallback;
     }
+    let mut index: Vec<CageTupleBlock> = vec![];
+    // Tiny catalogues retain the direct scan; indexing them costs more than filtering them.
+    if builder.tuples.len() >= 64 {
+        for tuples in builder.tuples.chunks(64) {
+            if !builder.control.check() {
+                return CatalogueResult::Incomplete;
+            }
+            let mut block = [[0; UNIT_SIZE]; MAX_CATALOGUE_CELLS];
+            for (tuple_index, tuple) in tuples.iter().enumerate() {
+                for position in 0..arity {
+                    block[position][tuple[position].trailing_zeros() as usize] |=
+                        1_u64 << tuple_index;
+                }
+            }
+            index.push(block);
+        }
+    }
     CatalogueResult::Complete(CageCatalogue {
         arity,
         tuples: builder.tuples,
+        index,
     })
 }
 
@@ -141,6 +160,9 @@ pub(super) fn filter(
         bits: [0; MAX_CONSTRAINT_CELLS],
         len: arity,
     };
+    if !catalogue.index.is_empty() {
+        return filter_index(domains, catalogue, control);
+    }
     for tuple in &catalogue.tuples {
         if !control.check() {
             return Bounded::Cancelled;
@@ -159,5 +181,50 @@ pub(super) fn filter(
         }
     }
 
+    Bounded::Complete(supports)
+}
+
+fn filter_index(
+    domains: &[u16],
+    catalogue: &CageCatalogue,
+    control: &mut ExecutionControl,
+) -> SupportMasksResult {
+    let mut supports = SupportMasks {
+        bits: [0; MAX_CONSTRAINT_CELLS],
+        len: catalogue.arity,
+    };
+    for block in &catalogue.index {
+        if !control.check() {
+            return Bounded::Cancelled;
+        }
+        let mut compatible = u64::MAX;
+        for (position, &domain) in domains.iter().enumerate() {
+            let mut permitted = 0;
+            let mut remaining = domain;
+            while remaining != 0 {
+                let digit = remaining.trailing_zeros() as usize;
+                remaining &= remaining - 1;
+                permitted |= block[position][digit];
+            }
+            compatible &= permitted;
+            if compatible == 0 {
+                break;
+            }
+        }
+        if compatible == 0 {
+            continue;
+        }
+        for (position, &domain) in domains.iter().enumerate() {
+            let mut remaining = domain & !supports.bits[position];
+            while remaining != 0 {
+                let digit = remaining.trailing_zeros() as usize;
+                let bit = 1 << digit;
+                remaining &= remaining - 1;
+                if block[position][digit] & compatible != 0 {
+                    supports.bits[position] |= bit;
+                }
+            }
+        }
+    }
     Bounded::Complete(supports)
 }
