@@ -63,3 +63,9 @@ PLAYWRIGHT_USE_PREBUILT=1 pnpm test:e2e
 For setup, browser installation and disposable test output locations, see [development](development.md). For Android checks and the opt-in backup reimport test, see [Android build](android/build.md).
 
 Deadline regressions use controlled clocks or cancellation signals rather than CPU speed assumptions. Keep queueing, initialization, execution, late-result disposal and input atomicity observable. Sealed V11 generation fixtures continue to validate historical puzzle mathematics; V12 generation tests use independent solution/trace checks and deterministic repeat comparisons, without regenerating old expected outputs.
+
+## Performance comparisons
+
+Run `cargo run -p sudoku-core --release --locked --example performance -- 16 3` from the repository root. The two arguments select fixed byte-seed count and repetitions. The example covers every supported variant/difficulty pair, measures generation and full assessment separately, and applies a three-second host probe to each operation. It prints JSON lines with totals, median/p95 latency, completion/cancellation counts and a digest of completed generation results and assessment traces.
+
+Build separate baseline and candidate executables with the same toolchain and profile, then alternate them without concurrent builds or test runners. Compare completion counts and digests before interpreting timings. Digests establish output consistency only; sealed native fixtures and independent mathematical validators still establish correctness. The clock-per-check native probe is not Android device timing. Measure the rebuilt WASM adapter and actual Workers separately, retaining the same request deadline.
