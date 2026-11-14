@@ -99,7 +99,11 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
         throw new Error('Missing sum or candidate geometry')
       }
 
-      expect(sum.y + sum.height).toBeLessThanOrEqual(notes.y + 1)
+      // Firefox rounds SVG text and CSS grid boxes differently at fractional positions.
+      const maximumClueOverlap = 1
+      const geometryRoundingAllowance = 0.05
+      const maximumClueBottom = notes.y + maximumClueOverlap + geometryRoundingAllowance
+      expect(sum.y + sum.height).toBeLessThanOrEqual(maximumClueBottom)
       const lastNote = await cell.locator('.notes span').last().boundingBox()
       const cellBox = await cell.boundingBox()
       if (!lastNote || !cellBox) {
