@@ -72,7 +72,11 @@ class HomeStartupTest {
             assertTrue("Home never became visible", sampled.await(15, TimeUnit.SECONDS))
             scenario.onActivity {
                 frames.forEach { bounds ->
-                    assertEquals("Every Home frame must use the final safe area", frames.last(), bounds)
+                    assertEquals(
+                        "Every Home frame must use the final safe area",
+                        frames.last(),
+                        bounds
+                    )
                 }
             }
         }

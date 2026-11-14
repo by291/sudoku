@@ -28,7 +28,10 @@ internal fun <T : Any> PlayerNavDisplay(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    val scenes = rememberSceneState(entries, listOf(SinglePaneSceneStrategy()), onBack = { scope.launch { onBack() } })
+    val scenes =
+        rememberSceneState(entries, listOf(SinglePaneSceneStrategy()), onBack = {
+            scope.launch { onBack() }
+        })
     val navigationState = rememberNavigationEventState(scenes)
     val owner = rememberNavigationEventDispatcherOwner(parent = null)
     val input = remember { SceneBackInput() }

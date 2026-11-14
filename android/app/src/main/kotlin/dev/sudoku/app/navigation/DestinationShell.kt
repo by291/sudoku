@@ -66,7 +66,11 @@ internal fun DestinationShell(
                                 Modifier.size(24.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
-                            Text("一格一念", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "一格一念",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     } else {
                         Text(
@@ -81,17 +85,23 @@ internal fun DestinationShell(
                 },
                 navigationIcon = {
                     if (current != AppRoute.Home) {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回首页") }
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回首页")
+                        }
                     }
                 },
                 actions = {
                     if (current == AppRoute.Home) {
-                        IconButton(onClick = { themeOpen = true }) { Icon(Icons.Outlined.Palette, "界面主题") }
+                        IconButton(onClick = {
+                            themeOpen = true
+                        }) { Icon(Icons.Outlined.Palette, "界面主题") }
                     } else if (current == AppRoute.Records) {
                         TextButton(onClick = onRecordsBackup) { Text("备份") }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         }
     ) { padding ->

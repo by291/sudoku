@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -50,6 +53,71 @@ internal fun SudokuApp(activity: MainActivity) {
     val model: AppViewModel = hiltViewModel()
     val state by model.uiState.collectAsStateWithLifecycle()
     val backStack = rememberNavBackStack(AppRoute.Home)
+
+    LaunchedEffect(state.ready) {
+        if (state.ready) {
+            withFrameNanos { }
+            model.maintainSummaries()
+        }
+    }
+
+    val showStartupProgress = rememberDelayedProgress(!state.ready && state.loading)
+
+    SudokuTheme(state.settings.theme) {
+        // Subscribe before Scaffold so the first Home frame has real system insets.
+        val startupInsets = WindowInsets.safeDrawing
+        val lightBackground = MaterialTheme.colorScheme.background.luminance() > 0.5f
+        SideEffect { activity.setSystemBarAppearance(lightBackground) }
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            if (!state.ready) {
+                StartupContent(
+                    StartupPresentation(
+                        state = state,
+                        showProgress = showStartupProgress,
+                        insets = startupInsets,
+                        onRetry = model::retry
+                    )
+                )
+            } else {
+                AppDestinations(model, state, backStack)
+            }
+        }
+    }
+}
+
+private data class StartupPresentation(
+    val state: AppUiState,
+    val showProgress: Boolean,
+    val insets: WindowInsets,
+    val onRetry: () -> Unit
+)
+
+@Composable
+private fun StartupContent(presentation: StartupPresentation) {
+    val (state, showProgress, insets, onRetry) = presentation
+    Column(
+        Modifier.fillMaxSize().windowInsetsPadding(insets).padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (showProgress) {
+            CircularProgressIndicator()
+        }
+        if (state.error != null || showProgress) {
+            Text(state.error ?: "正在准备首页…", Modifier.padding(vertical = 24.dp))
+        }
+        if (!state.loading) {
+            Button(onClick = onRetry) { Text("重试") }
+        }
+    }
+}
+
+@Composable
+private fun AppDestinations(
+    model: AppViewModel,
+    state: AppUiState,
+    backStack: NavBackStack<NavKey>
+) {
     val scope = rememberCoroutineScope()
     val gameBackActions = remember { mutableMapOf<AppRoute.Game, suspend () -> Boolean>() }
 
@@ -70,145 +138,117 @@ internal fun SudokuApp(activity: MainActivity) {
 
     fun back() {
         val current = backStack.lastOrNull() as? AppRoute
-        if (current != null && current != AppRoute.Home) {
-            if (current.isPrimaryDestination) {
-                primary(AppRoute.Home)
-            } else {
-                backStack.removeLastOrNull()
-            }
+        if (current == null || current == AppRoute.Home) {
+            return
+        }
+
+        if (current.isPrimaryDestination) {
+            primary(AppRoute.Home)
+        } else {
+            backStack.removeLastOrNull()
         }
     }
 
-    LaunchedEffect(state.ready) {
-        if (state.ready) {
-            androidx.compose.runtime.withFrameNanos { }
-            model.maintainSummaries()
-        }
-    }
-
-    val showStartupProgress = rememberDelayedProgress(!state.ready && state.loading)
-
-    SudokuTheme(state.settings.theme) {
-        // Subscribe during bootstrap so the first destination is measured with real system insets.
-        // Creating the subscription only inside Scaffold otherwise draws Home once with zero insets.
-        val startupInsets = WindowInsets.safeDrawing
-        val lightBackground = MaterialTheme.colorScheme.background.luminance() > 0.5f
-        SideEffect { activity.setSystemBarAppearance(lightBackground) }
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (!state.ready) {
-                Column(
-                    Modifier.fillMaxSize().windowInsetsPadding(startupInsets).padding(32.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+    val entries = rememberDecoratedNavEntries(
+        backStack = backStack,
+        entryDecorators = listOf(
+            rememberSaveableStateHolderNavEntryDecorator(),
+            rememberViewModelStoreNavEntryDecorator()
+        ),
+        entryProvider = entryProvider {
+            entry<AppRoute.Home> {
+                DestinationShell(
+                    AppRoute.Home,
+                    state.settings.theme,
+                    state.error,
+                    ::back,
+                    model::setTheme,
+                    model::retry
                 ) {
-                    if (showStartupProgress) CircularProgressIndicator()
-                    if (state.error != null || showStartupProgress) {
-                        Text(state.error ?: "正在准备首页…", Modifier.padding(vertical = 24.dp))
-                    }
-                    if (!state.loading) Button(onClick = model::retry) { Text("重试") }
+                    HomeRoute(
+                        onPlay = { backStack.add(AppRoute.Game(it)) },
+                        onLearning = { primary(AppRoute.Learning) },
+                        onRecords = { primary(AppRoute.Records) }
+                    )
                 }
-            } else {
-                val entries = rememberDecoratedNavEntries(
-                    backStack = backStack,
-                    entryDecorators = listOf(
-                        rememberSaveableStateHolderNavEntryDecorator(),
-                        rememberViewModelStoreNavEntryDecorator()
-                    ),
-                    entryProvider = entryProvider {
-                        entry<AppRoute.Home> {
-                            DestinationShell(
-                                AppRoute.Home,
-                                state.settings.theme,
-                                state.error,
-                                ::back,
-                                model::setTheme,
-                                model::retry
-                            ) {
-                                HomeRoute(
-                                    onPlay = { backStack.add(AppRoute.Game(it)) },
-                                    onLearning = { primary(AppRoute.Learning) },
-                                    onRecords = { primary(AppRoute.Records) }
-                                )
-                            }
-                        }
-                        entry<AppRoute.Learning> {
-                            DestinationShell(
-                                AppRoute.Learning,
-                                state.settings.theme,
-                                state.error,
-                                ::back,
-                                model::setTheme,
-                                model::retry
-                            ) {
-                                LearningRoute(onOpenLesson = { backStack.add(AppRoute.Lesson(it)) })
-                            }
-                        }
-                        entry<AppRoute.Records> {
-                            var backupOpen by rememberSaveable { mutableStateOf(false) }
-                            DestinationShell(
-                                AppRoute.Records,
-                                state.settings.theme,
-                                state.error,
-                                ::back,
-                                model::setTheme,
-                                model::retry,
-                                onRecordsBackup = { backupOpen = true }
-                            ) {
-                                RecordsRoute(
-                                    onResume = { backStack.add(AppRoute.Game(it)) },
-                                    onDatasetReplaced = { scope.launch { model.reloadSettings() } },
-                                    backupOpen = backupOpen,
-                                    onDismissBackup = { backupOpen = false }
-                                )
-                            }
-                        }
-                        entry<AppRoute.Lesson> { route ->
-                            LessonRoute(
-                                route.lessonId,
-                                onPractice = { backStack.add(AppRoute.Game(it)) },
-                                onBack = ::back
-                            )
-                        }
-                        entry<AppRoute.Game> { route ->
-                            GameRoute(
-                                route.launch,
-                                onLeave = ::back,
-                                onRecords = { primary(AppRoute.Records) },
-                                registerBackAction = { action ->
-                                    if (action == null) {
-                                        gameBackActions.remove(route)
-                                    } else {
-                                        gameBackActions[route] = action
-                                    }
-                                }
-                            )
-                        }
-                    }
+            }
+            entry<AppRoute.Learning> {
+                DestinationShell(
+                    AppRoute.Learning,
+                    state.settings.theme,
+                    state.error,
+                    ::back,
+                    model::setTheme,
+                    model::retry
+                ) {
+                    LearningRoute(onOpenLesson = { backStack.add(AppRoute.Lesson(it)) })
+                }
+            }
+            entry<AppRoute.Records> {
+                var backupOpen by rememberSaveable { mutableStateOf(false) }
+                DestinationShell(
+                    AppRoute.Records,
+                    state.settings.theme,
+                    state.error,
+                    ::back,
+                    model::setTheme,
+                    model::retry,
+                    onRecordsBackup = { backupOpen = true }
+                ) {
+                    RecordsRoute(
+                        onResume = { backStack.add(AppRoute.Game(it)) },
+                        onDatasetReplaced = { scope.launch { model.reloadSettings() } },
+                        backupOpen = backupOpen,
+                        onDismissBackup = { backupOpen = false }
+                    )
+                }
+            }
+            entry<AppRoute.Lesson> { route ->
+                LessonRoute(
+                    route.lessonId,
+                    onPractice = { backStack.add(AppRoute.Game(it)) },
+                    onBack = ::back
                 )
-                // Retain visited roots for filters/scroll, but expose only Home and the active
-                // workflow to Back. Hidden roots must never appear in predictive Back previews.
-                val activeRootIndex = backStack.indexOfLast { (it as? AppRoute)?.isPrimaryDestination == true }
-                val activeEntries = entries.drop(activeRootIndex)
-                val visibleEntries = if (backStack[activeRootIndex] == AppRoute.Home) {
-                    activeEntries
-                } else {
-                    listOf(entries[backStack.indexOf(AppRoute.Home)]) + activeEntries
-                }
-                PlayerNavDisplay(
-                    entries = visibleEntries,
-                    onBack = {
-                        val current = backStack.lastOrNull()
-                        val canLeave = current !is AppRoute.Game || gameBackActions[current]?.invoke() == true
-                        if (canLeave && backStack.lastOrNull() == current) {
-                            back()
-                            true
+            }
+            entry<AppRoute.Game> { route ->
+                GameRoute(
+                    route.launch,
+                    onLeave = ::back,
+                    onRecords = { primary(AppRoute.Records) },
+                    registerBackAction = { action ->
+                        if (action == null) {
+                            gameBackActions.remove(route)
                         } else {
-                            false
+                            gameBackActions[route] = action
                         }
-                    },
-                    modifier = Modifier.fillMaxSize()
+                    }
                 )
             }
         }
+    )
+    // Retain visited roots for filters/scroll, but expose only Home and the active
+    // workflow to Back. Hidden roots must never appear in predictive Back previews.
+    val activeRootIndex = backStack.indexOfLast { (it as? AppRoute)?.isPrimaryDestination == true }
+    val activeEntries = entries.drop(activeRootIndex)
+    val visibleEntries = if (backStack[activeRootIndex] == AppRoute.Home) {
+        activeEntries
+    } else {
+        listOf(entries[backStack.indexOf(AppRoute.Home)]) + activeEntries
     }
+    PlayerNavDisplay(
+        entries = visibleEntries,
+        onBack = {
+            val current = backStack.lastOrNull()
+            val canLeave = current !is AppRoute.Game || gameBackActions[current]?.invoke() == true
+
+            // A newer destination must not be popped by an older save-before-leave operation.
+            if (!canLeave || backStack.lastOrNull() != current) {
+                false
+            } else {
+                back()
+                true
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }

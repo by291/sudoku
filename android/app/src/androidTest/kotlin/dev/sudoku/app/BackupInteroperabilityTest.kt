@@ -33,7 +33,9 @@ class BackupInteroperabilityTest {
     @Test
     fun actualWebExportPassesAndroidRustValidationAndExportsEquivalentFacts() = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val source = instrumentation.context.assets.open("interop/web-backup-v1.json").bufferedReader().use {
+        val source = instrumentation.context.assets.open(
+            "interop/web-backup-v1.json"
+        ).bufferedReader().use {
             it.readText()
         }
         val preview = repository.previewBackup(source)
@@ -61,6 +63,9 @@ class BackupInteroperabilityTest {
         assertEquals(19, exported.value.backup.sessions.size)
         assertEquals(20, exported.value.backup.results.size)
         // Host verification restores this actual device-written output through the Web decoder.
-        File(instrumentation.targetContext.filesDir, "android-roundtrip-v1.json").writeText(exported.value.text)
+        File(
+            instrumentation.targetContext.filesDir,
+            "android-roundtrip-v1.json"
+        ).writeText(exported.value.text)
     }
 }

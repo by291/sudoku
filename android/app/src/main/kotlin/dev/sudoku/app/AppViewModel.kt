@@ -3,6 +3,7 @@ package dev.sudoku.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.sudoku.app.model.GameReadRepository
 import dev.sudoku.app.model.GameRepository
 import dev.sudoku.app.model.Settings
 import dev.sudoku.app.model.SettingsUpdate
@@ -31,17 +32,20 @@ internal data class ThemeFailure(val requested: ThemePreference, val message: St
 @HiltViewModel
 internal class AppViewModel @Inject constructor(
     private val repository: GameRepository,
-    private val reads: dev.sudoku.app.model.GameReadRepository
+    private val reads: GameReadRepository
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(AppUiState())
     val uiState = mutableState.asStateFlow()
 
     private val settingsWrites = Mutex()
+    private var settingsGeneration = 0L
+    private var activeEpoch: Long? = null
 
     init {
         loadBootstrap()
     }
 
+    /** Retry the failed bootstrap or the last requested theme. */
     fun retry() {
         val failedTheme = mutableState.value.themeFailure
         if (failedTheme != null) {
@@ -52,14 +56,24 @@ internal class AppViewModel @Inject constructor(
     }
 
     private fun loadBootstrap() {
+        val generation = ++settingsGeneration
         viewModelScope.launch {
             mutableState.value = mutableState.value.copy(loading = true, bootstrapError = null)
-            when (val snapshot = reads.readBootstrap()) {
-                is StorageOutcome.Success -> mutableState.value = AppUiState(
-                    ready = true,
-                    loading = false,
-                    settings = snapshot.value.settings
-                )
+
+            val snapshot = reads.readBootstrap()
+            if (generation != settingsGeneration) {
+                return@launch
+            }
+
+            when (snapshot) {
+                is StorageOutcome.Success -> {
+                    activeEpoch = snapshot.value.epoch
+                    mutableState.value = AppUiState(
+                        ready = true,
+                        loading = false,
+                        settings = snapshot.value.settings
+                    )
+                }
                 is StorageOutcome.Failure -> mutableState.value = mutableState.value.copy(
                     loading = false,
                     bootstrapError = "本机数据暂时无法读取，请重试。原有进度已保留。"
@@ -73,35 +87,58 @@ internal class AppViewModel @Inject constructor(
         reads.backfill()
     }
 
+    /** Load restored settings and prevent older writes from publishing into the new dataset. */
     suspend fun reloadSettings() {
-        when (val result = reads.readBootstrap()) {
-            is StorageOutcome.Success ->
-                mutableState.value =
-                    mutableState.value.copy(settings = result.value.settings, bootstrapError = null)
-            is StorageOutcome.Failure ->
-                mutableState.value =
-                    mutableState.value.copy(bootstrapError = "设置读取失败：${result.error.message}")
+        val generation = ++settingsGeneration
+
+        settingsWrites.withLock {
+            val result = reads.readBootstrap()
+            if (generation != settingsGeneration) {
+                return@withLock
+            }
+
+            when (result) {
+                is StorageOutcome.Success -> {
+                    activeEpoch = result.value.epoch
+                    mutableState.value = mutableState.value.copy(
+                        settings = result.value.settings,
+                        bootstrapError = null,
+                        themeFailure = null
+                    )
+                }
+                is StorageOutcome.Failure -> {
+                    mutableState.value = mutableState.value.copy(
+                        bootstrapError = "设置读取失败：${result.error.message}"
+                    )
+                }
+            }
         }
     }
 
+    /** Apply a theme patch only to the dataset from which the action was requested. */
     fun setTheme(theme: ThemePreference) {
+        val generation = settingsGeneration
+        val expectedEpoch = activeEpoch
+
         viewModelScope.launch {
             settingsWrites.withLock {
-                val epoch = repository.readDatasetEpoch()
-                if (epoch !is StorageOutcome.Success) {
-                    mutableState.value = mutableState.value.copy(themeFailure = ThemeFailure(theme, "设置暂时不可保存，请重试。"))
+                if (generation != settingsGeneration || expectedEpoch == null) {
                     return@withLock
                 }
 
-                when (val result = repository.updateSettings(SettingsUpdate.Theme(theme), epoch.value)) {
+                // Storage patches just the theme. The captured epoch rejects a restored dataset.
+                val result = repository.updateSettings(SettingsUpdate.Theme(theme), expectedEpoch)
+                if (generation != settingsGeneration) {
+                    return@withLock
+                }
+
+                mutableState.value = when (result) {
                     is StorageOutcome.Success ->
-                        mutableState.value =
-                            mutableState.value.copy(settings = result.value, themeFailure = null)
+                        mutableState.value.copy(settings = result.value, themeFailure = null)
                     is StorageOutcome.Failure ->
-                        mutableState.value =
-                            mutableState.value.copy(
-                                themeFailure = ThemeFailure(theme, "设置保存失败：${result.error.message}")
-                            )
+                        mutableState.value.copy(
+                            themeFailure = ThemeFailure(theme, "设置保存失败：${result.error.message}")
+                        )
                 }
             }
         }

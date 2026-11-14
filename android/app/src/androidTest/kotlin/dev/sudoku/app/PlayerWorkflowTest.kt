@@ -62,7 +62,9 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
-/** Uses the packaged ARM library and Room through the same application composition as the player. */
+/**
+ * Uses the packaged ARM library and Room through the same application composition as the player.
+ */
 @HiltAndroidTest
 @UninstallModules(EngineModule::class)
 class PlayerWorkflowTest {
@@ -104,8 +106,19 @@ class PlayerWorkflowTest {
                 "00".repeat(32),
                 "sudoku-v11"
             )
-            val session = createSession(puzzle, SessionMetadata.Free, "player-workflow", "2026-10-16T00:00:00.000Z")
-            val token = (repository.claimEditor(session.id, "instrumentation-fixture") as StorageOutcome.Success).value
+            val session =
+                createSession(
+                    puzzle,
+                    SessionMetadata.Free,
+                    "player-workflow",
+                    "2026-10-16T00:00:00.000Z"
+                )
+            val token = (
+                repository.claimEditor(
+                    session.id,
+                    "instrumentation-fixture"
+                ) as StorageOutcome.Success
+                ).value
             assertTrue(repository.writeSession(session, 0, token) is StorageOutcome.Success)
             assertTrue(repository.releaseEditor(token) is StorageOutcome.Success)
         }
@@ -126,7 +139,9 @@ class PlayerWorkflowTest {
         val boardBefore = compose.onNodeWithTag("cell-0").getUnclippedBoundsInRoot()
 
         activity?.onActivity {
-            it.onBackPressedDispatcher.dispatchOnBackStarted(BackEventCompat(0f, 600f, 0f, BackEventCompat.EDGE_LEFT))
+            it.onBackPressedDispatcher.dispatchOnBackStarted(
+                BackEventCompat(0f, 600f, 0f, BackEventCompat.EDGE_LEFT)
+            )
             it.onBackPressedDispatcher.dispatchOnBackProgressed(
                 BackEventCompat(240f, 600f, 0.5f, BackEventCompat.EDGE_LEFT)
             )
@@ -169,25 +184,45 @@ class PlayerWorkflowTest {
             compose.onNodeWithText("继续上次").performClick()
             compose.waitUntil(20_000) { controlledEngine.preparationHeld }
             compose.waitForIdle()
-            val boardBefore = compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            val boardBefore = compose.onNodeWithTag(
+                "game-board-workspace"
+            ).getUnclippedBoundsInRoot()
             val keyBefore = compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
             compose.onNodeWithContentDescription("填入数字2").assertIsNotEnabled()
             compose.onNodeWithTag("cell-0").assertDoesNotExist()
 
             awaitText("正在准备对局…")
-            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
-            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+            assertEquals(
+                boardBefore,
+                compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            )
+            assertEquals(
+                keyBefore,
+                compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
+            )
 
             gate.complete(Unit)
             controlledEngine.preparationGate = null
             awaitText("继续对局")
-            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
-            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+            assertEquals(
+                boardBefore,
+                compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            )
+            assertEquals(
+                keyBefore,
+                compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
+            )
 
             compose.onNodeWithText("继续对局").performClick()
             compose.onNodeWithTag("cell-0").assertIsDisplayed()
-            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
-            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+            assertEquals(
+                boardBefore,
+                compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            )
+            assertEquals(
+                keyBefore,
+                compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
+            )
         } finally {
             gate.complete(Unit)
             controlledEngine.preparationGate = null
@@ -201,20 +236,34 @@ class PlayerWorkflowTest {
         try {
             compose.onNodeWithText("继续上次").performClick()
             awaitText("正在准备对局…")
-            val boardBefore = compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            val boardBefore = compose.onNodeWithTag(
+                "game-board-workspace"
+            ).getUnclippedBoundsInRoot()
             val keyBefore = compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
 
             compose.onNodeWithText("取消").performClick()
             awaitText("已取消准备，现有进度保持不变。")
-            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
-            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+            assertEquals(
+                boardBefore,
+                compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            )
+            assertEquals(
+                keyBefore,
+                compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
+            )
 
             gate.complete(Unit)
             controlledEngine.preparationGate = null
             compose.onNodeWithText("重试").performClick()
             awaitText("继续对局")
-            assertEquals(boardBefore, compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot())
-            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot())
+            assertEquals(
+                boardBefore,
+                compose.onNodeWithTag("game-board-workspace").getUnclippedBoundsInRoot()
+            )
+            assertEquals(
+                keyBefore,
+                compose.onNodeWithContentDescription("填入数字2").getUnclippedBoundsInRoot()
+            )
         } finally {
             gate.complete(Unit)
             controlledEngine.preparationGate = null
@@ -318,7 +367,9 @@ class PlayerWorkflowTest {
             compose.onAllNodesWithText("正在检查当前棋盘规则…").fetchSemanticsNodes().isEmpty()
         }
         val boardBefore = compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot
-        val keyBefore = compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot
+        val keyBefore = compose.onNodeWithContentDescription(
+            "填入数字2"
+        ).fetchSemanticsNode().boundsInRoot
         val gate = CompletableDeferred<Unit>()
         controlledEngine.conflictGate = gate
 
@@ -327,15 +378,24 @@ class PlayerWorkflowTest {
             compose.onNodeWithContentDescription("填入数字2").performClick()
             awaitText("正在检查当前棋盘规则…")
 
-            assertEquals(boardBefore, compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot)
-            assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot)
+            assertEquals(
+                boardBefore,
+                compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot
+            )
+            assertEquals(
+                keyBefore,
+                compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot
+            )
         } finally {
             gate.complete(Unit)
             controlledEngine.conflictGate = null
         }
         awaitDescription("冲突", substring = true)
         assertEquals(boardBefore, compose.onNodeWithTag("cell-0").fetchSemanticsNode().boundsInRoot)
-        assertEquals(keyBefore, compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            keyBefore,
+            compose.onNodeWithContentDescription("填入数字2").fetchSemanticsNode().boundsInRoot
+        )
 
         compose.onNodeWithContentDescription("擦除").performClick()
         awaitDescription("第1行第1列，空格", substring = true)
@@ -622,7 +682,12 @@ class PlayerWorkflowTest {
                 "2026-10-14T07:00:00.000Z"
             )
             for (session in listOf(daily, lesson)) {
-                val token = (repository.claimEditor(session.id, "save-picker-fixture") as StorageOutcome.Success).value
+                val token = (
+                    repository.claimEditor(
+                        session.id,
+                        "save-picker-fixture"
+                    ) as StorageOutcome.Success
+                    ).value
                 assertTrue(repository.writeSession(session, 0, token) is StorageOutcome.Success)
                 assertTrue(repository.releaseEditor(token) is StorageOutcome.Success)
             }
@@ -648,7 +713,9 @@ class PlayerWorkflowTest {
         compose.onNodeWithText("继续上次").performScrollTo().performClick()
         awaitText("普通对局")
         compose.onNodeWithTag("continue-saves").performScrollToNode(hasText("2026-10-15 · 正式"))
-        val dailyRow = compose.onNodeWithTag("continue-save-${dailyFormalId("2026-10-15", Variant.CLASSIC)}")
+        val dailyRow = compose.onNodeWithTag(
+            "continue-save-${dailyFormalId("2026-10-15", Variant.CLASSIC)}"
+        )
         val listBounds = compose.onNodeWithTag("continue-saves").fetchSemanticsNode().boundsInRoot
         val rowBounds = dailyRow.fetchSemanticsNode().boundsInRoot
         assertEquals(listBounds.left, rowBounds.left)
@@ -665,7 +732,10 @@ class PlayerWorkflowTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
-            File(instrumentation.targetContext.getExternalFilesDir(null), "save-picker.png").outputStream().use {
+            File(
+                instrumentation.targetContext.getExternalFilesDir(null),
+                "save-picker.png"
+            ).outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
             }
         } finally {
@@ -703,7 +773,10 @@ class PlayerWorkflowTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
-            File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png").outputStream().use {
+            File(
+                instrumentation.targetContext.getExternalFilesDir(null),
+                "$name.png"
+            ).outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
             }
         } finally {
@@ -720,12 +793,15 @@ class PlayerWorkflowTest {
     }
 
     private fun awaitText(text: String) {
-        compose.waitUntil(20_000) { compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(20_000) {
+            compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }
 
 /** Gates native work so pending UI and loaded geometry can be compared deterministically. */
-private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEngine()) : SudokuEngine by native {
+private class ConflictGateEngine(private val native: SudokuEngine = RustSudokuEngine()) :
+    SudokuEngine by native {
     @Volatile var conflictGate: CompletableDeferred<Unit>? = null
 
     @Volatile var conflictHeld: Boolean = false

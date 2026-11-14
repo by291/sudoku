@@ -83,7 +83,12 @@ class StartupProgressTest {
                 "sudoku-v11"
             )
             val sessions = listOf(
-                createSession(puzzle, SessionMetadata.Free, "startup-free", "2026-10-16T00:00:00.000Z"),
+                createSession(
+                    puzzle,
+                    SessionMetadata.Free,
+                    "startup-free",
+                    "2026-10-16T00:00:00.000Z"
+                ),
                 createSession(
                     puzzle,
                     SessionMetadata.Daily(today, true),
@@ -92,7 +97,12 @@ class StartupProgressTest {
                 )
             )
             sessions.forEach { session ->
-                val token = (repository.claimEditor(session.id, "startup-fixture") as StorageOutcome.Success).value
+                val token = (
+                    repository.claimEditor(
+                        session.id,
+                        "startup-fixture"
+                    ) as StorageOutcome.Success
+                    ).value
                 assertTrue(repository.writeSession(session, 0, token) is StorageOutcome.Success)
                 assertTrue(repository.releaseEditor(token) is StorageOutcome.Success)
             }
