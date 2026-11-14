@@ -111,7 +111,11 @@ const feedbackSummary = computed(() => {
 const feedbackTheme = computed<CardProps['themeOverrides']>(() =>
   correct.value
     ? undefined
-    : { color: 'var(--error-soft)', borderColor: 'var(--error)', textColor: 'var(--error)' },
+    : {
+        color: 'var(--error-soft)',
+        borderColor: 'var(--error)',
+        textColor: 'var(--error)',
+      },
 )
 const primaryActionLabel = computed(() => {
   if (inGuide.value) {
@@ -360,7 +364,7 @@ h1 {
 }
 .lesson-workspace {
   margin-top: 20px;
-  /* The outer extent preserves scroll range; moving inner explanations must not become scroll anchors. */
+  /* The outer extent preserves the scroll range. Moving explanations cannot anchor it. */
   overflow-anchor: none;
 }
 .lesson-layout {

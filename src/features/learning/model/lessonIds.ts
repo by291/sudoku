@@ -36,15 +36,18 @@ export const LESSON_IDS = [
   'arrow-combined',
 ] as const
 
+/** Check whether an ID identifies a known lesson. */
 export function isLessonId(value: unknown): value is (typeof LESSON_IDS)[number] {
   return LESSON_IDS.some((id) => id === value)
 }
 
+/** Return the number of authored stages for a lesson ID. */
 export function lessonStageCount(id: string): number {
   return id.endsWith('-combined') ? 6 : 2
 }
 
 /** Stable course IDs own navigation metadata independently of exercise construction. */
+/** Look up the practice variant for a known lesson ID. */
 export function lessonVariant(id: unknown): SudokuVariant | null {
   if (!isLessonId(id)) {
     return null

@@ -11,6 +11,7 @@ import { LESSON_DIRECTORY } from '@/features/learning/model/lessonDirectory'
 import { createLessonContentLoader } from '@/features/learning/model/lessonContent'
 import type { ExerciseSubmissionResult, Lesson } from '@/features/learning/model/lessons'
 
+/** Own lesson selection and committed exercise progress for the current dataset. */
 export const useLearningStore = defineStore('learning', () => {
   const runtime = useGameRuntime()
   const directory = LESSON_DIRECTORY
@@ -27,6 +28,7 @@ export const useLearningStore = defineStore('learning', () => {
     if (selectedLesson.value?.id !== id) {
       selectedLesson.value = undefined
     }
+
     contentError.value = null
     contentLoading.value = true
 
@@ -77,9 +79,11 @@ export const useLearningStore = defineStore('learning', () => {
         awaitingPreferencesReload = true
         return
       }
+
       if (nextEpoch === null) {
         return
       }
+
       if (awaitingPreferencesReload) {
         awaitingPreferencesReload = false
         void load()
@@ -112,9 +116,11 @@ export const useLearningStore = defineStore('learning', () => {
 
     try {
       await preferences.load()
+
       if (current !== operation) {
         return
       }
+
       if (preferences.error) {
         error.value = '学习设置尚未读取，请重试。'
         return
@@ -127,7 +133,6 @@ export const useLearningStore = defineStore('learning', () => {
 
       if (!fence.ok) {
         error.value = '学习进度读取失败，请重试。'
-
         return
       }
 
@@ -163,6 +168,7 @@ export const useLearningStore = defineStore('learning', () => {
     return exerciseStages.value[id] ?? 0
   }
 
+  /** Check the current exercise answer and publish advancement only after its write commits. */
   async function submitExercise(
     id: string,
     answer: ExerciseAnswer['expected'],
@@ -178,6 +184,7 @@ export const useLearningStore = defineStore('learning', () => {
       'cell' in answer
         ? { cell: answer.cell, digit: answer.digit }
         : answer.map((pair) => ({ cell: pair.cell, digit: pair.digit }))
+
     let lesson: Lesson
     try {
       lesson = await content.load(id)
@@ -204,26 +211,35 @@ export const useLearningStore = defineStore('learning', () => {
     }
 
     if (stageIndex < stages.length - 1) {
-      return advanceExercise(id, stageIndex, current, result.explanation)
+      return advanceExercise({
+        lessonId: id,
+        stageIndex,
+        operation: current,
+        explanation: result.explanation,
+      })
     }
 
     return completeExercise(id, current, result.explanation)
   }
 
-  async function advanceExercise(
-    id: string,
-    stageIndex: number,
-    current: number,
-    explanation: string,
-  ): Promise<ExerciseSubmissionResult> {
-    const next = { ...exerciseStages.value, [id]: stageIndex + 1 }
+  async function advanceExercise(request: {
+    lessonId: string
+    stageIndex: number
+    operation: number
+    explanation: string
+  }): Promise<ExerciseSubmissionResult> {
+    const { lessonId, stageIndex, operation: current, explanation } = request
+    const next = { ...exerciseStages.value, [lessonId]: stageIndex + 1 }
+
     const saved = await preferences.update(
       { lessonStages: next },
       { optimistic: false, expectedEpoch: datasetEpoch ?? undefined },
     )
+
     if (current !== operation) {
       return { kind: 'cancelled', explanation }
     }
+
     if (!saved) {
       error.value = '答题正确，但阶段尚未保存。请再次提交以重试。'
       return { kind: 'save-failed', explanation }
@@ -236,39 +252,54 @@ export const useLearningStore = defineStore('learning', () => {
     return { kind: 'advance', explanation }
   }
 
+  async function persistCompletion(id: string, current: number, explanation: string) {
+    if (progress.value.some((item) => item.lessonId === id)) {
+      return null
+    }
+
+    if (datasetEpoch === null) {
+      const fence = await runtime.repository.readDatasetEpoch()
+      if (current !== operation) {
+        return { kind: 'cancelled', explanation } as const
+      }
+      if (!fence.ok) {
+        error.value = '答题正确，但进度尚未保存。请再次提交以重试。'
+        return { kind: 'save-failed', explanation } as const
+      }
+
+      datasetEpoch = fence.value
+    }
+
+    const completed = { lessonId: id, completedAt: runtime.wallNow().toISOString() }
+    const saved = await runtime.repository.writeLessonProgress(completed, datasetEpoch)
+
+    if (current !== operation) {
+      return { kind: 'cancelled', explanation } as const
+    }
+    if (!saved.ok) {
+      error.value = '答题正确，但进度尚未保存。请再次提交以重试。'
+      return { kind: 'save-failed', explanation } as const
+    }
+
+    if (!progress.value.some((item) => item.lessonId === id)) {
+      progress.value = [...progress.value, completed]
+    }
+    error.value = null
+
+    return null
+  }
+
   async function completeExercise(
     id: string,
     current: number,
     explanation: string,
   ): Promise<ExerciseSubmissionResult> {
-    if (!progress.value.some((item) => item.lessonId === id)) {
-      if (datasetEpoch === null) {
-        const fence = await runtime.repository.readDatasetEpoch()
-        if (current !== operation) {
-          return { kind: 'cancelled', explanation }
-        }
-        if (!fence.ok) {
-          error.value = '答题正确，但进度尚未保存。请再次提交以重试。'
-          return { kind: 'save-failed', explanation }
-        }
-
-        datasetEpoch = fence.value
-      }
-
-      const completed = { lessonId: id, completedAt: runtime.wallNow().toISOString() }
-      const saved = await runtime.repository.writeLessonProgress(completed, datasetEpoch)
-      if (current !== operation) {
-        return { kind: 'cancelled', explanation }
-      }
-      if (!saved.ok) {
-        error.value = '答题正确，但进度尚未保存。请再次提交以重试。'
-        return { kind: 'save-failed', explanation }
-      }
-
-      if (!progress.value.some((item) => item.lessonId === id)) {
-        progress.value = [...progress.value, completed]
-      }
-      error.value = null
+    const failure = await persistCompletion(id, current, explanation)
+    if (failure) {
+      return failure
+    }
+    if (current !== operation) {
+      return { kind: 'cancelled', explanation }
     }
 
     // Completion is durable before optional cursor cleanup. A cleanup failure cannot revoke it;

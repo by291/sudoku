@@ -1,6 +1,7 @@
 import { computed, ref, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 
+/** Reserve the measured lesson height while explanations change. */
 export function useLessonExtent(
   content: Readonly<Ref<HTMLElement | null>>,
   lessonId: MaybeRefOrGetter<string | undefined>,

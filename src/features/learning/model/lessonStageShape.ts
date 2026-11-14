@@ -144,6 +144,7 @@ function isStep(value: unknown): value is LogicalStep {
   }
 }
 
+/** Check the shape of an authored exercise answer. */
 export function isExerciseAnswer(value: unknown): value is ExerciseAnswer {
   return (
     isRecord(value) &&
@@ -155,6 +156,7 @@ export function isExerciseAnswer(value: unknown): value is ExerciseAnswer {
 }
 
 /** Validate transport shape only. The mandatory build gate proves bundled Sudoku facts in Rust. */
+/** Check exercise stage structure before semantic proof validation. */
 export function isExerciseStage(value: unknown): value is ExerciseStage {
   return (
     isRecord(value) &&

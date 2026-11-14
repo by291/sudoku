@@ -1,7 +1,7 @@
 import { computed, onMounted, onScopeDispose, ref, watch, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import type { Digit } from '@/sudoku/contracts'
-import { isDigit } from '@/sudoku/values'
+import { UNIT_SIZE, isDigit } from '@/sudoku/values'
 import { maskOf } from '@/shared/model/sudokuPresentation'
 import { isKeyboardOwnedByControl } from '@/shared/utils/keyboardOwnership'
 import { useLearningStore } from '@/features/learning/stores/useLearningStore'
@@ -9,6 +9,7 @@ import type { Lesson } from '@/features/learning/model/lessons'
 import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 
+/** Own the exercise draft and publish feedback only for the current lesson and dataset. */
 export function useLessonExercise(
   lesson: MaybeRefOrGetter<Lesson | undefined>,
   practice: MaybeRefOrGetter<boolean>,
@@ -26,12 +27,12 @@ export function useLessonExercise(
     return stage ? { stage, answer: stageAnswer(stage) } : undefined
   })
   const stageCaption = computed(() => {
-    let start = 0
+    let firstStageIndex = 0
     for (const exercise of currentLesson.value?.exercises ?? []) {
-      if (stageIndex.value < start + exercise.stages.length) {
-        return `${exercise.title} · 第 ${stageIndex.value - start + 1} / ${exercise.stages.length} 步 · 练习阶段 ${stageIndex.value + 1} / ${stages.value.length}`
+      if (stageIndex.value < firstStageIndex + exercise.stages.length) {
+        return `${exercise.title} · 第 ${stageIndex.value - firstStageIndex + 1} / ${exercise.stages.length} 步 · 练习阶段 ${stageIndex.value + 1} / ${stages.value.length}`
       }
-      start += exercise.stages.length
+      firstStageIndex += exercise.stages.length
     }
     return ''
   })
@@ -42,13 +43,19 @@ export function useLessonExercise(
   const feedback = ref<string | null>(null)
   const correct = ref(false)
   const busy = ref(false)
-  const exerciseCells = computed(() =>
-    !exercisePresentation.value
-      ? []
-      : exercisePresentation.value.answer.kind === 'placement'
-        ? [exercisePresentation.value.answer.expected.cell]
-        : [...new Set(exercisePresentation.value.answer.expected.map((pair) => pair.cell))],
-  )
+  const exerciseCells = computed(() => {
+    const expectedAnswer = exercisePresentation.value?.answer
+    if (!expectedAnswer) {
+      return []
+    }
+
+    if (expectedAnswer.kind === 'placement') {
+      return [expectedAnswer.expected.cell]
+    }
+
+    const cells = expectedAnswer.expected.map((removal) => removal.cell)
+    return [...new Set(cells)]
+  })
   const exercisePrompt = computed(() =>
     exercisePresentation.value?.answer.kind === 'placement'
       ? '点击圆点标出的空格，选择应该出现的数字，再提交答案。'
@@ -57,7 +64,7 @@ export function useLessonExercise(
   const selectionText = computed(() =>
     selected.value === null
       ? '先选择一个练习格'
-      : `已选第${Math.floor(selected.value / 9) + 1}行第${(selected.value % 9) + 1}列`,
+      : `已选第${Math.floor(selected.value / UNIT_SIZE) + 1}行第${(selected.value % UNIT_SIZE) + 1}列`,
   )
   const exampleNotes = computed(
     () =>
@@ -81,46 +88,61 @@ export function useLessonExercise(
       !completed.value &&
       (exercisePresentation.value?.answer.kind === 'elimination' || placement.value !== null),
   )
+
   // Local feedback belongs to a lesson and route mode, independently of durable progress writes.
   let ownerGeneration = 0
   let disposed = false
   let initializingRoute = false
 
+  function clearFeedback() {
+    feedback.value = null
+    correct.value = false
+  }
+
+  function clearAnswerDraft() {
+    placement.value = null
+    removals.value = []
+    clearFeedback()
+  }
+
   watch(
-    () =>
-      [
-        currentLesson.value?.id,
-        inPractice.value,
-        learning.datasetGeneration,
-        learning.readyGeneration,
-      ] as const,
-    async (values, previous) => {
-      const routeChanged = !previous || values[0] !== previous[0] || values[1] !== previous[1]
-      const datasetChanged = previous && values[2] !== previous[2]
+    () => ({
+      lessonId: currentLesson.value?.id,
+      isPractice: inPractice.value,
+      datasetGeneration: learning.datasetGeneration,
+      readyGeneration: learning.readyGeneration,
+    }),
+    async (selection, previous) => {
+      const hasRouteChanged =
+        !previous ||
+        selection.lessonId !== previous.lessonId ||
+        selection.isPractice !== previous.isPractice
+      const hasDatasetChanged =
+        previous && selection.datasetGeneration !== previous.datasetGeneration
+
       // The route initializer owns its awaited load/visit. Its own readiness publication
       // must not start a second initializer that clears a player's selected cell.
-      if (!routeChanged && !datasetChanged && initializingRoute) {
+      if (!hasRouteChanged && !hasDatasetChanged && initializingRoute) {
         return
       }
-      initializingRoute = routeChanged
+
+      initializingRoute = hasRouteChanged
       const owner = ++ownerGeneration
-      const id = currentLesson.value?.id
-      if (routeChanged) {
+      const lessonId = selection.lessonId
+      if (hasRouteChanged) {
         mode.value = 'guide'
       }
       selected.value = null
-      placement.value = null
-      removals.value = []
-      feedback.value = null
-      correct.value = false
+      clearAnswerDraft()
       busy.value = true
       stageIndex.value = 0
       canAdvance.value = false
       completed.value = false
 
-      if (routeChanged) {
+      if (hasRouteChanged) {
         await learning.load()
       }
+
       // Reset invalidates pending answers immediately. The committed reload then supplies
       // the new cursor; ordinary stage writes do not trigger this watcher or skip Next.
       if (learning.readyGeneration !== learning.datasetGeneration) {
@@ -129,14 +151,19 @@ export function useLessonExercise(
         }
         return
       }
-      if (!disposed && owner === ownerGeneration && id) {
-        stageIndex.value = Math.min(learning.exerciseStage(id), stages.value.length - 1)
-        if (routeChanged) {
+      if (disposed || owner !== ownerGeneration) {
+        return
+      }
+
+      if (lessonId) {
+        stageIndex.value = Math.min(learning.exerciseStage(lessonId), stages.value.length - 1)
+        if (hasRouteChanged) {
           // Settle the visit write before answers enqueue stages. A dataset-only reload
           // must preserve the imported last-visited preference in other open tabs.
-          await learning.selectLesson(id)
+          await learning.selectLesson(lessonId)
         }
       }
+
       if (!disposed && owner === ownerGeneration) {
         busy.value = false
         initializingRoute = false
@@ -171,18 +198,17 @@ export function useLessonExercise(
       }
 
       const pair = { cell: selected.value, digit }
-      const exists = removals.value.some(
+      const hasRemoval = removals.value.some(
         (item) => item.cell === pair.cell && item.digit === pair.digit,
       )
-      removals.value = exists
+      removals.value = hasRemoval
         ? removals.value.filter((item) => item.cell !== pair.cell || item.digit !== pair.digit)
         : [...removals.value, pair]
     } else {
       placement.value = { cell: selected.value, digit }
     }
 
-    feedback.value = null
-    correct.value = false
+    clearFeedback()
   }
 
   async function submitAnswer() {
@@ -203,9 +229,11 @@ export function useLessonExercise(
       return
     }
 
+    // A route change may replace the current draft while persistence is in flight.
     const owner = ownerGeneration
     busy.value = true
     const result = await learning.submitExercise(currentLesson.value.id, supplied, stageIndex.value)
+
     if (disposed || owner !== ownerGeneration) {
       return
     }
@@ -213,6 +241,7 @@ export function useLessonExercise(
     feedback.value = result.explanation
     canAdvance.value = false
     completed.value = false
+
     switch (result.kind) {
       case 'incorrect':
       case 'unavailable':
@@ -233,6 +262,7 @@ export function useLessonExercise(
       default:
         result satisfies never
     }
+
     busy.value = false
   }
 
@@ -241,26 +271,21 @@ export function useLessonExercise(
       return
     }
 
-    placement.value = null
-    removals.value = []
-    feedback.value = null
-    correct.value = false
+    clearAnswerDraft()
   }
 
   function nextStage() {
     if (!canAdvance.value || stageIndex.value >= stages.value.length - 1) {
       return
     }
+
     stageIndex.value++
     selected.value = null
-    placement.value = null
-    removals.value = []
-    feedback.value = null
-    correct.value = false
+    clearAnswerDraft()
     canAdvance.value = false
   }
 
-  function handleExerciseKey(event: KeyboardEvent) {
+  function dispatchExerciseKey(event: KeyboardEvent) {
     if (
       inPractice.value ||
       mode.value !== 'exercise' ||
@@ -284,11 +309,11 @@ export function useLessonExercise(
     answer(digit)
   }
 
-  onMounted(() => window.addEventListener('keydown', handleExerciseKey))
+  onMounted(() => window.addEventListener('keydown', dispatchExerciseKey))
   onScopeDispose(() => {
     disposed = true
     ownerGeneration++
-    window.removeEventListener('keydown', handleExerciseKey)
+    window.removeEventListener('keydown', dispatchExerciseKey)
   })
 
   return {

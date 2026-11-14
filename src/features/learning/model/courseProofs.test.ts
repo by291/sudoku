@@ -34,7 +34,7 @@ it.each(LESSONS)(
           expect(referenceCountSolutions(witness, stage.rules).count).toBe(1)
         } else {
           expect(
-            referenceCountSolutions(stage.board, stage.rules, 1, domains).count,
+            referenceCountSolutions(stage.board, stage.rules, { maxSolutions: 1, domains }).count,
             `${lesson.id} has a consistent candidate assignment`,
           ).toBe(1)
         }
@@ -48,7 +48,7 @@ it.each(LESSONS)(
         for (const { cell, digit } of forbidden) {
           const forced: Board = stage.board.map((value, index) => (index === cell ? digit : value))
           expect(
-            referenceCountSolutions(forced, stage.rules, 1, domains).count,
+            referenceCountSolutions(forced, stage.rules, { maxSolutions: 1, domains }).count,
             `${lesson.id} cannot place ${digit} at ${cell}`,
           ).toBe(0)
         }

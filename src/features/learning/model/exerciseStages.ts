@@ -2,11 +2,14 @@ import type { Board, Digit, NoteMask } from '@/sudoku/contracts'
 import type { LogicalStep, RuleEvidence, AdvancedEvidence } from '@/sudoku/contracts'
 import type { PuzzleRules, Unit } from '@/sudoku/contracts'
 import { copyRules } from '@/sudoku/ruleInput'
+import { BOARD_SIZE, BOX_SIZE, UNIT_SIZE } from '@/sudoku/values'
 import type { LessonCalculation } from '@/sudoku/contracts'
 
 // Engine symmetry identifiers preserve the authored transfer geometry.
 const HALF_TURN_SYMMETRY = 2
 const TRANSPOSE_SYMMETRY = 7
+const FIRST_SWAPPED_ROW = BOX_SIZE
+const SECOND_SWAPPED_ROW = FIRST_SWAPPED_ROW + 1
 
 export type ExerciseAnswer =
   | { kind: 'placement'; expected: { cell: number; digit: Digit } }
@@ -20,6 +23,7 @@ export type ExerciseStage = {
 }
 export type LessonExercise = { title: string; stages: readonly ExerciseStage[] }
 
+/** Read the expected placement or eliminations from an authored proof. */
 export function stageAnswer(stage: ExerciseStage): ExerciseAnswer {
   const step = stage.step
   return step.kind === 'placement'
@@ -36,24 +40,38 @@ export function transformStage(
   if (transform === 'swap-rows' && stage.rules.kind !== 'classic') {
     throw new TypeError('Row permutations must not change variant clue geometry')
   }
-  const swapRow = (row: number) => (row === 3 ? 4 : row === 4 ? 3 : row)
+
+  function swapRow(row: number): number {
+    switch (row) {
+      case FIRST_SWAPPED_ROW:
+        return SECOND_SWAPPED_ROW
+      case SECOND_SWAPPED_ROW:
+        return FIRST_SWAPPED_ROW
+      default:
+        return row
+    }
+  }
+
+  // The board can read through the same mapping used to move evidence: it is its own inverse.
   function cellMap(cell: number): number {
     if (transform === 'rotate') {
-      return 80 - cell
+      return BOARD_SIZE - 1 - cell
     }
     if (transform === 'swap-rows') {
-      return swapRow(Math.floor(cell / 9)) * 9 + (cell % 9)
+      return swapRow(Math.floor(cell / UNIT_SIZE)) * UNIT_SIZE + (cell % UNIT_SIZE)
     }
-    return (cell % 9) * 9 + Math.floor(cell / 9)
+    return (cell % UNIT_SIZE) * UNIT_SIZE + Math.floor(cell / UNIT_SIZE)
   }
+
   const cells = (values: readonly number[]) => values.map(cellMap)
+
   function unitMap(unit: Unit): Unit {
     if (transform === 'rotate') {
       return {
         kind: unit.kind,
         index:
           unit.kind === 'row' || unit.kind === 'column' || unit.kind === 'box'
-            ? 8 - unit.index
+            ? UNIT_SIZE - 1 - unit.index
             : unit.index,
       }
     }
@@ -65,9 +83,13 @@ export function transformStage(
     }
     return {
       kind: unit.kind,
-      index: unit.kind === 'box' ? (unit.index % 3) * 3 + Math.floor(unit.index / 3) : unit.index,
+      index:
+        unit.kind === 'box'
+          ? (unit.index % BOX_SIZE) * BOX_SIZE + Math.floor(unit.index / BOX_SIZE)
+          : unit.index,
     }
   }
+
   function clueMap(evidence: RuleEvidence): RuleEvidence {
     const common = { ...evidence, cells: cells(evidence.cells) }
     if (evidence.kind === 'thermo') {
@@ -78,17 +100,26 @@ export function transformStage(
         bounds: evidence.bounds.map((bound) => ({ ...bound, cell: cellMap(bound.cell) })),
       }
     }
+
     const domains = evidence.domains.map((domain) => ({ ...domain, cell: cellMap(domain.cell) }))
-    return evidence.kind === 'cage'
-      ? { ...common, kind: 'cage', sum: evidence.sum, domains }
-      : {
-          ...common,
-          kind: 'arrow',
-          circle: cellMap(evidence.circle),
-          shaft: cells(evidence.shaft),
-          domains,
-        }
+    if (evidence.kind === 'cage') {
+      return {
+        ...common,
+        kind: 'cage',
+        sum: evidence.sum,
+        domains,
+      }
+    }
+
+    return {
+      ...common,
+      kind: 'arrow',
+      circle: cellMap(evidence.circle),
+      shaft: cells(evidence.shaft),
+      domains,
+    }
   }
+
   function proofMap(evidence: LogicalStep['evidence']): LogicalStep['evidence'] {
     if (evidence.kind === 'unit') {
       return {
@@ -102,16 +133,23 @@ export function transformStage(
     if (evidence.kind === 'cage' || evidence.kind === 'arrow' || evidence.kind === 'thermo') {
       return clueMap(evidence)
     }
+
+    // Advanced evidence uses canonical cell order; path clues keep their direction.
     const common = {
-      cells: cells(evidence.cells).sort((a, b) => a - b),
+      cells: cells(evidence.cells).sort((leftCell, rightCell) => leftCell - rightCell),
       digits: evidence.digits,
       domains: evidence.domains
         .map((domain) => ({ ...domain, cell: cellMap(domain.cell) }))
-        .sort((a, b) => a.cell - b.cell),
+        .sort((leftDomain, rightDomain) => leftDomain.cell - rightDomain.cell),
     }
     switch (evidence.kind) {
       case 'subset':
-        return { ...common, kind: 'subset', unit: unitMap(evidence.unit), hidden: evidence.hidden }
+        return {
+          ...common,
+          kind: 'subset',
+          unit: unitMap(evidence.unit),
+          hidden: evidence.hidden,
+        }
       case 'fish':
         return {
           ...common,
@@ -143,24 +181,41 @@ export function transformStage(
       }
     }
   }
+
   const board = stage.board.map((_, cell) => stage.board[cellMap(cell)])
   const candidates = stage.candidates.map((_, cell) => stage.candidates[cellMap(cell)])
+
+  const symmetry = transform === 'rotate' ? HALF_TURN_SYMMETRY : TRANSPOSE_SYMMETRY
   const rules =
     stage.rules.kind === 'classic'
       ? stage.rules
       : calculation.transformRules({
           rules: copyRules(stage.rules),
-          symmetry: transform === 'rotate' ? HALF_TURN_SYMMETRY : TRANSPOSE_SYMMETRY,
+          symmetry,
         })
+
   const step =
     stage.step.kind === 'placement'
-      ? { ...stage.step, cell: cellMap(stage.step.cell), evidence: proofMap(stage.step.evidence) }
+      ? {
+          ...stage.step,
+          cell: cellMap(stage.step.cell),
+          evidence: proofMap(stage.step.evidence),
+        }
       : {
           ...stage.step,
           removals: stage.step.removals
             .map((removal) => ({ ...removal, cell: cellMap(removal.cell) }))
-            .sort((a, b) => a.cell - b.cell || a.digit - b.digit),
+            .sort(
+              (leftRemoval, rightRemoval) =>
+                leftRemoval.cell - rightRemoval.cell || leftRemoval.digit - rightRemoval.digit,
+            ),
           evidence: proofMap(stage.step.evidence),
         }
-  return { board, candidates, rules, step }
+
+  return {
+    board,
+    candidates,
+    rules,
+    step,
+  }
 }

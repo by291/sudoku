@@ -16,10 +16,12 @@ export type Lesson = {
   exercises: readonly LessonExercise[]
 }
 
+/** Read exercise stages in authored order. */
 export function lessonStages(lesson: Lesson): readonly ExerciseStage[] {
   return lesson.exercises.flatMap((exercise) => exercise.stages)
 }
 
+/** Compare a player answer with the authored placement or removal set. */
 export function checkExercise(
   exercise: { answer: ExerciseAnswer; explanation: string },
   answer: ExerciseAnswer['expected'],

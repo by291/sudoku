@@ -6,6 +6,11 @@ import type { ValidationDto } from '@sudoku/wasm'
 import type { Plugin } from 'vite'
 import { isRecord } from '../src/sudoku/values.ts'
 
+const CATALOGUE_SCHEMA_VERSION = 1
+const EXERCISES_PER_LESSON = 2
+const DIRECTORY_MODULE_ID = 'virtual:sudoku-lessons'
+const LESSON_MODULE_PREFIX = 'virtual:sudoku-lesson/'
+
 type TeachingValidator = (stage: unknown) => ValidationDto
 
 /** Reject incomplete proof as well as invalid proof; every bundled stage must be established. */
@@ -15,7 +20,7 @@ export function validateLessonCatalogueMath(
 ): { lessons: number; stages: number } {
   if (
     !isRecord(source) ||
-    source.schemaVersion !== 1 ||
+    source.schemaVersion !== CATALOGUE_SCHEMA_VERSION ||
     !Array.isArray(source.lessons) ||
     source.lessons.length === 0
   ) {
@@ -23,6 +28,7 @@ export function validateLessonCatalogueMath(
   }
 
   let stages = 0
+
   function validateStage(stage: unknown, location: string) {
     const result = validateTeachingStep(stage)
     if (result.status !== 'valid') {
@@ -37,16 +43,18 @@ export function validateLessonCatalogueMath(
       !isRecord(lesson) ||
       typeof lesson.id !== 'string' ||
       !Array.isArray(lesson.exercises) ||
-      lesson.exercises.length !== 2
+      lesson.exercises.length !== EXERCISES_PER_LESSON
     ) {
       throw new Error('Invalid lesson catalogue entry')
     }
+
     validateStage(lesson.guided, `${lesson.id}/guided`)
 
     for (const [exerciseIndex, exercise] of lesson.exercises.entries()) {
       if (!isRecord(exercise) || !Array.isArray(exercise.stages) || exercise.stages.length === 0) {
         throw new Error(`Invalid lesson exercise in ${lesson.id}`)
       }
+
       for (const [stageIndex, stage] of exercise.stages.entries()) {
         validateStage(stage, `${lesson.id}/exercises/${exerciseIndex}/stages/${stageIndex}`)
       }
@@ -56,9 +64,6 @@ export function validateLessonCatalogueMath(
   return { lessons: source.lessons.length, stages }
 }
 
-const directoryModuleId = 'virtual:sudoku-lessons'
-const lessonModulePrefix = 'virtual:sudoku-lesson/'
-
 type LessonAssets = { source: string; directory: string; lessons: Map<string, string> }
 
 function createLessonAssets(source: string): LessonAssets {
@@ -66,6 +71,7 @@ function createLessonAssets(source: string): LessonAssets {
   if (!isRecord(catalogue) || !Array.isArray(catalogue.lessons)) {
     throw new Error('Invalid lesson catalogue schema')
   }
+
   const lessons = new Map<string, string>()
   const directory = catalogue.lessons.map((lesson: unknown, order) => {
     if (
@@ -80,12 +86,14 @@ function createLessonAssets(source: string): LessonAssets {
     ) {
       throw new Error('Invalid lesson directory entry')
     }
+
     const stageCounts = lesson.exercises.map((exercise: unknown) => {
       if (!isRecord(exercise) || !Array.isArray(exercise.stages)) {
         throw new Error('Invalid lesson exercise')
       }
       return exercise.stages.length
     })
+
     lessons.set(lesson.id, JSON.stringify(lesson))
     return {
       id: lesson.id,
@@ -97,9 +105,11 @@ function createLessonAssets(source: string): LessonAssets {
       stageCount: stageCounts.reduce((total, count) => total + count, 0),
     }
   })
+
   const loaders = [...lessons.keys()].map(
-    (id) => `${JSON.stringify(id)}: () => import(${JSON.stringify(lessonModulePrefix + id)})`,
+    (id) => `${JSON.stringify(id)}: () => import(${JSON.stringify(LESSON_MODULE_PREFIX + id)})`,
   )
+
   return {
     source,
     lessons,
@@ -117,13 +127,17 @@ export function lessonCatalogueValidation(
   async function validateSnapshot() {
     const source = await readFile(cataloguePath, 'utf8')
     const catalogue: unknown = JSON.parse(source)
+
     const bindings = createBindings()
-    const wasm = await readFile(createRequire(import.meta.url).resolve('@sudoku/wasm/binary'))
+    const resolveModule = createRequire(import.meta.url)
+    const wasm = await readFile(resolveModule.resolve('@sudoku/wasm/binary'))
     await bindings.default({ module_or_path: wasm })
+
     const result = validateLessonCatalogueMath(catalogue, bindings.validate_teaching_step)
 
     // Never reread after validation: directory and lazy modules must share the proved bytes.
     assets = createLessonAssets(source)
+
     return result
   }
 
@@ -131,7 +145,7 @@ export function lessonCatalogueValidation(
     name: 'sudoku-lesson-catalogue-validation',
     enforce: 'pre',
     resolveId(id) {
-      if (id === directoryModuleId || id.startsWith(lessonModulePrefix)) {
+      if (id === DIRECTORY_MODULE_ID || id.startsWith(LESSON_MODULE_PREFIX)) {
         return '\0' + id
       }
       return null
@@ -144,6 +158,7 @@ export function lessonCatalogueValidation(
         throw new Error('The lesson catalogue could not be resolved')
       }
       catalogueId = resolved.id
+
       const result = await validateSnapshot()
       this.addWatchFile(cataloguePath)
       this.info(
@@ -153,21 +168,23 @@ export function lessonCatalogueValidation(
     load(id) {
       if (
         id !== catalogueId &&
-        id !== '\0' + directoryModuleId &&
-        !id.startsWith('\0' + lessonModulePrefix)
+        id !== '\0' + DIRECTORY_MODULE_ID &&
+        !id.startsWith('\0' + LESSON_MODULE_PREFIX)
       ) {
         return null
       }
+
       if (assets === null) {
         throw new Error('The lesson catalogue has not passed mathematical validation')
       }
       if (id === catalogueId) {
         return assets.source
       }
-      if (id === '\0' + directoryModuleId) {
+      if (id === '\0' + DIRECTORY_MODULE_ID) {
         return assets.directory
       }
-      const lesson = assets.lessons.get(id.slice(lessonModulePrefix.length + 1))
+
+      const lesson = assets.lessons.get(id.slice(LESSON_MODULE_PREFIX.length + 1))
       if (!lesson) {
         throw new Error('Unknown lesson asset')
       }
@@ -177,7 +194,9 @@ export function lessonCatalogueValidation(
       if (context.file !== cataloguePath) {
         return
       }
+
       await validateSnapshot()
+
       for (const module of context.server.moduleGraph.idToModuleMap.values()) {
         if (module.id?.startsWith('\0virtual:sudoku-lesson')) {
           context.server.moduleGraph.invalidateModule(module)

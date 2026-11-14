@@ -8,10 +8,19 @@ export const ARROW_REPEAT_RULES: PuzzleRules = {
   arrows: [{ circle: 8, shaft: [16, 24, 32, 40] }],
 }
 export const ARROW_REPEAT_BOARD: Board = Array.from({ length: 81 }, (_, cell) => {
-  if (cell === 8) return 8
-  if (cell === 16 || cell === 40) return 2
-  if (cell === 24) return 1
-  if (cell === 32) return 3
+  if (cell === 8) {
+    return 8
+  }
+  if (cell === 16 || cell === 40) {
+    return 2
+  }
+  if (cell === 24) {
+    return 1
+  }
+  if (cell === 32) {
+    return 3
+  }
+
   return 0
 })
 export const FULL_LENGTH_THERMO_RULES: PuzzleRules = {
@@ -20,7 +29,10 @@ export const FULL_LENGTH_THERMO_RULES: PuzzleRules = {
 }
 function literalBoard(text: string): Board {
   const board = Array.from(text, Number)
-  if (!isBoard(board)) throw new Error('Invalid literal variant fixture')
+  if (!isBoard(board)) {
+    throw new Error('Invalid literal variant fixture')
+  }
+
   return board
 }
 const latinSolution = literalBoard(
@@ -43,7 +55,14 @@ export const JIGSAW_REGIONS: readonly (readonly number[])[] = Array.from(
     Array.from({ length: 9 }, (_, offset) => {
       const cell =
         Math.floor(region / 3) * 27 + (region % 3) * 3 + Math.floor(offset / 3) * 9 + (offset % 3)
-      return cell === 2 ? 12 : cell === 12 ? 2 : cell
+      if (cell === 2) {
+        return 12
+      }
+      if (cell === 12) {
+        return 2
+      }
+
+      return cell
     }),
 )
 type VariantFixture = { rules: PuzzleRules; givens: Board; solution: Board }

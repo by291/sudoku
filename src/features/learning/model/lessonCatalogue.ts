@@ -25,6 +25,13 @@ type AuthoredLesson = {
   transfer: { kind: 'transpose' | 'rotate' | 'swap-rows'; source: 'focused' | 'authored-alternate' }
 }
 
+const CATALOGUE_SCHEMA_VERSION = 1
+const EXERCISES_PER_LESSON = 2
+
+function isTransferKind(value: string): boolean {
+  return value === 'transpose' || value === 'rotate' || value === 'swap-rows'
+}
+
 function hasChineseCopy(value: unknown): value is string {
   return typeof value === 'string' && /[\u4e00-\u9fff]/u.test(value)
 }
@@ -62,12 +69,16 @@ function isLesson(value: unknown): value is AuthoredLesson {
   }
   if (
     !isRecord(value.transfer) ||
-    !['transpose', 'rotate', 'swap-rows'].includes(String(value.transfer.kind)) ||
+    !isTransferKind(String(value.transfer.kind)) ||
     !['focused', 'authored-alternate'].includes(String(value.transfer.source))
   ) {
     return false
   }
-  if (!isStage(value.guided) || !Array.isArray(value.exercises) || value.exercises.length !== 2) {
+  if (
+    !isStage(value.guided) ||
+    !Array.isArray(value.exercises) ||
+    value.exercises.length !== EXERCISES_PER_LESSON
+  ) {
     return false
   }
   return value.exercises.every(
@@ -84,15 +95,21 @@ function stageSnapshot(stage: AuthoredStage): ExerciseStage {
   if (JSON.stringify(stage.answer) !== JSON.stringify(stageAnswer(stage))) {
     throw new Error('Authored stage answer disagrees with its evidence conclusion')
   }
-  return { board: stage.board, candidates: stage.candidates, rules: stage.rules, step: stage.step }
+
+  return {
+    board: stage.board,
+    candidates: stage.candidates,
+    rules: stage.rules,
+    step: stage.step,
+  }
 }
 
-/** Parsing owns a fresh snapshot; no consumer can mutate the imported catalogue or a later load. */
+/** Decode a fresh catalogue snapshot, isolated from the source and other consumers. */
 export function loadLessonCatalogue(source: unknown): readonly Lesson[] {
   const value: unknown = structuredClone(source)
   if (
     !isRecord(value) ||
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== CATALOGUE_SCHEMA_VERSION ||
     !isRecord(value.provenance) ||
     typeof value.provenance.source !== 'string' ||
     !Array.isArray(value.lessons) ||
@@ -105,6 +122,7 @@ export function loadLessonCatalogue(source: unknown): readonly Lesson[] {
 }
 
 /** Decode a fresh owned lesson; module objects and later loads never share mutable arrays. */
+/** Decode one lesson and verify the ID requested by the loader. */
 export function decodeLesson(source: unknown, expectedId: string): Lesson {
   const input: unknown = structuredClone(source)
   if (

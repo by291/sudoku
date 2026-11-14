@@ -57,7 +57,7 @@ const progressPercentage = computed(() =>
 )
 
 const suggestedLesson = computed(() => {
-  // Browsable content does not imply known progress; do not recommend from an unread empty snapshot.
+  // An unread progress snapshot cannot support a recommendation, even when lessons are visible.
   if (!learning.progressReady) {
     return undefined
   }
@@ -117,24 +117,36 @@ function lessonStatus(id: string, suggested: boolean): string {
   return suggested ? '推荐学习' : '可学习'
 }
 
+const FIRST_COURSE_LESSON = 0
+const SYNTHESIS_LESSON = 3
+
 const classicStages: Readonly<Record<string, string>> = {
   rules: '起步 · 认识棋盘',
   'naked-single': '基础 · 寻找唯一',
   'locked-candidate': '进阶 · 排除候选',
   'naked-triple': '高级 · 专家推理',
 }
+
+function describeLessonStage(lessonId: string, index: number): string {
+  if (selectedVariant.value === 'classic') {
+    return classicStages[lessonId]
+  }
+
+  switch (index) {
+    case FIRST_COURSE_LESSON:
+      return '入门 · 理解玩法'
+    case SYNTHESIS_LESSON:
+      return '综合 · 连续推理'
+    default:
+      return '进阶 · 候选与约束'
+  }
+}
+
 const lessonSteps = computed(() =>
   selectedLessons.value.map((lesson, index) => ({
     lesson,
     number: String(index + 1).padStart(2, '0'),
-    stage:
-      selectedVariant.value === 'classic'
-        ? classicStages[lesson.id]
-        : index === 0
-          ? '入门 · 理解玩法'
-          : index === 3
-            ? '综合 · 连续推理'
-            : '进阶 · 候选与约束',
+    stage: describeLessonStage(lesson.id, index),
     completed: completedLessonIds.value.has(lesson.id),
     suggested: lesson.id === suggestedLesson.value?.id,
   })),

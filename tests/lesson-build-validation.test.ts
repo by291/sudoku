@@ -143,7 +143,8 @@ it('emits the validated asset snapshot even if the source changes before module 
             },
           },
           generateBundle(_options, bundle) {
-            emittedCode = Object.values(bundle)
+            const outputs = Object.values(bundle)
+            emittedCode = outputs
               .filter((item) => item.type === 'chunk')
               .map((chunk) => chunk.code)
               .join('\n')
