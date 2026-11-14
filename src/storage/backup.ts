@@ -53,10 +53,13 @@ export type BackupPreview = {
 
 function resourceIssues(value: unknown): string | null {
   let nodes = 0
+
   function visit(current: unknown, depth: number): boolean {
-    if (++nodes > BACKUP_LIMITS.nodes || depth > BACKUP_LIMITS.depth) {
+    nodes++
+    if (nodes > BACKUP_LIMITS.nodes || depth > BACKUP_LIMITS.depth) {
       return false
     }
+
     if (Array.isArray(current)) {
       return (
         current.length <= BACKUP_LIMITS.nodes &&
@@ -68,6 +71,8 @@ function resourceIssues(value: unknown): string | null {
     }
     return true
   }
+
+  // Bound traversal before any record reaches the semantic decoder.
   if (!visit(value, 0)) {
     return 'Backup exceeds parser work or nesting limits'
   }
@@ -79,7 +84,9 @@ function resourceIssues(value: unknown): string | null {
   ) {
     return 'Backup collections are required'
   }
-  if (value.sessions.length + value.results.length + value.lessons.length > BACKUP_LIMITS.records) {
+
+  const recordCount = value.sessions.length + value.results.length + value.lessons.length
+  if (recordCount > BACKUP_LIMITS.records) {
     return 'Backup exceeds record limits'
   }
 
@@ -98,6 +105,7 @@ function resourceIssues(value: unknown): string | null {
       return 'Backup exceeds history limits'
     }
   }
+
   return null
 }
 
@@ -108,18 +116,22 @@ function parseCollection<T>(
 ): T[] {
   const ids = new Set<string>()
   const records: T[] = []
+
   for (const value of raw) {
     const parsed = decode(value)
     if (!parsed.valid) {
       throw new TypeError(parsed.issues.join('; '))
     }
+
     const id = identity(parsed.value)
     if (ids.has(id)) {
       throw new TypeError('Duplicate collection identity')
     }
+
     ids.add(id)
     records.push(parsed.value)
   }
+
   return records
 }
 
@@ -128,6 +140,7 @@ function validateBackup(value: unknown, validators: SnapshotValidators): LocalBa
   if (issue) {
     throw new TypeError(issue)
   }
+
   if (
     !isRecord(value) ||
     value.backupVersion !== 1 ||
@@ -138,6 +151,7 @@ function validateBackup(value: unknown, validators: SnapshotValidators): LocalBa
   ) {
     throw new TypeError('Unsupported backup version or invalid export time')
   }
+
   const sessions = parseCollection(
     value.sessions,
     (value) => parseSessionRecord(value, validators),
@@ -149,27 +163,33 @@ function validateBackup(value: unknown, validators: SnapshotValidators): LocalBa
     (record) => record.session.id,
   )
   const lessons = parseCollection(value.lessons, parseLessonProgress, (record) => record.lessonId)
+
+  // Daily IDs distinguish attempts; free and learning saves occupy replaceable slots.
   const activeSlots = new Set<string>()
   for (const { session } of sessions) {
     if (session.mode === 'daily') {
       continue
     }
+
     const slot = session.mode === 'free' ? `free:${session.puzzle.rules.kind}` : 'learning'
     if (activeSlots.has(slot)) {
       throw new TypeError('Multiple sessions occupy one active game slot')
     }
     activeSlots.add(slot)
   }
+
   const settings = parseSettings(value.settings)
   if (!settings.valid) {
     throw new TypeError(settings.issues.join('; '))
   }
+
   const resultById = new Map(results.map((record) => [record.session.id, record.session]))
   for (const { session } of sessions) {
     const completed = resultById.get(session.id)
     if (!completed) {
       continue
     }
+
     // Results retain the first completion. An unfinished snapshot may coexist with that
     // result, but the identity/puzzle cannot change and two completion facts must agree.
     if (
@@ -183,6 +203,7 @@ function validateBackup(value: unknown, validators: SnapshotValidators): LocalBa
       throw new TypeError('Inconsistent session and result facts')
     }
   }
+
   return {
     backupVersion: 1,
     exportedAt: value.exportedAt,
@@ -201,16 +222,19 @@ export function parseBackup(
   if (new TextEncoder().encode(text).byteLength > BACKUP_LIMITS.bytes) {
     return { valid: false, issues: ['Backup exceeds the 25 MiB file limit'] }
   }
+
   try {
     return { valid: true, value: validateBackup(JSON.parse(text), validators) }
   } catch (error) {
     if (error instanceof SnapshotValidationUnavailable) {
       throw error
     }
+
     return { valid: false, issues: [error instanceof Error ? error.message : 'Invalid backup'] }
   }
 }
 
+/** Summarizes the decoded backup for confirmation without changing it. */
 export function previewBackup(backup: LocalBackup): BackupPreview {
   return {
     exportedAt: backup.exportedAt,
@@ -227,14 +251,21 @@ export function previewBackup(backup: LocalBackup): BackupPreview {
   }
 }
 
-/** Captures one committed readonly transaction. Invalid records are counted, never silently exported. */
+/** Captures a committed read snapshot and counts invalid records excluded from export. */
 export async function readBackupSnapshot(
   db: IDBPDatabase<SudokuDatabase>,
   exportedAt: string,
   validators: SnapshotValidators,
 ): Promise<BackupExport> {
   const transaction = db.transaction(
-    ['sessions', 'results', 'lessons', 'settings', 'quarantine'],
+    [
+      // Include the exclusion count from the same committed dataset as the exported collections.
+      'sessions',
+      'results',
+      'lessons',
+      'settings',
+      'quarantine',
+    ],
     'readonly',
   )
   const [rawSessions, rawResults, rawLessons, rawSettings, quarantined] = await Promise.all([
@@ -245,6 +276,7 @@ export async function readBackupSnapshot(
     transaction.objectStore('quarantine').count(),
     transaction.done,
   ])
+
   const issue = resourceIssues({
     sessions: rawSessions,
     results: rawResults,
@@ -254,7 +286,9 @@ export async function readBackupSnapshot(
   if (issue) {
     throw new TypeError(issue)
   }
+
   let excluded = 0
+
   function validRecords<T>(
     raw: readonly unknown[],
     parse: (value: unknown) => ParseResult<T>,
@@ -270,10 +304,13 @@ export async function readBackupSnapshot(
     }
     return records
   }
+
   const settings = parseSettings(rawSettings ?? DEFAULT_SETTINGS)
   if (!settings.valid) {
     excluded++
   }
+
+  // Apply the restore limits to exports so a successful download can be imported again.
   const backup = validateBackup(
     {
       backupVersion: 1,
@@ -285,10 +322,16 @@ export async function readBackupSnapshot(
     },
     validators,
   )
+
   if (new TextEncoder().encode(JSON.stringify(backup)).byteLength > BACKUP_LIMITS.bytes) {
     throw new TypeError('Committed dataset exceeds backup limits')
   }
-  return { backup, excluded, quarantined }
+
+  return {
+    backup,
+    excluded,
+    quarantined,
+  }
 }
 
 /** Replaces all player collections and their epoch atomically; the input must be fully decoded. */
@@ -311,6 +354,7 @@ export async function replaceBackupSnapshot(
     ],
     'readwrite',
   )
+
   await commitTransaction(transaction, async () => {
     const epoch = await transaction.objectStore('meta').get('epoch')
     if (
@@ -321,6 +365,8 @@ export async function replaceBackupSnapshot(
     ) {
       throw new StorageConflict('revision-conflict', 'Local data changed after backup preview')
     }
+
+    // Leases are local to the old dataset and cannot authorize writes after replacement.
     for (const store of [
       'sessions',
       'results',
@@ -333,25 +379,31 @@ export async function replaceBackupSnapshot(
     ] as const) {
       await transaction.objectStore(store).clear()
     }
+
+    // Rebase imported saves and their projections together under the new epoch.
     for (const record of backup.sessions) {
       await transaction.objectStore('sessions').put({ ...record, revision: 1 })
       await transaction
         .objectStore('sessionSummaries')
         .put(projectRecord(record.session, 1, 'sessions'))
     }
+
     for (const record of backup.results) {
       await transaction.objectStore('results').put(record)
       await transaction
         .objectStore('resultSummaries')
         .put(projectRecord(record.session, 0, 'results'))
     }
+
     for (const record of backup.lessons) {
       await transaction.objectStore('lessons').put({ formatVersion: 1, ...record })
     }
     await transaction
       .objectStore('settings')
       .put({ formatVersion: 1, ...backup.settings }, 'preferences')
+
     await transaction.objectStore('meta').put(epoch + 1, 'epoch')
-    await transaction.objectStore('meta').put(initialSummaryState(true), 'summaries')
+    const hasCompleteCoverage = true
+    await transaction.objectStore('meta').put(initialSummaryState(hasCompleteCoverage), 'summaries')
   })
 }

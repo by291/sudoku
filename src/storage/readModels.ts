@@ -28,6 +28,7 @@ export type SummarySnapshot = {
 }
 
 export type SummaryQueryKind = 'sessions' | 'results'
+
 /** Pass back unchanged; time is the internal negative-millisecond ordering key. */
 export type SummaryCursor = {
   epoch: number

@@ -6,6 +6,7 @@ import type { GameSummary, SummaryCursor } from '@/storage/readModels'
 
 type HomeSheet = { kind: 'free'; variant: SudokuVariant } | { kind: 'daily' | 'resume' }
 
+/** Own home summaries and the active sheet's paged snapshot and request lifetime. */
 export function useHomeRecords() {
   const runtime = useGameRuntime()
   const today = ref(getChallengeDate(runtime.wallNow()))
@@ -29,6 +30,19 @@ export function useHomeRecords() {
   let sheet: HomeSheet | null = null
   let maintenance: AbortController | null = null
   const sheetBlocked = computed(() => sheetBusy.value || sheetPending.value || !!sheetError.value)
+
+  function resetResumePage() {
+    resumeChoices.value = []
+    nextCursor.value = null
+    pageNumber.value = 1
+    pageCursors = [null]
+  }
+
+  function resetSheetSnapshot() {
+    selectedSave.value = null
+    dailyStatuses.value = []
+    resetResumePage()
+  }
 
   async function load() {
     const operation = ++homeOperation
@@ -72,9 +86,8 @@ export function useHomeRecords() {
     sheetBusy.value = false
     if (!response.ok) {
       if (cursor && response.error.kind === 'revision-conflict') {
-        resumeChoices.value = []
-        pageCursors = [null]
-        pageNumber.value = 1
+        // This cursor belongs to an older dataset. Restart at the first page.
+        resetResumePage()
         await loadSheet()
         return
       }
@@ -107,7 +120,11 @@ export function useHomeRecords() {
       return runtime.repository.readDailyStatuses(today.value)
     }
 
-    return runtime.repository.readSummaryPage({ kind: 'sessions', unfinishedOnly: true, cursor })
+    return runtime.repository.readSummaryPage({
+      kind: 'sessions',
+      unfinishedOnly: true,
+      cursor,
+    })
   }
 
   async function openSheet(target: HomeSheet) {
@@ -115,13 +132,8 @@ export function useHomeRecords() {
     today.value = getChallengeDate(runtime.wallNow())
     sheet = target
 
-    selectedSave.value = null
-    resumeChoices.value = []
-    dailyStatuses.value = []
+    resetSheetSnapshot()
     sheetPending.value = false
-    nextCursor.value = null
-    pageNumber.value = 1
-    pageCursors = [null]
 
     await loadSheet()
   }
@@ -188,6 +200,7 @@ export function useHomeRecords() {
     const target = sheet
     const current = sheetOperation
     await load()
+
     if (current !== sheetOperation || target !== sheet) {
       return
     }
@@ -203,12 +216,8 @@ export function useHomeRecords() {
     // Never retain summaries from the replaced dataset while the new read is pending.
     unfinishedCount.value = null
     resultCount.value = null
-    selectedSave.value = null
-    resumeChoices.value = []
-    dailyStatuses.value = []
-    nextCursor.value = null
-    pageNumber.value = 1
-    pageCursors = [null]
+    resetSheetSnapshot()
+
     void load()
     void loadSheet()
   })

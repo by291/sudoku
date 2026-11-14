@@ -12,16 +12,9 @@ import SudokuBoard from '@/shared/components/SudokuBoard.vue'
 
 const records = useRecordsStore()
 const reader = Symbol('result-view')
-onScopeDispose(() => records.releaseReader(reader))
 const route = useRoute()
+
 const session = computed(() => records.result?.session ?? null)
-watch(
-  () => route.params.id,
-  (id) => {
-    void records.loadResult(typeof id === 'string' ? id : '', reader)
-  },
-  { immediate: true },
-)
 const board = computed(() => (session.value ? sessionBoard(session.value) : []))
 const showProgress = useDelayedProgress(() => records.busy)
 const backTarget = computed(() => {
@@ -30,6 +23,15 @@ const backTarget = computed(() => {
 
   return { path: '/records', query: { variant, tab: 'history' } }
 })
+
+watch(
+  () => route.params.id,
+  (id) => {
+    void records.loadResult(typeof id === 'string' ? id : '', reader)
+  },
+  { immediate: true },
+)
+onScopeDispose(() => records.releaseReader(reader))
 </script>
 
 <template>

@@ -11,13 +11,14 @@ export interface SaveQueue {
   readonly revision: number
 }
 
+/** Serializes owned session snapshots against the lease and last committed revision. */
 export function createSaveQueue(
   repository: Pick<GameRepository, 'writeSession'>,
   token: OwnershipToken,
   initialRevision: number,
 ): SaveQueue {
   let revision = initialRevision
-  let disposed = false
+  let isDisposed = false
   let latest: GameSession | null = null
   let last: StorageOutcome<SessionRecord> | null = null
   let tail: Promise<void> = Promise.resolve()
@@ -30,11 +31,13 @@ export function createSaveQueue(
     // Snapshot synchronously: a later edit must never alter an already queued write.
     const snapshot = structuredClone(session)
     latest = snapshot
+
     const work = tail.then(async () => {
-      if (disposed) {
+      if (isDisposed) {
         return failure()
       }
 
+      // Later writes must wait until a failed revision has been retried or discarded.
       if (last && !last.ok) {
         return last
       }
@@ -62,7 +65,7 @@ export function createSaveQueue(
     flush,
     async retry() {
       await tail
-      if (disposed) {
+      if (isDisposed) {
         return failure()
       }
 
@@ -74,6 +77,7 @@ export function createSaveQueue(
         return last
       }
 
+      // Intermediate snapshots are superseded by the latest edits at the same revision.
       if (latest) {
         last = null
         await enqueue(latest)
@@ -82,7 +86,7 @@ export function createSaveQueue(
       return flush()
     },
     dispose() {
-      disposed = true
+      isDisposed = true
     },
     get revision() {
       return revision

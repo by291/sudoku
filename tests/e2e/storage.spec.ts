@@ -151,13 +151,12 @@ test('allows memory-only play when IndexedDB cannot open and saves after recover
   // An explicit start retains the fenced memory-only path; setup cannot infer an empty save slot.
   await page.goto('/#/play/free?start=1&difficulty=easy')
   await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
-  await expect(
-    page
-      .getByRole('alert')
-      .filter({ hasText: '仅在内存中' })
-      .or(page.getByRole('alert').filter({ hasText: '暂存在内存中' }))
-      .first(),
-  ).toBeVisible()
+  const alerts = page.getByRole('alert')
+  const memoryOnlyNotice = alerts
+    .filter({ hasText: '仅在内存中' })
+    .or(alerts.filter({ hasText: '暂存在内存中' }))
+    .first()
+  await expect(memoryOnlyNotice).toBeVisible()
   await page.getByRole('button', { name: /空格/ }).first().click()
   await enterGameDigit(page, 1)
   await page.evaluate(() => window.dispatchEvent(new Event('restore-test-storage')))

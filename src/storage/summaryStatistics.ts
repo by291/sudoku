@@ -20,6 +20,7 @@ export class ResultStatistics {
 
   constructor(private readonly today: string) {}
 
+  /** Includes a completed result in its mode and assistance category. */
   add(result: GameSummary): void {
     this.completedCount++
     const classification = result.assisted ? 'assisted' : 'unassisted'
@@ -32,7 +33,7 @@ export class ResultStatistics {
     if (result.metadata.kind === 'daily' && result.metadata.formalAttempt && result.completedAt) {
       this.dailyTotals[classification]++
       const date = result.metadata.challengeDate
-      // A late formal finish still counts as a result, but only the Beijing challenge day earns a streak.
+      // Late formal finishes count toward totals. Streaks require the Beijing challenge day.
       if (date <= this.today && getChallengeDate(new Date(result.completedAt)) === date) {
         this.eligibleDays.add(Date.parse(`${date}T00:00:00Z`) / DAY_MS)
       }
@@ -51,6 +52,7 @@ export class ResultStatistics {
     }
 
     let day = Date.parse(`${this.today}T00:00:00Z`) / DAY_MS
+    // A player can still continue yesterday's streak by completing today's challenge.
     if (!this.eligibleDays.has(day)) {
       day--
     }

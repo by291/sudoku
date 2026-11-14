@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto'
 import { afterEach, expect, it, vi } from 'vitest'
 import { deleteDB, unwrap } from 'idb'
 import { openSudokuDatabase } from '@/storage/database'
+import { DEFAULT_SETTINGS } from '@/features/settings/model/preferences'
 
 import { makeAssessment, makeSession } from '../../tests/support/gameFixtures'
 import { deferred } from '../../tests/support/deferred'
@@ -56,6 +57,7 @@ it('keeps corrupt assessment metadata out of quarantine and preserves completed 
   })
   expect(await database.count('quarantine')).toBe(0)
 })
+
 it('upgrades an empty database and round-trips settings and progress', async () => {
   const { database, repository } = await setup()
 
@@ -74,10 +76,10 @@ it('upgrades an empty database and round-trips settings and progress', async () 
 
   expect(await repository.readLessonProgress()).toEqual({ ok: true, value: [progress] })
 })
+
 it('isolates corrupt records and preserves valid saves during cleanup', async () => {
   const { database, repository } = await setup()
 
-  expect(database.objectStoreNames.contains('sessions')).toBe(true)
   const valid = { formatVersion: 1, revision: 0, session: makeSession() }
   await database.put('sessions', valid)
   await database.put('sessions', {
@@ -96,6 +98,7 @@ it('isolates corrupt records and preserves valid saves during cleanup', async ()
   expect(await database.count('quarantine')).toBe(0)
   expect(await database.count('sessions')).toBe(1)
 })
+
 it('returns an explicit failure when IndexedDB cannot open', async () => {
   const repository = createGameRepository(() => Promise.reject(new Error('Storage blocked')))
 
@@ -382,7 +385,7 @@ it('keeps saved records when synchronous semantic validation cannot complete', a
       ok: false,
       error: { kind: 'unavailable' },
     })
-    // A incomplete semantic validation must outrank the write-failed policy and preserve the saved revision.
+    // Inconclusive validation takes precedence and preserves the saved revision.
     expect(
       await repository.writeSession(record.session, record.revision, lease.value),
     ).toMatchObject({
@@ -394,5 +397,73 @@ it('keeps saved records when synchronous semantic validation cannot complete', a
   } finally {
     owner.dispose()
     engine.dispose()
+  }
+})
+
+it('retains player data when the dataset epoch cannot advance', async () => {
+  const { database, repository } = await setup()
+  const epoch = Number.MAX_SAFE_INTEGER
+  const session = makeSession()
+  await database.put('meta', epoch, 'epoch')
+  await database.put('sessions', { formatVersion: 2, revision: 1, session })
+
+  const result = await repository.clearAll()
+
+  expect(result).toMatchObject({ ok: false, error: { kind: 'write-failed' } })
+  expect(await repository.readDatasetEpoch()).toEqual({ ok: true, value: epoch })
+  expect(await database.count('sessions')).toBe(1)
+})
+
+it('retains the saved record when its revision cannot advance', async () => {
+  const { database, repository } = await setup()
+  const ownership = createOwnershipCoordinator(() => Promise.resolve(database), { channel: null })
+  const session = makeSession()
+  const record = { formatVersion: 2, revision: Number.MAX_SAFE_INTEGER, session }
+  await database.put('sessions', record)
+  const lease = await ownership.acquireOwnership(session.id, 'test-owner')
+  if (!lease.ok || !lease.value) {
+    throw new Error('Fixture lease failed')
+  }
+
+  const result = await repository.writeSession(
+    { ...session, elapsedMs: 1000 },
+    record.revision,
+    lease.value,
+  )
+
+  expect(result).toMatchObject({ ok: false, error: { kind: 'write-failed' } })
+  expect(await database.get('sessions', session.id)).toEqual(record)
+  ownership.dispose()
+})
+
+it('reports notification failures separately from committed dataset replacements', async () => {
+  const { database } = await setup()
+  const failure = new Error('Reset notification failed')
+  const report = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const repository = createGameRepository(() => Promise.resolve(database), {
+    onReset: () => {
+      throw failure
+    },
+  })
+  const backup = JSON.stringify({
+    backupVersion: 1,
+    exportedAt: '2026-10-11T01:00:00.000Z',
+    sessions: [],
+    results: [],
+    lessons: [],
+    settings: DEFAULT_SETTINGS,
+  })
+
+  try {
+    const restored = await repository.restoreBackup(backup, 1)
+    const cleared = await repository.clearAll()
+
+    expect(restored).toEqual({ ok: true, value: undefined })
+    expect(cleared).toEqual({ ok: true, value: undefined })
+    expect(await repository.readDatasetEpoch()).toEqual({ ok: true, value: 3 })
+    expect(report).toHaveBeenCalledTimes(2)
+    expect(report).toHaveBeenCalledWith(expect.any(String), failure)
+  } finally {
+    report.mockRestore()
   }
 })

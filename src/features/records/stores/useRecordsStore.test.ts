@@ -550,3 +550,28 @@ it('does not publish an obsolete save failure into a newer backup after dataset 
   game.dispose()
   test.dispose()
 })
+
+it('retries mismatched records snapshots before publishing matching counts and rows', async () => {
+  const test = await createTestRuntime()
+  const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
+  const overview = vi.spyOn(test.runtime.repository, 'readOverview')
+  overview.mockResolvedValueOnce({
+    ok: true,
+    value: {
+      coverage: 'ready',
+      epoch: 1,
+      generation: 99,
+      summary: null,
+      completedCount: 99,
+    },
+  })
+
+  await records.load()
+
+  expect(overview).toHaveBeenCalledTimes(2)
+  expect(records.completedCount).toBe(0)
+  expect(records.completionCounts?.classic).toBe(0)
+  expect(records.loaded).toBe(true)
+  records.dispose()
+  test.dispose()
+})

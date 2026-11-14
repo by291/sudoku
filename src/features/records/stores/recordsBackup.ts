@@ -11,11 +11,11 @@ export type BackupRestoreOperation = {
 }
 export type BackupFileError = 'too-large' | 'unreadable'
 
-// Own backup work and preview identity; the public store settles saves and resets other stores.
+/** Owns backup work and preview identity while the public store coordinates other stores. */
 export function createRecordsBackup(
   runtime: Pick<GameRuntime, 'repository' | 'wallNow' | 'ensureEngine' | 'engine'>,
 ) {
-  const backupBusy = ref(false)
+  const isBackupBusy = ref(false)
   const backupError = ref<string | null>(null)
   const backupPreview = shallowRef<BackupPreview | null>(null)
   const notice = ref<string | null>(null)
@@ -29,7 +29,7 @@ export function createRecordsBackup(
 
   function beginOperation(): BackupOperation {
     operation = Symbol('backup')
-    backupBusy.value = true
+    isBackupBusy.value = true
     backupError.value = null
 
     return operation
@@ -38,7 +38,7 @@ export function createRecordsBackup(
   function finishOperation(current: BackupOperation) {
     // An obsolete completion cannot release the busy state owned by a newer operation.
     if (isCurrent(current)) {
-      backupBusy.value = false
+      isBackupBusy.value = false
     }
   }
 
@@ -78,9 +78,12 @@ export function createRecordsBackup(
       return null
     }
 
-    notice.value = `备份已准备：${result.value.backup.sessions.length} 个存档、${result.value.backup.results.length} 条成绩、${result.value.backup.lessons.length} 条课程进度。已隔离 ${result.value.quarantined} 条，另排除 ${result.value.excluded} 条无效记录。`
+    const { backup, quarantined: quarantinedCount, excluded } = result.value
+    const counts = `${backup.sessions.length} 个存档、${backup.results.length} 条成绩、${backup.lessons.length} 条课程进度`
+    const exclusions = `已隔离 ${quarantinedCount} 条，另排除 ${excluded} 条无效记录。`
+    notice.value = `备份已准备：${counts}。${exclusions}`
 
-    return JSON.stringify(result.value.backup)
+    return JSON.stringify(backup)
   }
 
   function cancelRestore() {
@@ -100,20 +103,29 @@ export function createRecordsBackup(
         : '备份文件读取失败，请重新选择文件。'
   }
 
+  async function validatePreview(text: string, current: BackupOperation) {
+    try {
+      await runtime.ensureEngine()
+
+      // A replacement can invalidate this preview while the engine becomes ready.
+      if (!isCurrent(current)) {
+        return null
+      }
+
+      return parseBackup(text, runtime.engine)
+    } catch {
+      reportError(current, '备份校验暂时无法完成，请重试。本机数据没有改变。')
+      return null
+    }
+  }
+
   async function previewRestore(text: string) {
     cancelRestore()
     const current = beginOperation()
 
     try {
-      let parsed
-      try {
-        await runtime.ensureEngine()
-        if (!isCurrent(current)) {
-          return
-        }
-        parsed = parseBackup(text, runtime.engine)
-      } catch {
-        reportError(current, '备份校验暂时无法完成，请重试。本机数据没有改变。')
+      const parsed = await validatePreview(text, current)
+      if (!parsed || !isCurrent(current)) {
         return
       }
       if (!parsed.valid) {
@@ -167,7 +179,7 @@ export function createRecordsBackup(
 
   function beginClear(): BackupOperation {
     operation = Symbol('clear')
-    backupBusy.value = true
+    isBackupBusy.value = true
     notice.value = null
 
     return operation
@@ -189,7 +201,7 @@ export function createRecordsBackup(
     operation = Symbol('reset')
     cancelRestore()
     quarantined.value = 0
-    backupBusy.value = false
+    isBackupBusy.value = false
   }
 
   function dispose() {
@@ -197,7 +209,7 @@ export function createRecordsBackup(
   }
 
   return {
-    backupBusy,
+    backupBusy: isBackupBusy,
     backupError,
     backupPreview,
     notice,

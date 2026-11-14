@@ -2,25 +2,34 @@ import { ref, shallowRef } from 'vue'
 import type { GameRuntime } from '@/runtime'
 import { getChallengeDate } from '@/features/game/model/daily'
 import type { SudokuVariant } from '@/sudoku/contracts'
-import type { GameSummary, RecordSummary, SummaryCursor } from '@/storage/readModels'
+import type {
+  CompletionCountsRead,
+  GameSummary,
+  OverviewRead,
+  RecordSummary,
+  SummaryCursor,
+  SummaryPage,
+} from '@/storage/readModels'
 import type { ResultRecord } from '@/storage/records'
 
 export type RecordsSelection = { tab: 'overview' | 'saves' | 'history'; variant: SudokuVariant }
 type ActiveSelection = RecordsSelection | { tab: 'result'; id: string }
 
-// Own the current read snapshot, its paging history and cancellable legacy maintenance.
+const SNAPSHOT_READ_ATTEMPTS = 2
+
+/** Owns the selected read snapshot, its paging history and cancellable legacy maintenance. */
 export function createRecordsReader(runtime: Pick<GameRuntime, 'repository' | 'wallNow'>) {
   const rows = shallowRef<readonly GameSummary[]>([])
   const summary = shallowRef<RecordSummary | null>(null)
   const completedCount = ref<number | null>(null)
   const completionCounts = shallowRef<Record<SudokuVariant, number> | null>(null)
   const result = shallowRef<ResultRecord | null>(null)
-  const pending = ref(false)
+  const isPending = ref(false)
   const nextCursor = shallowRef<SummaryCursor | null>(null)
   const pageNumber = ref(1)
   const error = ref<string | null>(null)
-  const readBusy = ref(false)
-  const loaded = ref(false)
+  const isReadBusy = ref(false)
+  const isLoaded = ref(false)
   const today = ref(getChallengeDate(runtime.wallNow()))
   let pageCursors: (SummaryCursor | null)[] = [null]
   let selection: ActiveSelection | null = null
@@ -33,76 +42,136 @@ export function createRecordsReader(runtime: Pick<GameRuntime, 'repository' | 'w
     summary.value = null
     completedCount.value = null
     result.value = null
-    loaded.value = false
-    pending.value = false
+    isLoaded.value = false
+    isPending.value = false
     nextCursor.value = null
     pageNumber.value = 1
     pageCursors = [null]
   }
 
-  async function readSelection(target: ActiveSelection, cursor: SummaryCursor | null = null) {
-    maintenance?.abort()
-    maintenance = null
-    const current = ++operation
-    today.value = getChallengeDate(runtime.wallNow())
-    readBusy.value = true
-    error.value = null
+  async function readResultSelection(id: string, current: number) {
+    const response = await runtime.repository.readResult(id)
 
-    if (target.tab === 'result') {
-      const response = await runtime.repository.readResult(target.id)
-      if (current !== operation) {
-        return
-      }
-
-      readBusy.value = false
-      if (!response.ok) {
-        error.value = '本机记录读取失败，请重试。'
-        return
-      }
-
-      result.value = response.value
-      loaded.value = true
+    // A newer selection or a released reader owns the outcome after the read settles.
+    if (!isCurrent(current)) {
       return
     }
 
-    const [response, counts] = await Promise.all([
-      target.tab === 'overview'
-        ? runtime.repository.readOverview(target.variant, today.value)
-        : runtime.repository.readSummaryPage({
-            kind: target.tab === 'saves' ? 'sessions' : 'results',
-            variant: target.variant,
-            cursor,
-          }),
-      runtime.repository.readCompletionCounts(),
-    ])
-    if (current !== operation) {
-      return
-    }
-
-    readBusy.value = false
-    if (!response.ok || !counts.ok) {
-      // A cursor belongs to one dataset generation; restart rather than mix snapshots.
-      if (!response.ok && cursor && response.error.kind === 'revision-conflict') {
-        clearReadSnapshot()
-        await readSelection(target)
-        return
-      }
+    isReadBusy.value = false
+    if (!response.ok) {
       error.value = '本机记录读取失败，请重试。'
       return
     }
 
-    completionCounts.value = counts.value.counts
-    pending.value = response.value.coverage === 'pending' || counts.value.coverage === 'pending'
-    if (response.value.coverage === 'ready') {
-      if ('summary' in response.value) {
-        summary.value = response.value.summary
-        completedCount.value = response.value.completedCount
+    result.value = response.value
+    isLoaded.value = true
+  }
+
+  function publishCatalogueSnapshot(
+    selected: SummaryPage | OverviewRead,
+    navigation: CompletionCountsRead,
+  ) {
+    if (selected.coverage === 'pending') {
+      // A repair invalidated the old page, so it cannot be shown with the new counts.
+      clearReadSnapshot()
+    } else {
+      if ('summary' in selected) {
+        summary.value = selected.summary
+        completedCount.value = selected.completedCount
       } else {
-        rows.value = response.value.rows
-        nextCursor.value = response.value.nextCursor
+        rows.value = selected.rows
+        nextCursor.value = selected.nextCursor
       }
-      loaded.value = true
+      isLoaded.value = true
     }
+
+    completionCounts.value = navigation.counts
+    isPending.value = selected.coverage === 'pending' || navigation.coverage === 'pending'
+  }
+
+  function readSelectedCatalogue(
+    target: RecordsSelection,
+    cursor: SummaryCursor | null,
+    challengeDate: string,
+  ) {
+    if (target.tab === 'overview') {
+      return runtime.repository.readOverview(target.variant, challengeDate)
+    }
+
+    return runtime.repository.readSummaryPage({
+      kind: target.tab === 'saves' ? 'sessions' : 'results',
+      variant: target.variant,
+      cursor,
+    })
+  }
+
+  async function readCatalogueSelection(
+    target: RecordsSelection,
+    cursor: SummaryCursor | null,
+    current: number,
+  ) {
+    const challengeDate = today.value
+    let pageCursor = cursor
+
+    for (let attempt = 0; attempt < SNAPSHOT_READ_ATTEMPTS; attempt++) {
+      const selectedRead = readSelectedCatalogue(target, pageCursor, challengeDate)
+      const [response, counts] = await Promise.all([
+        selectedRead,
+        runtime.repository.readCompletionCounts(),
+      ])
+
+      if (!isCurrent(current)) {
+        return
+      }
+
+      if (!response.ok && pageCursor && response.error.kind === 'revision-conflict') {
+        // A cursor can only resume the generation that produced its preceding page.
+        clearReadSnapshot()
+        pageCursor = null
+        continue
+      }
+      if (!response.ok || !counts.ok) {
+        break
+      }
+
+      const selected = response.value
+      const navigation = counts.value
+      const isSameSnapshot =
+        selected.epoch === navigation.epoch && selected.generation === navigation.generation
+      if (!isSameSnapshot) {
+        // Separate transactions can straddle a write or a dataset replacement.
+        if (selected.epoch !== navigation.epoch) {
+          clearReadSnapshot()
+          completionCounts.value = null
+          pageCursor = null
+        }
+        continue
+      }
+
+      publishCatalogueSnapshot(selected, navigation)
+      isReadBusy.value = false
+      return
+    }
+
+    isReadBusy.value = false
+    error.value = '本机记录读取失败，请重试。'
+  }
+
+  async function readSelection(target: ActiveSelection, cursor: SummaryCursor | null = null) {
+    maintenance?.abort()
+    maintenance = null
+
+    const current = ++operation
+    today.value = getChallengeDate(runtime.wallNow())
+    isReadBusy.value = true
+    error.value = null
+
+    if (target.tab === 'result') {
+      await readResultSelection(target.id, current)
+      return
+    }
+
+    await readCatalogueSelection(target, cursor, current)
   }
 
   async function load(target?: RecordsSelection, owner?: symbol) {
@@ -152,14 +221,14 @@ export function createRecordsReader(runtime: Pick<GameRuntime, 'repository' | 'w
     maintenance = null
     selection = null
     readOwner = null
-    readBusy.value = false
+    isReadBusy.value = false
     completionCounts.value = null
     clearReadSnapshot()
   }
 
   async function changePage(direction: 'next' | 'previous') {
     if (
-      readBusy.value ||
+      isReadBusy.value ||
       !selection ||
       selection.tab === 'overview' ||
       selection.tab === 'result'
@@ -187,25 +256,28 @@ export function createRecordsReader(runtime: Pick<GameRuntime, 'repository' | 'w
     await reading
 
     // A late page failure cannot roll back the page number of a newer filter or reader.
-    if (current === operation && target === selection && error.value) {
+    if (current === operation && target === selection && error.value && isLoaded.value) {
       pageNumber.value = previousPage
     }
   }
 
   async function retry() {
-    if (pending.value) {
+    if (isPending.value) {
       maintenance?.abort()
       const controller = new AbortController()
       maintenance = controller
       const current = ++operation
-      readBusy.value = true
+      isReadBusy.value = true
       error.value = null
+
       const response = await runtime.repository.maintainSummaries(controller.signal)
-      if (current !== operation) {
+
+      // A stale repair may have committed a record but cannot publish into a newer view.
+      if (!isCurrent(current)) {
         return
       }
 
-      readBusy.value = false
+      isReadBusy.value = false
       if (!response.ok) {
         error.value = '旧存档整理暂时无法完成，请重试。原始数据仍然保留。'
         return
@@ -223,7 +295,7 @@ export function createRecordsReader(runtime: Pick<GameRuntime, 'repository' | 'w
     clearReadSnapshot()
     completionCounts.value = null
     error.value = null
-    readBusy.value = true
+    isReadBusy.value = true
 
     return current
   }
@@ -240,7 +312,7 @@ export function createRecordsReader(runtime: Pick<GameRuntime, 'repository' | 'w
     if (selection) {
       await readSelection(selection)
     } else {
-      readBusy.value = false
+      isReadBusy.value = false
     }
   }
 
@@ -256,12 +328,12 @@ export function createRecordsReader(runtime: Pick<GameRuntime, 'repository' | 'w
     completedCount,
     completionCounts,
     result,
-    pending,
+    pending: isPending,
     nextCursor,
     pageNumber,
     error,
-    readBusy,
-    loaded,
+    readBusy: isReadBusy,
+    loaded: isLoaded,
     today,
     load,
     loadResult,

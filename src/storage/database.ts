@@ -37,6 +37,7 @@ export interface SudokuDatabase extends DBSchema {
 
 export type DatabaseProvider = () => Promise<IDBPDatabase<SudokuDatabase>>
 
+/** Opens the local database and upgrades indexes without reading canonical player data. */
 export function openSudokuDatabase(name = 'sudoku-local'): Promise<IDBPDatabase<SudokuDatabase>> {
   return openDB<SudokuDatabase>(name, 2, {
     upgrade(database, oldVersion, _newVersion, transaction) {
@@ -48,7 +49,13 @@ export function openSudokuDatabase(name = 'sudoku-local'): Promise<IDBPDatabase<
         database.createObjectStore('results', { keyPath: 'session.id' })
         database.createObjectStore('lessons', { keyPath: 'lessonId' })
 
-        for (const store of ['settings', 'quarantine', 'leases', 'meta'] as const) {
+        for (const store of [
+          // These stores have explicit keys; only canonical collections need inline identities.
+          'settings',
+          'quarantine',
+          'leases',
+          'meta',
+        ] as const) {
           database.createObjectStore(store)
         }
 
@@ -66,17 +73,21 @@ export function openSudokuDatabase(name = 'sudoku-local'): Promise<IDBPDatabase<
         for (const name of ['sessionSummaries', 'resultSummaries'] as const) {
           const store = database.createObjectStore(name, { keyPath: 'id' })
           store.createIndex('by-order', ['orderTime', 'id'])
-          store.createIndex('by-variant-order', ['variant', 'orderTime', 'id'])
-          store.createIndex('by-mode-order', ['mode', 'orderTime', 'id'])
-          store.createIndex('by-variant-mode-order', ['variant', 'mode', 'orderTime', 'id'])
-          store.createIndex('by-unfinished-order', ['unfinished', 'orderTime', 'id'])
+          // Every index shares the same order and stable ID tie-breaker.
+          const orderKeys = ['orderTime', 'id']
+          store.createIndex('by-variant-order', ['variant', ...orderKeys])
+          store.createIndex('by-mode-order', ['mode', ...orderKeys])
+          const variantModeKeys = ['variant', 'mode']
+          store.createIndex('by-variant-mode-order', variantModeKeys.concat(orderKeys))
+          store.createIndex('by-unfinished-order', ['unfinished', ...orderKeys])
           store.createIndex('by-variant-unfinished-order', [
             'variant',
             'unfinished',
             'orderTime',
             'id',
           ])
-          store.createIndex('by-mode-unfinished-order', ['mode', 'unfinished', 'orderTime', 'id'])
+          const modeUnfinishedKeys = ['mode', 'unfinished']
+          store.createIndex('by-mode-unfinished-order', modeUnfinishedKeys.concat(orderKeys))
           store.createIndex('by-variant-mode-unfinished-order', [
             'variant',
             'mode',
@@ -85,7 +96,8 @@ export function openSudokuDatabase(name = 'sudoku-local'): Promise<IDBPDatabase<
             'id',
           ])
         }
-        // Upgrades never load or validate canonical payloads; legacy coverage is explicit.
+
+        // Existing payloads require a separate backfill, outside the version-change transaction.
         unwrap(transaction.objectStore('meta')).put(
           initialSummaryState(oldVersion === 0),
           'summaries',
@@ -101,6 +113,7 @@ export function openSudokuDatabase(name = 'sudoku-local'): Promise<IDBPDatabase<
   })
 }
 
+/** Runs transaction work and resolves only after IndexedDB commits its requests. */
 export async function commitTransaction<T>(
   transaction: { done: Promise<void>; abort(): void },
   operation: () => Promise<T>,
@@ -120,6 +133,7 @@ export async function commitTransaction<T>(
       }
       throw error
     })
+  // Request success precedes commit. Either promise can still report transaction failure.
   const [value] = await Promise.all([work, transaction.done])
 
   return value

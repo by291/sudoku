@@ -9,7 +9,12 @@ import type { StorageOutcome } from '@/storage/records'
 export const LEASE_DURATION_MS = 6000
 export const LEASE_RENEWAL_MS = 2000
 
-export type OwnershipToken = { sessionId: string; ownerId: string; fence: number; epoch: number }
+export type OwnershipToken = {
+  sessionId: string
+  ownerId: string
+  fence: number
+  epoch: number
+}
 
 type Lease = OwnershipToken & { expiresAt: number }
 
@@ -73,6 +78,7 @@ type OwnershipTransaction = IDBPTransaction<
   'readwrite'
 >
 
+/** Rejects expired leases or stale fences inside the transaction that will write the session. */
 export async function assertOwnership(
   transaction: OwnershipTransaction,
   token: OwnershipToken,
@@ -92,36 +98,49 @@ export async function assertOwnership(
   }
 }
 
+function defaultChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === 'undefined') {
+    return null
+  }
+
+  return new BroadcastChannel('sudoku-local')
+}
+
+function parseNotice(value: unknown): OwnershipNotice | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (value.kind === 'ownership' && isIdentifier(value.sessionId)) {
+    return { kind: 'ownership', sessionId: value.sessionId }
+  }
+  if (value.kind === 'reset' && isNonnegativeInteger(value.epoch)) {
+    return { kind: 'reset', epoch: value.epoch }
+  }
+
+  return null
+}
+
+/** Coordinates editing leases across tabs, with optional peer notifications. */
 export function createOwnershipCoordinator(
   database: DatabaseProvider,
   options: { now?: () => number; channel?: BroadcastChannel | null } = {},
 ): OwnershipCoordinator {
   const now = options.now ?? Date.now
-  const channel =
-    options.channel === undefined
-      ? typeof BroadcastChannel === 'undefined'
-        ? null
-        : new BroadcastChannel('sudoku-local')
-      : options.channel
+  const channel = options.channel === undefined ? defaultChannel() : options.channel
   const listeners = new Set<(notice: OwnershipNotice) => void>()
+
   const receive = (event: MessageEvent<unknown>) => {
-    const value = event.data
-    if (!isRecord(value)) {
+    const notice = parseNotice(event.data)
+    if (!notice) {
       return
     }
 
-    const notice: OwnershipNotice | null =
-      value.kind === 'ownership' && isIdentifier(value.sessionId)
-        ? { kind: 'ownership', sessionId: value.sessionId }
-        : value.kind === 'reset' && isNonnegativeInteger(value.epoch)
-          ? { kind: 'reset', epoch: value.epoch }
-          : null
-    if (notice) {
-      for (const listener of listeners) {
-        listener(notice)
-      }
+    for (const listener of listeners) {
+      listener(notice)
     }
   }
+
   channel?.addEventListener('message', receive)
   const publish = (notice: OwnershipNotice) => channel?.postMessage(notice)
 
@@ -166,13 +185,22 @@ export function createOwnershipCoordinator(
           return null
         }
 
-        const fence =
-          previous && previous.epoch === epoch
-            ? previous.ownerId === ownerId && previous.expiresAt > now()
-              ? previous.fence
-              : previous.fence + 1
-            : 1
-        const token = { sessionId, ownerId, fence, epoch }
+        // A still-active lease for this owner can keep its fence. A takeover needs a fresh one.
+        let fence = 1
+        if (previous && previous.epoch === epoch) {
+          const isSameActiveOwner = previous.ownerId === ownerId && previous.expiresAt > now()
+          fence = isSameActiveOwner ? previous.fence : previous.fence + 1
+        }
+        if (!isNonnegativeInteger(fence)) {
+          throw new TypeError('Editing lease fence exhausted')
+        }
+
+        const token = {
+          sessionId,
+          ownerId,
+          fence,
+          epoch,
+        }
         await transaction
           .objectStore('leases')
           .put({ ...token, expiresAt: now() + LEASE_DURATION_MS }, sessionId)
@@ -212,6 +240,7 @@ export function createOwnershipCoordinator(
           lease.ownerId === token.ownerId &&
           lease.fence === token.fence
         ) {
+          // Keep the fence so reacquiring this session cannot make an old token valid again.
           await transaction.objectStore('leases').put({ ...lease, expiresAt: 0 }, token.sessionId)
         }
       })

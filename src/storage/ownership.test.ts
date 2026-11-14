@@ -166,3 +166,22 @@ it('commits one result and rejects a queued snapshot after reset', async () => {
   queue.dispose()
   owner.dispose()
 })
+
+it('retains an expired lease when its fence cannot advance', async () => {
+  const clock = await setup()
+  const owner = createOwnershipCoordinator(clock.provider, { now: clock.now, channel: null })
+  const previous = {
+    sessionId: 'game',
+    ownerId: 'previous-tab',
+    fence: Number.MAX_SAFE_INTEGER,
+    epoch: 1,
+    expiresAt: 0,
+  }
+  await clock.database.put('leases', previous, previous.sessionId)
+
+  const acquired = await owner.acquireOwnership(previous.sessionId, 'next-tab')
+
+  expect(acquired).toMatchObject({ ok: false, error: { kind: 'unavailable' } })
+  expect(await clock.database.get('leases', previous.sessionId)).toEqual(previous)
+  owner.dispose()
+})

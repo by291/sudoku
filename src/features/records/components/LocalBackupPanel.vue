@@ -9,11 +9,15 @@ import { useDelayedProgress } from '@/shared/composables/useDelayedProgress'
 const records = useRecordsStore()
 const importButton = useTemplateRef<InstanceType<typeof NButton>>('importButton')
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
-const reading = ref(false)
-const showReading = useDelayedProgress(reading)
+const isReading = ref(false)
+const showReading = useDelayedProgress(isReading)
 const showBusy = useDelayedProgress(() => records.backupBusy)
 let fileGeneration = 0
-onScopeDispose(() => fileGeneration++)
+
+// A file read can finish after this view unmounts. Invalidate its publication.
+onScopeDispose(() => {
+  fileGeneration++
+})
 
 function focusImport() {
   const trigger: unknown = importButton.value?.$el
@@ -27,11 +31,14 @@ async function downloadBackup() {
   if (text === null) {
     return
   }
+
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
   const link = document.createElement('a')
   link.href = url
-  link.download = `sudoku-backup-${new Date().toISOString().replaceAll(':', '-')}.json`
+  const timestamp = new Date().toISOString().replaceAll(':', '-')
+  link.download = `sudoku-backup-${timestamp}.json`
   link.click()
+
   // The browser consumes the object URL asynchronously when starting the download.
   setTimeout(() => URL.revokeObjectURL(url), 1000)
   void records.inspectBackup()
@@ -41,22 +48,31 @@ async function readBackupFile(event: Event) {
   if (!(event.target instanceof HTMLInputElement)) {
     return
   }
+
   const file = event.target.files?.[0]
+  // Reset the native selection so choosing the same file triggers another change.
   event.target.value = ''
   if (!file) {
     return
   }
-  const current = ++fileGeneration
+
+  fileGeneration++
+  const current = fileGeneration
   records.beginBackupFileSelection()
   if (file.size > BACKUP_LIMITS.bytes) {
     records.reportBackupFileError('too-large')
     return
   }
-  reading.value = true
+
+  isReading.value = true
   try {
     const text = await file.text()
+    if (current !== fileGeneration) {
+      return
+    }
+
+    await records.previewRestore(text)
     if (current === fileGeneration) {
-      await records.previewRestore(text)
       void records.inspectBackup()
     }
   } catch {
@@ -65,7 +81,7 @@ async function readBackupFile(event: Event) {
     }
   } finally {
     if (current === fileGeneration) {
-      reading.value = false
+      isReading.value = false
     }
   }
 }
@@ -87,20 +103,20 @@ async function confirmRestore() {
   <section class="panel backup-panel" aria-labelledby="backup-heading">
     <h2 id="backup-heading">本地备份与恢复</h2>
     <p class="muted">把存档、成绩、课程进度和设置保存为文件，留作浏览器数据丢失后的恢复副本。</p>
-    <div class="backup-actions" :aria-busy="records.busy || reading">
+    <div class="backup-actions" :aria-busy="records.busy || isReading">
       <NButton
         ref="importButton"
-        :disabled="records.busy || reading"
+        :disabled="records.busy || isReading"
         :aria-describedby="records.backupError ? 'backup-error' : undefined"
         @click="fileInput?.click()"
         >导入备份</NButton
       >
-      <NButton :disabled="records.busy || reading" @click="downloadBackup">导出备份</NButton>
+      <NButton :disabled="records.busy || isReading" @click="downloadBackup">导出备份</NButton>
       <input
         ref="fileInput"
         class="file-input"
         type="file"
-        :disabled="records.busy || reading"
+        :disabled="records.busy || isReading"
         accept=".json,application/json"
         aria-label="选择备份文件"
         @change="readBackupFile"

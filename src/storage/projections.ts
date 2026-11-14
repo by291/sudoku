@@ -32,19 +32,23 @@ export type ProjectionTransaction = IDBPTransaction<
   'readwrite'
 >
 
-export function initialSummaryState(complete: boolean): SummaryState {
+/** Creates independent coverage checkpoints for sessions and results. */
+export function initialSummaryState(isComplete: boolean): SummaryState {
   return {
     generation: 1,
-    sessions: { complete, after: null },
-    results: { complete, after: null },
+    sessions: { complete: isComplete, after: null },
+    results: { complete: isComplete, after: null },
   }
 }
 
+/** Decodes coverage metadata, resetting invalid per-collection checkpoints. */
 export function parseSummaryState(value: unknown): SummaryState {
   if (!isRecord(value) || !isNonnegativeInteger(value.generation)) {
     throw new TypeError('Invalid summary coverage')
   }
-  const state = initialSummaryState(false)
+
+  const hasCompleteCoverage = false
+  const state = initialSummaryState(hasCompleteCoverage)
   state.generation = value.generation
   for (const kind of ['sessions', 'results'] as const) {
     const source = value[kind]
@@ -60,10 +64,12 @@ export function parseSummaryState(value: unknown): SummaryState {
   return state
 }
 
+/** Maps a canonical collection to its derived projection store. */
 export function summaryStore(kind: SummaryQueryKind) {
   return kind === 'sessions' ? 'sessionSummaries' : 'resultSummaries'
 }
 
+/** Creates compact browsing facts with the required ordering keys. */
 export function projectRecord(
   session: GameSession,
   revision: number,
@@ -105,6 +111,7 @@ export function projectRecord(
 
 export class InvalidStoredSummary extends Error {}
 
+/** Decodes a projection and verifies its derived index fields. */
 export function parseSummary(value: unknown, kind: SummaryQueryKind): StoredSummary {
   if (
     !isRecord(value) ||
@@ -167,6 +174,7 @@ export function parseSummary(value: unknown, kind: SummaryQueryKind): StoredSumm
   }
 }
 
+/** Invalidates existing cursors inside the canonical write transaction. */
 export async function advanceSummaryGeneration(
   transaction: ProjectionTransaction,
 ): Promise<SummaryState> {

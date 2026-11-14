@@ -112,6 +112,7 @@ async function assertDatasetEpoch(
   }
 }
 
+/** Classifies an operation error without exposing its implementation to callers. */
 export function storageError(
   error: unknown,
   kind: 'unavailable' | 'write-failed',
@@ -122,12 +123,21 @@ export function storageError(
   }
 }
 
+const RECOVERY_STORES = [
+  // Moving a record to quarantine also invalidates its projection and pagination cursors.
+  'sessionSummaries',
+  'resultSummaries',
+  'quarantine',
+  'meta',
+] as const
+
 type AccessPolicy = {
   /** Failure classification only; each operation selects its own IndexedDB transaction mode. */
   failureKind?: 'unavailable' | 'write-failed'
   prepareValidation?: boolean
 }
 
+/** Creates the canonical player-data repository and its transactional summary boundary. */
 export function createGameRepository(
   database: DatabaseProvider,
   validators: SnapshotValidators,
@@ -137,14 +147,20 @@ export function createGameRepository(
     prepareValidation?: () => Promise<void>
   } = {},
 ): GameRepository {
-  function isMatchingPrevious(raw: unknown, previous: { id: string; revision: number }): boolean {
-    const parsed = parseSessionRecord(raw, validators)
+  function isMatchingPrevious(
+    record: SessionRecord,
+    previous: { id: string; revision: number },
+  ): boolean {
+    return record.session.id === previous.id && record.revision === previous.revision
+  }
 
-    return (
-      parsed.valid &&
-      parsed.value.session.id === previous.id &&
-      parsed.value.revision === previous.revision
-    )
+  function publishCommittedReset() {
+    // The dataset is already committed. Notification failure cannot roll it back.
+    try {
+      options.onReset?.()
+    } catch (error) {
+      console.error('Could not notify peers after replacing local Sudoku data', error)
+    }
   }
 
   async function access<T>(
@@ -179,47 +195,82 @@ export function createGameRepository(
     }
   }
 
+  async function quarantineRecord(input: {
+    transaction: ProjectionTransaction
+    store: 'sessions' | 'results' | 'lessons'
+    key: IDBValidKey
+    value: unknown
+    issues: readonly string[]
+  }) {
+    const { transaction, store, key, value, issues } = input
+    await transaction.objectStore('quarantine').put(
+      {
+        store,
+        key,
+        value,
+        issues,
+      },
+      `${store}:${String(key)}`,
+    )
+    await transaction.objectStore(store).delete(IDBKeyRange.only(key))
+
+    // Browsing must not retain a projection of a canonical record moved to quarantine.
+    if (store !== 'lessons') {
+      await transaction.objectStore(summaryStore(store)).delete(String(key))
+    }
+  }
+
+  async function listRecords<T>(input: {
+    db: IDBPDatabase<SudokuDatabase>
+    store: 'sessions' | 'results' | 'lessons'
+    parse: (value: unknown) => ParseResult<T>
+  }): Promise<readonly T[]> {
+    const { db, store, parse } = input
+    const transaction = db.transaction([store, ...RECOVERY_STORES], 'readwrite')
+
+    return commitTransaction(transaction, async () => {
+      const objectStore = transaction.objectStore(store)
+      const records: T[] = []
+      let cursor = await objectStore.openCursor()
+
+      while (cursor) {
+        const parsed = parse(cursor.value)
+        if (parsed.valid) {
+          records.push(parsed.value)
+        } else {
+          await quarantineRecord({
+            transaction,
+            store,
+            key: cursor.primaryKey,
+            value: cursor.value,
+            issues: parsed.issues,
+          })
+          if (store !== 'lessons') {
+            await advanceSummaryGeneration(transaction)
+          }
+        }
+
+        cursor = await cursor.continue()
+      }
+
+      return records
+    })
+  }
+
   async function list<T>(
     store: 'sessions' | 'results' | 'lessons',
     parse: (value: unknown) => ParseResult<T>,
   ): Promise<StorageOutcome<readonly T[]>> {
     return access(
-      async (db) => {
-        const transaction = db.transaction(
-          [store, 'sessionSummaries', 'resultSummaries', 'quarantine', 'meta'],
-          'readwrite',
-        )
-
-        return commitTransaction(transaction, async () => {
-          const objectStore = transaction.objectStore(store)
-          const records: T[] = []
-          let cursor = await objectStore.openCursor()
-
-          while (cursor) {
-            const parsed = parse(cursor.value)
-            if (parsed.valid) {
-              records.push(parsed.value)
-            } else {
-              await transaction
-                .objectStore('quarantine')
-                .put(
-                  { store, key: cursor.primaryKey, value: cursor.value, issues: parsed.issues },
-                  `${store}:${String(cursor.primaryKey)}`,
-                )
-              await cursor.delete()
-              if (store !== 'lessons') {
-                await transaction.objectStore(summaryStore(store)).delete(String(cursor.primaryKey))
-                await advanceSummaryGeneration(transaction)
-              }
-            }
-
-            cursor = await cursor.continue()
-          }
-
-          return records
-        })
+      (db) =>
+        listRecords({
+          db,
+          store,
+          parse,
+        }),
+      {
+        prepareValidation: store !== 'lessons',
       },
-      { prepareValidation: store !== 'lessons' },
     )
   }
 
@@ -230,10 +281,7 @@ export function createGameRepository(
   ): Promise<StorageOutcome<T | null>> {
     return access(
       async (db) => {
-        const transaction = db.transaction(
-          [kind, 'sessionSummaries', 'resultSummaries', 'quarantine', 'meta'],
-          'readwrite',
-        )
+        const transaction = db.transaction([kind, ...RECOVERY_STORES], 'readwrite')
 
         return commitTransaction(transaction, async () => {
           const raw = await transaction.objectStore(kind).get(id)
@@ -246,11 +294,13 @@ export function createGameRepository(
             return parsed.value
           }
 
-          await transaction
-            .objectStore('quarantine')
-            .put({ store: kind, key: id, value: raw, issues: parsed.issues }, `${kind}:${id}`)
-          await transaction.objectStore(kind).delete(id)
-          await transaction.objectStore(summaryStore(kind)).delete(id)
+          await quarantineRecord({
+            transaction,
+            store: kind,
+            key: id,
+            value: raw,
+            issues: parsed.issues,
+          })
           await advanceSummaryGeneration(transaction)
 
           return null
@@ -258,6 +308,42 @@ export function createGameRepository(
       },
       { prepareValidation: true },
     )
+  }
+
+  async function writeCompletion(transaction: ProjectionTransaction, session: GameSession) {
+    const results = transaction.objectStore('results')
+    const existing = await results.get(session.id)
+    let record: ResultRecord = { formatVersion: 2, session }
+
+    // Upgrade the original result without replacing its first completion facts.
+    if (existing !== undefined) {
+      const original = parseResultRecord(existing, validators)
+      if (!original.valid) {
+        await quarantineRecord({
+          transaction,
+          store: 'results',
+          key: session.id,
+          value: existing,
+          issues: original.issues,
+        })
+        return
+      }
+      record = original.value
+    }
+
+    await results.put(record)
+    await transaction
+      .objectStore('resultSummaries')
+      .put(projectRecord(record.session, 0, 'results'))
+  }
+
+  async function putSessionWithSummary(transaction: ProjectionTransaction, record: SessionRecord) {
+    // One transaction keeps the board, its projection and existing pagination cursors in sync.
+    await transaction.objectStore('sessions').put(record)
+    await transaction
+      .objectStore('sessionSummaries')
+      .put(projectRecord(record.session, record.revision, 'sessions'))
+    await advanceSummaryGeneration(transaction)
   }
 
   async function readSlotRecords(
@@ -305,7 +391,14 @@ export function createGameRepository(
     readSummaryPage: (query) => access((db) => reads.readSummaryPage(db, query)),
     readOverview: (variant, today) => access((db) => reads.readOverview(db, variant, today)),
     maintainSummaries: (signal) =>
-      access((db) => maintainSummaries(db, validators, options.prepareValidation, signal)),
+      access((db) =>
+        maintainSummaries({
+          db,
+          validators,
+          prepareValidation: options.prepareValidation,
+          signal,
+        }),
+      ),
     readSlot: (mode, variant) =>
       access(
         async (db) => {
@@ -336,7 +429,7 @@ export function createGameRepository(
         failureKind: 'write-failed',
       })
       if (result.ok) {
-        options.onReset?.()
+        publishCommittedReset()
       }
       return result
     },
@@ -374,49 +467,24 @@ export function createGameRepository(
               throw new StorageConflict('revision-conflict', 'The saved revision has changed')
             }
 
+            const revision = expectedRevision + 1
+            if (!isNonnegativeInteger(revision)) {
+              throw new TypeError('Session revision exhausted')
+            }
+
             const record: SessionRecord = {
               formatVersion: 2,
-              revision: expectedRevision + 1,
+              revision,
               session: parsed.value,
             }
             assertActive(signal)
-            await transaction.objectStore('sessions').put(record)
-            await transaction
-              .objectStore('sessionSummaries')
-              .put(projectRecord(record.session, record.revision, 'sessions'))
-            await advanceSummaryGeneration(transaction)
+            await putSessionWithSummary(transaction, record)
+
             if (session.completion) {
-              const results = transaction.objectStore('results')
-              const existing = await results.get(session.id)
-              if (existing === undefined) {
-                await results.put({ formatVersion: 2, session: parsed.value })
-                await transaction
-                  .objectStore('resultSummaries')
-                  .put(projectRecord(parsed.value, 0, 'results'))
-              } else {
-                // Upgrade the original result rather than replacing its first completion facts.
-                const original = parseResultRecord(existing, validators)
-                if (original.valid) {
-                  await results.put(original.value)
-                  await transaction
-                    .objectStore('resultSummaries')
-                    .put(projectRecord(original.value.session, 0, 'results'))
-                } else {
-                  await transaction.objectStore('quarantine').put(
-                    {
-                      store: 'results',
-                      key: session.id,
-                      value: existing,
-                      issues: original.issues,
-                    },
-                    `results:${session.id}`,
-                  )
-                  await results.delete(session.id)
-                  await transaction.objectStore('resultSummaries').delete(session.id)
-                }
-              }
+              await writeCompletion(transaction, parsed.value)
             }
 
+            // Cancellation during the writes must abort the complete transaction.
             assertActive(signal)
 
             return record
@@ -450,21 +518,23 @@ export function createGameRepository(
             assertActive(signal)
             await assertOwnership(transaction, token, (options.now ?? Date.now)())
             const slot = await readSlotRecords(transaction, mode, session.puzzle.rules.kind)
+            const previousInSlot = slot[0]
+            const existing = await transaction.objectStore('sessions').get(session.id)
             if (
-              (await transaction.objectStore('sessions').get(session.id)) ||
-              slot.length > 1 ||
-              (slot.length === 1 && (!previous || !isMatchingPrevious(slot[0], previous)))
+              existing ||
+              (previousInSlot && (!previous || !isMatchingPrevious(previousInSlot, previous)))
             ) {
               throw new StorageConflict('revision-conflict', 'The active game slot has changed')
             }
 
+            // Both leases are checked in the transaction before replacing the current slot.
             if (previous) {
               await assertOwnership(transaction, previous.token, (options.now ?? Date.now)())
               const raw = await transaction.objectStore('sessions').get(previous.id)
               const previousRecord = parseSessionRecord(raw, validators)
               if (
-                !isMatchingPrevious(raw, previous) ||
                 !previousRecord.valid ||
+                !isMatchingPrevious(previousRecord.value, previous) ||
                 !belongsToSlot(previousRecord.value.session, session) ||
                 previous.token.sessionId !== previous.id
               ) {
@@ -476,13 +546,13 @@ export function createGameRepository(
               await transaction.objectStore('sessionSummaries').delete(previous.id)
             }
 
-            const record: SessionRecord = { formatVersion: 2, revision: 1, session: parsed.value }
+            const record: SessionRecord = {
+              formatVersion: 2,
+              revision: 1,
+              session: parsed.value,
+            }
             assertActive(signal)
-            await transaction.objectStore('sessions').put(record)
-            await transaction
-              .objectStore('sessionSummaries')
-              .put(projectRecord(record.session, record.revision, 'sessions'))
-            await advanceSummaryGeneration(transaction)
+            await putSessionWithSummary(transaction, record)
             assertActive(signal)
 
             return record
@@ -509,7 +579,7 @@ export function createGameRepository(
           )
           await commitTransaction(transaction, async () => {
             const epoch = await transaction.objectStore('meta').get('epoch')
-            if (typeof epoch !== 'number' || !Number.isSafeInteger(epoch)) {
+            if (!isNonnegativeInteger(epoch) || !isNonnegativeInteger(epoch + 1)) {
               throw new TypeError('Invalid dataset epoch')
             }
 
@@ -527,13 +597,16 @@ export function createGameRepository(
             }
 
             await transaction.objectStore('meta').put(epoch + 1, 'epoch')
-            await transaction.objectStore('meta').put(initialSummaryState(true), 'summaries')
+            const hasCompleteCoverage = true
+            await transaction
+              .objectStore('meta')
+              .put(initialSummaryState(hasCompleteCoverage), 'summaries')
           })
         },
         { failureKind: 'write-failed' },
       )
       if (result.ok) {
-        options.onReset?.()
+        publishCommittedReset()
       }
 
       return result
@@ -566,12 +639,15 @@ export function createGameRepository(
             return parsed.value
           }
 
-          await transaction
-            .objectStore('quarantine')
-            .put(
-              { store: 'settings', key: 'preferences', value: raw, issues: parsed.issues },
-              'settings:preferences',
-            )
+          await transaction.objectStore('quarantine').put(
+            {
+              store: 'settings',
+              key: 'preferences',
+              value: raw,
+              issues: parsed.issues,
+            },
+            'settings:preferences',
+          )
           await transaction.objectStore('settings').delete('preferences')
 
           return { ...DEFAULT_SETTINGS }

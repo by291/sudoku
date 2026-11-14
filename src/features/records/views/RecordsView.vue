@@ -7,11 +7,11 @@ import {
   getVariantPresentation,
   VARIANT_OPTIONS,
 } from '@/features/game/model/variants'
-import { isSudokuVariant } from '@/sudoku/catalogue'
-import { supportedDifficulties } from '@/sudoku/catalogue'
+import { isSudokuVariant, supportedDifficulties } from '@/sudoku/catalogue'
 import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
 import {
+  formatCompletionTime,
   groupCompletedSummaries,
   modeName,
   sessionLink,
@@ -23,10 +23,10 @@ import LocalBackupPanel from '@/features/records/components/LocalBackupPanel.vue
 
 const records = useRecordsStore()
 const reader = Symbol('records-view')
-onScopeDispose(() => records.releaseReader(reader))
 const confirmation = ref<'clear' | 'quarantine' | null>(null)
 const route = useRoute()
 const router = useRouter()
+
 const variantQuery = computed(() => parseVariantQuery(route.query.variant))
 const variant = computed(() => (variantQuery.value.valid ? variantQuery.value.value : 'classic'))
 const variantOptions = [...VARIANT_OPTIONS]
@@ -38,11 +38,18 @@ const recordTabs = [
 const tab = computed(() =>
   route.query.tab === 'saves' || route.query.tab === 'history' ? route.query.tab : 'overview',
 )
+
 const showProgress = useDelayedProgress(() => records.busy)
-const variantMenuOpen = ref(false)
+const isVariantMenuOpen = ref(false)
 const compactNavigationMedia = window.matchMedia('(max-width: 800px)')
 const compactNavigation = ref(compactNavigationMedia.matches)
+
 const summary = computed(() => records.summary)
+const formalCompletionTotal = computed(() => {
+  const totals = summary.value?.dailyTotals
+
+  return totals ? totals.unassisted + totals.assisted : '—'
+})
 const results = computed(() => records.rows)
 const saves = computed(() => {
   const latest = records.rows.find((row) => !row.completedAt)
@@ -65,6 +72,8 @@ watch(
   },
   { immediate: true },
 )
+
+onScopeDispose(() => records.releaseReader(reader))
 
 function variantDestination(value: string) {
   return {
@@ -99,6 +108,7 @@ function navigateTabs(event: KeyboardEvent, value: string) {
     default:
       return
   }
+
   event.preventDefault()
   const next = recordTabs[nextIndex]
   if (next) {
@@ -115,7 +125,7 @@ function updateVariant(value: unknown) {
 
 function updateNavigationLayout() {
   compactNavigation.value = compactNavigationMedia.matches
-  variantMenuOpen.value = false
+  isVariantMenuOpen.value = false
 }
 
 compactNavigationMedia.addEventListener('change', updateNavigationLayout)
@@ -132,6 +142,7 @@ function requestConfirmation(action: 'clear' | 'quarantine', event: MouseEvent) 
 async function confirm() {
   const action = confirmation.value
   confirmation.value = null
+
   if (action === 'clear') {
     await records.clearLocalData()
   } else {
@@ -153,6 +164,7 @@ function duration(value: number | null | undefined) {
         <p v-if="showProgress" role="status" aria-live="polite">正在处理本机记录…</p>
       </div>
     </header>
+
     <NAlert v-if="records.error" class="feedback-message" type="error" :show-icon="false">
       {{ records.error }}
       <NButton :disabled="records.busy" @click="records.retry">重试读取</NButton>
@@ -170,6 +182,7 @@ function duration(value: number | null | undefined) {
       旧存档需要整理，完成后可查看完整记录。
       <NButton :disabled="records.busy" @click="records.retry">整理存档并重试</NButton>
     </NAlert>
+
     <div class="records-workspace">
       <aside v-if="!compactNavigation" class="records-sidebar">
         <h2 class="sidebar-heading">选择玩法</h2>
@@ -205,14 +218,14 @@ function duration(value: number | null | undefined) {
       <label v-else class="variant-field"
         >成绩玩法
         <NSelect
-          v-model:show="variantMenuOpen"
+          v-model:show="isVariantMenuOpen"
           filterable
           :value="variant"
           :options="variantOptions"
           :input-props="{
             role: 'combobox',
             'aria-label': '成绩玩法',
-            'aria-expanded': variantMenuOpen,
+            'aria-expanded': isVariantMenuOpen,
             'aria-controls': 'records-variant-menu',
           }"
           :menu-props="{ id: 'records-variant-menu', role: 'listbox', 'aria-label': '玩法选项' }"
@@ -220,6 +233,7 @@ function duration(value: number | null | undefined) {
           @update:value="updateVariant"
         />
       </label>
+
       <section class="records-content" :aria-label="`${getVariantPresentation(variant).label}成绩`">
         <div class="record-tabs" role="tablist" aria-label="记录分类">
           <NButton
@@ -236,6 +250,7 @@ function duration(value: number | null | undefined) {
             >{{ item.label }}</NButton
           >
         </div>
+
         <section
           v-if="tab === 'overview'"
           id="records-panel-overview"
@@ -262,12 +277,7 @@ function duration(value: number | null | undefined) {
                 </div>
                 <div class="panel stat">
                   <span>正式挑战完成</span
-                  ><strong
-                    >{{
-                      summary ? summary.dailyTotals.unassisted + summary.dailyTotals.assisted : '—'
-                    }}
-                    <small>次</small></strong
-                  >
+                  ><strong>{{ formalCompletionTotal }} <small>次</small></strong>
                   <p>
                     无辅助 {{ summary?.dailyTotals.unassisted ?? '—' }} · 辅助
                     {{ summary?.dailyTotals.assisted ?? '—' }}
@@ -275,6 +285,7 @@ function duration(value: number | null | undefined) {
                 </div>
               </div>
             </div>
+
             <section class="panel bests">
               <h2>自由游玩 · 最快成绩</h2>
               <table>
@@ -320,6 +331,7 @@ function duration(value: number | null | undefined) {
               <p class="muted">已填 — / — 格 · 已用时 —</p>
               <p class="muted small">开始于 —</p>
             </article>
+
             <article v-if="saves.latest" class="panel latest-save">
               <p class="eyebrow">最近开始 · 进行中</p>
               <h3>{{ modeName(saves.latest.session) }}</h3>
@@ -344,6 +356,7 @@ function duration(value: number | null | undefined) {
                 >
               </RouterLink>
             </article>
+
             <ul v-if="saves.others.length" class="stored-sessions">
               <li
                 v-for="{ session, summary: saveSummary } in saves.others"
@@ -391,6 +404,7 @@ function duration(value: number | null | undefined) {
               <h3>—</h3>
               <p class="muted">完成时间 — · 用时 —</p>
             </section>
+
             <section v-for="group in historyGroups" :key="group.date" class="panel history-date">
               <h3>
                 <time :datetime="group.date">{{ group.label }}</time>
@@ -411,14 +425,7 @@ function duration(value: number | null | undefined) {
                       >
                       <p class="muted">
                         {{ DIFFICULTY_NAMES[session.difficulty] }} ·
-                        {{
-                          session.completedAt
-                            ? new Date(session.completedAt).toLocaleTimeString('zh-CN', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : ''
-                        }}
+                        {{ formatCompletionTime(session.completedAt) }}
                       </p>
                     </div>
                     <div class="history-time">
@@ -432,6 +439,7 @@ function duration(value: number | null | undefined) {
             </section>
           </section>
         </section>
+
         <nav
           v-if="tab !== 'overview' && (records.pageNumber > 1 || records.nextCursor)"
           class="record-pagination"
@@ -449,6 +457,7 @@ function duration(value: number | null | undefined) {
             >下一页</NButton
           >
         </nav>
+
         <NCard v-if="records.quarantined" class="feedback-message" size="small" role="status">
           <p>{{ records.quarantined }} 条损坏或不兼容的记录已隔离，有效数据仍可使用。</p>
           <NButton @click="requestConfirmation('quarantine', $event)">清理损坏记录</NButton>
@@ -461,6 +470,7 @@ function duration(value: number | null | undefined) {
         </div>
       </section>
     </div>
+
     <ConfirmationDialog
       v-if="confirmation"
       destructive

@@ -1,4 +1,4 @@
-import type { IDBPDatabase } from 'idb'
+import type { IDBPDatabase, IDBPTransaction } from 'idb'
 import type { SudokuDatabase, SummaryIndexes } from '@/storage/database'
 import { commitTransaction } from '@/storage/database'
 import { StorageConflict } from '@/storage/ownership'
@@ -26,16 +26,32 @@ import {
 import type { ProjectionRepair } from '@/storage/summaryCoverage'
 import { ResultStatistics } from '@/storage/summaryStatistics'
 
+const CATALOGUE_STORES = [
+  // Coverage must come from the same transaction as the projections it describes.
+  'sessionSummaries',
+  'resultSummaries',
+  'meta',
+] as const
+
 function prefixRange(prefix: (string | number)[], after?: [number, string]): IDBKeyRange {
-  return IDBKeyRange.bound(after ? [...prefix, ...after] : prefix, [...prefix, []], !!after)
+  const lowerBound = after ? [...prefix, ...after] : prefix
+  // An array sorts after the scalar ordering keys. Resume strictly after the last time/ID pair.
+  const upperBound = [...prefix, []]
+
+  return IDBKeyRange.bound(lowerBound, upperBound, after !== undefined)
 }
 
+/** Reads compact home counts from one committed projection snapshot. */
 export async function readHome(db: IDBPDatabase<SudokuDatabase>): Promise<HomeRead> {
-  const transaction = db.transaction(['sessionSummaries', 'resultSummaries', 'meta'], 'readonly')
+  const transaction = db.transaction(CATALOGUE_STORES, 'readonly')
   return commitTransaction(transaction, async () => {
     const snapshot = await readSummarySnapshot(transaction)
     if (snapshot.coverage === 'pending') {
-      return { ...snapshot, unfinishedCount: null, resultCount: null }
+      return {
+        ...snapshot,
+        unfinishedCount: null,
+        resultCount: null,
+      }
     }
 
     const unfinishedCount = await transaction
@@ -44,10 +60,15 @@ export async function readHome(db: IDBPDatabase<SudokuDatabase>): Promise<HomeRe
       .count(prefixRange([1]))
     const resultCount = await transaction.objectStore('resultSummaries').count()
 
-    return { ...snapshot, unfinishedCount, resultCount }
+    return {
+      ...snapshot,
+      unfinishedCount,
+      resultCount,
+    }
   })
 }
 
+/** Counts completed games for every variant without opening saved boards. */
 export async function readCompletionCounts(
   db: IDBPDatabase<SudokuDatabase>,
 ): Promise<CompletionCountsRead> {
@@ -118,11 +139,12 @@ function queryIndex(query: SummaryPageQuery): {
   return { index: 'by-order', prefix }
 }
 
+/** Reads one ordered page, rejecting cursors from another filter or dataset snapshot. */
 export async function readSummaryPage(
   db: IDBPDatabase<SudokuDatabase>,
   query: SummaryPageQuery,
 ): Promise<SummaryPage> {
-  const transaction = db.transaction(['sessionSummaries', 'resultSummaries', 'meta'], 'readonly')
+  const transaction = db.transaction(CATALOGUE_STORES, 'readonly')
   const repairs: ProjectionRepair[] = []
   const result: SummaryPage = await commitTransaction(transaction, async () => {
     const snapshot = await readSummarySnapshot(transaction, query.kind)
@@ -147,23 +169,30 @@ export async function readSummaryPage(
       throw new StorageConflict('revision-conflict', 'Saved records changed; reload the first page')
     }
     if (snapshot.coverage === 'pending') {
-      return { ...snapshot, rows: [], nextCursor: null }
+      return {
+        ...snapshot,
+        rows: [],
+        nextCursor: null,
+      }
     }
 
     const { index, prefix } = queryIndex(query)
-    const raw = await transaction
-      .objectStore(summaryStore(query.kind))
-      .index(index)
-      .getAll(
-        prefixRange(prefix, cursor ? [cursor.time, cursor.id] : undefined),
-        SUMMARY_PAGE_SIZE + 1,
-      )
+    const store = transaction.objectStore(summaryStore(query.kind))
+    const range = prefixRange(prefix, cursor ? [cursor.time, cursor.id] : undefined)
+
+    // One lookahead key decides whether to issue a cursor without a separate count.
+    const raw = await store.index(index).getAll(range, SUMMARY_PAGE_SIZE + 1)
 
     const rows = []
     for (const value of raw.slice(0, SUMMARY_PAGE_SIZE)) {
       const row = readProjection(value, query.kind, repairs)
       if (!row) {
-        return { ...snapshot, coverage: 'pending', rows: [], nextCursor: null }
+        return {
+          ...snapshot,
+          coverage: 'pending',
+          rows: [],
+          nextCursor: null,
+        }
       }
 
       rows.push(row)
@@ -193,12 +222,21 @@ export async function readSummaryPage(
   return result
 }
 
+/** Resolves one active slot using canonical keys and its compact projection. */
 export async function readSlotSummary(
   db: IDBPDatabase<SudokuDatabase>,
   mode: 'free' | 'learning',
   variant?: SudokuVariant,
 ): Promise<SlotSummaryRead> {
-  const transaction = db.transaction(['sessions', 'sessionSummaries', 'meta'], 'readonly')
+  const transaction = db.transaction(
+    [
+      // Canonical keys can establish absence even when the derived store is incomplete.
+      'sessions',
+      'sessionSummaries',
+      'meta',
+    ],
+    'readonly',
+  )
   const missing: ProjectionRepair[] = []
   const result: SlotSummaryRead = await commitTransaction(transaction, async () => {
     const snapshot = await readSummarySnapshot(transaction, 'sessions')
@@ -225,17 +263,29 @@ export async function readSlotSummary(
 
     const key = keys[0]
     if (key === undefined) {
-      return { ...snapshot, coverage: 'ready', summary: null }
+      return {
+        ...snapshot,
+        coverage: 'ready',
+        summary: null,
+      }
     }
 
     const raw = await transaction.objectStore('sessionSummaries').get(key)
     if (raw === undefined) {
       missing.push({ kind: 'sessions', id: key })
-      return { ...snapshot, coverage: 'pending', summary: null }
+      return {
+        ...snapshot,
+        coverage: 'pending',
+        summary: null,
+      }
     }
 
     const summary = readProjection(raw, 'sessions', missing)
-    return { ...snapshot, coverage: summary ? 'ready' : 'pending', summary }
+    return {
+      ...snapshot,
+      coverage: summary ? 'ready' : 'pending',
+      summary,
+    }
   })
 
   if (missing.length > 0) {
@@ -245,6 +295,48 @@ export async function readSlotSummary(
   return result
 }
 
+type DailyReadTransaction = IDBPTransaction<
+  SudokuDatabase,
+  ('sessions' | 'results' | 'sessionSummaries' | 'resultSummaries' | 'meta')[],
+  'readonly'
+>
+
+async function readFormalAttempt(
+  transaction: DailyReadTransaction,
+  id: string,
+  missing: ProjectionRepair[],
+): Promise<DailyVariantStatus['state'] | null> {
+  const saved = await transaction.objectStore('sessionSummaries').get(id)
+  const result = await transaction.objectStore('resultSummaries').get(id)
+  const session = saved === undefined ? null : readProjection(saved, 'sessions', missing)
+  const completed = result === undefined ? null : readProjection(result, 'results', missing)
+  if (missing.length > 0) {
+    return null
+  }
+
+  // A retained completion is sufficient proof that the formal attempt is no longer available.
+  if (session?.completedAt || completed) {
+    return 'completed'
+  }
+
+  // Check canonical keys before treating missing projections as an available attempt.
+  const missingSession =
+    !session && (await transaction.objectStore('sessions').getKey(id)) !== undefined
+  const missingResult = (await transaction.objectStore('results').getKey(id)) !== undefined
+  if (missingSession) {
+    missing.push({ kind: 'sessions', id })
+  }
+  if (missingResult) {
+    missing.push({ kind: 'results', id })
+  }
+  if (missing.length > 0) {
+    return null
+  }
+
+  return session ? 'in-progress' : 'available'
+}
+
+/** Reads formal-attempt statuses without opening canonical boards. */
 export async function readDailyStatuses(
   db: IDBPDatabase<SudokuDatabase>,
   date: string,
@@ -254,45 +346,38 @@ export async function readDailyStatuses(
   }
 
   const transaction = db.transaction(
-    ['sessions', 'results', 'sessionSummaries', 'resultSummaries', 'meta'],
+    [
+      // Canonical keys distinguish genuinely absent attempts from missing projections.
+      'sessions',
+      'results',
+      ...CATALOGUE_STORES,
+    ],
     'readonly',
   )
   const missing: ProjectionRepair[] = []
   const result: DailyStatusesRead = await commitTransaction(transaction, async () => {
     const snapshot = await readSummarySnapshot(transaction)
+
     const statuses: DailyVariantStatus[] = []
     for (const variant of SUDOKU_VARIANTS) {
       const id = getDailyFormalId(date, variant)
-      const saved = await transaction.objectStore('sessionSummaries').get(id)
-      const result = await transaction.objectStore('resultSummaries').get(id)
-      const session = saved === undefined ? null : readProjection(saved, 'sessions', missing)
-      const completed = result === undefined ? null : readProjection(result, 'results', missing)
-      if (missing.length > 0) {
-        return { ...snapshot, coverage: 'pending', statuses: [] }
-      }
-      let state: DailyVariantStatus['state'] = 'available'
-      if (session?.completedAt || completed) {
-        state = 'completed'
-      } else {
-        const missingSession =
-          !session && (await transaction.objectStore('sessions').getKey(id)) !== undefined
-        const missingResult = (await transaction.objectStore('results').getKey(id)) !== undefined
-        if (missingSession) {
-          missing.push({ kind: 'sessions', id })
-        }
-        if (missingResult) {
-          missing.push({ kind: 'results', id })
-        }
-        if (missing.length > 0) {
-          return { ...snapshot, coverage: 'pending', statuses: [] }
-        }
-        if (session) {
-          state = 'in-progress'
+      const state = await readFormalAttempt(transaction, id, missing)
+      if (state === null) {
+        return {
+          ...snapshot,
+          coverage: 'pending',
+          statuses: [],
         }
       }
+
       statuses.push({ variant, state })
     }
-    return { ...snapshot, coverage: 'ready', statuses }
+
+    return {
+      ...snapshot,
+      coverage: 'ready',
+      statuses,
+    }
   })
 
   if (missing.length > 0) {
@@ -302,6 +387,7 @@ export async function readDailyStatuses(
   return result
 }
 
+/** Aggregates validated result projections for one variant and challenge date. */
 export async function readOverview(
   db: IDBPDatabase<SudokuDatabase>,
   variant: SudokuVariant,
@@ -311,12 +397,16 @@ export async function readOverview(
     throw new TypeError('Invalid overview date')
   }
 
-  const transaction = db.transaction(['sessionSummaries', 'resultSummaries', 'meta'], 'readonly')
+  const transaction = db.transaction(CATALOGUE_STORES, 'readonly')
   const repairs: ProjectionRepair[] = []
   const result: OverviewRead = await commitTransaction(transaction, async () => {
     const snapshot = await readSummarySnapshot(transaction, 'results')
     if (snapshot.coverage === 'pending') {
-      return { ...snapshot, summary: null, completedCount: null }
+      return {
+        ...snapshot,
+        summary: null,
+        completedCount: null,
+      }
     }
 
     const statistics = new ResultStatistics(today)
@@ -327,7 +417,12 @@ export async function readOverview(
     while (cursor) {
       const result = readProjection(cursor.value, 'results', repairs)
       if (!result) {
-        return { ...snapshot, coverage: 'pending', summary: null, completedCount: null }
+        return {
+          ...snapshot,
+          coverage: 'pending',
+          summary: null,
+          completedCount: null,
+        }
       }
 
       statistics.add(result)

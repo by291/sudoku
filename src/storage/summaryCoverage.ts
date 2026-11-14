@@ -18,6 +18,7 @@ type ReadTransaction = IDBPTransaction<
   'readonly'
 >
 
+/** Reads coverage and its revision from the transaction that owns the projection query. */
 export async function readSummarySnapshot(
   transaction: ReadTransaction,
   kind?: SummaryQueryKind,
@@ -28,13 +29,17 @@ export async function readSummarySnapshot(
   }
 
   const state = parseSummaryState(await transaction.objectStore('meta').get('summaries'))
-  const ready = kind ? state[kind].complete : state.sessions.complete && state.results.complete
-  return { epoch, generation: state.generation, coverage: ready ? 'ready' : 'pending' }
+  const isReady = kind ? state[kind].complete : state.sessions.complete && state.results.complete
+  return {
+    epoch,
+    generation: state.generation,
+    coverage: isReady ? 'ready' : 'pending',
+  }
 }
 
 export type ProjectionRepair = { kind: SummaryQueryKind; id: string | null }
 
-/** Appends a coverage repair when stored projection data is corrupt; never validates canonical payloads. */
+/** Reads a projection or queues a coverage repair for corrupt derived data. */
 export function readProjection(
   value: unknown,
   kind: SummaryQueryKind,
@@ -58,7 +63,15 @@ export async function invalidateProjectionCoverage(
   snapshot: SummarySnapshot,
   missing: readonly ProjectionRepair[],
 ): Promise<number> {
-  const transaction = db.transaction(['meta', 'sessionSummaries', 'resultSummaries'], 'readwrite')
+  const transaction = db.transaction(
+    [
+      // Resetting a derived store and invalidating its coverage must commit together.
+      'meta',
+      'sessionSummaries',
+      'resultSummaries',
+    ],
+    'readwrite',
+  )
   return commitTransaction(transaction, async () => {
     const metadata = transaction.objectStore('meta')
     const epoch = await metadata.get('epoch')
@@ -71,21 +84,25 @@ export async function invalidateProjectionCoverage(
       )
     }
 
-    let changed = false
+    let hasChanged = false
     for (const { kind, id } of missing) {
       const coverage = state[kind]
       if (id === null) {
         // Rebuild the derived store from canonical keys, including removal of corrupt orphans.
         await transaction.objectStore(summaryStore(kind)).clear()
         state[kind] = { complete: false, after: null }
-        changed = true
-      } else if (coverage.complete || (coverage.after !== null && id <= coverage.after)) {
+        hasChanged = true
+        continue
+      }
+
+      // A key ahead of the checkpoint is already scheduled. Rewind only for skipped keys.
+      if (coverage.complete || (coverage.after !== null && id <= coverage.after)) {
         state[kind] = { complete: false, after: null }
-        changed = true
+        hasChanged = true
       }
     }
 
-    if (changed) {
+    if (hasChanged) {
       state.generation++
       if (!Number.isSafeInteger(state.generation)) {
         throw new TypeError('Summary generation exhausted')

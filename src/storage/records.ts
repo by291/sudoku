@@ -43,7 +43,11 @@ function parsePuzzle(value: unknown, validators: SnapshotValidators): ParseResul
     : { valid: false, issues: [...result.issues] }
 }
 
-export type SessionRecord = { formatVersion: 2; revision: number; session: GameSession }
+export type SessionRecord = {
+  formatVersion: 2
+  revision: number
+  session: GameSession
+}
 
 export type ResultRecord = { formatVersion: 2; session: GameSession }
 
@@ -56,14 +60,17 @@ export type StorageFailure = {
 
 export type StorageOutcome<T> = { ok: true; value: T } | { ok: false; error: StorageFailure }
 
+/** Checks that the value is an exact nonnegative JavaScript integer. */
 export function isNonnegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
+/** Checks the size and nonblank requirement for persisted identifiers. */
 export function isIdentifier(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
 }
 
+/** Checks the canonical UTC format used for persisted instants. */
 export function isIsoInstant(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -82,6 +89,7 @@ function validDate(value: unknown): value is string {
   return isIsoInstant(timestamp)
 }
 
+/** Decodes the mode-specific identity fields from persisted input. */
 export function parseSessionMetadata(value: unknown): SessionMetadata | null {
   if (!isRecord(value)) {
     return null
@@ -100,7 +108,11 @@ export function parseSessionMetadata(value: unknown): SessionMetadata | null {
     validDate(value.challengeDate) &&
     typeof value.formalAttempt === 'boolean'
   ) {
-    return { kind: 'daily', challengeDate: value.challengeDate, formalAttempt: value.formalAttempt }
+    return {
+      kind: 'daily',
+      challengeDate: value.challengeDate,
+      formalAttempt: value.formalAttempt,
+    }
   }
 
   return null
@@ -196,6 +208,7 @@ function parseAssistance(value: unknown): Assistance | null {
   }
 }
 
+/** Decodes and owns a session snapshot, including its history and completion. */
 export function parseSession(
   value: unknown,
   validators: SnapshotValidators,
@@ -242,6 +255,7 @@ export function parseSession(
     }
   }
 
+  // Undo pops the most recent move first. Redo therefore stores moves in reverse order.
   for (let index = 1; index < redoStack.length; index++) {
     if (!sameLayers(redoStack[index - 1].before, redoStack[index].after)) {
       return invalid('Disconnected redo history')
@@ -344,6 +358,7 @@ function parseLegacySession(
   return puzzle.valid ? parseSession({ ...value, puzzle: puzzle.value }, validators) : puzzle
 }
 
+/** Decodes current or legacy session records while retaining the stored revision. */
 export function parseSessionRecord(
   value: unknown,
   validators: SnapshotValidators,
@@ -362,10 +377,18 @@ export function parseSessionRecord(
       : parseSession(value.session, validators)
 
   return session.valid
-    ? { valid: true, value: { formatVersion: 2, revision: value.revision, session: session.value } }
+    ? {
+        valid: true,
+        value: {
+          formatVersion: 2,
+          revision: value.revision,
+          session: session.value,
+        },
+      }
     : session
 }
 
+/** Decodes a historical result and verifies that it records a completion. */
 export function parseResultRecord(
   value: unknown,
   validators: SnapshotValidators,
@@ -387,6 +410,7 @@ export function parseResultRecord(
     : { valid: false, issues: ['Result must be completed'] }
 }
 
+/** Decodes persisted settings and supported course cursors. */
 export function parseSettings(value: unknown): ParseResult<Settings> {
   if (
     !isRecord(value) ||
@@ -427,6 +451,7 @@ export function parseSettings(value: unknown): ParseResult<Settings> {
   }
 }
 
+/** Decodes the stable lesson identity and completion instant. */
 export function parseLessonProgress(value: unknown): ParseResult<LessonProgress> {
   if (
     !isRecord(value) ||

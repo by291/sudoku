@@ -35,7 +35,8 @@ async function setup(path: string, delayRead: boolean | 'overview' = false) {
   await test.database.put('sessions', { formatVersion: 2, revision: 1, session })
   await test.database.put('meta', initialSummaryState(false), 'summaries')
   expect((await test.runtime.repository.maintainSummaries()).ok).toBe(true)
-  const pending = deferred<Awaited<ReturnType<typeof test.runtime.repository.readSummaryPage>>>()
+  const emptyPage = await test.runtime.repository.readSummaryPage({ kind: 'results' })
+  const pending = deferred<typeof emptyPage>()
   const overviewResponse = await test.runtime.repository.readOverview('classic', '2026-10-11')
   const pendingOverview = deferred<typeof overviewResponse>()
   if (delayRead === 'overview') {
@@ -60,7 +61,16 @@ async function setup(path: string, delayRead: boolean | 'overview' = false) {
     await vi.waitFor(() => expect(records.loaded).toBe(true))
   }
 
-  return { ...test, records, router, wrapper, pending, pendingOverview, overviewResponse }
+  return {
+    ...test,
+    records,
+    router,
+    wrapper,
+    pending,
+    emptyPage,
+    pendingOverview,
+    overviewResponse,
+  }
 }
 
 it('selects local saves from the URL and retains the tab when changing variant', async () => {
@@ -116,17 +126,14 @@ it('shows counts for all variants in every tab and refreshes them after clearing
 })
 
 it('keeps unread data distinct from empty data and defers transient loading text', async () => {
-  const { wrapper, pending } = await setup('/records?tab=history', true)
+  const { wrapper, pending, emptyPage } = await setup('/records?tab=history', true)
 
   expect(wrapper.text()).not.toContain('还没有完成记录')
   expect(wrapper.text()).not.toContain('已完成 0 局')
   expect(wrapper.text()).not.toContain('正在处理本机记录')
   await vi.waitFor(() => expect(wrapper.text()).toContain('正在处理本机记录'))
 
-  pending.resolve({
-    ok: true,
-    value: { coverage: 'ready', epoch: 1, generation: 1, rows: [], nextCursor: null },
-  })
+  pending.resolve(emptyPage)
   await flushPromises()
 
   expect(wrapper.text()).toContain('还没有完成记录')

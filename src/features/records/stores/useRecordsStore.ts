@@ -10,6 +10,7 @@ import type { BackupOperation } from '@/features/records/stores/recordsBackup'
 
 export type { RecordsSelection } from '@/features/records/stores/recordsReader'
 
+/** Coordinates records browsing and backups with the active game and other player stores. */
 export const useRecordsStore = defineStore('records', () => {
   const runtime = useGameRuntime()
   const preferences = usePreferencesStore()
@@ -47,12 +48,13 @@ export const useRecordsStore = defineStore('records', () => {
 
   async function settleForBackup(operation: BackupOperation): Promise<boolean> {
     // Capture/save the active game before the repository takes its committed backup snapshot.
-    const saved = await game.prepareBackup()
+    const isSaved = await game.prepareBackup()
+
     // A peer replacement can finish while saving; its new backup owns subsequent feedback.
     if (!backup.isCurrent(operation)) {
       return false
     }
-    if (!saved) {
+    if (!isSaved) {
       backup.reportError(operation, '当前游戏尚未保存，请重试保存后再处理备份。')
       return false
     }
@@ -103,6 +105,7 @@ export const useRecordsStore = defineStore('records', () => {
     if (busy.value) {
       return
     }
+
     const candidate = backup.beginRestore()
     if (!candidate) {
       return
@@ -128,6 +131,7 @@ export const useRecordsStore = defineStore('records', () => {
     const operation = backup.beginClear()
     await game.leaveGame()
     await preferences.flush()
+
     const result = await runtime.repository.clearAll()
     if (!result.ok) {
       backup.finishOperation(operation)
