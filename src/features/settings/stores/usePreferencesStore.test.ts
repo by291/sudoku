@@ -115,3 +115,63 @@ it('ignores a stale settings conflict delivered after a reset and fresh read', a
   expect(await preferences.update({ showTimer: false })).toBe(true)
   test.dispose()
 })
+
+it('preserves an in-flight lesson cursor when a later optimistic timer setting is saved', async () => {
+  const test = await createTestRuntime()
+  const preferences = test.app.runWithContext(() => usePreferencesStore(test.pinia))
+  await preferences.load()
+  const entered = deferred<void>()
+  const release = deferred<void>()
+  const writeSettings = test.runtime.repository.writeSettings
+  vi.spyOn(test.runtime.repository, 'writeSettings').mockImplementationOnce(
+    async (snapshot, epoch) => {
+      entered.resolve()
+      await release.promise
+      return writeSettings(snapshot, epoch)
+    },
+  )
+
+  const lessonStages = { 'killer-combined': 2 }
+  const cursorSave = preferences.update({ lessonStages }, { optimistic: false })
+  await entered.promise
+  const timerSave = preferences.update({ showTimer: false })
+  const visibleBeforeCommit = preferences.settings
+  release.resolve()
+  await cursorSave
+  await timerSave
+
+  expect(visibleBeforeCommit.lessonStages).toEqual(DEFAULT_SETTINGS.lessonStages)
+  expect(visibleBeforeCommit.showTimer).toBe(false)
+  const expected = { ...DEFAULT_SETTINGS, lessonStages, showTimer: false }
+  expect(preferences.settings).toEqual(expected)
+  expect(await test.runtime.repository.readSettings()).toEqual({ ok: true, value: expected })
+  test.dispose()
+})
+
+it('retries an optimistic preference after a failed write without dropping committed progress', async () => {
+  const test = await createTestRuntime()
+  const preferences = test.app.runWithContext(() => usePreferencesStore(test.pinia))
+  const lessonStages = { 'killer-combined': 2 }
+  const stored = { ...DEFAULT_SETTINGS, lessonStages }
+  await test.runtime.repository.writeSettings(stored, 1)
+  await preferences.load()
+  vi.spyOn(test.runtime.repository, 'writeSettings').mockResolvedValueOnce({
+    ok: false,
+    error: { kind: 'unavailable', message: 'Save temporarily unavailable' },
+  })
+
+  const firstWrite = await preferences.update({ showTimer: false })
+  const visibleAfterFailure = preferences.settings
+  const storedAfterFailure = await test.runtime.repository.readSettings()
+  const retry = await preferences.retry()
+
+  expect(firstWrite).toBe(false)
+  expect(visibleAfterFailure.showTimer).toBe(false)
+  expect(storedAfterFailure).toEqual({ ok: true, value: stored })
+  expect(retry).toBe(true)
+  expect(await test.runtime.repository.readSettings()).toEqual({
+    ok: true,
+    value: { ...stored, showTimer: false },
+  })
+  test.dispose()
+})
