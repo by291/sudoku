@@ -8,7 +8,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class BackupDocumentsTest {
-    @Test fun `unknown provider size cannot bypass backup byte bound`() {
+    @Test
+    fun `unknown provider size cannot bypass backup byte bound`() {
         val input = object : InputStream() {
             var remaining = BackupLimits.BYTES + 1
 
@@ -26,15 +27,20 @@ class BackupDocumentsTest {
         assertFailsWith<IllegalArgumentException> { readBackupDocument(input) }
     }
 
-    @Test fun `UTF8 decoding rejects truncated multibyte text without replacing portable facts`() {
+    @Test
+    fun `UTF8 decoding rejects truncated multibyte text without replacing portable facts`() {
         val input = ByteArrayInputStream(byteArrayOf(0x7b, 0xe4.toByte(), 0xb8.toByte()))
 
         assertFailsWith<java.nio.charset.CharacterCodingException> { readBackupDocument(input) }
     }
 
-    @Test fun `unknown size Chinese document is preserved`() {
+    @Test
+    fun `unknown size Chinese document is preserved`() {
         val text = "{\"title\":\"一格一念\",\"seed\":\"\\ud800\"}"
 
-        assertEquals(text, readBackupDocument(ByteArrayInputStream(text.toByteArray(Charsets.UTF_8))))
+        assertEquals(
+            text,
+            readBackupDocument(ByteArrayInputStream(text.toByteArray(Charsets.UTF_8)))
+        )
     }
 }

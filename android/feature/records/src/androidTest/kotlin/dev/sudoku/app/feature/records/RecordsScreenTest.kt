@@ -52,7 +52,8 @@ import org.junit.Rule
 import org.junit.Test
 
 class RecordsScreenTest {
-    @Test fun queryRetryRemainsAvailableWhileExportAwaitsItsProvider() {
+    @Test
+    fun queryRetryRemainsAvailableWhileExportAwaitsItsProvider() {
         show(RecordsUiState(loading = false, busy = true, queryFailure = RecordsFailure("读取记录失败")))
 
         compose.onNodeWithText("重试").performScrollTo().assertIsEnabled().performClick()
@@ -60,15 +61,20 @@ class RecordsScreenTest {
         compose.runOnIdle { assertEquals(1, retries) }
     }
 
-    @Test fun backupRetryRemainsAvailableWhileTheSelectedQueryLoads() {
-        show(RecordsUiState(loading = true, backupFailure = RecordsFailure("备份解析失败")), backup = true)
+    @Test
+    fun backupRetryRemainsAvailableWhileTheSelectedQueryLoads() {
+        show(
+            RecordsUiState(loading = true, backupFailure = RecordsFailure("备份解析失败")),
+            backup = true
+        )
 
         compose.onNodeWithText("重试").performScrollTo().assertIsEnabled().performClick()
 
         compose.runOnIdle { assertEquals(1, backupRetries) }
     }
 
-    @Test fun closedBackupFailureUsesItsOwnRetryWhileTheQueryLoads() {
+    @Test
+    fun closedBackupFailureUsesItsOwnRetryWhileTheQueryLoads() {
         show(RecordsUiState(loading = true, backupFailure = RecordsFailure("导出备份失败")))
 
         compose.onNodeWithText("导出备份失败").performScrollTo().assertIsDisplayed()
@@ -80,7 +86,8 @@ class RecordsScreenTest {
         }
     }
 
-    @Test fun confirmedClearFailureRemainsRecoverableAfterItsSheetCloses() {
+    @Test
+    fun confirmedClearFailureRemainsRecoverableAfterItsSheetCloses() {
         val state = show(RecordsUiState(loading = false, epoch = 1), backup = true)
         compose.onNodeWithText("清空本机数据").performScrollTo().performClick()
         compose.onNodeWithText("确认清空").assertIsDisplayed().performClick()
@@ -133,14 +140,30 @@ class RecordsScreenTest {
                             onVariant = { variant ->
                                 state.value = state.value.copy(
                                     variant = variant,
-                                    items = (if (state.value.tab == RecordsTab.HISTORY) historyItems else initial.items)
+                                    items = (
+                                        if (state.value.tab ==
+                                            RecordsTab.HISTORY
+                                        ) {
+                                            historyItems
+                                        } else {
+                                            initial.items
+                                        }
+                                        )
                                         .filter { it.summary?.variant == variant }
                                 )
                             },
                             onTab = { tab ->
                                 state.value = state.value.copy(
                                     tab = tab,
-                                    items = (if (tab == RecordsTab.HISTORY) historyItems else initial.items)
+                                    items = (
+                                        if (tab ==
+                                            RecordsTab.HISTORY
+                                        ) {
+                                            historyItems
+                                        } else {
+                                            initial.items
+                                        }
+                                        )
                                         .filter { it.summary?.variant == state.value.variant }
                                         .sortedByDescending { it.summary?.startedAt }
                                 )
@@ -164,7 +187,8 @@ class RecordsScreenTest {
         return state
     }
 
-    @Test fun overviewKeepsItsCardsWhileCountsAreUnknown() {
+    @Test
+    fun overviewKeepsItsCardsWhileCountsAreUnknown() {
         val state = show(RecordsUiState())
         compose.onNodeWithText("每日挑战 · 当前连续").assertIsDisplayed()
         compose.onNodeWithText("0 局").assertDoesNotExist()
@@ -181,11 +205,18 @@ class RecordsScreenTest {
         }
 
         capture("records-loaded")
-        assertEquals(card, compose.onNodeWithTag("records-streak").fetchSemanticsNode().boundsInRoot)
-        assertEquals(bests, compose.onNodeWithTag("records-bests").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            card,
+            compose.onNodeWithTag("records-streak").fetchSemanticsNode().boundsInRoot
+        )
+        assertEquals(
+            bests,
+            compose.onNodeWithTag("records-bests").fetchSemanticsNode().boundsInRoot
+        )
     }
 
-    @Test fun unreadListsShowPlaceholdersInsteadOfFalseEmptyStates() {
+    @Test
+    fun unreadListsShowPlaceholdersInsteadOfFalseEmptyStates() {
         show(RecordsUiState())
         tabNode("本地存档").performClick()
         compose.onNodeWithTag("records-list-placeholder").assertIsDisplayed()
@@ -195,7 +226,8 @@ class RecordsScreenTest {
         compose.onNodeWithText("第一份记录，等你写下").assertDoesNotExist()
     }
 
-    @Test fun recordTabsSeparateOverviewFromEmptyLists() {
+    @Test
+    fun recordTabsSeparateOverviewFromEmptyLists() {
         show()
         tabNode("概览").assertIsSelected()
         tabNode("本地存档").performClick()
@@ -207,7 +239,8 @@ class RecordsScreenTest {
         pageNode("最佳用时").assertIsDisplayed()
     }
 
-    @Test fun clearRequiresAnExplicitConfirmationAndCancelIsInitiallyFocused() {
+    @Test
+    fun clearRequiresAnExplicitConfirmationAndCancelIsInitiallyFocused() {
         show(backup = true)
         compose.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
         compose.onNodeWithText("清空本机数据").performScrollTo().performClick()
@@ -220,7 +253,20 @@ class RecordsScreenTest {
         compose.runOnIdle { assertTrue(cleared) }
     }
 
-    @Test fun backupPreviewShowsCountsBeforeDestructiveReplacement() {
+    @Test
+    fun replacingDatasetDismissesAnOpenClearConfirmation() {
+        val state = show(backup = true)
+        compose.onNodeWithText("清空本机数据").performScrollTo().performClick()
+        compose.onNodeWithText("确认清空").assertIsDisplayed()
+
+        compose.runOnIdle { state.value = state.value.copy(epoch = 2) }
+
+        compose.onNodeWithText("确认清空").assertDoesNotExist()
+        compose.runOnIdle { assertFalse(cleared) }
+    }
+
+    @Test
+    fun backupPreviewShowsCountsBeforeDestructiveReplacement() {
         val backup = LocalBackup(
             exportedAt = "2026-10-16T01:02:03.004Z",
             sessions = emptyList(),
@@ -230,16 +276,21 @@ class RecordsScreenTest {
         )
         show(RecordsUiState(loading = false, epoch = 1, preview = BackupPreview(backup, 1)))
 
-        compose.onNodeWithText("导出时间：2026-10-16T01:02:03.004Z", substring = true).assertIsDisplayed()
+        compose.onNodeWithText(
+            "导出时间：2026-10-16T01:02:03.004Z",
+            substring = true
+        ).assertIsDisplayed()
         compose.runOnIdle { assertFalse(restored) }
         compose.onNodeWithText("确认替换本机数据").performClick()
         compose.runOnIdle { assertTrue(restored) }
     }
 
-    @Test fun savesAndHistoryOpenTheSelectedSessionAndKeepTheVariantFilter() {
+    @Test
+    fun savesAndHistoryOpenTheSelectedSessionAndKeepTheVariantFilter() {
         val first = session("older", Difficulty.EASY, "2026-10-15T08:00:00Z")
         val latest = session("latest", Difficulty.HARD, "2026-10-17T08:00:00Z")
-        val diagonal = session("diagonal", Difficulty.MEDIUM, "2026-10-16T08:00:00Z", PuzzleRules.Diagonal)
+        val diagonal =
+            session("diagonal", Difficulty.MEDIUM, "2026-10-16T08:00:00Z", PuzzleRules.Diagonal)
         val completed = first.copy(completion = Completion("2026-10-15T08:04:32Z", 272000))
         show(
             RecordsUiState(
@@ -274,7 +325,8 @@ class RecordsScreenTest {
         compose.runOnIdle { assertEquals("diagonal", resumed) }
     }
 
-    @Test fun backupActionsAreDisabledWhileBusyAndFailuresStayInTheSheet() {
+    @Test
+    fun backupActionsAreDisabledWhileBusyAndFailuresStayInTheSheet() {
         val state = show(RecordsUiState(loading = false, epoch = 1, busy = true), backup = true)
         compose.onNodeWithText("导出备份").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText("从备份恢复").performScrollTo().assertIsNotEnabled()
@@ -294,7 +346,8 @@ class RecordsScreenTest {
         capture("backup")
     }
 
-    @Test fun quarantineCleanupStillRequiresConfirmation() {
+    @Test
+    fun quarantineCleanupStillRequiresConfirmation() {
         show(RecordsUiState(loading = false, epoch = 1, quarantined = 2), backup = true)
         compose.onNodeWithText("清理隔离记录").performScrollTo().performClick()
         compose.onNodeWithText("确认清理").assertIsDisplayed()
@@ -303,7 +356,8 @@ class RecordsScreenTest {
         compose.runOnIdle { assertTrue(cleaned) }
     }
 
-    @Test fun firstLoadShowsUnknownStatisticsAndRefreshRetainsLoadedData() {
+    @Test
+    fun firstLoadShowsUnknownStatisticsAndRefreshRetainsLoadedData() {
         val state = show(RecordsUiState())
         compose.onNodeWithText("0 局").assertDoesNotExist()
         pageNode("最佳用时").assertIsDisplayed()
@@ -326,7 +380,9 @@ class RecordsScreenTest {
     }
 
     private fun pageNode(text: String, substring: Boolean = false): SemanticsNodeInteraction {
-        compose.onNodeWithTag("records-content").performScrollToNode(hasText(text, substring = substring))
+        compose.onNodeWithTag(
+            "records-content"
+        ).performScrollToNode(hasText(text, substring = substring))
         return compose.onNodeWithText(text, substring = substring)
     }
 
@@ -336,7 +392,10 @@ class RecordsScreenTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         try {
-            File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png").outputStream().use {
+            File(
+                instrumentation.targetContext.getExternalFilesDir(null),
+                "$name.png"
+            ).outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
             }
         } finally {

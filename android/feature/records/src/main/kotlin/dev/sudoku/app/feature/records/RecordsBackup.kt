@@ -59,15 +59,17 @@ internal fun RecordsBackup(
     onImport: () -> Unit,
     onDismissPreview: () -> Unit,
     onRestore: () -> Unit,
-    onClear: () -> Unit,
+    onClear: (Long) -> Unit,
     onCleanup: () -> Unit
 ) {
-    var clearConfirmation by rememberSaveable { mutableStateOf(false) }
+    // A destructive confirmation authorizes only the dataset shown when it was opened.
+    var clearEpoch by rememberSaveable { mutableStateOf<Long?>(null) }
+    val confirmedDataset = clearEpoch?.takeIf { it == state.epoch }
     var cleanupConfirmation by rememberSaveable { mutableStateOf(false) }
     val closeFocus = remember { FocusRequester() }
     val pending = state.busy
     val showProgress = rememberDelayedProgress(pending)
-    if (open && !clearConfirmation && !cleanupConfirmation && state.preview == null) {
+    if (open && confirmedDataset == null && !cleanupConfirmation && state.preview == null) {
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -78,16 +80,28 @@ internal fun RecordsBackup(
             Box(
                 Modifier.align(Alignment.CenterHorizontally).padding(top = 10.dp, bottom = 4.dp)
                     .size(32.dp, 4.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), RoundedCornerShape(2.dp))
+                    .background(
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                        RoundedCornerShape(2.dp)
+                    )
             )
             InitialDialogFocus(closeFocus)
             Column(
-                Modifier.verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                Modifier.verticalScroll(
+                    rememberScrollState()
+                ).padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("本地数据与备份", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                    IconButton(onClick = onDismiss, modifier = Modifier.focusRequester(closeFocus)) {
+                    Text(
+                        "本地数据与备份",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.focusRequester(closeFocus)
+                    ) {
                         Icon(Icons.Outlined.Close, "关闭备份面板")
                     }
                 }
@@ -103,12 +117,29 @@ internal fun RecordsBackup(
                 Surface(
                     shape = RoundedCornerShape(18.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
                 ) {
                     Column {
-                        BackupAction("导出备份", "将当前数据保存为文件", Icons.Outlined.FileUpload, available, onExport)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                        BackupAction("从备份恢复", "选择文件，确认后替换本机数据", Icons.Outlined.FileDownload, available, onImport)
+                        BackupAction(
+                            "导出备份",
+                            "将当前数据保存为文件",
+                            Icons.Outlined.FileUpload,
+                            available,
+                            onExport
+                        )
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                        )
+                        BackupAction(
+                            "从备份恢复",
+                            "选择文件，确认后替换本机数据",
+                            Icons.Outlined.FileDownload,
+                            available,
+                            onImport
+                        )
                     }
                 }
                 Text(
@@ -117,10 +148,18 @@ internal fun RecordsBackup(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (state.quarantined > 0) {
-                    Text("有 ${state.quarantined} 条无效记录已隔离，未包含在统计中。", style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = { cleanupConfirmation = true }, enabled = available) { Text("清理隔离记录") }
+                    Text(
+                        "有 ${state.quarantined} 条无效记录已隔离，未包含在统计中。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(onClick = {
+                        cleanupConfirmation = true
+                    }, enabled = available) { Text("清理隔离记录") }
                 }
-                TextButton(onClick = { clearConfirmation = true }, enabled = available && state.epoch != null) {
+                TextButton(
+                    onClick = { clearEpoch = state.epoch },
+                    enabled = available && state.epoch != null
+                ) {
                     Text("清空本机数据", color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -128,40 +167,47 @@ internal fun RecordsBackup(
     }
     state.preview?.let { preview ->
         DestructiveConfirmation(
-            title = "恢复备份",
-            message = "导出时间：${preview.backup.exportedAt}\n" +
-                "存档 ${preview.backup.sessions.size} 条 · 完成记录 ${preview.backup.results.size} 条 · " +
-                "课程完成 ${preview.backup.lessons.size} 条\n\n" +
-                "确认后将替换全部本机数据，此操作无法撤销。建议先导出当前备份。" +
-                (state.backupFailure?.let { "\n\n${it.message}" } ?: ""),
-            confirmLabel = "确认替换本机数据",
-            busy = pending,
+            content = ConfirmationContent(
+                title = "恢复备份",
+                message = "导出时间：${preview.backup.exportedAt}\n" +
+                    "存档 ${preview.backup.sessions.size} 条 · " +
+                    "完成记录 ${preview.backup.results.size} 条 · " +
+                    "课程完成 ${preview.backup.lessons.size} 条\n\n" +
+                    "确认后将替换全部本机数据，此操作无法撤销。建议先导出当前备份。" +
+                    (state.backupFailure?.let { "\n\n${it.message}" } ?: ""),
+                confirmLabel = "确认替换本机数据",
+                isBusy = pending
+            ),
             onDismiss = onDismissPreview,
             onConfirm = onRestore
         )
     }
-    if (clearConfirmation) {
+    if (confirmedDataset != null) {
         DestructiveConfirmation(
-            "清空本机数据",
-            "将删除全部存档、完成记录、课程进度与设置，此操作无法撤销。",
-            "确认清空",
-            pending,
-            { clearConfirmation = false },
-            {
-                clearConfirmation = false
+            content = ConfirmationContent(
+                title = "清空本机数据",
+                message = "将删除全部存档、完成记录、课程进度与设置，此操作无法撤销。",
+                confirmLabel = "确认清空",
+                isBusy = pending
+            ),
+            onDismiss = { clearEpoch = null },
+            onConfirm = {
+                clearEpoch = null
                 onDismiss()
-                onClear()
+                onClear(confirmedDataset)
             }
         )
     }
     if (cleanupConfirmation) {
         DestructiveConfirmation(
-            "清理隔离记录",
-            "将永久删除 ${state.quarantined} 条已隔离的无效记录。有效存档与完成记录不受影响。",
-            "确认清理",
-            pending,
-            { cleanupConfirmation = false },
-            {
+            content = ConfirmationContent(
+                title = "清理隔离记录",
+                message = "将永久删除 ${state.quarantined} 条已隔离的无效记录。有效存档与完成记录不受影响。",
+                confirmLabel = "确认清理",
+                isBusy = pending
+            ),
+            onDismiss = { cleanupConfirmation = false },
+            onConfirm = {
                 cleanupConfirmation = false
                 onCleanup()
             }
@@ -170,7 +216,13 @@ internal fun RecordsBackup(
 }
 
 @Composable
-private fun BackupAction(title: String, subtitle: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
+private fun BackupAction(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
     Surface(onClick = onClick, enabled = enabled, color = MaterialTheme.colorScheme.surface) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 80.dp).padding(16.dp),
@@ -196,27 +248,35 @@ private fun BackupAction(title: String, subtitle: String, icon: ImageVector, ena
     }
 }
 
+private data class ConfirmationContent(
+    val title: String,
+    val message: String,
+    val confirmLabel: String,
+    val isBusy: Boolean
+)
+
 @Composable
 private fun DestructiveConfirmation(
-    title: String,
-    message: String,
-    confirmLabel: String,
-    busy: Boolean,
+    content: ConfirmationContent,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
     val cancelFocus = remember { FocusRequester() }
     AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(title) },
-        text = { Text(message) },
+        onDismissRequest = {
+            if (!content.isBusy) {
+                onDismiss()
+            }
+        },
+        title = { Text(content.title) },
+        text = { Text(content.message) },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
-                enabled = !busy
+                enabled = !content.isBusy
             ) {
                 Text(
-                    confirmLabel,
+                    content.confirmLabel,
                     color = MaterialTheme.colorScheme.error
                 )
             }
@@ -226,8 +286,10 @@ private fun DestructiveConfirmation(
             InitialDialogFocus(cancelFocus)
             TextButton(
                 onClick = onDismiss,
-                enabled = !busy,
-                modifier = Modifier.focusRequester(cancelFocus).focusProperties { canFocus = !busy }
+                enabled = !content.isBusy,
+                modifier = Modifier.focusRequester(cancelFocus).focusProperties {
+                    canFocus = !content.isBusy
+                }
             ) { Text("取消") }
         }
 

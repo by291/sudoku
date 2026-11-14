@@ -8,6 +8,7 @@ import dev.sudoku.app.model.StorageFailureKind
 import dev.sudoku.app.model.StorageOutcome
 import dev.sudoku.app.model.SummaryCursor
 import dev.sudoku.app.model.SummaryItem
+import dev.sudoku.app.model.SummaryPage
 import dev.sudoku.app.model.SummaryQuery
 import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.challengeDate
@@ -19,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+private const val MAX_VISIBLE_RECORDS = 120
 
 internal data class RecordsQueryState(
     val loading: Boolean = true,
@@ -51,6 +54,7 @@ internal class RecordsQueryController(
         if (variant == state.value.variant && tab == state.value.tab) {
             return
         }
+
         invalidate()
         mutableState.update { RecordsQueryState(variant = variant, tab = tab) }
         refresh()
@@ -67,6 +71,7 @@ internal class RecordsQueryController(
         if (more && (state.value.next == null || state.value.loading)) {
             return
         }
+
         job?.cancel()
         val operation = ++generation
         job = scope.launch { load(operation, more) }
@@ -90,7 +95,9 @@ internal class RecordsQueryController(
                 } catch (error: Exception) {
                     if (operation == generation) {
                         retryRepair = true
-                        mutableState.update { it.copy(loading = false, failure = error.recordsFailure("整理记录失败")) }
+                        mutableState.update {
+                            it.copy(loading = false, failure = error.recordsFailure("整理记录失败"))
+                        }
                     }
                 }
             }
@@ -104,42 +111,37 @@ internal class RecordsQueryController(
         mutableState.update { it.copy(loading = true, failure = null) }
         try {
             val overview = if (before.tab == RecordsTab.OVERVIEW) {
-                reads.readOverview(before.variant, challengeDate(Instant.now())).requireRecordsSuccess()
+                reads.readOverview(
+                    before.variant,
+                    challengeDate(Instant.now())
+                ).requireRecordsSuccess()
             } else {
                 null
             }
-            var append = more
-            val page = if (before.tab != RecordsTab.OVERVIEW) {
-                val query = when (before.tab) {
-                    RecordsTab.SAVES -> SummaryQuery.Saves(before.variant)
-                    RecordsTab.HISTORY -> SummaryQuery.History(before.variant)
-                    RecordsTab.OVERVIEW -> error("Overview has no summary page")
-                }
-                val outcome = reads.readPage(query, cursor = if (more) before.next else null)
-                if (outcome is StorageOutcome.Failure && outcome.error.kind == StorageFailureKind.REVISION_CONFLICT) {
-                    append = false
-                    reads.readPage(query).requireRecordsSuccess()
-                } else {
-                    outcome.requireRecordsSuccess()
-                }
-            } else {
-                null
-            }
+            val pageRead = if (overview == null) readPage(before, more = more) else null
+            val page = pageRead?.page
             val epoch = overview?.epoch ?: checkNotNull(page).epoch
-            if (repository.readDatasetEpoch().requireRecordsSuccess() != epoch) {
-                throw RecordsStorageException(StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Dataset changed"))
-            }
-            // Cancellation alone cannot fence a non-cancellable repository delivery after a filter switch.
+
+            val currentEpoch = repository.readDatasetEpoch()
+            // A non-cancellable read can return after the active filter has changed.
             if (operation != generation) {
                 return
             }
+            if (currentEpoch.requireRecordsSuccess() != epoch) {
+                val failure =
+                    StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Dataset changed")
+                throw RecordsStorageException(failure)
+            }
+
+            val retained = if (pageRead?.isAppend == true) before.items else emptyList()
+            val visible = (retained + page?.items.orEmpty()).takeLast(MAX_VISIBLE_RECORDS)
             mutableState.update {
                 it.copy(
                     loading = false,
                     epoch = epoch,
                     summary = overview?.summary,
                     pending = overview?.pending ?: checkNotNull(page).pending,
-                    items = ((if (append) before.items else emptyList()) + page?.items.orEmpty()).takeLast(120),
+                    items = visible,
                     next = page?.next,
                     failure = null
                 )
@@ -148,13 +150,36 @@ internal class RecordsQueryController(
             throw error
         } catch (error: Exception) {
             if (operation == generation) {
-                mutableState.update { it.copy(loading = false, failure = error.recordsFailure("读取记录失败")) }
+                mutableState.update {
+                    it.copy(loading = false, failure = error.recordsFailure("读取记录失败"))
+                }
             }
         }
     }
+
+    private data class PageRead(val page: SummaryPage, val isAppend: Boolean)
+
+    private suspend fun readPage(before: RecordsQueryState, more: Boolean): PageRead {
+        val query = when (before.tab) {
+            RecordsTab.SAVES -> SummaryQuery.Saves(before.variant)
+            RecordsTab.HISTORY -> SummaryQuery.History(before.variant)
+            RecordsTab.OVERVIEW -> error("Overview has no summary page")
+        }
+        val outcome = reads.readPage(query, cursor = before.next.takeIf { more })
+
+        // An expired cursor belongs to a different projection and cannot append to old rows.
+        if (outcome is StorageOutcome.Failure &&
+            outcome.error.kind == StorageFailureKind.REVISION_CONFLICT
+        ) {
+            return PageRead(reads.readPage(query).requireRecordsSuccess(), isAppend = false)
+        }
+
+        return PageRead(outcome.requireRecordsSuccess(), isAppend = more)
+    }
 }
 
-internal class RecordsStorageException(val failure: StorageFailure) : IllegalStateException(failure.message)
+internal class RecordsStorageException(val failure: StorageFailure) :
+    IllegalStateException(failure.message)
 
 internal fun <T> StorageOutcome<T>.requireRecordsSuccess(): T = when (this) {
     is StorageOutcome.Success -> value

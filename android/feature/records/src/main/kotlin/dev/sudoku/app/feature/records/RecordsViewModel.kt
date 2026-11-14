@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.sudoku.app.model.BackupExport
 import dev.sudoku.app.model.BackupPreview
 import dev.sudoku.app.model.GameReadRepository
 import dev.sudoku.app.model.GameRepository
@@ -45,7 +46,9 @@ internal data class RecordsUiState(
 
 internal enum class RecordsTab(val label: String) { OVERVIEW("概览"), SAVES("本地存档"), HISTORY("完成历史") }
 
-/** Coordinates independent query and backup owners without sharing their failures or retry identity. */
+/**
+ * Coordinates independent query and backup owners without sharing their failures or retry identity.
+ */
 @HiltViewModel
 internal class RecordsViewModel @Inject constructor(
     repository: GameRepository,
@@ -57,8 +60,12 @@ internal class RecordsViewModel @Inject constructor(
         reads,
         viewModelScope,
         RecordsQueryState(
-            variant = Variant.entries.firstOrNull { it.name == savedState.get<String>(VARIANT_KEY) } ?: Variant.CLASSIC,
-            tab = RecordsTab.entries.firstOrNull { it.name == savedState.get<String>(TAB_KEY) } ?: RecordsTab.OVERVIEW
+            variant =
+            Variant.entries.firstOrNull { it.name == savedState.get<String>(VARIANT_KEY) }
+                ?: Variant.CLASSIC,
+            tab =
+            RecordsTab.entries.firstOrNull { it.name == savedState.get<String>(TAB_KEY) }
+                ?: RecordsTab.OVERVIEW
         )
     )
     private val backup = RecordsBackupController(
@@ -70,7 +77,8 @@ internal class RecordsViewModel @Inject constructor(
         },
         onRecordsChanged = { query.refresh() }
     )
-    private val mutableState = MutableStateFlow(composedState(query.state.value, backup.state.value))
+    private val mutableState =
+        MutableStateFlow(composedState(query.state.value, backup.state.value))
     val uiState = mutableState.asStateFlow()
     val pendingExport get() = backup.pendingExport
 
@@ -92,7 +100,9 @@ internal class RecordsViewModel @Inject constructor(
         query.select(tab = tab)
     }
 
-    /** Run inside repeatOnLifecycle(STARTED); the initial Room emission performs the return refresh. */
+    /**
+     * Run inside repeatOnLifecycle(STARTED); the initial Room emission performs the return refresh.
+     */
     @OptIn(kotlinx.coroutines.FlowPreview::class)
     suspend fun observe() = coroutineScope {
         launch { reads.changes.debounce(100).collect { refresh() } }
@@ -119,11 +129,13 @@ internal class RecordsViewModel @Inject constructor(
 
     suspend fun prepareExport() = backup.prepareExport()
 
-    fun finishExport(export: dev.sudoku.app.model.BackupExport?, error: String? = null) =
+    fun finishExport(export: BackupExport?, error: String? = null) =
         backup.finishExport(export, error)
 
-    fun documentFailure(message: String, action: BackupDocumentAction = BackupDocumentAction.IMPORT) =
-        backup.documentFailure(message, action)
+    fun documentFailure(
+        message: String,
+        action: BackupDocumentAction = BackupDocumentAction.IMPORT
+    ) = backup.documentFailure(message, action)
 
     fun previewImport(text: String) = backup.preview(text)
 
@@ -131,9 +143,8 @@ internal class RecordsViewModel @Inject constructor(
 
     fun confirmRestore() = backup.restore()
 
-    fun clearAll() {
-        query.state.value.epoch?.let { backup.clear(it) }
-    }
+    /** Clear only the dataset for which the user opened the confirmation. */
+    fun clearAll(confirmedEpoch: Long) = backup.clear(confirmedEpoch)
 
     fun removeQuarantined() = backup.cleanup()
 }

@@ -31,28 +31,39 @@ import kotlinx.coroutines.test.setMain
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordsViewModelTest {
-    @Test fun `successful count refresh preserves the failed export document retry`() = runTest {
+    @Test
+    fun `successful count refresh preserves the failed export document retry`() = runTest {
         verifyExportRetryAfterCount(failCount = false)
     }
 
-    @Test fun `failed count refresh preserves the failed export storage kind and document retry`() = runTest {
-        verifyExportRetryAfterCount(failCount = true)
-    }
+    @Test
+    fun `failed count refresh preserves the failed export storage kind and document retry`() =
+        runTest {
+            verifyExportRetryAfterCount(failCount = true)
+        }
 
-    private suspend fun kotlinx.coroutines.test.TestScope.verifyExportRetryAfterCount(failCount: Boolean) {
+    private suspend fun kotlinx.coroutines.test.TestScope.verifyExportRetryAfterCount(
+        failCount: Boolean
+    ) {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake().also { it.failExport = true }
             val model = RecordsViewModel(repository, recordReads(repository), SavedStateHandle())
             assertNull(model.prepareExport())
             runCurrent()
-            assertEquals(StorageFailureKind.WRITE_FAILED, model.uiState.value.backupFailure?.storage?.kind)
+            assertEquals(
+                StorageFailureKind.WRITE_FAILED,
+                model.uiState.value.backupFailure?.storage?.kind
+            )
             repository.failCount = failCount
 
             model.openBackup()
             runCurrent()
 
-            assertEquals(StorageFailureKind.WRITE_FAILED, model.uiState.value.backupFailure?.storage?.kind)
+            assertEquals(
+                StorageFailureKind.WRITE_FAILED,
+                model.uiState.value.backupFailure?.storage?.kind
+            )
             assertEquals(BackupDocumentAction.EXPORT, model.retryBackup())
             repository.failExport = false
             assertNotNull(model.prepareExport())
@@ -65,16 +76,20 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `opening backup metadata retains the captured failed clear operation`() = runTest {
+    @Test
+    fun `opening backup metadata retains the captured failed clear operation`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake().also { it.failClear = true }
             val model = RecordsViewModel(repository, recordReads(repository), SavedStateHandle())
             model.refresh()
             runCurrent()
-            model.clearAll()
+            model.clearAll(confirmedEpoch = 1L)
             runCurrent()
-            assertEquals(StorageFailureKind.WRITE_FAILED, model.uiState.value.backupFailure?.storage?.kind)
+            assertEquals(
+                StorageFailureKind.WRITE_FAILED,
+                model.uiState.value.backupFailure?.storage?.kind
+            )
 
             model.openBackup()
             runCurrent()
@@ -90,18 +105,23 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `recreated query choices use the saved tab and variant without retaining page payloads`() = runTest {
+    @Test
+    fun `recreated view restores filters without retaining pages`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake()
             val queries = mutableListOf<dev.sudoku.app.model.SummaryQuery>()
-            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(repository) {
+            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(
+                repository
+            ) {
                 override suspend fun readPage(
                     query: dev.sudoku.app.model.SummaryQuery,
                     cursor: dev.sudoku.app.model.SummaryCursor?
                 ): StorageOutcome<dev.sudoku.app.model.SummaryPage> {
                     queries += query
-                    return StorageOutcome.Success(dev.sudoku.app.model.SummaryPage(1, emptyList(), null, false))
+                    return StorageOutcome.Success(
+                        dev.sudoku.app.model.SummaryPage(1, emptyList(), null, false)
+                    )
                 }
             }
             val saved = SavedStateHandle()
@@ -124,17 +144,22 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `query and backup failures retain their storage kinds and independent retries`() = runTest {
+    @Test
+    fun `query and backup failures retain their storage kinds and independent retries`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake()
             var queryFails = true
-            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(repository) {
+            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(
+                repository
+            ) {
                 override suspend fun readOverview(
                     variant: dev.sudoku.app.model.Variant,
                     today: String
                 ): StorageOutcome<dev.sudoku.app.model.OverviewSnapshot> = if (queryFails) {
-                    StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Offline"))
+                    StorageOutcome.Failure(
+                        StorageFailure(StorageFailureKind.UNAVAILABLE, "Offline")
+                    )
                 } else {
                     recordReads(repository).readOverview(variant, today)
                 }
@@ -147,14 +172,23 @@ class RecordsViewModelTest {
             model.confirmRestore()
             runCurrent()
 
-            assertEquals(StorageFailureKind.UNAVAILABLE, model.uiState.value.queryFailure?.storage?.kind)
-            assertEquals(StorageFailureKind.WRITE_FAILED, model.uiState.value.backupFailure?.storage?.kind)
+            assertEquals(
+                StorageFailureKind.UNAVAILABLE,
+                model.uiState.value.queryFailure?.storage?.kind
+            )
+            assertEquals(
+                StorageFailureKind.WRITE_FAILED,
+                model.uiState.value.backupFailure?.storage?.kind
+            )
             queryFails = false
             model.retryQuery()
             runCurrent()
 
             assertNull(model.uiState.value.queryFailure)
-            assertEquals(StorageFailureKind.WRITE_FAILED, model.uiState.value.backupFailure?.storage?.kind)
+            assertEquals(
+                StorageFailureKind.WRITE_FAILED,
+                model.uiState.value.backupFailure?.storage?.kind
+            )
             repository.failRestore = false
             model.retryBackup()
             runCurrent()
@@ -166,12 +200,15 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `query switching remains live while export awaits the document provider`() = runTest {
+    @Test
+    fun `query switching remains live while export awaits the document provider`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake()
             var selected: dev.sudoku.app.model.Variant? = null
-            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(repository) {
+            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(
+                repository
+            ) {
                 override suspend fun readOverview(
                     variant: dev.sudoku.app.model.Variant,
                     today: String
@@ -196,7 +233,8 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `a successful query refresh preserves the failed restore retry`() = runTest {
+    @Test
+    fun `a successful query refresh preserves the failed restore retry`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake()
@@ -222,20 +260,25 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `only the selected tab reads data and stale pagination replaces the old list`() = runTest {
+    @Test
+    fun `only the selected tab reads data and stale pagination replaces the old list`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake()
             var pages = 0
             var version = 0L
-            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(repository) {
+            val reads = object : dev.sudoku.app.model.GameReadRepository by recordReads(
+                repository
+            ) {
                 override suspend fun readPage(
                     query: dev.sudoku.app.model.SummaryQuery,
                     cursor: dev.sudoku.app.model.SummaryCursor?
                 ): StorageOutcome<dev.sudoku.app.model.SummaryPage> {
                     pages++
                     if (cursor != null && cursor.generation != version) {
-                        return StorageOutcome.Failure(StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Changed"))
+                        return StorageOutcome.Failure(
+                            StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Changed")
+                        )
                     }
                     return StorageOutcome.Success(
                         dev.sudoku.app.model.SummaryPage(
@@ -274,7 +317,8 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `failed replacement keeps preview and offers retry without reporting success`() = runTest {
+    @Test
+    fun `failed replacement keeps preview and offers retry without reporting success`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = RecordsRepositoryFake()
@@ -303,10 +347,13 @@ class RecordsViewModelTest {
         }
     }
 
-    @Test fun `document provider failure never reports exported success`() = runTest {
+    @Test
+    fun `document provider failure never reports exported success`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val model = RecordsRepositoryFake().let { RecordsViewModel(it, recordReads(it), SavedStateHandle()) }
+            val model = RecordsRepositoryFake().let {
+                RecordsViewModel(it, recordReads(it), SavedStateHandle())
+            }
             model.refresh()
             runCurrent()
             assertNotNull(model.prepareExport())
@@ -349,18 +396,23 @@ private class RecordsRepositoryFake : GameRepository {
     override suspend fun countQuarantined(): StorageOutcome<Int> {
         countCalls++
         return if (failCount) {
-            StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Count unavailable"))
+            StorageOutcome.Failure(
+                StorageFailure(StorageFailureKind.UNAVAILABLE, "Count unavailable")
+            )
         } else {
             StorageOutcome.Success(0)
         }
     }
 
-    override suspend fun previewBackup(text: String) = StorageOutcome.Success(BackupPreview(backup, epoch))
+    override suspend fun previewBackup(text: String) =
+        StorageOutcome.Success(BackupPreview(backup, epoch))
 
     override suspend fun exportBackup(exportedAt: String): StorageOutcome<BackupExport> {
         exportCalls++
         return if (failExport) {
-            StorageOutcome.Failure(StorageFailure(StorageFailureKind.WRITE_FAILED, "Export unavailable"))
+            StorageOutcome.Failure(
+                StorageFailure(StorageFailureKind.WRITE_FAILED, "Export unavailable")
+            )
         } else {
             StorageOutcome.Success(BackupExport(backup, "{}"))
         }
@@ -379,7 +431,9 @@ private class RecordsRepositoryFake : GameRepository {
     override suspend fun clearAll(expectedEpoch: Long): StorageOutcome<Unit> {
         clearEpochs += expectedEpoch
         if (failClear) {
-            return StorageOutcome.Failure(StorageFailure(StorageFailureKind.WRITE_FAILED, "Clear failed"))
+            return StorageOutcome.Failure(
+                StorageFailure(StorageFailureKind.WRITE_FAILED, "Clear failed")
+            )
         }
         epoch++
         return StorageOutcome.Success(Unit)
@@ -397,7 +451,10 @@ private class RecordsRepositoryFake : GameRepository {
     override suspend fun writeLessonProgress(progress: LessonProgress, expectedEpoch: Long) =
         StorageOutcome.Success(Unit)
 
-    override suspend fun claimEditor(sessionId: String, ownerId: String): StorageOutcome<EditorToken> = error("Unused")
+    override suspend fun claimEditor(
+        sessionId: String,
+        ownerId: String
+    ): StorageOutcome<EditorToken> = error("Unused")
 
     override suspend fun releaseEditor(token: EditorToken): StorageOutcome<Unit> = error("Unused")
 
@@ -414,25 +471,26 @@ private class RecordsRepositoryFake : GameRepository {
     ): StorageOutcome<SessionRecord> = error("Unused")
 }
 
-private fun recordReads(repository: GameRepository) = object : dev.sudoku.app.model.GameReadRepository by (
-    java.lang.reflect.Proxy.newProxyInstance(
-        dev.sudoku.app.model.GameReadRepository::class.java.classLoader,
-        arrayOf(dev.sudoku.app.model.GameReadRepository::class.java)
-    ) { _, method, _ ->
-        error("Unexpected records query: ${method.name}")
-    } as dev.sudoku.app.model.GameReadRepository
-    ) {
-    override suspend fun readOverview(
-        variant: dev.sudoku.app.model.Variant,
-        today: String
-    ): StorageOutcome<dev.sudoku.app.model.OverviewSnapshot> {
-        val epoch = (repository.readDatasetEpoch() as StorageOutcome.Success).value
-        return StorageOutcome.Success(
-            dev.sudoku.app.model.OverviewSnapshot(
-                epoch,
-                dev.sudoku.app.model.summarizeRecords(emptyList(), today, variant),
-                false
+private fun recordReads(repository: GameRepository) =
+    object : dev.sudoku.app.model.GameReadRepository by (
+        java.lang.reflect.Proxy.newProxyInstance(
+            dev.sudoku.app.model.GameReadRepository::class.java.classLoader,
+            arrayOf(dev.sudoku.app.model.GameReadRepository::class.java)
+        ) { _, method, _ ->
+            error("Unexpected records query: ${method.name}")
+        } as dev.sudoku.app.model.GameReadRepository
+        ) {
+        override suspend fun readOverview(
+            variant: dev.sudoku.app.model.Variant,
+            today: String
+        ): StorageOutcome<dev.sudoku.app.model.OverviewSnapshot> {
+            val epoch = (repository.readDatasetEpoch() as StorageOutcome.Success).value
+            return StorageOutcome.Success(
+                dev.sudoku.app.model.OverviewSnapshot(
+                    epoch,
+                    dev.sudoku.app.model.summarizeRecords(emptyList(), today, variant),
+                    false
+                )
             )
-        )
+        }
     }
-}

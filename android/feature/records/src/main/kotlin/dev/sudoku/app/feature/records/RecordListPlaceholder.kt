@@ -40,7 +40,10 @@ internal fun RecordListPlaceholder() {
                     listOf(0.45f, 0.75f, 0.6f).forEachIndexed { index, width ->
                         Box(
                             Modifier.fillMaxWidth(width).height(if (index == 0) 22.dp else 16.dp)
-                                .background(colors.onSurface.copy(alpha = 0.06f), RoundedCornerShape(4.dp))
+                                .background(
+                                    colors.onSurface.copy(alpha = 0.06f),
+                                    RoundedCornerShape(4.dp)
+                                )
                         )
                     }
                 }

@@ -39,7 +39,9 @@ internal data class RecordsBackupState(
     val replacementGeneration: Long = 0
 )
 
-/** Owns backup business operations and the export/provider handshake; the route owns document I/O. */
+/**
+ * Owns backup business operations and the export/provider handshake; the route owns document I/O.
+ */
 internal class RecordsBackupController(
     private val repository: GameRepository,
     private val scope: CoroutineScope,
@@ -129,7 +131,12 @@ internal class RecordsBackupController(
 
     private fun replaced(notice: String) {
         mutableState.update {
-            it.copy(preview = null, notice = notice, replacementGeneration = it.replacementGeneration + 1)
+            it.copy(
+                preview = null,
+                notice = notice,
+                replacementGeneration =
+                it.replacementGeneration + 1
+            )
         }
         onDatasetReplaced()
     }
@@ -158,7 +165,10 @@ internal class RecordsBackupController(
         invalidateCount()
         mutableState.update { it.copy(busy = true, failure = null, retry = null, notice = null) }
         return try {
-            repository.exportBackup(isoInstant(Instant.now())).requireRecordsSuccess().also { pendingExport = it }
+            repository.exportBackup(isoInstant(Instant.now())).requireRecordsSuccess().also {
+                pendingExport =
+                    it
+            }
         } catch (error: CancellationException) {
             mutableState.update { it.copy(busy = false) }
             throw error
@@ -217,7 +227,9 @@ internal class RecordsBackupController(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                mutableState.update { it.copy(failure = error.recordsFailure(prefix), retry = retry) }
+                mutableState.update {
+                    it.copy(failure = error.recordsFailure(prefix), retry = retry)
+                }
             } finally {
                 mutableState.update { it.copy(busy = false) }
             }
@@ -226,7 +238,8 @@ internal class RecordsBackupController(
 
     private fun invalidateCount() {
         countRead?.cancel()
-        // A provider/read may finish non-cancellably; an older count must not alter a newer operation.
+        // A provider/read may finish non-cancellably; an older count must not alter a newer
+        // operation.
         countGeneration++
     }
 }

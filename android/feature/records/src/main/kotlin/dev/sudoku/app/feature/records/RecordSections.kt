@@ -56,13 +56,25 @@ internal fun RecordsOverview(variant: Variant, summary: RecordSummary?) {
             shape = RoundedCornerShape(20.dp),
             color = colors.primaryContainer
         ) {
-            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.fillMaxWidth().padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(18.dp), tint = colors.primary)
-                    Text("每日挑战 · 当前连续", style = MaterialTheme.typography.labelLarge, color = colors.primary)
+                    Icon(
+                        Icons.Outlined.CalendarMonth,
+                        null,
+                        Modifier.size(18.dp),
+                        tint = colors.primary
+                    )
+                    Text(
+                        "每日挑战 · 当前连续",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.primary
+                    )
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -113,8 +125,14 @@ internal fun RecordsOverview(variant: Variant, summary: RecordSummary?) {
                         val unassisted = times?.unassisted?.let(::formatElapsedTime) ?: "—"
                         val assisted = times?.assisted?.let(::formatElapsedTime) ?: "—"
                         if (stacked) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(difficultyLabel(difficulty), style = MaterialTheme.typography.titleSmall)
+                            Column(
+                                Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    difficultyLabel(difficulty),
+                                    style = MaterialTheme.typography.titleSmall
+                                )
                                 BestTime("未使用辅助", unassisted)
                                 BestTime("使用辅助", assisted)
                             }
@@ -153,7 +171,11 @@ internal fun RecordsOverview(variant: Variant, summary: RecordSummary?) {
 private fun DailyTotal(count: Int?, label: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("${count ?: "—"} 局", style = MaterialTheme.typography.titleLarge)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -166,7 +188,11 @@ private fun BestTime(label: String, time: String) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(time, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        Text(
+            time,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -194,7 +220,11 @@ internal fun RecordSectionHeading(title: String, detail: String) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -220,7 +250,10 @@ internal fun EmptyRecords(title: String, description: String) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
                 Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
                     Icon(Icons.Outlined.GridOn, null, tint = MaterialTheme.colorScheme.primary)
                 }
@@ -239,12 +272,31 @@ internal fun EmptyRecords(title: String, description: String) {
 @Composable
 internal fun FeaturedSave(session: GameSummary, enabled: Boolean, onResume: () -> Unit) {
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Schedule, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                Text("继续上次的思路", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Outlined.Schedule,
+                    null,
+                    Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "继续上次的思路",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-            Text(recordTitle(session), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                recordTitle(session),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
             Text(
                 "已用时 ${formatElapsedTime(session.elapsedMs)} · ${assistanceLabel(session)}",
                 style = MaterialTheme.typography.bodySmall,
@@ -271,7 +323,12 @@ internal fun FeaturedSave(session: GameSummary, enabled: Boolean, onResume: () -
 }
 
 @Composable
-internal fun RecordEntry(session: GameSummary, enabled: Boolean, history: Boolean, onOpen: () -> Unit) {
+internal fun RecordEntry(
+    session: GameSummary,
+    enabled: Boolean,
+    history: Boolean,
+    onOpen: () -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val action = when {
         history -> "查看记录"
@@ -312,7 +369,11 @@ internal fun RecordEntry(session: GameSummary, enabled: Boolean, history: Boolea
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(recordTitle(session), style = MaterialTheme.typography.titleSmall)
-                Text(recordDetail(session), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                Text(
+                    recordDetail(session),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant
+                )
                 if (!history) {
                     Text(
                         recordDate(session),
@@ -329,10 +390,20 @@ internal fun RecordEntry(session: GameSummary, enabled: Boolean, history: Boolea
                 }
             }
             if (!stacked) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(formatElapsedTime(session.elapsedMs), style = MaterialTheme.typography.bodyLarge)
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        formatElapsedTime(session.elapsedMs),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(action, style = MaterialTheme.typography.labelSmall, color = colors.primary)
+                        Text(
+                            action,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.primary
+                        )
                         Icon(
                             Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                             null,
@@ -371,6 +442,8 @@ private fun recordDate(session: GameSummary): String {
     if (daily != null) {
         return "挑战日期 ${daily.challengeDate}"
     }
-    return Instant.parse(session.completion?.completedAt ?: session.startedAt).atZone(ZoneId.systemDefault())
+    return Instant.parse(
+        session.completion?.completedAt ?: session.startedAt
+    ).atZone(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofPattern("M 月 d 日 HH:mm"))
 }

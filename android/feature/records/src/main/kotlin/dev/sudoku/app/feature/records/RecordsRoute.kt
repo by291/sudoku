@@ -22,6 +22,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private val BACKUP_DOCUMENT_TYPES = arrayOf(
+    "application/json",
+    "text/plain",
+    "application/octet-stream"
+)
+
+/** Connect records queries and backup actions to navigation and Android document providers. */
 @Composable
 fun RecordsRoute(
     onResume: (GameLaunch) -> Unit,
@@ -37,7 +44,9 @@ fun RecordsRoute(
     var documentLoading by remember { mutableStateOf(false) }
     var deliveredReplacement by rememberSaveable { mutableStateOf(0L) }
     val createDocument =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
             val export = model.pendingExport
             if (uri == null) {
                 model.finishExport(null)
@@ -47,8 +56,11 @@ fun RecordsRoute(
                 scope.launch {
                     try {
                         withContext(Dispatchers.IO) {
-                            val stream = context.contentResolver.openOutputStream(uri, "wt") ?: error("无法打开所选文件。")
-                            // Success is published only after the provider flushes and closes the stream.
+                            val stream =
+                                context.contentResolver.openOutputStream(uri, "wt")
+                                    ?: error("无法打开所选文件。")
+                            // Success is published only after the provider flushes and closes the
+                            // stream.
                             stream.use { output ->
                                 output.write(export.text.toByteArray(Charsets.UTF_8))
                                 output.flush()
@@ -64,36 +76,54 @@ fun RecordsRoute(
                 }
             }
         }
-    val openDocument = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            scope.launch {
-                documentLoading = true
-                try {
-                    val text = withContext(Dispatchers.IO) {
-                        val input = context.contentResolver.openInputStream(uri) ?: error("无法读取所选文件。")
-                        input.use(::readBackupDocument)
+    val openDocument =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    documentLoading = true
+                    try {
+                        val text = withContext(Dispatchers.IO) {
+                            val input =
+                                context.contentResolver.openInputStream(uri) ?: error("无法读取所选文件。")
+                            input.use(::readBackupDocument)
+                        }
+                        model.previewImport(text)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        model.documentFailure("读取备份失败：${error.message.orEmpty()}。可重新选择文件。")
+                    } finally {
+                        documentLoading = false
                     }
-                    model.previewImport(text)
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    model.documentFailure("读取备份失败：${error.message.orEmpty()}。可重新选择文件。")
-                } finally {
-                    documentLoading = false
                 }
             }
         }
-    }
 
     LaunchedEffect(model, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { model.observe() }
     }
-    LaunchedEffect(backupOpen) { if (backupOpen) model.openBackup() }
+    LaunchedEffect(backupOpen) {
+        if (backupOpen) {
+            model.openBackup()
+        }
+    }
     LaunchedEffect(state.replacementGeneration) {
         if (state.replacementGeneration > deliveredReplacement) {
             deliveredReplacement = state.replacementGeneration
             onDatasetReplaced()
         }
+    }
+
+    fun exportBackup() {
+        scope.launch {
+            val exported = model.prepareExport() ?: return@launch
+            val date = exported.backup.exportedAt.take(10)
+            createDocument.launch("一格一念数独-$date.json")
+        }
+    }
+
+    fun importBackup() {
+        openDocument.launch(BACKUP_DOCUMENT_TYPES)
     }
 
     RecordsScreen(
@@ -105,26 +135,13 @@ fun RecordsRoute(
         onRetry = model::retryQuery,
         onRetryBackup = {
             when (model.retryBackup()) {
-                BackupDocumentAction.EXPORT -> scope.launch {
-                    model.prepareExport()?.let { exported ->
-                        createDocument.launch("一格一念数独-${exported.backup.exportedAt.take(10)}.json")
-                    }
-                }
-                BackupDocumentAction.IMPORT -> openDocument.launch(
-                    arrayOf("application/json", "text/plain", "application/octet-stream")
-                )
+                BackupDocumentAction.EXPORT -> exportBackup()
+                BackupDocumentAction.IMPORT -> importBackup()
                 null -> Unit
             }
         },
-        onExport = {
-            scope.launch {
-                val exported = model.prepareExport()
-                if (exported != null) {
-                    createDocument.launch("一格一念数独-${exported.backup.exportedAt.take(10)}.json")
-                }
-            }
-        },
-        onImport = { openDocument.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
+        onExport = ::exportBackup,
+        onImport = ::importBackup,
         onDismissPreview = model::dismissPreview,
         onRestore = model::confirmRestore,
         onClear = model::clearAll,
