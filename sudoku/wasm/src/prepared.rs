@@ -1,4 +1,4 @@
-use crate::control::execution;
+use crate::control::{check, execution, timeout_error};
 use crate::conversion::editing::PreparedEditInput;
 use crate::conversion::rules::metadata_to_dto;
 use crate::conversion::values::{counter, indices};
@@ -10,13 +10,14 @@ use crate::dto::operations::{
 use crate::dto::rules::{MetadataDto, PrepareInputDto};
 use crate::dto::values::BoardDto;
 use crate::js_error;
-use sudoku_core::constraints::types::{ConflictStatus, PreparedComputation};
+use sudoku_core::constraints::types::{ConflictResult, ConflictStatus, PreparedComputation};
 use sudoku_core::editing::EditOutcome;
 use sudoku_core::search::types::SearchResult;
 use sudoku_core::types::{Board, Bounded, CoreResult};
 use tsify::{Ts, Tsify};
 use wasm_bindgen::prelude::*;
 
+/// Convert a complete or incomplete exact count to an owned browser result.
 pub fn search_to_dto(result: SearchResult) -> CoreResult<SearchResultDto> {
     Ok(match result {
         SearchResult::Complete {
@@ -34,6 +35,18 @@ pub fn search_to_dto(result: SearchResult) -> CoreResult<SearchResultDto> {
     })
 }
 
+fn conflicts_to_dto(conflicts: ConflictResult) -> CoreResult<ConflictResultDto> {
+    let violations = conflicts.violations.iter();
+    let violations = violations
+        .map(violation_to_dto)
+        .collect::<CoreResult<_>>()?;
+
+    Ok(match conflicts.status {
+        ConflictStatus::Complete => ConflictResultDto::Complete { violations },
+        ConflictStatus::Incomplete => ConflictResultDto::Incomplete { violations },
+    })
+}
+
 /// Own one immutable compiled layout and return independent metadata and operation results.
 /// Exact queries reuse immutable prepared constraints.
 #[wasm_bindgen]
@@ -43,23 +56,28 @@ pub struct PreparedPuzzle {
 
 #[wasm_bindgen]
 impl PreparedPuzzle {
+    /// Prepare an owned handle for a rule layout, or throw if preparation times out.
     #[wasm_bindgen(constructor)]
     pub fn new(input: Ts<PrepareInputDto>) -> Result<PreparedPuzzle, JsError> {
         let input = input.to_rust()?;
         let rules = input.rules.try_into().map_err(js_error)?;
+
         let mut execution_control = execution();
         let result = sudoku_core::constraints::computation::prepare_computation(
             &rules,
             &mut execution_control,
         );
-        crate::control::check(&execution_control)?;
+
+        check(&execution_control)?;
+
         let Bounded::Complete(computation) = result.map_err(js_error)? else {
-            return Err(JsError::new("Computation timed out"));
+            return Err(timeout_error());
         };
 
         Ok(Self { computation })
     }
 
+    /// Report whether live arithmetic evaluation belongs on a worker.
     #[wasm_bindgen(getter, js_name = liveExecution)]
     pub fn live_execution(&self) -> Result<Ts<crate::dto::operations::LiveExecutionDto>, JsError> {
         use crate::dto::operations::LiveExecutionDto;
@@ -71,12 +89,14 @@ impl PreparedPuzzle {
         .into_ts()?)
     }
 
+    /// Copy the rule geometry and topology into owned JavaScript metadata.
     pub fn metadata(&self) -> Result<Ts<MetadataDto>, JsError> {
         Ok(metadata_to_dto(self.computation.rules())
             .map_err(js_error)?
             .into_ts()?)
     }
 
+    /// Check whether a full board satisfies this layout.
     pub fn is_complete(&self, board: Ts<BoardDto>) -> Result<bool, JsError> {
         let board: Board = board.to_rust()?.try_into().map_err(js_error)?;
         Ok(sudoku_core::board::is_complete(
@@ -85,6 +105,7 @@ impl PreparedPuzzle {
         ))
     }
 
+    /// Return the indices of filled entries that differ from the supplied solution.
     pub fn review_entries(
         &self,
         input: Ts<crate::dto::operations::ReviewInputDto>,
@@ -95,6 +116,7 @@ impl PreparedPuzzle {
         indices(sudoku_core::board::incorrect_entries(&board, &solution)).map_err(js_error)
     }
 
+    /// Compute candidate masks using duplicate peers alone.
     pub fn base_candidates(&self, board: Ts<BoardDto>) -> Result<Vec<u16>, JsError> {
         let board: Board = board.to_rust()?.try_into().map_err(js_error)?;
         Ok(
@@ -105,6 +127,7 @@ impl PreparedPuzzle {
         )
     }
 
+    /// Propagate local arithmetic support into an owned candidate grid.
     pub fn candidates(
         &self,
         input: Ts<BoardQueryDto>,
@@ -113,12 +136,16 @@ impl PreparedPuzzle {
         let board: Board = input.board.try_into().map_err(js_error)?;
         let mut execution_control = execution();
 
+        // Keep live candidate evaluation on the raw traversal used by board edits. The static
+        // catalogue is reserved here for exact search, whose propagation uses prepared support.
         let candidates = sudoku_core::constraints::candidates::evaluate_candidates(
             &board,
             self.computation.rules(),
             &mut execution_control,
         );
-        crate::control::check(&execution_control)?;
+
+        check(&execution_control)?;
+
         let result = match candidates {
             Bounded::Complete(candidates) => CandidateResultDto::Complete {
                 candidates: candidates.iter().map(|mask| mask.bits()).collect(),
@@ -139,26 +166,20 @@ impl PreparedPuzzle {
         board: Ts<BoardDto>,
     ) -> Result<Ts<crate::dto::operations::ConflictComputationDto>, JsError> {
         let board: Board = board.to_rust()?.try_into().map_err(js_error)?;
+
         let conflicts = sudoku_core::constraints::conflicts::preview_conflicts(
             &board,
             self.computation.rules(),
         );
-        let violations = conflicts
-            .violations
-            .iter()
-            .map(violation_to_dto)
-            .collect::<CoreResult<_>>()
-            .map_err(js_error)?;
-        let result = match conflicts.status {
-            ConflictStatus::Complete => ConflictResultDto::Complete { violations },
-            ConflictStatus::Incomplete => ConflictResultDto::Incomplete { violations },
-        };
+
+        let result = conflicts_to_dto(conflicts).map_err(js_error)?;
         Ok(
             crate::dto::operations::ConflictComputationDto(ComputationResultDto { result })
                 .into_ts()?,
         )
     }
 
+    /// Evaluate direct and arithmetic conflicts, preserving explicit incompleteness.
     pub fn conflicts(
         &self,
         input: Ts<BoardQueryDto>,
@@ -167,22 +188,16 @@ impl PreparedPuzzle {
         let board: Board = input.board.try_into().map_err(js_error)?;
         let mut execution_control = execution();
 
+        // Use the live conflict traversal so preparation does not change cancellation order.
         let conflicts = sudoku_core::constraints::conflicts::evaluate_conflicts(
             &board,
             self.computation.rules(),
             &mut execution_control,
         );
-        crate::control::check(&execution_control)?;
-        let violations = conflicts
-            .violations
-            .iter()
-            .map(violation_to_dto)
-            .collect::<CoreResult<_>>()
-            .map_err(js_error)?;
-        let result = match conflicts.status {
-            ConflictStatus::Complete => ConflictResultDto::Complete { violations },
-            ConflictStatus::Incomplete => ConflictResultDto::Incomplete { violations },
-        };
+
+        check(&execution_control)?;
+
+        let result = conflicts_to_dto(conflicts).map_err(js_error)?;
 
         Ok(
             crate::dto::operations::ConflictComputationDto(ComputationResultDto { result })
@@ -190,6 +205,8 @@ impl PreparedPuzzle {
         )
     }
 
+    /// Count up to two solutions using this handle's prepared support.
+    /// Node exhaustion returns an incomplete result. The host deadline throws a timeout.
     pub fn count_solutions(
         &self,
         input: Ts<PreparedCountInputDto>,
@@ -197,17 +214,18 @@ impl PreparedPuzzle {
         let input = input.to_rust()?;
         let board: Board = input.board.try_into().map_err(js_error)?;
         let options = input.options.unwrap_or_default();
-        let mut execution_control = execution();
-        let nodes = options.node_limit.map(u64::from).unwrap_or(u64::MAX);
+        let node_limit = options.node_limit.map(u64::from).unwrap_or(u64::MAX);
 
+        let mut execution_control = execution();
         let result = sudoku_core::search::exact::count_solutions(
             &board,
             &self.computation,
             &mut execution_control,
-            nodes,
+            node_limit,
         );
 
-        crate::control::check(&execution_control)?;
+        check(&execution_control)?;
+
         Ok(
             crate::dto::operations::SearchComputationDto(ComputationResultDto {
                 result: search_to_dto(result).map_err(js_error)?,
@@ -216,6 +234,7 @@ impl PreparedPuzzle {
         )
     }
 
+    /// Apply an edit to owned input layers and return a new snapshot on completion.
     pub fn edit(
         &self,
         input: Ts<EditInputDto>,
@@ -227,7 +246,6 @@ impl PreparedPuzzle {
         } = input.to_rust()?.try_into().map_err(js_error)?;
 
         let mut execution_control = execution();
-
         let result = sudoku_core::editing::edit_board(
             &givens,
             &before,
@@ -235,7 +253,9 @@ impl PreparedPuzzle {
             self.computation.rules(),
             &mut execution_control,
         );
-        crate::control::check(&execution_control)?;
+
+        check(&execution_control)?;
+
         let result = match result.map_err(js_error)? {
             EditOutcome::Complete(result) => EditResultDto::Complete {
                 entries: (&result.layers.entries).into(),

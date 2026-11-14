@@ -16,6 +16,8 @@ use sudoku_core::rules::types::SudokuVariant;
 use sudoku_core::types::{CoreResult, Difficulty, EngineError};
 use wasm_bindgen::{JsCast, JsValue};
 
+const MAX_SAFE_JS_INTEGER: f64 = 9_007_199_254_740_991.0;
+
 fn error(message: &str) -> EngineError {
     EngineError::invalid(message)
 }
@@ -55,7 +57,7 @@ fn difficulty(value: &JsValue) -> Option<Difficulty> {
 fn count(value: &JsValue) -> Option<u64> {
     // as_f64 accepts only JS numbers; BigInt, booleans and numeric text must not coerce.
     let number = value.as_f64()?;
-    (number.is_finite() && (0.0..=9007199254740991.0).contains(&number) && number.fract() == 0.0)
+    (number.is_finite() && (0.0..=MAX_SAFE_JS_INTEGER).contains(&number) && number.fract() == 0.0)
         .then_some(number as u64)
 }
 
@@ -69,6 +71,7 @@ fn issue_strings(value: &JsValue) -> Option<Vec<String>> {
         .collect()
 }
 
+/// Validate the wire summary's identity, counters and workload consistency.
 pub fn parse_summary(value: &JsValue) -> CoreResult<DifficultyAssessment> {
     let identity_error = || error("Invalid assessment summary identity");
     if !record(value) || !equals(&get(value, "ratingVersion")?, RATING_VERSION) {
@@ -152,10 +155,12 @@ pub fn parse_summary(value: &JsValue) -> CoreResult<DifficultyAssessment> {
     })
 }
 
+/// Decode a historical outcome, including its legacy incomplete status.
 pub fn parse_outcome(value: &JsValue) -> CoreResult<AssessmentOutcomeDto> {
     if !record(value) {
         return Err(error("Invalid assessment outcome"));
     }
+
     let status = get(value, "status")?;
     if equals(&status, "rated") {
         return Ok(AssessmentOutcomeDto::Rated {
@@ -168,28 +173,32 @@ pub fn parse_outcome(value: &JsValue) -> CoreResult<AssessmentOutcomeDto> {
             .ok_or_else(|| error("Invalid assessment failure issues"))?;
         return Ok(AssessmentOutcomeDto::Invalid { issues });
     }
+
     let version = get(value, "ratingVersion")?;
     let variant = variant(&get(value, "variant")?)
         .ok_or_else(|| error("Invalid assessment outcome identity"))?;
     if !equals(&version, RATING_VERSION) {
         return Err(error("Invalid assessment outcome identity"));
     }
+
     if equals(&status, "ungraded") {
         return Ok(AssessmentOutcomeDto::Ungraded {
             rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: variant.into(),
         });
     }
+
     let stage = get(value, "stage")?;
     let tier = get(value, "difficulty")?;
-    let valid_stage = if equals(&stage, "validation") {
+    let is_valid_stage = if equals(&stage, "validation") {
         tier.is_null()
     } else if equals(&stage, "logic") {
         difficulty(&tier).is_some_and(|tier| supports_difficulty(variant, tier))
     } else {
         false
     };
-    if (equals(&status, "incomplete") || equals(&status, "budget-exhausted")) && valid_stage {
+
+    if (equals(&status, "incomplete") || equals(&status, "budget-exhausted")) && is_valid_stage {
         return Ok(AssessmentOutcomeDto::Incomplete {
             rating_version: crate::dto::rating::RatingVersionDto::V2,
             variant: variant.into(),
@@ -229,6 +238,40 @@ impl From<UnavailableReason> for UnavailableReasonDto {
     }
 }
 
+fn parse_stored_unavailable(
+    value: &JsValue,
+) -> CoreResult<Option<(StoredAssessment, Option<PuzzleAssessmentDto>)>> {
+    let original_reason = get(value, "reason")?;
+    let original_issues = get(value, "issues")?;
+    let Some(reason) = reason(&original_reason) else {
+        return Ok(None);
+    };
+    if !Array::is_array(&original_issues) {
+        return Ok(None);
+    }
+
+    // Preserve historical UTF-16, including isolated surrogates, in the returned JS strings.
+    let preserved_issues: JsValue = Array::from(&original_issues).into();
+    let Some(issues) = issue_strings(&preserved_issues) else {
+        return Ok(None);
+    };
+
+    let preserved_reason = if equals(&original_reason, "budget-exhausted") {
+        UnavailableReasonDto::BudgetExhausted
+    } else {
+        reason.into()
+    };
+    let preserved = PuzzleAssessmentDto::Unavailable {
+        reason: preserved_reason,
+        issues: preserved_issues,
+    };
+
+    Ok(Some((
+        StoredAssessment::Unavailable { reason, issues },
+        Some(preserved),
+    )))
+}
+
 fn parse_stored(value: &JsValue) -> CoreResult<(StoredAssessment, Option<PuzzleAssessmentDto>)> {
     if !record(value) {
         return Ok((
@@ -238,32 +281,14 @@ fn parse_stored(value: &JsValue) -> CoreResult<(StoredAssessment, Option<PuzzleA
             None,
         ));
     }
+
     let status = get(value, "status")?;
-    if equals(&status, "unavailable") {
-        let original_reason = get(value, "reason")?;
-        let original_issues = get(value, "issues")?;
-        if let Some(reason) = reason(&original_reason)
-            && Array::is_array(&original_issues)
-        {
-            // Snapshot JS strings before validation so historical UTF-16, including isolated
-            // surrogates, never round-trips through Rust's UTF-8 strings when returned.
-            let preserved_issues: JsValue = Array::from(&original_issues).into();
-            if let Some(issues) = issue_strings(&preserved_issues) {
-                let preserved = PuzzleAssessmentDto::Unavailable {
-                    reason: if equals(&original_reason, "budget-exhausted") {
-                        UnavailableReasonDto::BudgetExhausted
-                    } else {
-                        reason.into()
-                    },
-                    issues: preserved_issues,
-                };
-                return Ok((
-                    StoredAssessment::Unavailable { reason, issues },
-                    Some(preserved),
-                ));
-            }
-        }
+    if equals(&status, "unavailable")
+        && let Some(unavailable) = parse_stored_unavailable(value)?
+    {
+        return Ok(unavailable);
     }
+
     if equals(&status, "rated") {
         let summary = get(value, "summary")?;
         if record(&summary) {
@@ -285,6 +310,7 @@ fn parse_stored(value: &JsValue) -> CoreResult<(StoredAssessment, Option<PuzzleA
             ));
         }
     }
+
     Ok((
         match parse_outcome(value) {
             Ok(_) => StoredAssessment::OtherOutcome,
@@ -296,6 +322,7 @@ fn parse_stored(value: &JsValue) -> CoreResult<(StoredAssessment, Option<PuzzleA
     ))
 }
 
+/// Validate stored metadata while preserving absence and historical diagnostic text.
 pub fn decode(input: AssessmentValidationInputDto) -> CoreResult<AssessmentValidationDto> {
     if !input.present {
         return Ok(AssessmentValidationDto::Absent);
@@ -309,6 +336,7 @@ pub fn decode(input: AssessmentValidationInputDto) -> CoreResult<AssessmentValid
             None,
         )
     });
+
     let identity = AssessmentIdentity {
         variant: input.identity.variant.into(),
         difficulty: input.identity.difficulty.into(),
@@ -325,13 +353,12 @@ pub fn decode(input: AssessmentValidationInputDto) -> CoreResult<AssessmentValid
         },
         Some(PuzzleAssessment::Unavailable { reason, issues }) => {
             AssessmentValidationDto::Present {
-                value: preserved_unavailable.unwrap_or_else(|| PuzzleAssessmentDto::Unavailable {
-                    reason: reason.into(),
-                    issues: issues
-                        .into_iter()
-                        .map(JsValue::from)
-                        .collect::<Array>()
-                        .into(),
+                value: preserved_unavailable.unwrap_or_else(|| {
+                    let messages: Array = issues.into_iter().map(JsValue::from).collect();
+                    PuzzleAssessmentDto::Unavailable {
+                        reason: reason.into(),
+                        issues: messages.into(),
+                    }
                 }),
             }
         }

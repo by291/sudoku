@@ -8,7 +8,11 @@ const COMPUTATION_TIMEOUT_MS: f64 = 3_000.0;
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen::prelude::wasm_bindgen(catch, js_namespace = ["globalThis", "performance"], js_name = now)]
+    #[wasm_bindgen::prelude::wasm_bindgen(
+        catch,
+        js_namespace = ["globalThis", "performance"],
+        js_name = now
+    )]
     fn monotonic_now() -> Result<f64, wasm_bindgen::JsValue>;
 }
 
@@ -45,6 +49,7 @@ impl CancellationProbe for Deadline {
     }
 }
 
+/// Start one deadline for a synchronous WASM computation and its nested operations.
 pub fn execution() -> ExecutionControl {
     #[cfg(target_arch = "wasm32")]
     let deadline = Deadline {
@@ -57,9 +62,15 @@ pub fn execution() -> ExecutionControl {
     ExecutionControl::with_cancellation(Arc::new(deadline))
 }
 
+/// Construct the shared error for an expired WASM deadline.
+pub(crate) fn timeout_error() -> JsError {
+    JsError::new("Computation timed out")
+}
+
+/// Settle the deadline before the caller converts or publishes a core outcome.
 pub fn check(control: &ExecutionControl) -> Result<(), JsError> {
     if !control.check() {
-        return Err(JsError::new("Computation timed out"));
+        return Err(timeout_error());
     }
     Ok(())
 }

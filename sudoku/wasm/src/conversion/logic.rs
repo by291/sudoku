@@ -5,6 +5,7 @@ use crate::dto::logic::{
     HintResultDto, HintUnavailableDto, LogicalStepDto, PlacementDto, RemovalDto, RuleEvidenceDto,
     TechniqueDto, UnitEvidenceDto, UnitEvidenceKindDto,
 };
+use crate::dto::rules::UnitDto;
 use crate::dto::values::DigitDto;
 use sudoku_core::hint::{HintResult, HintUnavailable, Placement};
 use sudoku_core::logic::techniques::Technique;
@@ -12,6 +13,7 @@ use sudoku_core::logic::types::{
     AdvancedEvidence, AdvancedEvidenceKind, CandidateDomain, CellBound, ColoringLink, ColoringMode,
     Evidence, LogicalAction, LogicalStep, Removal, RuleEvidence, RuleEvidenceKind,
 };
+use sudoku_core::rules::types::Unit;
 use sudoku_core::types::{CandidateMask, CoreResult, Digit, EngineError};
 
 impl From<TechniqueDto> for Technique {
@@ -62,6 +64,14 @@ impl From<Technique> for TechniqueDto {
     }
 }
 
+fn digits_to_dto(digits: &[u8]) -> Vec<DigitDto> {
+    digits.iter().map(|&digit| DigitDto(digit)).collect()
+}
+
+fn units_to_dto(units: &[Unit]) -> CoreResult<Vec<UnitDto>> {
+    units.iter().map(|&unit| unit_to_dto(unit)).collect()
+}
+
 fn domains_to_dto(domains: &[CandidateDomain]) -> CoreResult<Vec<DomainDto>> {
     domains
         .iter()
@@ -98,10 +108,12 @@ fn checked_digit(digit: DigitDto) -> CoreResult<u8> {
     Ok(Digit::try_from(digit.0)?.value())
 }
 
+/// Copy the facts of a rule witness into its wire variant.
 pub fn rule_to_dto(evidence: &RuleEvidence) -> CoreResult<RuleEvidenceDto> {
     let constraint_id = evidence.constraint_id.clone();
     let cells = indices(&evidence.cells)?;
-    let digits = evidence.digits.iter().copied().map(DigitDto).collect();
+    let digits = digits_to_dto(&evidence.digits);
+
     Ok(match &evidence.kind {
         RuleEvidenceKind::Cage { sum, domains } => RuleEvidenceDto::Cage {
             constraint_id,
@@ -203,6 +215,7 @@ fn rule_to_core(evidence: RuleEvidenceDto) -> CoreResult<RuleEvidence> {
             },
         ),
     };
+
     Ok(RuleEvidence {
         constraint_id,
         cells: core_indices(cells)?,
@@ -213,8 +226,9 @@ fn rule_to_core(evidence: RuleEvidenceDto) -> CoreResult<RuleEvidence> {
 
 fn advanced_to_dto(evidence: &AdvancedEvidence) -> CoreResult<AdvancedEvidenceDto> {
     let cells = indices(&evidence.cells)?;
-    let digits = evidence.digits.iter().copied().map(DigitDto).collect();
+    let digits = digits_to_dto(&evidence.digits);
     let domains = domains_to_dto(&evidence.domains)?;
+
     Ok(match &evidence.kind {
         AdvancedEvidenceKind::Subset { unit, hidden } => AdvancedEvidenceDto::Subset {
             cells,
@@ -227,16 +241,8 @@ fn advanced_to_dto(evidence: &AdvancedEvidence) -> CoreResult<AdvancedEvidenceDt
             cells,
             digits,
             domains,
-            bases: bases
-                .iter()
-                .copied()
-                .map(unit_to_dto)
-                .collect::<CoreResult<_>>()?,
-            covers: covers
-                .iter()
-                .copied()
-                .map(unit_to_dto)
-                .collect::<CoreResult<_>>()?,
+            bases: units_to_dto(bases)?,
+            covers: units_to_dto(covers)?,
         },
         AdvancedEvidenceKind::Wing { pivot, wings } => AdvancedEvidenceDto::Wing {
             cells,
@@ -369,6 +375,7 @@ fn advanced_to_core(evidence: AdvancedEvidenceDto) -> CoreResult<AdvancedEvidenc
             )
         }
     };
+
     Ok(AdvancedEvidence {
         cells: core_indices(cells)?,
         digits: digits_to_core(digits)?,
@@ -391,17 +398,13 @@ fn evidence_to_dto(evidence: &Evidence) -> CoreResult<EvidenceDto> {
             kind: UnitEvidenceKindDto::Unit,
             unit: unit_to_dto(*unit)?,
             cells: indices(cells)?,
-            digits: digits.iter().copied().map(DigitDto).collect(),
+            digits: digits_to_dto(digits),
             premises: premises
                 .iter()
                 .map(rule_to_dto)
                 .collect::<CoreResult<_>>()?,
-            units: units
-                .iter()
-                .flatten()
-                .copied()
-                .map(unit_to_dto)
-                .collect::<CoreResult<_>>()?,
+            // Older witnesses may omit related units; the wire form owns an empty list.
+            units: units_to_dto(units.as_deref().unwrap_or_default())?,
         }),
     })
 }
@@ -430,9 +433,11 @@ fn evidence_to_core(evidence: EvidenceDto) -> CoreResult<Evidence> {
     })
 }
 
+/// Convert a logical action and its evidence into an owned browser step.
 pub fn step_to_dto(step: &LogicalStep) -> CoreResult<LogicalStepDto> {
     let technique = step.technique.into();
     let evidence = evidence_to_dto(&step.evidence)?;
+
     Ok(match &step.action {
         LogicalAction::Placement { cell, digit } => LogicalStepDto::Placement {
             technique,
@@ -456,6 +461,7 @@ pub fn step_to_dto(step: &LogicalStep) -> CoreResult<LogicalStepDto> {
     })
 }
 
+/// Decode a logical step before its evidence is validated by the core.
 pub fn step_to_core(step: LogicalStepDto) -> CoreResult<LogicalStep> {
     let (technique, evidence, action) = match step {
         LogicalStepDto::Placement {
@@ -494,6 +500,7 @@ pub fn step_to_core(step: LogicalStepDto) -> CoreResult<LogicalStep> {
             },
         ),
     };
+
     Ok(LogicalStep {
         technique: technique.into(),
         evidence: evidence_to_core(evidence)?,
@@ -501,6 +508,7 @@ pub fn step_to_core(step: LogicalStepDto) -> CoreResult<LogicalStep> {
     })
 }
 
+/// Convert a hint and any proof steps to an owned wire result.
 pub fn hint_to_dto(hint: &HintResult) -> CoreResult<HintResultDto> {
     Ok(match hint {
         HintResult::ReviewEntry { cell } => HintResultDto::ReviewEntry {
@@ -523,6 +531,7 @@ pub fn hint_to_dto(hint: &HintResult) -> CoreResult<HintResultDto> {
     })
 }
 
+/// Decode the hint DTO without proving its deductions.
 pub fn hint_to_core(hint: HintResultDto) -> CoreResult<HintResult> {
     Ok(match hint {
         HintResultDto::ReviewEntry { cell } => HintResult::ReviewEntry {
@@ -548,6 +557,7 @@ pub fn hint_to_core(hint: HintResultDto) -> CoreResult<HintResult> {
     })
 }
 
+/// Copy the solver's outcome and trace to the wire representation.
 pub fn logic_to_dto(
     result: &sudoku_core::logic::types::LogicResult,
 ) -> CoreResult<crate::dto::logic::LogicResultDto> {

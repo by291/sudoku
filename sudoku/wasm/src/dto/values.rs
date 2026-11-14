@@ -51,7 +51,7 @@ pub struct SearchOptionsDto {
     pub node_limit: Option<u32>,
 }
 
-/// Semantic validators accept untrusted JS values, then decode their explicit DTO before computation.
+/// Carry an untrusted JS value until a semantic validator can decode its wire shape.
 #[derive(Deserialize, Tsify)]
 #[serde(transparent)]
 #[tsify(type = "unknown")]

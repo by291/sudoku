@@ -8,15 +8,15 @@ const bindings = createBindings()
 const binary = readFileSync(new URL('../pkg/sudoku_wasm_bg.wasm', import.meta.url))
 bindings.initSync({ module: new globalThis.WebAssembly.Module(binary) })
 
-function withExpiredDeadline(operation) {
+function withExpiredDeadline(operation, expireAfterReads = 1) {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'performance')
-  let milliseconds = 0
+  let reads = 0
   Object.defineProperty(globalThis, 'performance', {
     configurable: true,
     value: {
       now() {
-        milliseconds += 4_000
-        return milliseconds
+        reads += 1
+        return Math.max(0, reads - expireAfterReads) * 4_000
       },
     },
   })
@@ -87,4 +87,33 @@ test('raw and prepared computations settle expired deadlines before returning re
   } finally {
     prepared.free()
   }
+})
+
+test('logical analysis and hints time out while preparing variant topology', () => {
+  const board = Array(81).fill(0)
+  const rules = { kind: 'diagonal' }
+  const logic = { board, rules, allowed: [], maxSteps: 0 }
+  const hint = { board, solution: board, rules, maxSteps: 0 }
+
+  // With zero deduction steps, topology preparation must supply the extra clock reads.
+  const expireAfterReads = 2
+  withExpiredDeadline(() => assertTimeout(() => bindings.analyze_logic(logic)), expireAfterReads)
+  withExpiredDeadline(() => assertTimeout(() => bindings.hint(hint)), expireAfterReads)
+})
+
+test('analysis input errors retain precedence over a timed-out computation', () => {
+  const board = Array(81).fill(0)
+  const rules = { kind: 'diagonal' }
+  const excessiveStepLimit = 501
+
+  withExpiredDeadline(() => {
+    assert.throws(
+      () => bindings.analyze_logic({ board, rules, allowed: [], maxSteps: excessiveStepLimit }),
+      /Logical step limits may only lower the fixed bound/,
+    )
+    assert.throws(
+      () => bindings.hint({ board, solution: board, rules, maxSteps: excessiveStepLimit }),
+      /Logical step limits may only lower the fixed bound/,
+    )
+  })
 })

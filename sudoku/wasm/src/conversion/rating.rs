@@ -26,6 +26,7 @@ fn issues_to_dto(issues: &[AssessmentIssue]) -> CoreResult<Vec<AssessmentIssueDt
         .collect()
 }
 
+/// Convert the checked workload and identity to an owned summary.
 pub fn summary_to_dto(summary: &DifficultyAssessment) -> CoreResult<AssessmentSummaryDto> {
     let workload = &summary.workload;
     let counts = ALL_TECHNIQUES
@@ -54,6 +55,7 @@ pub fn summary_to_dto(summary: &DifficultyAssessment) -> CoreResult<AssessmentSu
     })
 }
 
+/// Convert an assessment and its proof trace for the full export.
 pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResultDto> {
     let outcome = assessment_summary_to_dto(result)?;
     let trace = match result {
@@ -90,6 +92,7 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
     })
 }
 
+/// Convert an assessment without exporting its proof trace.
 pub fn assessment_summary_to_dto(
     result: &AssessmentResult,
 ) -> CoreResult<LiveAssessmentOutcomeDto> {
@@ -160,13 +163,56 @@ mod tests {
 
         assert_eq!(
             json,
-            serde_json::json!({ "status": "invalid", "issues": [
-            { "kind": "message", "message": "  diagnostic  " },
-            { "kind": "violation", "violation": { "constraintId": "row:0", "cells": [0, 1], "code": { "kind": "duplicate" } } },
-            { "kind": "violation", "violation": { "constraintId": "cage:2", "cells": [12, 3], "code": { "kind": "cage-total", "index": 2, "sum": 11 } } },
-            { "kind": "violation", "violation": { "constraintId": "thermo:4", "cells": [20, 11, 2], "code": { "kind": "thermo-order", "index": 4 } } },
-            { "kind": "violation", "violation": { "constraintId": "arrow:6", "cells": [30, 21, 12], "code": { "kind": "arrow-total", "index": 6 } } }
-        ] })
+            serde_json::json!({
+                "status": "invalid",
+                "issues": [
+                    { "kind": "message", "message": "  diagnostic  " },
+                    {
+                        "kind": "violation",
+                        "violation": {
+                            "constraintId": "row:0",
+                            "cells": [0, 1],
+                            "code": { "kind": "duplicate" },
+                        },
+                    },
+                    {
+                        "kind": "violation",
+                        "violation": {
+                            "constraintId": "cage:2",
+                            "cells": [12, 3],
+                            "code": {
+                                "kind": "cage-total",
+                                "index": 2,
+                                "sum": 11,
+                            },
+                        },
+                    },
+                    {
+                        "kind": "violation",
+                        "violation": {
+                            "constraintId": "thermo:4",
+                            "cells": [
+                                20,
+                                11,
+                                2,
+                            ],
+                            "code": { "kind": "thermo-order", "index": 4 },
+                        },
+                    },
+                    {
+                        "kind": "violation",
+                        "violation": {
+                            "constraintId": "arrow:6",
+                            "cells": [
+                                30,
+                                21,
+                                12,
+                            ],
+                            "code": { "kind": "arrow-total", "index": 6 },
+                        },
+                    },
+                ],
+            })
         );
     }
 }

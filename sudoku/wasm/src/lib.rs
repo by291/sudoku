@@ -19,14 +19,19 @@ use dto::operations::{ComputationResultDto, CountInputDto};
 use dto::rating::AssessmentInputDto;
 use dto::rules::{PuzzleContentDto, RulesDto, TransformInputDto, ValidationDto};
 use js_sys::{ArrayBuffer, Uint8Array};
+use sudoku_core::control::ExecutionControl;
 use sudoku_core::generation::types::{PUZZLE_VERSION, VARIANT_PUZZLE_VERSION};
 use sudoku_core::random::Seed;
 use sudoku_core::rating::types::{
     AssessmentInput, AssessmentLimits, AssessmentResult, RATING_VERSION,
 };
-use sudoku_core::types::{Board, Bounded, EngineError};
+use sudoku_core::rules::context::prepare_rules;
+use sudoku_core::rules::types::{PreparedRules, PuzzleRules};
+use sudoku_core::types::{BOARD_SIZE, Board, Bounded, EngineError};
 use tsify::{Ts, Tsify};
 use wasm_bindgen::prelude::*;
+
+const BRIDGE_VERSION: u32 = 4;
 
 fn js_error(error: EngineError) -> JsError {
     JsError::new(&error.to_string())
@@ -40,27 +45,47 @@ fn issues(error: EngineError) -> Vec<String> {
 }
 
 fn checked_steps(value: Option<u32>) -> Result<u32, JsError> {
-    let steps = value.unwrap_or(500);
-    if steps > 500 {
+    let steps = value.unwrap_or(conversion::js_input::MAX_HINT_STEPS);
+    if steps > conversion::js_input::MAX_HINT_STEPS {
         return Err(JsError::new(
             "Logical step limits may only lower the fixed bound",
         ));
     }
+
     Ok(steps)
 }
 
 fn owned_bytes(value: &Uint8Array) -> Result<Vec<u8>, JsError> {
-    // Slice ABI glue can coerce strings/array-like values. Inspect the original JS handle before copying.
+    // Slice ABI glue can coerce strings and array-like values. Check the original JS handle.
     if !ArrayBuffer::is_view(value.as_ref()) || !value.is_instance_of::<Uint8Array>() {
         return Err(JsError::new("Expected a Uint8Array"));
     }
+
     Ok(value.to_vec())
 }
 
+fn prepare_analysis_rules(
+    rules: &PuzzleRules,
+    control: &mut ExecutionControl,
+    max_steps: Option<u32>,
+) -> Result<(PreparedRules, u32), JsError> {
+    // Topology preparation shares the analysis deadline. Geometry and step-limit errors
+    // keep their existing precedence over a timed-out computation.
+    let preparation = prepare_rules(rules, control).map_err(js_error)?;
+    let max_steps = checked_steps(max_steps)?;
+
+    let Bounded::Complete(prepared) = preparation else {
+        return Err(control::timeout_error());
+    };
+
+    Ok((prepared, max_steps))
+}
+
+/// Return the bridge and algorithm versions used to identify this WASM instance.
 #[wasm_bindgen]
 pub fn engine_info() -> Result<Ts<EngineInfo>, JsError> {
     Ok(EngineInfo {
-        bridge_version: 4,
+        bridge_version: BRIDGE_VERSION,
         puzzle_version: PUZZLE_VERSION,
         variant_puzzle_version: VARIANT_PUZZLE_VERSION,
         rating_version: RATING_VERSION,
@@ -68,11 +93,13 @@ pub fn engine_info() -> Result<Ts<EngineInfo>, JsError> {
     .into_ts()?)
 }
 
+/// Derive owned seed bytes from a checked JavaScript byte array.
 #[wasm_bindgen]
 pub fn derive_seed(material: Uint8Array) -> Result<Vec<u8>, JsError> {
     Ok(Seed::derive(&owned_bytes(&material)?).as_bytes().to_vec())
 }
 
+/// Generate a puzzle from a 32-byte seed using a shared computation deadline.
 #[wasm_bindgen]
 pub fn generate(
     seed: Uint8Array,
@@ -80,12 +107,14 @@ pub fn generate(
 ) -> Result<Ts<GenerationResultDto>, JsError> {
     let seed = Seed::try_from(owned_bytes(&seed)?.as_slice()).map_err(js_error)?;
     let (input, limits) = generation_input(seed, options.to_rust()?).map_err(js_error)?;
+
     let mut execution_control = execution();
     let result = sudoku_core::generation::generate::generate_puzzle_with_control(
         &input,
         &limits,
         &mut execution_control,
     );
+
     // Cancellation must settle before a stopped inner operation becomes an input error.
     control::check(&execution_control)?;
     Ok(result_to_dto(result.map_err(js_error)?)
@@ -93,6 +122,7 @@ pub fn generate(
         .into_ts()?)
 }
 
+/// Return a logical trace under the requested techniques and step limit.
 #[wasm_bindgen]
 pub fn analyze_logic(
     input: Ts<LogicInputDto>,
@@ -100,17 +130,22 @@ pub fn analyze_logic(
     let input = input.to_rust()?;
     let board: Board = input.board.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
-    let rules = sudoku_core::rules::context::compile_rules(&rules).map_err(js_error)?;
     let allowed: Vec<_> = input.allowed.into_iter().map(Into::into).collect();
+
     let mut execution_control = execution();
+    let (rules, max_steps) =
+        prepare_analysis_rules(&rules, &mut execution_control, Some(input.max_steps))?;
+
     let result = sudoku_core::logic::solver::analyze_logic(
         &board,
         &rules,
         &allowed,
-        checked_steps(Some(input.max_steps))?,
+        max_steps,
         &mut execution_control,
     );
+
     control::check(&execution_control)?;
+
     Ok(
         crate::dto::operations::LogicComputationDto(ComputationResultDto {
             result: logic_to_dto(&result).map_err(js_error)?,
@@ -119,6 +154,7 @@ pub fn analyze_logic(
     )
 }
 
+/// Return an owned hint or review result for the supplied board and solution.
 #[wasm_bindgen]
 pub fn hint(
     input: Ts<HintInputDto>,
@@ -127,16 +163,21 @@ pub fn hint(
     let board: Board = input.board.try_into().map_err(js_error)?;
     let solution: Board = input.solution.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
-    let rules = sudoku_core::rules::context::compile_rules(&rules).map_err(js_error)?;
+
     let mut execution_control = execution();
+    let (rules, max_steps) =
+        prepare_analysis_rules(&rules, &mut execution_control, input.max_steps)?;
+
     let result = sudoku_core::hint::analyze_hint(
         &board,
         &solution,
         &rules,
-        checked_steps(input.max_steps)?,
+        max_steps,
         &mut execution_control,
     );
+
     control::check(&execution_control)?;
+
     Ok(
         crate::dto::operations::HintComputationDto(ComputationResultDto {
             result: hint_to_dto(&result).map_err(js_error)?,
@@ -153,6 +194,7 @@ fn run_assessment(input: AssessmentInputDto) -> Result<AssessmentResult, JsError
         .map_or_else(AssessmentLimits::default, |limits| AssessmentLimits {
             max_steps: limits.max_steps,
         });
+
     let snapshot = AssessmentInput {
         board,
         rules,
@@ -161,6 +203,7 @@ fn run_assessment(input: AssessmentInputDto) -> Result<AssessmentResult, JsError
             .unwrap_or_else(|| RATING_VERSION.to_string()),
         limits,
     };
+
     let mut execution_control = execution();
     let result = sudoku_core::rating::assessment::assess_puzzle_with_control(
         &snapshot,
@@ -170,6 +213,7 @@ fn run_assessment(input: AssessmentInputDto) -> Result<AssessmentResult, JsError
     Ok(result)
 }
 
+/// Assess difficulty and return the owned proof trace.
 #[wasm_bindgen]
 pub fn assess(
     input: Ts<AssessmentInputDto>,
@@ -197,6 +241,7 @@ pub fn assess_summary(
     )
 }
 
+/// Count up to two solutions, with explicit incompleteness on node exhaustion.
 #[wasm_bindgen]
 pub fn count_solutions(
     input: Ts<CountInputDto>,
@@ -205,10 +250,15 @@ pub fn count_solutions(
     let board: Board = input.board.try_into().map_err(js_error)?;
     let rules = input.rules.try_into().map_err(js_error)?;
     let options = input.options.unwrap_or_default();
+    let node_limit = options.node_limit.map(u64::from).unwrap_or(u64::MAX);
+
     let mut execution_control = execution();
-    let nodes = options.node_limit.map(u64::from).unwrap_or(u64::MAX);
-    let result =
-        sudoku_core::search::exact::count_with_rules(&board, &rules, &mut execution_control, nodes);
+    let result = sudoku_core::search::exact::count_with_rules(
+        &board,
+        &rules,
+        &mut execution_control,
+        node_limit,
+    );
     control::check(&execution_control)?;
     Ok(
         crate::dto::operations::SearchComputationDto(ComputationResultDto {
@@ -218,6 +268,7 @@ pub fn count_solutions(
     )
 }
 
+/// Validate untrusted puzzle content without interpreting stored seed metadata.
 #[wasm_bindgen]
 pub fn validate_puzzle(
     input: Ts<dto::values::UntrustedValueDto>,
@@ -225,10 +276,12 @@ pub fn validate_puzzle(
     let content = serde_wasm_bindgen::from_value::<PuzzleContentDto>(input.to_rust()?.0)
         .map_err(|_| EngineError::invalid("Invalid puzzle board or rules"))
         .and_then(|value| value.try_into());
+
     let mut execution_control = execution();
     let outcome = content.and_then(|content| {
         sudoku_core::puzzle::validate_puzzle_bounded(&content, &mut execution_control)
     });
+
     control::check(&execution_control)?;
     let result = match outcome {
         Ok(Bounded::Complete(())) => ValidationDto::Valid,
@@ -237,9 +290,11 @@ pub fn validate_puzzle(
             issues: issues(error),
         },
     };
+
     Ok(result.into_ts()?)
 }
 
+/// Validate hint evidence against rules and, when supplied, replay it on a board.
 #[wasm_bindgen]
 pub fn validate_hint_evidence(
     input: Ts<dto::values::UntrustedValueDto>,
@@ -251,6 +306,7 @@ pub fn validate_hint_evidence(
                     EngineError::invalid("Hint evidence does not match the requested rules")
                 })
             });
+
     let mut execution_control = execution();
     let outcome = parsed.and_then(|input| {
         let hint = hint_to_core(input.hint)?;
@@ -263,6 +319,7 @@ pub fn validate_hint_evidence(
             &mut execution_control,
         )
     });
+
     control::check(&execution_control)?;
     let result = match outcome {
         Ok(hint) => HintValidationDto::Valid {
@@ -272,9 +329,11 @@ pub fn validate_hint_evidence(
             issues: issues(error),
         },
     };
+
     Ok(result.into_ts()?)
 }
 
+/// Apply a supported spatial symmetry and optional digit complement to rule geometry.
 #[wasm_bindgen]
 pub fn transform_rules(input: Ts<TransformInputDto>) -> Result<Ts<RulesDto>, JsError> {
     let input = input.to_rust()?;
@@ -287,6 +346,7 @@ pub fn transform_rules(input: Ts<TransformInputDto>) -> Result<Ts<RulesDto>, JsE
     Ok(rules_to_dto(&transformed).map_err(js_error)?.into_ts()?)
 }
 
+/// Validate stored assessment metadata against the expected variant and difficulty.
 #[wasm_bindgen]
 pub fn validate_assessment(
     input: Ts<dto::rating::AssessmentValidationInputDto>,
@@ -296,12 +356,14 @@ pub fn validate_assessment(
         .into_ts()?)
 }
 
+/// Validate the identity and workload of an untrusted assessment summary.
 #[wasm_bindgen]
 pub fn parse_assessment_summary(
     value: Ts<dto::values::UntrustedValueDto>,
 ) -> Result<Ts<dto::rating::ParsedSummaryDto>, JsError> {
     let parsed = conversion::metadata::parse_summary(&value.to_rust()?.0)
         .and_then(|value| conversion::rating::summary_to_dto(&value));
+
     let result = match parsed {
         Ok(value) => dto::rating::ParsedAssessmentDto::Valid { valid: true, value },
         Err(error) => dto::rating::ParsedAssessmentDto::Invalid {
@@ -309,9 +371,11 @@ pub fn parse_assessment_summary(
             issues: issues(error),
         },
     };
+
     Ok(dto::rating::ParsedSummaryDto(result).into_ts()?)
 }
 
+/// Decode a historical assessment outcome and its string diagnostics.
 #[wasm_bindgen]
 pub fn parse_assessment_outcome(
     value: Ts<dto::values::UntrustedValueDto>,
@@ -323,9 +387,11 @@ pub fn parse_assessment_outcome(
             issues: issues(error),
         },
     };
+
     Ok(dto::rating::ParsedOutcomeDto(result).into_ts()?)
 }
 
+/// Decode a live assessment outcome and its structured diagnostics.
 #[wasm_bindgen]
 pub fn parse_live_assessment_outcome(
     value: Ts<dto::values::UntrustedValueDto>,
@@ -337,9 +403,11 @@ pub fn parse_live_assessment_outcome(
             issues: issues(error),
         },
     };
+
     Ok(dto::rating::ParsedLiveOutcomeDto(result).into_ts()?)
 }
 
+/// Validate hint shape alone, leaving rule and board evidence to the replay validator.
 #[wasm_bindgen]
 pub fn parse_hint(
     input: Ts<dto::values::UntrustedValueDto>,
@@ -352,6 +420,7 @@ pub fn parse_hint(
         })
         .and_then(hint_to_core)
         .and_then(|hint| sudoku_core::hint::validation::validate_hint_shape(&hint));
+
     let result = match parsed {
         Ok(hint) => HintValidationDto::Valid {
             hint: hint_to_dto(&hint).map_err(js_error)?,
@@ -360,9 +429,11 @@ pub fn parse_hint(
             issues: issues(error),
         },
     };
+
     Ok(result.into_ts()?)
 }
 
+/// Validate the rule DTO and its geometry without solving a board.
 #[wasm_bindgen]
 pub fn validate_rules(
     input: Ts<dto::values::UntrustedValueDto>,
@@ -370,15 +441,18 @@ pub fn validate_rules(
     let parsed = serde_wasm_bindgen::from_value::<RulesDto>(input.to_rust()?.0)
         .map_err(|_| EngineError::invalid("Invalid puzzle rules"))
         .and_then(sudoku_core::rules::types::PuzzleRules::try_from);
+
     let result = match parsed {
         Ok(_) => ValidationDto::Valid,
         Err(error) => ValidationDto::Invalid {
             issues: issues(error),
         },
     };
+
     Ok(result.into_ts()?)
 }
 
+/// Check an authored deduction against its rule geometry and candidate state.
 #[wasm_bindgen]
 pub fn validate_teaching_step(
     input: Ts<dto::values::UntrustedValueDto>,
@@ -389,18 +463,24 @@ pub fn validate_teaching_step(
                 serde_wasm_bindgen::from_value::<dto::logic::TeachingStepInputDto>(value)
                     .map_err(|_| EngineError::invalid("Invalid teaching step envelope"))
             });
+
     let mut execution_control = execution();
     let outcome = parsed.and_then(|input| {
         let board = input.board.try_into()?;
         let rules = input.rules.try_into()?;
+
+        // Validate each mask before reporting a wrong length, even for excess masks.
         let candidates = input
             .candidates
             .into_iter()
             .map(sudoku_core::types::CandidateMask::try_from)
             .collect::<Result<Vec<_>, _>>()?;
-        let candidates = candidates
-            .try_into()
-            .map_err(|_| EngineError::invalid("Teaching candidate state must contain 81 masks"))?;
+        let candidates = candidates.try_into().map_err(|_| {
+            EngineError::invalid(format!(
+                "Teaching candidate state must contain {BOARD_SIZE} masks"
+            ))
+        })?;
+
         let step = conversion::logic::step_to_core(input.step)?;
         sudoku_core::logic::teaching::validate_teaching_step_with_control(
             &board,
@@ -410,6 +490,7 @@ pub fn validate_teaching_step(
             &mut execution_control,
         )
     });
+
     control::check(&execution_control)?;
     Ok(match outcome {
         Ok(()) => ValidationDto::Valid,

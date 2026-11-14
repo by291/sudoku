@@ -116,7 +116,8 @@ pub struct PreparedCountInputDto {
     pub options: Option<SearchOptionsDto>,
 }
 
-// Tsify 0.5.8's ABI names erase generic arguments. Concrete transparent responses keep generated signatures sound.
+// Tsify erases generic arguments from ABI names. Use concrete transparent responses
+// so each generated signature names its own result type.
 macro_rules! computation_response {
     ($name:ident, $result:ty) => {
         #[derive(Serialize, Tsify)]
@@ -126,9 +127,7 @@ macro_rules! computation_response {
     };
 }
 computation_response!(CandidateComputationDto, CandidateResultDto);
-
 computation_response!(SearchComputationDto, SearchResultDto);
-
 computation_response!(LogicComputationDto, super::logic::LogicResultDto);
 computation_response!(HintComputationDto, super::logic::HintResultDto);
 computation_response!(AssessmentComputationDto, super::rating::AssessmentResultDto);

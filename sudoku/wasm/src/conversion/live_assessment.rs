@@ -4,7 +4,7 @@ use crate::dto::operations::{ViolationCodeDto, ViolationDto};
 use crate::dto::rating::{AssessmentIssueDto, AssessmentOutcomeDto, LiveAssessmentOutcomeDto};
 use js_sys::{Object, Reflect};
 use sudoku_core::logic::techniques::{ALL_TECHNIQUES, Technique};
-use sudoku_core::types::{CoreResult, EngineError};
+use sudoku_core::types::{BOARD_SIZE, CoreResult, EngineError};
 use wasm_bindgen::JsValue;
 
 #[wasm_bindgen::prelude::wasm_bindgen]
@@ -13,6 +13,54 @@ extern "C" {
     #[wasm_bindgen::prelude::wasm_bindgen(js_namespace = Array, js_name = isArray, catch)]
     fn is_array(value: &JsValue) -> Result<bool, JsValue>;
 }
+
+const BOARD_CELL_COUNT: u32 = BOARD_SIZE as u32;
+const LAST_CELL_INDEX: u32 = BOARD_CELL_COUNT - 1;
+
+#[rustfmt::skip]
+const VIOLATION_FIELDS: &[&str] = &[
+    "constraintId",
+    "cells",
+    "code",
+];
+
+#[rustfmt::skip]
+const CAGE_TOTAL_FIELDS: &[&str] = &[
+    "kind",
+    "index",
+    "sum",
+];
+
+#[rustfmt::skip]
+const ISSUE_FIELDS: &[&str] = &[
+    "kind",
+    "message",
+    "violation",
+];
+
+#[rustfmt::skip]
+const SUMMARY_FIELDS: &[&str] = &[
+    "ratingVersion",
+    "variant",
+    "difficulty",
+    "workload",
+];
+
+#[rustfmt::skip]
+const UNGRADED_FIELDS: &[&str] = &[
+    "status",
+    "ratingVersion",
+    "variant",
+];
+
+#[rustfmt::skip]
+const INCOMPLETE_FIELDS: &[&str] = &[
+    "status",
+    "ratingVersion",
+    "variant",
+    "stage",
+    "difficulty",
+];
 
 fn invalid() -> EngineError {
     EngineError::invalid("Invalid live assessment outcome")
@@ -34,7 +82,7 @@ fn record(value: &JsValue, fields: &[&str]) -> CoreResult<()> {
         return Err(invalid());
     }
 
-    // Reflect catches throwing getters/proxies; an unknown field cannot silently change the union shape.
+    // Reflective reads can fail. Reject unknown keys before interpreting the variant.
     let keys = Reflect::own_keys(value).map_err(|_| invalid())?;
     for key in keys.iter() {
         let key = key.as_string().ok_or_else(invalid)?;
@@ -70,12 +118,13 @@ fn array(value: &JsValue, maximum: u32) -> CoreResult<Vec<JsValue>> {
 }
 
 fn violation(value: &JsValue) -> CoreResult<ViolationDto> {
-    record(value, &["constraintId", "cells", "code"])?;
+    record(value, VIOLATION_FIELDS)?;
     let constraint_id = text(&get(value, "constraintId")?)?;
-    let cells = array(&get(value, "cells")?, 81)?
+    let cells = array(&get(value, "cells")?, BOARD_CELL_COUNT)?
         .iter()
-        .map(|cell| number(cell, 80))
+        .map(|cell| number(cell, LAST_CELL_INDEX))
         .collect::<CoreResult<_>>()?;
+
     let code = get(value, "code")?;
     let kind = text(&get(&code, "kind")?)?;
     let code = match kind.as_str() {
@@ -84,7 +133,7 @@ fn violation(value: &JsValue) -> CoreResult<ViolationDto> {
             ViolationCodeDto::Duplicate
         }
         "cage-total" => {
-            record(&code, &["kind", "index", "sum"])?;
+            record(&code, CAGE_TOTAL_FIELDS)?;
             ViolationCodeDto::CageTotal {
                 index: number(&get(&code, "index")?, u32::MAX)?,
                 sum: number(&get(&code, "sum")?, u32::from(u16::MAX))? as u16,
@@ -111,7 +160,7 @@ fn violation(value: &JsValue) -> CoreResult<ViolationDto> {
 
 fn issue(value: &JsValue) -> CoreResult<AssessmentIssueDto> {
     // Check the record before reading its discriminant (null and primitives are malformed).
-    record(value, &["kind", "message", "violation"])?;
+    record(value, ISSUE_FIELDS)?;
     match text(&get(value, "kind")?)?.as_str() {
         "message" => {
             record(value, &["kind", "message"])?;
@@ -142,10 +191,7 @@ fn copy_fields(value: &JsValue, fields: &[&str]) -> CoreResult<JsValue> {
 }
 
 fn summary_snapshot(value: &JsValue) -> CoreResult<JsValue> {
-    let summary = copy_fields(
-        value,
-        &["ratingVersion", "variant", "difficulty", "workload"],
-    )?;
+    let summary = copy_fields(value, SUMMARY_FIELDS)?;
     let workload = copy_fields(
         &get(&summary, "workload")?,
         &[
@@ -160,10 +206,24 @@ fn summary_snapshot(value: &JsValue) -> CoreResult<JsValue> {
         ],
     )?;
     let counts = get(&workload, "techniqueCounts")?;
-    if !counts.is_object() || counts.is_null() || is_array(&counts).map_err(|_| invalid())? {
+    let owned_counts = snapshot_technique_counts(&counts)?;
+
+    Reflect::set(
+        &workload,
+        &JsValue::from_str("techniqueCounts"),
+        &owned_counts,
+    )
+    .map_err(|_| invalid())?;
+    Reflect::set(&summary, &JsValue::from_str("workload"), &workload).map_err(|_| invalid())?;
+
+    Ok(summary)
+}
+
+fn snapshot_technique_counts(counts: &JsValue) -> CoreResult<Object> {
+    if !counts.is_object() || counts.is_null() || is_array(counts).map_err(|_| invalid())? {
         return Err(invalid());
     }
-    let keys = Reflect::own_keys(&counts).map_err(|_| invalid())?;
+    let keys = Reflect::own_keys(counts).map_err(|_| invalid())?;
     if keys.length() as usize != ALL_TECHNIQUES.len() {
         return Err(EngineError::invalid(
             "Assessment technique counts must include every known technique",
@@ -179,23 +239,13 @@ fn summary_snapshot(value: &JsValue) -> CoreResult<JsValue> {
                 "Invalid or inapplicable assessment technique count",
             ));
         }
-        Reflect::set(
-            &owned_counts,
-            &JsValue::from_str(&key),
-            &get(&counts, &key)?,
-        )
-        .map_err(|_| invalid())?;
+        Reflect::set(&owned_counts, &JsValue::from_str(&key), &get(counts, &key)?)
+            .map_err(|_| invalid())?;
     }
-    Reflect::set(
-        &workload,
-        &JsValue::from_str("techniqueCounts"),
-        &owned_counts,
-    )
-    .map_err(|_| invalid())?;
-    Reflect::set(&summary, &JsValue::from_str("workload"), &workload).map_err(|_| invalid())?;
-    Ok(summary)
+    Ok(owned_counts)
 }
 
+/// Check live diagnostics and snapshot JS records before shared semantic validation.
 pub(crate) fn parse(value: &JsValue) -> CoreResult<LiveAssessmentOutcomeDto> {
     record(
         value,
@@ -209,6 +259,7 @@ pub(crate) fn parse(value: &JsValue) -> CoreResult<LiveAssessmentOutcomeDto> {
             "difficulty",
         ],
     )?;
+
     let status = text(&get(value, "status")?)?;
     match status.as_str() {
         "invalid" => {
@@ -221,26 +272,20 @@ pub(crate) fn parse(value: &JsValue) -> CoreResult<LiveAssessmentOutcomeDto> {
         }
         "rated" => {
             record(value, &["status", "summary"])?;
-            // The historical summary validator sees only owned plain records, so reflective failures
-            // cannot escape through its Object.keys call. Numeric and null distinctions remain intact.
+            // Snapshot plain records before the historical validator calls Object.keys.
+            // Fallible reads preserve numeric and null distinctions.
             let summary = metadata::parse_summary(&summary_snapshot(&get(value, "summary")?)?)?;
             return Ok(LiveAssessmentOutcomeDto::Rated {
                 summary: super::rating::summary_to_dto(&summary)?,
             });
         }
-        "ungraded" => record(value, &["status", "ratingVersion", "variant"])?,
-        "incomplete" => record(
-            value,
-            &["status", "ratingVersion", "variant", "stage", "difficulty"],
-        )?,
+        "ungraded" => record(value, UNGRADED_FIELDS)?,
+        "incomplete" => record(value, INCOMPLETE_FIELDS)?,
         _ => return Err(invalid()),
     }
 
     // Reuse existing identity/stage policy, including absent versus explicit null difficulty.
-    let owned = copy_fields(
-        value,
-        &["status", "ratingVersion", "variant", "stage", "difficulty"],
-    )?;
+    let owned = copy_fields(value, INCOMPLETE_FIELDS)?;
     match metadata::parse_outcome(&owned)? {
         AssessmentOutcomeDto::Ungraded {
             rating_version,

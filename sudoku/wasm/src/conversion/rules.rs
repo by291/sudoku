@@ -58,6 +58,7 @@ impl TryFrom<RulesDto> for PuzzleRules {
     }
 }
 
+/// Copy native rule geometry to the corresponding browser variant.
 pub fn rules_to_dto(value: &PuzzleRules) -> CoreResult<RulesDto> {
     Ok(match value {
         PuzzleRules::Classic => RulesDto::Classic,
@@ -117,6 +118,7 @@ impl From<UnitKind> for UnitKindDto {
     }
 }
 
+/// Convert an ordered unit identity to the browser index width.
 pub fn unit_to_dto(unit: Unit) -> CoreResult<UnitDto> {
     Ok(UnitDto {
         kind: unit.kind.into(),
@@ -124,9 +126,13 @@ pub fn unit_to_dto(unit: Unit) -> CoreResult<UnitDto> {
     })
 }
 
+/// Decode a browser unit identity before rule-context validation.
 pub fn unit_to_core(unit: UnitDto) -> CoreResult<Unit> {
     let kind: UnitKind = unit.kind.into();
-    let maximum = if kind == UnitKind::Diagonal { 1 } else { 8 };
+    let maximum = match kind {
+        UnitKind::Diagonal => 1,
+        _ => sudoku_core::types::UNIT_SIZE as u32 - 1,
+    };
     if unit.index > maximum {
         return Err(EngineError::invalid("Invalid Sudoku unit index"));
     }
@@ -137,6 +143,52 @@ pub fn unit_to_core(unit: UnitDto) -> CoreResult<Unit> {
     })
 }
 
+fn constraint_to_dto(constraint: &RuleConstraint) -> CoreResult<ConstraintDto> {
+    Ok(match constraint {
+        RuleConstraint::Cage {
+            id,
+            index: clue_index,
+            cells,
+            sum,
+        } => ConstraintDto::Cage {
+            id: id.clone(),
+            index: index(*clue_index)?,
+            cells: indices(cells)?,
+            sum: *sum,
+        },
+        RuleConstraint::Thermo {
+            id,
+            index: clue_index,
+            cells,
+        } => ConstraintDto::Thermo {
+            id: id.clone(),
+            index: index(*clue_index)?,
+            cells: indices(cells)?,
+        },
+        RuleConstraint::Arrow {
+            id,
+            index: clue_index,
+            cells,
+        } => {
+            let Some((&circle, shaft)) = cells.split_first() else {
+                return Err(EngineError::invalid("Compiled arrow has no circle"));
+            };
+
+            ConstraintDto::Arrow {
+                id: id.clone(),
+                index: index(*clue_index)?,
+                circle: index(circle)?,
+                shaft: indices(shaft)?,
+            }
+        }
+    })
+}
+
+fn index_rows_to_dto(rows: &[Vec<usize>]) -> CoreResult<Vec<Vec<u32>>> {
+    rows.iter().map(indices).collect()
+}
+
+/// Copy immutable prepared rule metadata into an independent result.
 pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
     let metadata = prepared.metadata_ref();
     let units = metadata
@@ -150,73 +202,21 @@ pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
             })
         })
         .collect::<CoreResult<_>>()?;
+
     let constraints = metadata
         .constraints
         .iter()
-        .map(|constraint| {
-            Ok(match constraint {
-                RuleConstraint::Cage {
-                    id,
-                    index: clue_index,
-                    cells,
-                    sum,
-                } => ConstraintDto::Cage {
-                    id: id.clone(),
-                    index: index(*clue_index)?,
-                    cells: indices(cells)?,
-                    sum: *sum,
-                },
-                RuleConstraint::Thermo {
-                    id,
-                    index: clue_index,
-                    cells,
-                } => ConstraintDto::Thermo {
-                    id: id.clone(),
-                    index: index(*clue_index)?,
-                    cells: indices(cells)?,
-                },
-                RuleConstraint::Arrow {
-                    id,
-                    index: clue_index,
-                    cells,
-                } => {
-                    let Some((&circle, shaft)) = cells.split_first() else {
-                        return Err(EngineError::invalid("Compiled arrow has no circle"));
-                    };
-                    ConstraintDto::Arrow {
-                        id: id.clone(),
-                        index: index(*clue_index)?,
-                        circle: index(circle)?,
-                        shaft: indices(shaft)?,
-                    }
-                }
-            })
-        })
+        .map(constraint_to_dto)
         .collect::<CoreResult<_>>()?;
+
     Ok(MetadataDto {
         rules: rules_to_dto(&metadata.rules)?,
         units,
         constraints,
-        cell_units: metadata
-            .cell_units
-            .iter()
-            .map(indices)
-            .collect::<CoreResult<_>>()?,
-        cell_constraints: metadata
-            .cell_constraints
-            .iter()
-            .map(indices)
-            .collect::<CoreResult<_>>()?,
-        duplicate_peers: metadata
-            .duplicate_peers
-            .iter()
-            .map(indices)
-            .collect::<CoreResult<_>>()?,
-        related_cells: metadata
-            .related_cells
-            .iter()
-            .map(indices)
-            .collect::<CoreResult<_>>()?,
+        cell_units: index_rows_to_dto(&metadata.cell_units)?,
+        cell_constraints: index_rows_to_dto(&metadata.cell_constraints)?,
+        duplicate_peers: index_rows_to_dto(&metadata.duplicate_peers)?,
+        related_cells: index_rows_to_dto(&metadata.related_cells)?,
     })
 }
 

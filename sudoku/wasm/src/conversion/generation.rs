@@ -27,6 +27,7 @@ impl From<GenerationVersion> for GenerationVersionDto {
     }
 }
 
+/// Decode generation identity and limits from the supplied browser options.
 pub fn input(
     seed: Seed,
     options: GenerationOptionsDto,
@@ -38,16 +39,18 @@ pub fn input(
         seed,
         version.as_str(),
     )?;
+
     let limits = options
         .limits
         .map_or_else(GenerationLimits::default, |limits| GenerationLimits {
             max_layouts: limits.max_layouts,
-
             max_steps: limits.max_steps,
         });
+
     Ok((input, limits))
 }
 
+/// Convert the generation outcome and counters to their owned wire representation.
 pub fn result_to_dto(result: GenerationResult) -> CoreResult<GenerationResultDto> {
     let source = result.metrics;
     let metrics = GenerationMetricsDto {
@@ -55,15 +58,16 @@ pub fn result_to_dto(result: GenerationResult) -> CoreResult<GenerationResultDto
         completed_layouts: source.completed_layouts,
         candidate_visits: source.candidate_visits,
     };
+
     Ok(match result.outcome {
         GenerationOutcome::Ready { puzzle, assessment } => {
             let content = &puzzle.content;
-            let seed = puzzle
-                .seed
-                .as_bytes()
+            let seed_bytes = puzzle.seed.as_bytes();
+            let seed = seed_bytes
                 .iter()
                 .map(|byte| format!("{byte:02x}"))
                 .collect();
+
             let puzzle = GeneratedPuzzleDto {
                 givens: (&content.givens).into(),
                 solution: (&content.solution).into(),

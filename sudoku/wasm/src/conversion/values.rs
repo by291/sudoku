@@ -63,20 +63,26 @@ impl From<SudokuVariant> for VariantDto {
     }
 }
 
+/// Convert a counter to the unsigned range represented by the browser DTO.
 pub fn counter(value: u64) -> CoreResult<u32> {
     u32::try_from(value)
         .map_err(|_| EngineError::invalid("Core counter exceeds the browser's numeric bounds"))
 }
 
+/// Convert a native index to the unsigned browser representation.
 pub fn index(value: usize) -> CoreResult<u32> {
     u32::try_from(value)
         .map_err(|_| EngineError::invalid("Core index exceeds the browser's numeric bounds"))
 }
 
+/// Copy native indices in their original order, failing on overflow.
 pub fn indices(values: impl AsRef<[usize]>) -> CoreResult<Vec<u32>> {
-    values.as_ref().iter().copied().map(index).collect()
+    let values = values.as_ref();
+    let indices = values.iter().copied();
+    indices.map(index).collect()
 }
 
+/// Convert browser indices to the native platform width.
 pub fn core_indices(values: Vec<u32>) -> CoreResult<Vec<usize>> {
     values
         .into_iter()

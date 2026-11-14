@@ -3,7 +3,7 @@ use js_sys::{Array, Object, Reflect};
 use sudoku_core::types::{CoreResult, EngineError};
 use wasm_bindgen::{JsCast, JsValue};
 
-const MAX_HINT_STEPS: u32 = 500;
+pub(crate) const MAX_HINT_STEPS: u32 = 500;
 
 fn invalid() -> EngineError {
     EngineError::invalid("Hint evidence does not match the requested rules")
@@ -22,12 +22,14 @@ pub fn map_field(
     if !record(&value) {
         return Ok(value);
     }
+
     let key = JsValue::from_str(field);
     let original = Reflect::get(&value, &key).map_err(|_| invalid())?;
     let normalized = normalize(original.clone())?;
     if normalized == original {
         return Ok(value);
     }
+
     let copy = Object::assign(&Object::new(), &Object::from(value));
     if !Reflect::set(&copy, &key, &normalized).map_err(|_| invalid())? {
         return Err(invalid());
@@ -35,6 +37,7 @@ pub fn map_field(
     Ok(copy.into())
 }
 
+/// Normalize omitted unit evidence before decoding a logical step.
 pub fn step(value: JsValue) -> CoreResult<JsValue> {
     map_field(value, "evidence", |evidence| {
         if !record(&evidence) {
@@ -50,7 +53,9 @@ pub fn step(value: JsValue) -> CoreResult<JsValue> {
         {
             return Ok(evidence);
         }
-        // default Vec accepts an absent field, while buffered undefined and null both look like unit.
+
+        // Serde defaults an absent list, but buffering loses the distinction between null
+        // and undefined.
         // Remove only explicit undefined here so null remains a rejected, distinct input.
         let copy = Object::assign(&Object::new(), &Object::from(evidence));
         if !Reflect::delete_property(&copy, &units).map_err(|_| invalid())? {
@@ -60,6 +65,7 @@ pub fn step(value: JsValue) -> CoreResult<JsValue> {
     })
 }
 
+/// Normalize the steps of a bounded hint chain before tagged decoding.
 pub fn hint(value: JsValue) -> CoreResult<JsValue> {
     map_field(value, "steps", |steps| {
         if !Array::is_array(&steps) {
@@ -69,13 +75,19 @@ pub fn hint(value: JsValue) -> CoreResult<JsValue> {
         if array.length() > MAX_HINT_STEPS {
             return Err(invalid());
         }
+
         let copy = Array::new();
-        let mut changed = false;
+        let mut has_changes = false;
         for original in array.iter() {
             let normalized = step(original.clone())?;
-            changed |= normalized != original;
+            has_changes |= normalized != original;
             copy.push(&normalized);
         }
-        Ok(if changed { copy.into() } else { steps })
+
+        if has_changes {
+            return Ok(copy.into());
+        }
+
+        Ok(steps)
     })
 }
