@@ -10,7 +10,12 @@ withDefaults(
     autoFocus?: boolean
     maskClosable?: boolean
   }>(),
-  { maxWidth: 640, closable: true, autoFocus: true, maskClosable: true },
+  {
+    maxWidth: 640,
+    closable: true,
+    autoFocus: true,
+    maskClosable: true,
+  },
 )
 defineEmits<{ 'update:show': [show: boolean]; afterLeave: [] }>()
 </script>

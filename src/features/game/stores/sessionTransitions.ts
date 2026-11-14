@@ -12,12 +12,19 @@ import {
   getDailyFormalId,
   getDailySeedMaterial,
 } from '@/features/game/model/daily'
-import { createSession } from '@/features/game/model/session'
+import { createSessionSnapshot } from '@/features/game/model/session'
 import type { GameSession, SessionMetadata, SessionPhase } from '@/features/game/model/session'
 import type { GameTransition } from '@/features/game/model/variants'
 import type { StorageOutcome, SessionRecord } from '@/storage/records'
 import type { SessionPersistence } from '@/features/game/stores/sessionPersistence'
 import type { PuzzleAssessment } from '@/sudoku/contracts'
+
+export type SessionInstallation = {
+  session: GameSession
+  token: OwnershipToken | null
+  revision: number
+  mode: 'paused' | 'playing'
+}
 
 export type SessionTransitionHost = {
   session: Ref<GameSession | null>
@@ -25,7 +32,7 @@ export type SessionTransitionHost = {
   readOnly: Ref<boolean>
   error: Ref<string | null>
   pause(): void
-  install(next: GameSession, token: OwnershipToken | null, revision: number, paused: boolean): void
+  install(installation: SessionInstallation): void
   retrySave(): Promise<void>
   activateClock(): void
   dropSession(): void
@@ -39,6 +46,50 @@ type ReplacementOptions = {
   datasetEpoch?: number | null
 }
 
+type ReplacementPreparation = {
+  puzzle: Puzzle
+  metadata: SessionMetadata
+  options: ReplacementOptions
+  epoch: number
+}
+
+type PreparedReplacement = {
+  next: GameSession
+  datasetEpoch: number
+  epoch: number
+  signal: AbortSignal | undefined
+}
+
+type CommittedReplacement = {
+  next: GameSession
+  persisted: SessionRecord
+  token: OwnershipToken
+  datasetEpoch: number
+  epoch: number
+  leases: ReplacementLeases
+}
+
+type ReplacementCommit = {
+  next: GameSession
+  token: OwnershipToken
+  previous: PreviousSessionLease
+  signal: AbortSignal | undefined
+}
+
+type ReplacementLeaseRequest = {
+  next: GameSession
+  datasetEpoch: number
+  epoch: number
+  leases: ReplacementLeases
+}
+
+type PreparedGeneration = {
+  input: GenerationInput
+  metadata: SessionMetadata
+  id: string | undefined
+  datasetEpoch: number | null
+}
+
 type PreviousSessionLease =
   { kind: 'none' } | { kind: 'borrowed' | 'acquired'; record: SessionRecord; token: OwnershipToken }
 
@@ -49,6 +100,7 @@ type ReplacementLeases = {
   next: OwnershipToken | null
 }
 
+/** Coordinate fenced game restores and replacements while the store owns active play. */
 export function createSessionTransitions(
   runtime: GameRuntime,
   host: SessionTransitionHost,
@@ -176,7 +228,7 @@ export function createSessionTransitions(
   }
 
   async function reloadLatestSession(): Promise<GameTransition> {
-    // The caller explicitly confirms replacing conflicted local edits; ordinary transitions stay guarded.
+    // Only explicit recovery authorizes replacing conflicted local edits.
     if (!session.value || !readOnly.value) {
       return { status: 'blocked', reason: 'ownership' }
     }
@@ -243,39 +295,30 @@ export function createSessionTransitions(
       return { status: 'cancelled' }
     }
 
-    if (!records.ok) {
+    if (!records.ok || !records.value) {
       if (lease.value) {
         await runtime.ownership.releaseOwnership(lease.value)
       }
 
+      // Releasing ownership can suspend. A late read failure must not replace newer UI state.
       if (epoch !== operationGeneration) {
         return { status: 'cancelled' }
       }
 
-      error.value = '读取存档失败，请重试。'
+      error.value = records.ok ? '找不到这份存档，可能已被清除。' : '读取存档失败，请重试。'
       phase.value = session.value ? 'paused' : 'failed'
 
       return { status: 'blocked', reason: 'load' }
     }
 
     const record = records.value
-    if (!record) {
-      if (lease.value) {
-        await runtime.ownership.releaseOwnership(lease.value)
-      }
-
-      if (epoch !== operationGeneration) {
-        return { status: 'cancelled' }
-      }
-
-      error.value = '找不到这份存档，可能已被清除。'
-      phase.value = session.value ? 'paused' : 'failed'
-
-      return { status: 'blocked', reason: 'load' }
-    }
-
     readOnly.value = lease.value === null
-    install(record.session, lease.value, record.revision, true)
+    install({
+      session: record.session,
+      token: lease.value,
+      revision: record.revision,
+      mode: 'paused',
+    })
     error.value = null
     saveState.value = 'saved'
     saveMessage.value = null
@@ -315,96 +358,22 @@ export function createSessionTransitions(
 
     const epoch = operationGeneration
     const id = session.value.id
+    const isCurrentSession = () => epoch === operationGeneration && session.value?.id === id
+
     await waitForReplacementCleanup()
-    if (epoch !== operationGeneration || session.value?.id !== id) {
+    if (!isCurrentSession()) {
       return
     }
 
     await persistence.waitForRelease()
-    if (epoch !== operationGeneration || session.value?.id !== id) {
+    if (!isCurrentSession()) {
       return
     }
 
     if (readOnly.value || !persistence.capture().token) {
-      const lease = await runtime.ownership.acquireOwnership(id, runtime.ownerId)
-      if (epoch !== operationGeneration || session.value?.id !== id) {
-        if (lease.ok && lease.value) {
-          await runtime.ownership.releaseOwnership(lease.value)
-        }
-
+      const resumedGeneration = await reacquireEditingLease(id, isCurrentSession)
+      if (resumedGeneration !== operationGeneration || session.value?.id !== id) {
         return
-      }
-
-      if (lease.ok && !lease.value) {
-        readOnly.value = true
-
-        return
-      }
-
-      if (lease.ok && lease.value) {
-        const catalog = await runtime.repository.readSession(id)
-        if (epoch !== operationGeneration || session.value?.id !== id) {
-          await runtime.ownership.releaseOwnership(lease.value)
-
-          return
-        }
-
-        if (!catalog.ok) {
-          await runtime.ownership.releaseOwnership(lease.value)
-          if (epoch !== operationGeneration || session.value?.id !== id) {
-            return
-          }
-
-          handleSave(catalog)
-
-          return
-        }
-
-        const stored = catalog.value
-        if (
-          persistence.capture().dirty &&
-          (stored?.revision ?? 0) !== persistence.capture().revision
-        ) {
-          await runtime.ownership.releaseOwnership(lease.value)
-          if (epoch !== operationGeneration || session.value?.id !== id) {
-            return
-          }
-
-          handleSave({
-            ok: false,
-            error: {
-              kind: 'revision-conflict',
-              message: 'The saved game changed while local edits were unsaved',
-            },
-          })
-
-          return
-        }
-
-        if (!stored && persistence.capture().revision > 0) {
-          await runtime.ownership.releaseOwnership(lease.value)
-          if (epoch !== operationGeneration || session.value?.id !== id) {
-            return
-          }
-
-          error.value = '存档已被移除，请返回首页。'
-
-          return
-        }
-
-        const localDirty = persistence.capture().dirty
-        if (stored && !localDirty) {
-          install(stored.session, lease.value, stored.revision, true)
-        } else {
-          persistence.attach(id, lease.value, persistence.capture().revision)
-          if (localDirty) {
-            persistence.markDirty()
-          }
-        }
-
-        readOnly.value = false
-      } else {
-        handleSave(lease)
       }
     }
 
@@ -417,27 +386,130 @@ export function createSessionTransitions(
     host.activateClock()
   }
 
-  async function prepareReplacementSession(
-    puzzle: Puzzle,
-    metadata: SessionMetadata,
-    options: ReplacementOptions,
-    epoch: number,
-  ): Promise<GameTransition | { status: 'prepared'; next: GameSession; datasetEpoch: number }> {
+  async function reacquireEditingLease(id: string, isCurrentSession: () => boolean) {
+    const lease = await runtime.ownership.acquireOwnership(id, runtime.ownerId)
+    if (!isCurrentSession()) {
+      if (lease.ok && lease.value) {
+        await runtime.ownership.releaseOwnership(lease.value)
+      }
+
+      return null
+    }
+
+    if (!lease.ok) {
+      handleSave(lease)
+      return operationGeneration
+    }
+
+    const token = lease.value
+    if (!token) {
+      readOnly.value = true
+      return null
+    }
+
+    return restoreLeasedRevision(id, token, isCurrentSession)
+  }
+
+  async function restoreLeasedRevision(
+    id: string,
+    token: OwnershipToken,
+    isCurrentSession: () => boolean,
+  ) {
+    // Read after acquiring the lease to include the previous owner's final write.
+    const catalog = await runtime.repository.readSession(id)
+    if (!isCurrentSession()) {
+      await runtime.ownership.releaseOwnership(token)
+
+      return null
+    }
+
+    if (!catalog.ok) {
+      await runtime.ownership.releaseOwnership(token)
+      if (!isCurrentSession()) {
+        return null
+      }
+
+      handleSave(catalog)
+
+      return null
+    }
+
+    const stored = catalog.value
+    if (persistence.capture().dirty && (stored?.revision ?? 0) !== persistence.capture().revision) {
+      await runtime.ownership.releaseOwnership(token)
+      if (!isCurrentSession()) {
+        return null
+      }
+
+      handleSave({
+        ok: false,
+        error: {
+          kind: 'revision-conflict',
+          message: 'The saved game changed while local edits were unsaved',
+        },
+      })
+
+      return null
+    }
+
+    if (!stored && persistence.capture().revision > 0) {
+      await runtime.ownership.releaseOwnership(token)
+      if (!isCurrentSession()) {
+        return null
+      }
+
+      error.value = '存档已被移除，请返回首页。'
+
+      return null
+    }
+
+    const localDirty = persistence.capture().dirty
+    if (stored && !localDirty) {
+      install({
+        session: stored.session,
+        token,
+        revision: stored.revision,
+        mode: 'paused',
+      })
+    } else {
+      persistence.attach(id, token, persistence.capture().revision)
+      if (localDirty) {
+        persistence.markDirty()
+      }
+    }
+
+    readOnly.value = false
+    return operationGeneration
+  }
+
+  async function prepareReplacementSession({
+    puzzle,
+    metadata,
+    options,
+    epoch,
+  }: ReplacementPreparation): Promise<
+    GameTransition | { status: 'prepared'; next: GameSession; datasetEpoch: number }
+  > {
     const id = options.id ?? runtime.createId()
     const fence = await runtime.repository.readDatasetEpoch()
     if (epoch !== operationGeneration) {
       return { status: 'cancelled' }
     }
 
-    const datasetEpoch =
-      options.datasetEpoch === undefined
-        ? (persistence.capture().token?.epoch ?? (fence.ok ? fence.value : null))
-        : options.datasetEpoch
+    // A captured epoch takes precedence over the current fence so replacement cannot adopt
+    // a dataset restored while generation was in flight.
+    let datasetEpoch = options.datasetEpoch
+    if (datasetEpoch === undefined) {
+      const attachedEpoch = persistence.capture().token?.epoch
+      datasetEpoch = attachedEpoch ?? (fence.ok ? fence.value : null)
+    }
+
     if (datasetEpoch !== null && fence.ok && fence.value !== datasetEpoch) {
       host.dropSession()
       error.value = '本机数据已被替换，请重新选择游戏。'
       return { status: 'cancelled' }
     }
+
     const computation = await prepareEngine(epoch)
     if (computation.status !== 'ready') {
       return computation
@@ -458,13 +530,13 @@ export function createSessionTransitions(
       value: options.assessment ?? null,
       identity: { variant: validated.value.rules.kind, difficulty: validated.value.difficulty },
     })
-    const next = createSession(
-      validated.value,
+    const next = createSessionSnapshot({
+      puzzle: validated.value,
       metadata,
       id,
-      runtime.wallNow().toISOString(),
-      assessment.status === 'present' ? assessment.value : undefined,
-    )
+      startedAt: runtime.wallNow().toISOString(),
+      assessment: assessment.status === 'present' ? assessment.value : undefined,
+    })
 
     if (datasetEpoch === null) {
       if (fence.ok) {
@@ -480,20 +552,30 @@ export function createSessionTransitions(
       // A first game started without storage remains memory-only. An unknown initial
       // epoch cannot authorize adopting a recovered or restored dataset's fresh lease.
       readOnly.value = false
-      install(next, null, 0, false)
+      install({
+        session: next,
+        token: null,
+        revision: 0,
+        mode: 'playing',
+      })
       handleSave({
         ok: false,
         error: { kind: 'unavailable', message: 'Initial dataset epoch unavailable' },
       })
       return { status: 'ready' }
     }
+
     if (!fence.ok) {
       phase.value = session.value ? 'paused' : 'failed'
       error.value = '无法确认本机存档状态，请重试。'
       return { status: 'blocked', reason: 'load' }
     }
 
-    return { status: 'prepared', next, datasetEpoch }
+    return {
+      status: 'prepared',
+      next,
+      datasetEpoch,
+    }
   }
 
   async function releasePreviousLease(leases: ReplacementLeases) {
@@ -567,7 +649,11 @@ export function createSessionTransitions(
     const acquired = await runtime.ownership.acquireOwnership(previous.session.id, runtime.ownerId)
     if (acquired.ok && acquired.value) {
       // Register ownership before the generation check so finally also cleans up late acquisition.
-      leases.previous = { kind: 'acquired', record: previous, token: acquired.value }
+      leases.previous = {
+        kind: 'acquired',
+        record: previous,
+        token: acquired.value,
+      }
     }
     if (epoch !== operationGeneration) {
       return { status: 'cancelled' }
@@ -581,12 +667,14 @@ export function createSessionTransitions(
     return { status: 'ready' }
   }
 
-  async function acquireReplacementLease(
-    next: GameSession,
-    datasetEpoch: number,
-    epoch: number,
-    leases: ReplacementLeases,
-  ): Promise<ReplacementResult | { status: 'acquired'; token: OwnershipToken }> {
+  async function acquireReplacementLease({
+    next,
+    datasetEpoch,
+    epoch,
+    leases,
+  }: ReplacementLeaseRequest): Promise<
+    ReplacementResult | { status: 'acquired'; token: OwnershipToken }
+  > {
     const acquired = await runtime.ownership.acquireOwnership(next.id, runtime.ownerId)
     if (acquired.ok) {
       leases.next = acquired.value
@@ -641,12 +729,7 @@ export function createSessionTransitions(
     return { status: 'acquired', token: acquired.value }
   }
 
-  function commitReplacement(
-    next: GameSession,
-    token: OwnershipToken,
-    previous: PreviousSessionLease,
-    signal: AbortSignal | undefined,
-  ) {
+  function commitReplacement({ next, token, previous, signal }: ReplacementCommit) {
     if (next.metadata.kind === 'daily') {
       return runtime.repository.writeSession(next, 0, token, signal)
     }
@@ -665,14 +748,14 @@ export function createSessionTransitions(
     )
   }
 
-  async function installReplacement(
-    next: GameSession,
-    persisted: SessionRecord,
-    token: OwnershipToken,
-    datasetEpoch: number,
-    epoch: number,
-    leases: ReplacementLeases,
-  ): Promise<GameTransition> {
+  async function installReplacement({
+    next,
+    persisted,
+    token,
+    datasetEpoch,
+    epoch,
+    leases,
+  }: CommittedReplacement): Promise<GameTransition> {
     // Commit the replacement before releasing the attached save queue or its editing lease.
     await persistence.release()
     await releasePreviousLease(leases)
@@ -702,8 +785,13 @@ export function createSessionTransitions(
     }
 
     readOnly.value = false
-    install(next, token, persisted.revision, false)
-    // Successful installation transfers the proposed lease to persistence; cleanup no longer owns it.
+    install({
+      session: next,
+      token,
+      revision: persisted.revision,
+      mode: 'playing',
+    })
+    // Installation transfers the proposed lease to persistence, so cleanup must leave it intact.
     leases.next = null
     handleSave({ ok: true, value: persisted })
     return { status: 'ready' }
@@ -715,7 +803,12 @@ export function createSessionTransitions(
     options: ReplacementOptions = {},
   ): Promise<GameTransition> {
     const epoch = options.epoch ?? operationGeneration
-    const prepared = await prepareReplacementSession(puzzle, metadata, options, epoch)
+    const prepared = await prepareReplacementSession({
+      puzzle,
+      metadata,
+      options,
+      epoch,
+    })
     if (prepared.status !== 'prepared') {
       return prepared
     }
@@ -723,7 +816,12 @@ export function createSessionTransitions(
       return { status: 'cancelled' }
     }
 
-    const work = replacePreparedSession(prepared.next, prepared.datasetEpoch, epoch, options.signal)
+    const work = replacePreparedSession({
+      next: prepared.next,
+      datasetEpoch: prepared.datasetEpoch,
+      epoch,
+      signal: options.signal,
+    })
     replacementWork = work
     let result: ReplacementResult
     try {
@@ -745,12 +843,12 @@ export function createSessionTransitions(
     return result
   }
 
-  async function replacePreparedSession(
-    next: GameSession,
-    datasetEpoch: number,
-    epoch: number,
-    signal: AbortSignal | undefined,
-  ): Promise<ReplacementResult> {
+  async function replacePreparedSession({
+    next,
+    datasetEpoch,
+    epoch,
+    signal,
+  }: PreparedReplacement): Promise<ReplacementResult> {
     const leases: ReplacementLeases = { previous: { kind: 'none' }, next: null }
     try {
       const previous = await preparePreviousSession(next, epoch, leases)
@@ -761,7 +859,12 @@ export function createSessionTransitions(
         return { status: 'cancelled' }
       }
 
-      const acquired = await acquireReplacementLease(next, datasetEpoch, epoch, leases)
+      const acquired = await acquireReplacementLease({
+        next,
+        datasetEpoch,
+        epoch,
+        leases,
+      })
       if (acquired.status !== 'acquired') {
         return acquired
       }
@@ -769,7 +872,12 @@ export function createSessionTransitions(
         return { status: 'cancelled' }
       }
 
-      const persisted = await commitReplacement(next, acquired.token, leases.previous, signal)
+      const persisted = await commitReplacement({
+        next,
+        token: acquired.token,
+        previous: leases.previous,
+        signal,
+      })
       if (epoch !== operationGeneration) {
         return { status: 'cancelled' }
       }
@@ -785,14 +893,14 @@ export function createSessionTransitions(
         return { status: 'blocked', reason: 'save' }
       }
 
-      return await installReplacement(
+      return await installReplacement({
         next,
-        persisted.value,
-        acquired.token,
+        persisted: persisted.value,
+        token: acquired.token,
         datasetEpoch,
         epoch,
         leases,
-      )
+      })
     } finally {
       // Includes cancellation during denied-acquisition epoch reads and every late acquired token.
       if (leases.next || leases.previous.kind === 'acquired') {
@@ -818,15 +926,20 @@ export function createSessionTransitions(
     if (operation !== operationGeneration) {
       return { status: 'cancelled' }
     }
-    return generatePreparedGame(snapshot, metadata, id, fence.ok ? fence.value : null)
+    return generatePreparedGame({
+      input: snapshot,
+      metadata,
+      id,
+      datasetEpoch: fence.ok ? fence.value : null,
+    })
   }
 
-  async function generatePreparedGame(
-    input: GenerationInput,
-    metadata: SessionMetadata,
-    id: string | undefined,
-    datasetEpoch: number | null,
-  ): Promise<GameTransition> {
+  async function generatePreparedGame({
+    input,
+    metadata,
+    id,
+    datasetEpoch,
+  }: PreparedGeneration): Promise<GameTransition> {
     failedGeneration.value = null
     error.value = null
     phase.value = 'generating'
@@ -842,18 +955,27 @@ export function createSessionTransitions(
       // Work-bound exhaustion repeats deterministically for the same input. A new choice
       // can start a new request; timeout and transport failure still support identical retry.
       if (result.status !== 'cancelled' && result.status !== 'incomplete') {
-        failedGeneration.value = { input, metadata, id }
+        failedGeneration.value = {
+          input,
+          metadata,
+          id,
+        }
       }
 
-      if (result.status === 'timed-out') {
-        error.value = '出题超时，请重试。'
-      } else if (result.status === 'incomplete') {
-        error.value = '未能生成符合要求的题目，请重新选择。'
-      } else if (result.status === 'cancelled') {
-        error.value = '已取消出题。'
-      } else {
-        error.value = '出题失败，请重试。'
+      switch (result.status) {
+        case 'timed-out':
+          error.value = '出题超时，请重试。'
+          break
+        case 'incomplete':
+          error.value = '未能生成符合要求的题目，请重新选择。'
+          break
+        case 'cancelled':
+          error.value = '已取消出题。'
+          break
+        default:
+          error.value = '出题失败，请重试。'
       }
+
       phase.value = session.value ? 'paused' : 'failed'
 
       return result.status === 'cancelled'
@@ -877,7 +999,11 @@ export function createSessionTransitions(
         return { status: 'cancelled' }
       }
 
-      failedGeneration.value = { input, metadata, id }
+      failedGeneration.value = {
+        input,
+        metadata,
+        id,
+      }
     }
 
     return transition
@@ -897,6 +1023,77 @@ export function createSessionTransitions(
     error.value = '已取消出题。'
   }
 
+  async function recoverSaveQueue(id: string, isCurrentSession: () => boolean) {
+    const catalog = await runtime.repository.readSession(id)
+    if (!isCurrentSession()) {
+      return
+    }
+
+    if (!catalog.ok) {
+      handleSave(catalog)
+
+      return
+    }
+
+    const current = catalog.value
+    if ((current?.revision ?? 0) !== persistence.capture().revision) {
+      handleSave({
+        ok: false,
+        error: { kind: 'revision-conflict', message: 'Saved revision changed' },
+      })
+
+      return
+    }
+
+    const active = session.value
+    if (!active) {
+      return
+    }
+
+    if (!current && active.mode !== 'daily') {
+      const slot = await runtime.repository.readSlot(active.mode, active.puzzle.rules.kind)
+      if (!isCurrentSession()) {
+        return
+      }
+      if (!slot.ok) {
+        handleSave(slot)
+        return
+      }
+      if (slot.value) {
+        error.value = '已有其他存档，请重新载入后继续。'
+        readOnly.value = true
+        pause()
+        return
+      }
+    }
+
+    const acquired = await runtime.ownership.acquireOwnership(id, runtime.ownerId)
+    if (!isCurrentSession()) {
+      if (acquired.ok && acquired.value) {
+        await runtime.ownership.releaseOwnership(acquired.value)
+      }
+
+      return
+    }
+
+    if (!acquired.ok || !acquired.value) {
+      if (acquired.ok) {
+        readOnly.value = true
+      } else {
+        handleSave(acquired)
+      }
+
+      return
+    }
+
+    persistence.attach(id, acquired.value, current?.revision ?? 0)
+    persistence.markDirty()
+    const result = await persistence.save(session.value ?? active)
+    if (isCurrentSession()) {
+      handleSave(result)
+    }
+  }
+
   async function retrySave() {
     if (!session.value || readOnly.value) {
       return
@@ -904,94 +1101,31 @@ export function createSessionTransitions(
 
     const epoch = operationGeneration
     const id = session.value.id
+    const isCurrentSession = () => epoch === operationGeneration && session.value?.id === id
+
     await waitForReplacementCleanup()
-    if (epoch !== operationGeneration || session.value?.id !== id) {
+    if (!isCurrentSession()) {
       return
     }
 
     await persistence.waitForRelease()
-    if (epoch !== operationGeneration || session.value?.id !== id) {
+    if (!isCurrentSession()) {
       return
     }
 
     if (!persistence.hasQueue) {
-      const catalog = await runtime.repository.readSession(id)
-      if (epoch !== operationGeneration || session.value?.id !== id) {
-        return
-      }
-
-      if (!catalog.ok) {
-        handleSave(catalog)
-
-        return
-      }
-
-      const current = catalog.value
-      if ((current?.revision ?? 0) !== persistence.capture().revision) {
-        handleSave({
-          ok: false,
-          error: { kind: 'revision-conflict', message: 'Saved revision changed' },
-        })
-
-        return
-      }
-
-      if (!current && session.value.mode !== 'daily') {
-        const slot = await runtime.repository.readSlot(
-          session.value.mode,
-          session.value.puzzle.rules.kind,
-        )
-        if (epoch !== operationGeneration || session.value?.id !== id) {
-          return
-        }
-        if (!slot.ok) {
-          handleSave(slot)
-          return
-        }
-        if (slot.value) {
-          error.value = '已有其他存档，请重新载入后继续。'
-          readOnly.value = true
-          pause()
-          return
-        }
-      }
-
-      const acquired = await runtime.ownership.acquireOwnership(id, runtime.ownerId)
-      if (epoch !== operationGeneration || session.value?.id !== id) {
-        if (acquired.ok && acquired.value) {
-          await runtime.ownership.releaseOwnership(acquired.value)
-        }
-
-        return
-      }
-
-      if (!acquired.ok || !acquired.value) {
-        if (acquired.ok) {
-          readOnly.value = true
-        } else {
-          handleSave(acquired)
-        }
-
-        return
-      }
-
-      persistence.attach(id, acquired.value, current?.revision ?? 0)
-      persistence.markDirty()
-      const result = await persistence.save(session.value)
-      if (epoch === operationGeneration && session.value?.id === id) {
-        handleSave(result)
-      }
-
+      await recoverSaveQueue(id, isCurrentSession)
       return
     }
 
     const checkpoint = persistence.capture()
-    const result = await persistence.retry(session.value)
-    if (
-      epoch !== operationGeneration ||
-      session.value?.id !== id ||
-      !persistence.isCurrent(checkpoint)
-    ) {
+    const active = session.value
+    if (!active) {
+      return
+    }
+
+    const result = await persistence.retry(active)
+    if (!isCurrentSession() || !persistence.isCurrent(checkpoint)) {
       return
     }
 
@@ -1062,12 +1196,16 @@ export function createSessionTransitions(
     // Existing formal attempts win before any current-version seed derivation or construction.
     const seed = runtime.engine.deriveSeed(getDailySeedMaterial(date))
     const { input } = getDailyIdentity(date, variant, seed)
-    return generatePreparedGame(
+    return generatePreparedGame({
       input,
-      { kind: 'daily', challengeDate: date, formalAttempt },
-      formalAttempt ? formalId : runtime.createId(),
-      fence.value,
-    )
+      metadata: {
+        kind: 'daily',
+        challengeDate: date,
+        formalAttempt,
+      },
+      id: formalAttempt ? formalId : runtime.createId(),
+      datasetEpoch: fence.value,
+    })
   }
 
   return {

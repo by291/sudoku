@@ -4,13 +4,15 @@ import type { Board, ConflictComputationDto } from '@/sudoku/contracts'
 import type { PreparedPuzzle } from '@/sudoku/mainEngine'
 import type { SudokuWorkerClient } from '@/worker/client'
 
+type ConflictAnalysisInput = {
+  layout: ShallowRef<PreparedPuzzle | null>
+  board: ComputedRef<Board>
+  enabled: ComputedRef<boolean>
+  worker: SudokuWorkerClient
+}
+
 /** Owns only live conflicts; hint, note and session transition cancellation stay independent. */
-export function useConflictAnalysis(
-  layout: ShallowRef<PreparedPuzzle | null>,
-  board: ComputedRef<Board>,
-  enabled: ComputedRef<boolean>,
-  worker: SudokuWorkerClient,
-) {
+export function useConflictAnalysis({ layout, board, enabled, worker }: ConflictAnalysisInput) {
   const evaluation = shallowRef<ConflictComputationDto['result']>({
     status: 'complete',
     violations: [],
@@ -19,8 +21,14 @@ export function useConflictAnalysis(
   let generation = 0
   let controller: AbortController | null = null
 
+  // prettier-ignore
+  const analysisSources = [
+    () => layout.value,
+    () => board.value.join(','),
+    enabled,
+  ] as const
   const stop = watch(
-    [() => layout.value, () => board.value.join(','), enabled],
+    analysisSources,
     () => {
       const current = ++generation
       controller?.abort()
@@ -77,5 +85,9 @@ export function useConflictAnalysis(
   }
 
   onScopeDispose(dispose)
-  return { evaluation, state, dispose }
+  return {
+    evaluation,
+    state,
+    dispose,
+  }
 }

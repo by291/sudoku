@@ -22,22 +22,25 @@ const chosenTheme = computed({
 })
 const { preference, setTheme, theme, themeOverrides } = useTheme(chosenTheme)
 
-onMounted(preferences.load)
 let shutdownPromise: Promise<unknown> | null = null
 
 function shutdown(): Promise<unknown> {
   if (!shutdownPromise) {
     records.dispose()
     game.dispose()
+
     // Semantic save decoding still needs the engine until the final save settles.
     shutdownPromise = game.leaveGame().finally(() => runtime.dispose?.())
   }
+
   return shutdownPromise
 }
 
+onMounted(preferences.load)
 onScopeDispose(() => {
   void shutdown()
 })
+
 defineExpose({ shutdown })
 </script>
 

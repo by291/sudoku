@@ -13,6 +13,34 @@ type KeyboardGame = {
   toggleNoteMode(): void
 }
 
+function applyCellShortcut(key: string, game: KeyboardGame, cell: number): boolean {
+  const row = Math.floor(cell / UNIT_SIZE)
+  const column = cell % UNIT_SIZE
+  const digit = Number(key)
+  if (key.length === 1 && isDigit(digit)) {
+    game.dispatch({
+      kind: game.noteMode ? 'toggle-note' : 'enter',
+      cell,
+      digit,
+    })
+  } else if (['delete', 'backspace'].includes(key)) {
+    game.dispatch({ kind: 'erase', cell })
+  } else if (key === 'arrowleft') {
+    game.selectCell(column === 0 ? cell : cell - 1)
+  } else if (key === 'arrowright') {
+    game.selectCell(column === UNIT_SIZE - 1 ? cell : cell + 1)
+  } else if (key === 'arrowup') {
+    game.selectCell(row === 0 ? cell : cell - UNIT_SIZE)
+  } else if (key === 'arrowdown') {
+    game.selectCell(row === UNIT_SIZE - 1 ? cell : cell + UNIT_SIZE)
+  } else {
+    return false
+  }
+
+  return true
+}
+
+/** Consume a recognized shortcut when the active board owns keyboard input. */
 export function handleGameKey(event: KeyboardEvent, game: KeyboardGame): boolean {
   if (!game.editable || isKeyboardOwnedByControl(event)) {
     return false
@@ -28,26 +56,8 @@ export function handleGameKey(event: KeyboardEvent, game: KeyboardGame): boolean
     game.toggleNoteMode()
   } else if (game.selectedCell === null) {
     return false
-  } else {
-    const cell = game.selectedCell
-    const row = Math.floor(cell / UNIT_SIZE)
-    const column = cell % UNIT_SIZE
-    const digit = Number(key)
-    if (key.length === 1 && isDigit(digit)) {
-      game.dispatch({ kind: game.noteMode ? 'toggle-note' : 'enter', cell, digit })
-    } else if (['delete', 'backspace'].includes(key)) {
-      game.dispatch({ kind: 'erase', cell })
-    } else if (key === 'arrowleft') {
-      game.selectCell(column === 0 ? cell : cell - 1)
-    } else if (key === 'arrowright') {
-      game.selectCell(column === UNIT_SIZE - 1 ? cell : cell + 1)
-    } else if (key === 'arrowup') {
-      game.selectCell(row === 0 ? cell : cell - UNIT_SIZE)
-    } else if (key === 'arrowdown') {
-      game.selectCell(row === UNIT_SIZE - 1 ? cell : cell + UNIT_SIZE)
-    } else {
-      return false
-    }
+  } else if (!applyCellShortcut(key, game, game.selectedCell)) {
+    return false
   }
 
   event.preventDefault()
@@ -55,11 +65,13 @@ export function handleGameKey(event: KeyboardEvent, game: KeyboardGame): boolean
   return true
 }
 
+/** Attach the global game shortcuts for this route scope. */
 export function useGameKeyboard() {
   const game = useGameStore()
   const listener = (event: KeyboardEvent) => {
     handleGameKey(event, game)
   }
+
   onMounted(() => window.addEventListener('keydown', listener))
   onScopeDispose(() => window.removeEventListener('keydown', listener))
 }

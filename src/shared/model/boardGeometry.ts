@@ -1,5 +1,7 @@
 import type { PuzzleRules, RulesFor, SudokuVariant } from '@/sudoku/contracts'
-import { isCellIndex } from '@/sudoku/values'
+import { BOARD_SIZE, UNIT_SIZE, isCellIndex } from '@/sudoku/values'
+
+const CAGE_BORDER_INSET = 0.09
 
 export type BoardEdge = { cell: number; edge: 'top' | 'right' | 'bottom' | 'left' }
 
@@ -17,7 +19,7 @@ export type VariantBoardAdapter<K extends SudokuVariant> = {
 }
 
 function position(cell: number): string {
-  return `第${Math.floor(cell / 9) + 1}行第${(cell % 9) + 1}列`
+  return `第${Math.floor(cell / UNIT_SIZE) + 1}行第${(cell % UNIT_SIZE) + 1}列`
 }
 
 export const VARIANT_BOARD_ADAPTERS = {
@@ -33,11 +35,17 @@ export const VARIANT_BOARD_ADAPTERS = {
     geometry() {
       const clues: BoardClue[] = []
       clues.push(
-        { kind: 'diagonal', cells: Array.from({ length: 9 }, (_, index) => index * 10) },
-        { kind: 'diagonal', cells: Array.from({ length: 9 }, (_, index) => (index + 1) * 8) },
+        {
+          kind: 'diagonal',
+          cells: Array.from({ length: UNIT_SIZE }, (_, index) => index * (UNIT_SIZE + 1)),
+        },
+        {
+          kind: 'diagonal',
+          cells: Array.from({ length: UNIT_SIZE }, (_, index) => (index + 1) * (UNIT_SIZE - 1)),
+        },
       )
 
-      return { boundaries: [], clues: clues }
+      return { boundaries: [], clues }
     },
     describeCell(cell, rules) {
       return getBoardGeometry(rules).clues.flatMap((clue, index) =>
@@ -51,24 +59,25 @@ export const VARIANT_BOARD_ADAPTERS = {
     geometry(rules) {
       const boundaries: BoardEdge[] = []
 
-      const regions = Array<number>(81)
+      const regions = Array<number>(BOARD_SIZE)
       rules.regions.forEach((cells, region) =>
         cells.forEach((cell) => {
           regions[cell] = region
         }),
       )
 
-      for (let cell = 0; cell < 81; cell++) {
-        if (cell % 9 < 8 && regions[cell] !== regions[cell + 1]) {
+      // Draw each shared edge once, from its upper or left cell.
+      for (let cell = 0; cell < BOARD_SIZE; cell++) {
+        if (cell % UNIT_SIZE < UNIT_SIZE - 1 && regions[cell] !== regions[cell + 1]) {
           boundaries.push({ cell, edge: 'right' })
         }
 
-        if (cell < 72 && regions[cell] !== regions[cell + 9]) {
+        if (cell < BOARD_SIZE - UNIT_SIZE && regions[cell] !== regions[cell + UNIT_SIZE]) {
           boundaries.push({ cell, edge: 'bottom' })
         }
       }
 
-      return { boundaries: boundaries, clues: [] }
+      return { boundaries, clues: [] }
     },
     describeCell(cell, rules) {
       return rules.regions.flatMap((cells, index) =>
@@ -89,7 +98,7 @@ export const VARIANT_BOARD_ADAPTERS = {
         }),
       )
 
-      return { boundaries: [], clues: clues }
+      return { boundaries: [], clues }
     },
     describeCell(cell, rules) {
       return rules.cages.flatMap((cage, index) =>
@@ -103,10 +112,14 @@ export const VARIANT_BOARD_ADAPTERS = {
     geometry(rules) {
       const clues: BoardClue[] = []
       rules.paths.forEach((cells, index) =>
-        clues.push({ kind: 'thermo', id: `thermo:${index}`, cells }),
+        clues.push({
+          kind: 'thermo',
+          id: `thermo:${index}`,
+          cells,
+        }),
       )
 
-      return { boundaries: [], clues: clues }
+      return { boundaries: [], clues }
     },
     describeCell(cell, rules) {
       return rules.paths.flatMap((cells, index) =>
@@ -130,20 +143,25 @@ export const VARIANT_BOARD_ADAPTERS = {
         }),
       )
 
-      return { boundaries: [], clues: clues }
+      return { boundaries: [], clues }
     },
     describeCell(cell, rules) {
-      return rules.arrows.flatMap((arrow, index) =>
-        arrow.circle === cell || arrow.shaft.includes(cell)
-          ? [
-              `箭头${index + 1}：箭杆${arrow.shaft.length}格的总和等于圆圈${position(arrow.circle)}的数字；当前是${arrow.circle === cell ? '圆圈' : '箭杆'}，标准规则允许时箭杆可重复。`,
-            ]
-          : [],
-      )
+      return rules.arrows.flatMap((arrow, index) => {
+        const isCircle = arrow.circle === cell
+        if (!isCircle && !arrow.shaft.includes(cell)) {
+          return []
+        }
+
+        const role = isCircle ? '圆圈' : '箭杆'
+        return [
+          `箭头${index + 1}：箭杆${arrow.shaft.length}格的总和等于圆圈${position(arrow.circle)}的数字；当前是${role}，标准规则允许时箭杆可重复。`,
+        ]
+      })
     },
   },
 } satisfies { [K in SudokuVariant]: VariantBoardAdapter<K> }
 
+/** Build the visual boundaries and clues for a checked rule layout. */
 export function getBoardGeometry(rules: PuzzleRules): BoardGeometry {
   switch (rules.kind) {
     case 'classic':
@@ -161,6 +179,7 @@ export function getBoardGeometry(rules: PuzzleRules): BoardGeometry {
   }
 }
 
+/** Describe only the rules that affect the selected cell. */
 export function getSelectedRuleDescriptions(cell: number, rules: PuzzleRules): readonly string[] {
   if (!isCellIndex(cell)) {
     return []
@@ -182,6 +201,7 @@ export function getSelectedRuleDescriptions(cell: number, rules: PuzzleRules): r
   }
 }
 
+/** Join the selected cell rule descriptions for its accessible label. */
 export function getCellRuleContext(cell: number, rules: PuzzleRules): string {
   return getSelectedRuleDescriptions(cell, rules).join(' ')
 }
@@ -189,34 +209,35 @@ export function getCellRuleContext(cell: number, rules: PuzzleRules): string {
 /** Inset each outside edge while joining across adjacent cells in the same cage. */
 export function getCageOutline(cells: readonly number[]): string {
   const cage = new Set(cells)
-  const inset = 0.09
   const lines: string[] = []
 
   for (const cell of cells) {
-    const x = cell % 9
-    const y = Math.floor(cell / 9)
-    const left = x > 0 && cage.has(cell - 1)
-    const right = x < 8 && cage.has(cell + 1)
-    const top = y > 0 && cage.has(cell - 9)
-    const bottom = y < 8 && cage.has(cell + 9)
-    const x1 = x + (left ? 0 : inset)
-    const x2 = x + 1 - (right ? 0 : inset)
-    const y1 = y + (top ? 0 : inset)
-    const y2 = y + 1 - (bottom ? 0 : inset)
-    if (!top) {
-      lines.push(`M${x1},${y1}H${x2}`)
+    const column = cell % UNIT_SIZE
+    const row = Math.floor(cell / UNIT_SIZE)
+    const hasLeftNeighbor = column > 0 && cage.has(cell - 1)
+    const hasRightNeighbor = column < UNIT_SIZE - 1 && cage.has(cell + 1)
+    const hasTopNeighbor = row > 0 && cage.has(cell - UNIT_SIZE)
+    const hasBottomNeighbor = row < UNIT_SIZE - 1 && cage.has(cell + UNIT_SIZE)
+
+    const leftEdge = column + (hasLeftNeighbor ? 0 : CAGE_BORDER_INSET)
+    const rightEdge = column + 1 - (hasRightNeighbor ? 0 : CAGE_BORDER_INSET)
+    const topEdge = row + (hasTopNeighbor ? 0 : CAGE_BORDER_INSET)
+    const bottomEdge = row + 1 - (hasBottomNeighbor ? 0 : CAGE_BORDER_INSET)
+
+    if (!hasTopNeighbor) {
+      lines.push(`M${leftEdge},${topEdge}H${rightEdge}`)
     }
 
-    if (!bottom) {
-      lines.push(`M${x1},${y2}H${x2}`)
+    if (!hasBottomNeighbor) {
+      lines.push(`M${leftEdge},${bottomEdge}H${rightEdge}`)
     }
 
-    if (!left) {
-      lines.push(`M${x1},${y1}V${y2}`)
+    if (!hasLeftNeighbor) {
+      lines.push(`M${leftEdge},${topEdge}V${bottomEdge}`)
     }
 
-    if (!right) {
-      lines.push(`M${x2},${y1}V${y2}`)
+    if (!hasRightNeighbor) {
+      lines.push(`M${rightEdge},${topEdge}V${bottomEdge}`)
     }
   }
 

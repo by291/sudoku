@@ -25,7 +25,12 @@ const props = withDefaults(
     canStartNew: boolean
     newGameLabel: string
   }>(),
-  { announceSelection: true, notesLoading: false, selectedNotes: 0, inactive: false },
+  {
+    announceSelection: true,
+    notesLoading: false,
+    selectedNotes: 0,
+    inactive: false,
+  },
 )
 const emit = defineEmits<{
   digit: [digit: Digit]
@@ -116,7 +121,11 @@ const menuOptions = computed<NonNullable<DropdownProps['options']>>(() => [
         'div',
         {
           role: 'presentation',
-          style: { padding: '8px 16px', fontSize: '12px', color: 'var(--muted)' },
+          style: {
+            padding: '8px 16px',
+            fontSize: '12px',
+            color: 'var(--muted)',
+          },
         },
         '辅助工具 · 使用后记为辅助完成',
       ),
@@ -212,21 +221,38 @@ function handleMenuKey(event: KeyboardEvent) {
     return
   }
 
-  if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Escape', 'Enter', ' '].includes(event.key)) {
+  // prettier-ignore
+  const menuKeys = [
+    'ArrowDown',
+    'ArrowUp',
+    'Home',
+    'End',
+    'Escape',
+    'Enter',
+    ' ',
+  ]
+  if (menuKeys.includes(event.key)) {
     event.preventDefault()
     event.stopPropagation()
-    if (event.key === 'Escape') {
-      menuOpen.value = false
-      focusMore()
-    } else if (event.key === 'Home') {
-      focusMenuPosition('first')
-    } else if (event.key === 'End') {
-      focusMenuPosition('last')
-    } else if (event.key === 'Enter' || event.key === ' ') {
-      items[current]?.click()
-    } else {
-      const direction = event.key === 'ArrowDown' ? 1 : -1
-      items[(current + direction + items.length) % items.length]?.focus()
+    switch (event.key) {
+      case 'Escape':
+        menuOpen.value = false
+        focusMore()
+        break
+      case 'Home':
+        focusMenuPosition('first')
+        break
+      case 'End':
+        focusMenuPosition('last')
+        break
+      case 'Enter':
+      case ' ':
+        items[current]?.click()
+        break
+      default: {
+        const direction = event.key === 'ArrowDown' ? 1 : -1
+        items[(current + direction + items.length) % items.length]?.focus()
+      }
     }
   } else if (event.key.length === 1) {
     const nextItems = [...items.slice(current + 1), ...items.slice(0, current + 1)]

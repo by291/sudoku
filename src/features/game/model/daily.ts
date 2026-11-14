@@ -4,6 +4,7 @@ import type { GenerationInput } from '@/sudoku/generationInput'
 import type { SudokuVariant } from '@/sudoku/contracts'
 import { SUDOKU_VARIANTS } from '@/sudoku/catalogue'
 
+/** Check that a value is a real calendar date in the persisted challenge format. */
 export function isChallengeDate(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -20,9 +21,17 @@ const beijingCalendar = new Intl.DateTimeFormat('en-US', {
   day: '2-digit',
 })
 
+// prettier-ignore
+const challengeDateParts = [
+  'year',
+  'month',
+  'day',
+] as const
+
+/** Read the challenge day in Beijing time, regardless of the local time zone. */
 export function getChallengeDate(now: Date): string {
   const parts = beijingCalendar.formatToParts(now)
-  const date = ['year', 'month', 'day']
+  const date = challengeDateParts
     .map((kind) => parts.find((part) => part.type === kind)?.value)
     .join('-')
   if (!isChallengeDate(date)) {
@@ -40,6 +49,7 @@ export function getDailySeedMaterial(date: string): Uint8Array {
   return Uint8Array.from(`daily:${date}`, (character) => character.charCodeAt(0))
 }
 
+/** Return the stable formal attempt id for the given day and variant. */
 export function getDailyFormalId(date: string, variant: SudokuVariant): string {
   if (!isChallengeDate(date)) {
     throw new TypeError('Invalid challenge date')
@@ -47,6 +57,7 @@ export function getDailyFormalId(date: string, variant: SudokuVariant): string {
   return variant === 'classic' ? `daily:${date}:formal` : `daily:${variant}:${date}:formal`
 }
 
+/** Build the current generation request while preserving the stable formal attempt id. */
 export function getDailyIdentity(
   date: string,
   variant: SudokuVariant,
@@ -54,9 +65,14 @@ export function getDailyIdentity(
 ): { seed: Uint8Array; formalId: string; input: GenerationInput } {
   const formalId = getDailyFormalId(date, variant)
   const input = createGenerationInput(variant, 'medium', seed)
-  return { formalId, input, seed: input.seed.slice() }
+  return {
+    formalId,
+    input,
+    seed: input.seed.slice(),
+  }
 }
 
+/** Clear the board while retaining the daily attempt identity, time, and assistance. */
 export function restartDailySession(session: GameSession): GameSession {
   if (session.mode !== 'daily') {
     throw new TypeError('Only daily sessions retain their accumulated time')
@@ -80,6 +96,7 @@ export type DailyVariantStatus = {
   state: 'available' | 'in-progress' | 'completed'
 }
 
+/** Summarize formal attempts and completed results for the requested day. */
 export function getDailyStatuses(
   sessions: readonly { session: GameSession }[],
   results: readonly { session: GameSession }[],

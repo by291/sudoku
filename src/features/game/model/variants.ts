@@ -23,6 +23,7 @@ export const VARIANT_PRESENTATION = {
   },
 } satisfies Record<SudokuVariant, VariantPresentation>
 
+/** Read the player-facing label and rule explanation for a variant. */
 export function getVariantPresentation(variant: SudokuVariant): VariantPresentation {
   return VARIANT_PRESENTATION[variant]
 }
@@ -32,6 +33,7 @@ export const VARIANT_OPTIONS = SUDOKU_VARIANTS.map((value) => ({
   label: getVariantPresentation(value).label,
 }))
 
+/** Default missing variant queries and report invalid supplied values. */
 export function parseVariantQuery(value: unknown): ParseResult<SudokuVariant> {
   if (value === undefined) {
     return { valid: true, value: 'classic' }

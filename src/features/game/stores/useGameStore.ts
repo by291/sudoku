@@ -1,5 +1,6 @@
 import { createSessionPersistence } from '@/features/game/stores/sessionPersistence'
 import { createSessionTransitions } from '@/features/game/stores/sessionTransitions'
+import type { SessionInstallation } from '@/features/game/stores/sessionTransitions'
 import { computed, ref, shallowRef, watch, onScopeDispose } from 'vue'
 import { defineStore } from 'pinia'
 import { useGameRuntime } from '@/runtime'
@@ -18,14 +19,14 @@ import type {
 import {
   applySessionAction,
   commitBoardEdit,
-  completeSession,
+  recordSessionCompletion,
   sessionBoard,
 } from '@/features/game/model/session'
 import { pauseClock, readElapsed, resumeClock } from '@/features/game/model/timer'
 import type { RunClock } from '@/features/game/model/timer'
-import type { OwnershipToken } from '@/storage/ownership'
 import type { StorageOutcome } from '@/storage/records'
 
+/** Own the active board, player actions, and resources for the current game. */
 export const useGameStore = defineStore('game', () => {
   const runtime = useGameRuntime()
   const session = shallowRef<GameSession | null>(null)
@@ -50,7 +51,17 @@ export const useGameStore = defineStore('game', () => {
   const { saveState, saveMessage } = persistence
   const transitions = createSessionTransitions(
     runtime,
-    { session, phase, readOnly, error, pause, install, retrySave, activateClock, dropSession },
+    {
+      session,
+      phase,
+      readOnly,
+      error,
+      pause,
+      install,
+      retrySave,
+      activateClock,
+      dropSession,
+    },
     persistence,
   )
   const {
@@ -100,7 +111,12 @@ export const useGameStore = defineStore('game', () => {
   )
 
   const editable = computed(() => phase.value === 'playing' && !readOnly.value)
-  const conflictAnalysis = useConflictAnalysis(prepared, board, editable, runtime.worker)
+  const conflictAnalysis = useConflictAnalysis({
+    layout: prepared,
+    board,
+    enabled: editable,
+    worker: runtime.worker,
+  })
   const conflictEvaluation = conflictAnalysis.evaluation
   const conflictAnalysisState = conflictAnalysis.state
   const conflicts = computed(() => [
@@ -130,7 +146,7 @@ export const useGameStore = defineStore('game', () => {
     notesLoading.value = false
   }
 
-  // The layer revision ignores elapsed time and assistance facts but fences every playable snapshot.
+  // Fence playable snapshots without invalidating them for clock or assistance changes.
   const stopNoteRevision = watch(
     [
       () => session.value?.id,
@@ -260,15 +276,10 @@ export const useGameStore = defineStore('game', () => {
     await persistence.release()
   }
 
-  function install(
-    next: GameSession,
-    nextToken: OwnershipToken | null,
-    revision: number,
-    paused: boolean,
-  ) {
+  function install({ session: next, token, revision, mode }: SessionInstallation) {
     cancelOperation()
     session.value = next
-    persistence.attach(next.id, nextToken, revision)
+    persistence.attach(next.id, token, revision)
 
     selectedCell.value = null
     noteMode.value = false
@@ -281,7 +292,7 @@ export const useGameStore = defineStore('game', () => {
     if (next.completion) {
       phase.value = 'completed'
     } else {
-      phase.value = paused ? 'paused' : 'playing'
+      phase.value = mode
     }
     if (phase.value === 'playing') {
       clock.value = resumeClock(clock.value, now.value)
@@ -304,22 +315,24 @@ export const useGameStore = defineStore('game', () => {
       return
     }
 
-    const outcome =
-      action.kind === 'enter' ||
-      action.kind === 'erase' ||
-      action.kind === 'toggle-note' ||
-      action.kind === 'generate-notes'
-        ? commitBoardEdit(
-            session.value,
-            layout.edit({
-              givens: [...session.value.puzzle.givens],
-              entries: [...session.value.entries],
-              notes: [...session.value.notes],
-              action,
-            }).result,
-            action,
-          )
-        : applySessionAction(session.value, action)
+    let outcome: SessionActionResult
+    switch (action.kind) {
+      case 'enter':
+      case 'erase':
+      case 'toggle-note':
+      case 'generate-notes': {
+        const edit = layout.edit({
+          givens: [...session.value.puzzle.givens],
+          entries: [...session.value.entries],
+          notes: [...session.value.notes],
+          action,
+        })
+        outcome = commitBoardEdit(session.value, edit.result, action)
+        break
+      }
+      default:
+        outcome = applySessionAction(session.value, action)
+    }
 
     commitAction(outcome, action, layout)
   }
@@ -337,6 +350,8 @@ export const useGameStore = defineStore('game', () => {
 
     session.value = outcome.session
     persistence.markDirty()
+
+    // Fact-only actions keep the board and its associated feedback current.
     if (action.kind !== 'hint-shown' && action.kind !== 'check') {
       cancelOperation()
       hint.value = null
@@ -349,15 +364,16 @@ export const useGameStore = defineStore('game', () => {
       checkedCells.value = layout.reviewEntries(board.value, outcome.session.puzzle.solution)
     }
 
-    if (session.value && layout.isComplete(board.value)) {
+    const isBoardComplete = layout.isComplete(board.value)
+    if (session.value && isBoardComplete) {
       clock.value = pauseClock(clock.value, runtime.monotonicNow())
       tick()
-      session.value = completeSession(
-        session.value,
-        runtime.wallNow().toISOString(),
-        elapsedMs.value,
-        true,
-      )
+      session.value = recordSessionCompletion({
+        session: session.value,
+        completedAt: runtime.wallNow().toISOString(),
+        elapsedMs: elapsedMs.value,
+        isBoardComplete,
+      })
       phase.value = 'completed'
       cancelOperation()
     }

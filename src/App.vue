@@ -15,8 +15,8 @@ const application = ref<InstanceType<typeof ReadyApplication> | null>(null)
 let generation = 0
 let disposed = false
 
-async function prepareInitialNavigation(retry: boolean) {
-  if (retry) {
+async function prepareInitialNavigation(options: { isRetry: boolean }) {
+  if (options.isRetry) {
     // A failed initial navigation must be restarted; isReady alone would wait indefinitely.
     await router.replace(router.options.history.location)
   }
@@ -36,7 +36,8 @@ async function start() {
 
   try {
     // Browsing starts with storage services; computation is requested by actual game operations.
-    await prepareInitialNavigation(retry)
+    await prepareInitialNavigation({ isRetry: retry })
+
     // Disposal or a newer retry owns the outcome after navigation completes.
     if (disposed || current !== generation) {
       return
@@ -44,7 +45,7 @@ async function start() {
 
     preparedRuntime = createGameRuntime()
 
-    // Pinia 4.0.3 resolves store injections in the app context; publish before mounting stores.
+    // Pinia resolves store injections in the app context; publish before mounting stores.
     props.installRuntime(preparedRuntime)
     runtime.value = preparedRuntime
     preparedRuntime = null
@@ -64,6 +65,7 @@ onScopeDispose(() => {
   disposed = true
   generation++
 
+  // The mounted application owns final save settlement; bootstrap owns unused services.
   if (application.value?.shutdown) {
     void application.value.shutdown()
   } else {

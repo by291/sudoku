@@ -105,10 +105,14 @@ function selectDifficulty(value: unknown) {
   }
 }
 
+// Save the opener before the modal takes focus so keyboard users can resume there.
 const previousFocus = document.activeElement
 const actions = useTemplateRef<HTMLElement>('actions')
+
 watch(actions, (element) => element?.querySelector('button')?.focus(), { flush: 'post' })
+
 onUnmounted(async () => {
+  // Wait for the dialog to leave the DOM before restoring focus outside it.
   await nextTick()
   if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
     previousFocus.focus()

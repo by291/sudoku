@@ -4,6 +4,7 @@ import type { RouteLocationNormalized } from 'vue-router'
 import { LEASE_RENEWAL_MS } from '@/storage/ownership'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 
+/** Own route departure, page visibility, and game lifecycle listeners. */
 export function useGameLifecycle() {
   const game = useGameStore()
   const router = useRouter()

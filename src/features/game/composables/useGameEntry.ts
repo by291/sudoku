@@ -20,6 +20,7 @@ type GameEntryOptions = {
   chooseDaily(): void
 }
 
+/** Resolve a game route into setup, explicit start, or a restored save. */
 export function useGameEntry(options: GameEntryOptions) {
   const route = useRoute()
   const router = useRouter()
@@ -81,76 +82,12 @@ export function useGameEntry(options: GameEntryOptions) {
     nextVariant.value =
       metadata.value.kind === 'learning' ? options.practiceVariant() : queryVariant.value.value
     if (options.autoRestore() && !requestedId && metadata.value.kind === 'free') {
-      // Only an explicit save link resumes a board; ordinary entry waits for the setup dialog.
-      const transition = await game.clearActiveSession()
-      if (current !== initialization) {
-        return
-      }
-
-      ready.value = true
-      if (transition.status !== 'ready') {
-        return
-      }
-
-      if (route.query.start === '1') {
-        if (!isDifficulty(route.query.difficulty)) {
-          initializationError.value = '无法识别指定的难度，请重新选择。'
-
-          return
-        }
-
-        if (!supportsDifficulty(nextVariant.value, route.query.difficulty)) {
-          initializationError.value = '专家难度仅适用于标准数独，请重新选择玩法或难度。'
-          return
-        }
-
-        difficulty.value = route.query.difficulty
-        await start()
-      } else {
-        void refreshTarget()
-      }
-
+      await initializeFreeEntry(current)
       return
     }
 
     if (options.autoRestore()) {
-      const records = await findRequestedSave(requestedId)
-      if (current !== initialization) {
-        return
-      }
-
-      if (!records.ok) {
-        initializationError.value = '读取存档失败。新开一局可暂存在内存中，请保持页面打开。'
-      } else {
-        replacementAvailable.value = !!records.value
-        const id = requestedId
-        const record = records.value
-        if (
-          record &&
-          record.session.mode === metadata.value.kind &&
-          (metadata.value.kind !== 'learning' ||
-            (record.session.metadata.kind === 'learning' &&
-              record.session.metadata.lessonId === metadata.value.lessonId))
-        ) {
-          const transition = await game.restoreSession(record.session.id)
-          if (current !== initialization) {
-            return
-          }
-
-          if (transition.status === 'ready') {
-            nextVariant.value = record.session.puzzle.rules.kind
-          }
-        } else {
-          await game.clearActiveSession()
-          if (current !== initialization) {
-            return
-          }
-
-          if (id) {
-            initializationError.value = '存档与当前模式不匹配，或已被清除。'
-          }
-        }
-      }
+      await restoreRequestedSave(requestedId, current)
     }
 
     if (current !== initialization) {
@@ -159,6 +96,73 @@ export function useGameEntry(options: GameEntryOptions) {
 
     ready.value = true
     void refreshTarget()
+  }
+
+  async function initializeFreeEntry(current: number) {
+    // Release the previous game before processing a start link. A failed save must block the start.
+    const transition = await game.clearActiveSession()
+    if (current !== initialization) {
+      return
+    }
+
+    ready.value = true
+    if (transition.status !== 'ready') {
+      return
+    }
+
+    if (route.query.start !== '1') {
+      void refreshTarget()
+      return
+    }
+
+    const requestedDifficulty = route.query.difficulty
+    if (!isDifficulty(requestedDifficulty)) {
+      initializationError.value = '无法识别指定的难度，请重新选择。'
+      return
+    }
+
+    if (!supportsDifficulty(nextVariant.value, requestedDifficulty)) {
+      initializationError.value = '专家难度仅适用于标准数独，请重新选择玩法或难度。'
+      return
+    }
+
+    difficulty.value = requestedDifficulty
+    await start()
+  }
+
+  async function restoreRequestedSave(requestedId: string | null, current: number) {
+    const records = await findRequestedSave(requestedId)
+    if (current !== initialization) {
+      return
+    }
+
+    if (!records.ok) {
+      initializationError.value = '读取存档失败。新开一局可暂存在内存中，请保持页面打开。'
+      return
+    }
+
+    const record = records.value
+    replacementAvailable.value = !!record
+    const requestedMetadata = metadata.value
+    const isMatchingSave =
+      record &&
+      record.session.mode === requestedMetadata.kind &&
+      (requestedMetadata.kind !== 'learning' ||
+        (record.session.metadata.kind === 'learning' &&
+          record.session.metadata.lessonId === requestedMetadata.lessonId))
+    if (isMatchingSave) {
+      const transition = await game.restoreSession(record.session.id)
+      if (current === initialization && transition.status === 'ready') {
+        nextVariant.value = record.session.puzzle.rules.kind
+      }
+
+      return
+    }
+
+    await game.clearActiveSession()
+    if (current === initialization && requestedId) {
+      initializationError.value = '存档与当前模式不匹配，或已被清除。'
+    }
   }
 
   function findRequestedSave(requestedId: string | null) {
@@ -227,7 +231,11 @@ export function useGameEntry(options: GameEntryOptions) {
     delete query.difficulty
 
     await router.replace({
-      query: { ...query, variant: activeVariant.value, session: session.value.id },
+      query: {
+        ...query,
+        variant: activeVariant.value,
+        session: session.value.id,
+      },
     })
   }
 

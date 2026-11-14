@@ -84,7 +84,11 @@ const drawings = computed(() =>
       }
     }
 
-    return { ...clue, path: path(clue.cells), point: center(clue.cells[0]) }
+    return {
+      ...clue,
+      path: path(clue.cells),
+      point: center(clue.cells[0]),
+    }
   }),
 )
 const boundaries = computed(() => props.geometry.boundaries.map(edgePath))

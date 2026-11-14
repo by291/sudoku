@@ -5,7 +5,9 @@ import { useDailyStatuses } from '@/features/game/composables/useDailyStatuses'
 import type { SudokuVariant } from '@/sudoku/contracts'
 import { parseVariantQuery } from '@/features/game/model/variants'
 import type { Difficulty } from '@/sudoku/contracts'
+import { focusDialogOpener } from '@/features/game/composables/dialogFocus'
 
+/** Coordinate daily route entry, save restoration, and challenge selection. */
 export function useDailyEntry() {
   const game = useGameStore()
   const route = useRoute()
@@ -43,21 +45,7 @@ export function useDailyEntry() {
 
     const id = typeof route.query.session === 'string' ? route.query.session : null
     if (!id) {
-      const transition = await game.clearActiveSession()
-      if (current !== initialization) {
-        return
-      }
-
-      if (transition.status === 'ready') {
-        selectedVariant.value = variant.value
-        if (route.query.start === '1') {
-          // An explicit start URL already expresses intent; full validation remains in startDaily.
-          await startDailyAction(selectedVariant.value)
-        }
-      } else if (game.session?.mode === 'daily') {
-        selectedVariant.value = game.activeVariant
-      }
-
+      await enterWithoutSave(variant.value, current)
       return
     }
 
@@ -78,30 +66,49 @@ export function useDailyEntry() {
     }
 
     const stored = result.value
-    if (stored?.session.mode === 'daily') {
-      const transition = await game.restoreSession(id)
-      if (current !== initialization) {
-        return
-      }
+    if (stored?.session.mode !== 'daily') {
+      await clearInvalidSaveLink(variant.value, current)
+      return
+    }
 
-      if (transition.status === 'ready') {
-        selectedVariant.value = game.activeVariant
-      }
-    } else {
-      const transition = await game.clearActiveSession()
-      if (current !== initialization) {
-        return
-      }
+    const transition = await game.restoreSession(id)
+    if (current === initialization && transition.status === 'ready') {
+      selectedVariant.value = game.activeVariant
+    }
+  }
 
-      if (transition.status === 'ready') {
-        selectedVariant.value = variant.value
-      } else if (game.session?.mode === 'daily') {
-        selectedVariant.value = game.activeVariant
-      }
+  async function clearToVariant(variant: SudokuVariant, current: number): Promise<boolean> {
+    const transition = await game.clearActiveSession()
+    if (current !== initialization) {
+      return false
+    }
 
-      if (route.query.session) {
-        localError.value = '找不到这份每日挑战存档，请开始今天的挑战。'
-      }
+    if (transition.status === 'ready') {
+      selectedVariant.value = variant
+      return true
+    }
+
+    if (game.session?.mode === 'daily') {
+      selectedVariant.value = game.activeVariant
+    }
+
+    return false
+  }
+
+  async function enterWithoutSave(variant: SudokuVariant, current: number) {
+    const canStart = await clearToVariant(variant, current)
+    if (current !== initialization || !canStart || route.query.start !== '1') {
+      return
+    }
+
+    // The explicit start URL supplies intent; startDaily still validates the challenge.
+    await startDailyAction(selectedVariant.value)
+  }
+
+  async function clearInvalidSaveLink(variant: SudokuVariant, current: number) {
+    await clearToVariant(variant, current)
+    if (current === initialization && route.query.session) {
+      localError.value = '找不到这份每日挑战存档，请开始今天的挑战。'
     }
   }
 
@@ -120,10 +127,12 @@ export function useDailyEntry() {
     const current = ++startOperation
     switching.value = true
     setupOpen.value = false
+
     const transition = await game.startDaily(today.value, variant)
     if (current !== startOperation) {
       return
     }
+
     switching.value = false
     if (transition.status === 'ready' && game.session?.mode === 'daily') {
       selectedVariant.value = game.activeVariant
@@ -133,9 +142,7 @@ export function useDailyEntry() {
   }
 
   function openSetup(event?: MouseEvent) {
-    if (event?.currentTarget instanceof HTMLElement) {
-      event.currentTarget.focus()
-    }
+    focusDialogOpener(event)
 
     selectedVariant.value =
       game.session?.mode === 'daily' ? game.activeVariant : selectedVariant.value
@@ -143,8 +150,14 @@ export function useDailyEntry() {
     void refreshStatuses()
   }
 
+  // prettier-ignore
+  const readRouteQuery = () => [
+    route.query.session,
+    route.query.variant,
+    route.query.start,
+  ]
   watch(
-    () => [route.query.session, route.query.variant, route.query.start],
+    readRouteQuery,
     () => {
       void load()
       void refreshStatuses()

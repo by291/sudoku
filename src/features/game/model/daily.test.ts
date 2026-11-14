@@ -10,14 +10,24 @@ import {
 import { VARIANT_FIXTURES } from '../../../../tests/fixtures/variants'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 
-it('changes the challenge at Beijing midnight with exact ASCII seed material', () => {
-  expect(getChallengeDate(new Date('2026-10-11T15:59:59.999Z'))).toBe('2026-10-11')
-  expect(getChallengeDate(new Date('2026-10-11T16:00:00.000Z'))).toBe('2026-10-12')
-  expect(Array.from(getDailySeedMaterial('2026-10-11'))).toEqual([
-    100, 97, 105, 108, 121, 58, 50, 48, 50, 54, 45, 49, 48, 45, 49, 49,
-  ])
+it('changes the challenge at Beijing midnight', () => {
+  const beforeMidnight = new Date('2026-10-11T15:59:59.999Z')
+  const atMidnight = new Date('2026-10-11T16:00:00.000Z')
+
+  expect(getChallengeDate(beforeMidnight)).toBe('2026-10-11')
+  expect(getChallengeDate(atMidnight)).toBe('2026-10-12')
+})
+
+it('encodes the day as exact ASCII seed material', () => {
+  const material = getDailySeedMaterial('2026-10-11')
+
+  expect(new TextDecoder('ascii').decode(material)).toBe('daily:2026-10-11')
+})
+
+it('rejects seed material for an invalid challenge date', () => {
   expect(() => getDailySeedMaterial('2026-02-30')).toThrow()
 })
+
 it('restarts daily entries while retaining identity, accumulated time and assistance', () => {
   const session = makeSession({
     id: 'daily:2026-10-11:formal',
@@ -26,6 +36,7 @@ it('restarts daily entries while retaining identity, accumulated time and assist
     elapsedMs: 71000,
     assistance: { assisted: true, hintCount: 2, checkCount: 1, candidateCount: 1 },
   })
+
   const restarted = restartDailySession(session)
 
   expect(restarted).toMatchObject({
@@ -37,6 +48,7 @@ it('restarts daily entries while retaining identity, accumulated time and assist
   expect(restarted.entries.every((value) => value === 0)).toBe(true)
   expect(restarted.notes.every((value) => value === 0)).toBe(true)
 })
+
 it('uses current seeds and stable type-specific formal daily identities', () => {
   expect(getDailyFormalId('2026-10-11', 'classic')).toBe('daily:2026-10-11:formal')
   expect(getDailyIdentity('2026-10-11', 'classic', new Uint8Array(32))).toMatchObject({
@@ -50,6 +62,7 @@ it('uses current seeds and stable type-specific formal daily identities', () => 
     input: { variant: 'arrow', difficulty: 'medium' },
   })
 })
+
 it('reports six independent statuses without counting practice replays', () => {
   const classic = makeSession({
     id: 'daily:2026-10-11:formal',

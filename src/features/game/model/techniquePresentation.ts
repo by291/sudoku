@@ -55,6 +55,39 @@ function advancedReason(evidence: AdvancedEvidence): string {
   }
 }
 
+function describeAdvancedDomains(evidence: AdvancedEvidence): string[] {
+  const details = evidence.domains
+    .filter(({ cell, mask }) => evidence.cells.includes(cell) && mask !== 0)
+    .map(({ cell, mask }) => `${cellPosition(cell)}：${digitsIn(mask).join('、')}`)
+  if (evidence.kind === 'fish') {
+    const unitLabel = (unit: Unit) => `第${unit.index + 1}${unit.kind === 'row' ? '行' : '列'}`
+    details.unshift(
+      `基础单元：${evidence.bases.map(unitLabel).join('、')}`,
+      `覆盖单元：${evidence.covers.map(unitLabel).join('、')}`,
+    )
+  }
+  if (evidence.kind === 'wing') {
+    details.unshift(
+      `枢轴：${cellPosition(evidence.pivot)}；两翼：${evidence.wings.map(cellPosition).join('、')}`,
+    )
+  }
+  if (evidence.kind === 'coloring') {
+    details.unshift(
+      `颜色 A：${evidence.colors[0].map(cellPosition).join('、')}`,
+      `颜色 B：${evidence.colors[1].map(cellPosition).join('、')}`,
+    )
+    details.push(
+      ...evidence.links.map(
+        ({ cells }) =>
+          `${cellPosition(cells[0])} ↔ ${cellPosition(cells[1])}：数字${evidence.digits[0]}恰有两个位置`,
+      ),
+    )
+  }
+
+  return details
+}
+
+/** Format relevant candidate evidence and arithmetic for the hint details. */
 export function explainStepEvidence(step: LogicalStep): readonly string[] {
   const evidence = step.evidence
   if (evidence.kind === 'unit') {
@@ -62,42 +95,16 @@ export function explainStepEvidence(step: LogicalStep): readonly string[] {
   }
 
   if (isAdvancedEvidence(evidence)) {
-    const details = evidence.domains
-      .filter(({ cell, mask }) => evidence.cells.includes(cell) && mask !== 0)
-      .map(({ cell, mask }) => `${cellPosition(cell)}：${digitsIn(mask).join('、')}`)
-    if (evidence.kind === 'fish') {
-      const unitLabel = (unit: Unit) => `第${unit.index + 1}${unit.kind === 'row' ? '行' : '列'}`
-      details.unshift(
-        `基础单元：${evidence.bases.map(unitLabel).join('、')}`,
-        `覆盖单元：${evidence.covers.map(unitLabel).join('、')}`,
-      )
-    }
-    if (evidence.kind === 'wing') {
-      details.unshift(
-        `枢轴：${cellPosition(evidence.pivot)}；两翼：${evidence.wings.map(cellPosition).join('、')}`,
-      )
-    }
-    if (evidence.kind === 'coloring') {
-      details.unshift(
-        `颜色 A：${evidence.colors[0].map(cellPosition).join('、')}`,
-        `颜色 B：${evidence.colors[1].map(cellPosition).join('、')}`,
-      )
-      details.push(
-        ...evidence.links.map(
-          ({ cells }) =>
-            `${cellPosition(cells[0])} ↔ ${cellPosition(cells[1])}：数字${evidence.digits[0]}恰有两个位置`,
-        ),
-      )
-    }
-
-    return details
+    return describeAdvancedDomains(evidence)
   }
 
   if (evidence.kind === 'thermo') {
-    return evidence.bounds.map(
-      ({ cell, min, max }) =>
-        `${cellPosition(cell)}（从圆头起第${evidence.path.indexOf(cell) + 1}格，共${evidence.path.length}格）：${min === max ? min : `${min}–${max}`}`,
-    )
+    return evidence.bounds.map(({ cell, min, max }) => {
+      const pathPosition = evidence.path.indexOf(cell) + 1
+      const bounds = min === max ? String(min) : `${min}–${max}`
+      const position = `从圆头起第${pathPosition}格，共${evidence.path.length}格`
+      return `${cellPosition(cell)}（${position}）：${bounds}`
+    })
   }
 
   const details = evidence.domains.map(({ cell, mask }) => {
@@ -108,6 +115,7 @@ export function explainStepEvidence(step: LogicalStep): readonly string[] {
 
     return `${label}${cellPosition(cell)}：${digitsIn(mask).join('、')}`
   })
+
   if (evidence.kind === 'cage') {
     details.unshift(`目标总和：${evidence.sum}`)
   }
@@ -142,6 +150,7 @@ export function explainStepEvidence(step: LogicalStep): readonly string[] {
   return details
 }
 
+/** Explain a hint step in player-facing language. */
 export function explainStep(step: LogicalStep): string {
   const evidence = step.evidence
   if (isAdvancedEvidence(evidence)) {
@@ -182,9 +191,13 @@ export function explainStep(step: LogicalStep): string {
     return `${TECHNIQUE_NAMES[step.technique]}：${reason}，${deduction}，${conclusion}。`
   }
 
-  const unitName = { row: '行', column: '列', box: '宫', region: '区域', diagonal: '对角线' }[
-    evidence.unit.kind
-  ]
+  const unitName = {
+    row: '行',
+    column: '列',
+    box: '宫',
+    region: '区域',
+    diagonal: '对角线',
+  }[evidence.unit.kind]
   const cells = step.evidence.cells
     .map((cell) => `第${Math.floor(cell / UNIT_SIZE) + 1}行第${(cell % UNIT_SIZE) + 1}列`)
     .join('、')
@@ -223,5 +236,7 @@ export function explainStep(step: LogicalStep): string {
       ? reasons[step.technique]
       : '候选范围受到当前规则限制'
 
-  return `${prefix}${TECHNIQUE_NAMES[step.technique]}：第${evidence.unit.index + 1}${unitName}中，${reason}。`
+  const techniqueName = TECHNIQUE_NAMES[step.technique]
+  const unitPosition = `第${evidence.unit.index + 1}${unitName}`
+  return `${prefix}${techniqueName}：${unitPosition}中，${reason}。`
 }

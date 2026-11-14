@@ -5,23 +5,20 @@ import type { GlobalThemeOverrides } from 'naive-ui'
 
 import type { ThemePreference } from '@/features/settings/model/preferences'
 
+/** Resolve the selected theme and observe system changes for the owning Vue scope. */
 export function useTheme(preference: Ref<ThemePreference> = ref('system')) {
   const media = window.matchMedia('(prefers-color-scheme: dark)')
   const resolvedTheme = ref<'light' | 'dark'>('light')
 
   function applyTheme() {
-    resolvedTheme.value =
-      preference.value === 'system' ? (media.matches ? 'dark' : 'light') : preference.value
+    const systemTheme = media.matches ? 'dark' : 'light'
+    resolvedTheme.value = preference.value === 'system' ? systemTheme : preference.value
     document.documentElement.dataset.theme = resolvedTheme.value
   }
 
   function setTheme(value: ThemePreference) {
     preference.value = value
   }
-
-  media.addEventListener('change', applyTheme)
-  watch(preference, applyTheme, { immediate: true, flush: 'sync' })
-  onScopeDispose(() => media.removeEventListener('change', applyTheme))
 
   const uiConfiguration = computed(() => {
     // Track the resolved theme so CSS overrides refresh when the system theme changes.
@@ -95,6 +92,11 @@ export function useTheme(preference: Ref<ThemePreference> = ref('system')) {
 
     return { theme, themeOverrides }
   })
+
+  media.addEventListener('change', applyTheme)
+  // The dataset must be updated before the theme overrides read its CSS variables.
+  watch(preference, applyTheme, { immediate: true, flush: 'sync' })
+  onScopeDispose(() => media.removeEventListener('change', applyTheme))
 
   return {
     preference,

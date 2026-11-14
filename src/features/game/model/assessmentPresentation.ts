@@ -1,6 +1,7 @@
 import type { AssessmentIssue, LiveAssessmentOutcome, PuzzleAssessment } from '@/sudoku/contracts'
 import { violationMessage } from '@/features/game/model/violationPresentation'
 
+/** Render a live assessment issue in player-facing text. */
 export function assessmentIssueMessage(issue: AssessmentIssue): string {
   switch (issue.kind) {
     case 'message':
@@ -17,7 +18,11 @@ export function toStoredAssessment(outcome: LiveAssessmentOutcome): PuzzleAssess
       return { status: 'rated', summary: outcome.summary }
     case 'ungraded':
     case 'incomplete':
-      return { status: 'unavailable', reason: outcome.status, issues: [] }
+      return {
+        status: 'unavailable',
+        reason: outcome.status,
+        issues: [],
+      }
     case 'invalid':
       return {
         status: 'unavailable',

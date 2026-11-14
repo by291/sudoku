@@ -3,6 +3,9 @@ import type { Puzzle } from '@/sudoku/contracts'
 import type { PuzzleAssessment } from '@/sudoku/contracts'
 import type { EditComputationDto } from '@/sudoku/contracts'
 import { copyRules } from '@/sudoku/ruleInput'
+import { BOARD_SIZE } from '@/sudoku/values'
+
+const MAX_SESSION_ID_LENGTH = 200
 
 export type GameMode = 'free' | 'learning' | 'daily'
 
@@ -60,6 +63,21 @@ export type BoardEditAction = Extract<
 >
 export type SessionFactAction = Exclude<GameAction, BoardEditAction>
 
+type SessionCreation = {
+  puzzle: Puzzle
+  metadata: SessionMetadata
+  id: string
+  startedAt: string
+  assessment?: PuzzleAssessment
+}
+
+type SessionCompletion = {
+  session: GameSession
+  completedAt: string
+  elapsedMs: number
+  isBoardComplete: boolean
+}
+
 /** Takes a semantically validated puzzle and normalized assessment; owns the returned snapshots. */
 export function createSession(
   puzzle: Puzzle,
@@ -68,7 +86,20 @@ export function createSession(
   startedAt: string,
   assessment?: PuzzleAssessment,
 ): GameSession {
-  if (!id || id.length > 200 || !Number.isFinite(Date.parse(startedAt))) {
+  return createSessionSnapshot({
+    puzzle,
+    metadata,
+    id,
+    startedAt,
+    assessment,
+  })
+}
+
+/** Create owned session layers from a validated puzzle and assessment. */
+export function createSessionSnapshot(creation: SessionCreation): GameSession {
+  const { puzzle, metadata, id, startedAt, assessment } = creation
+
+  if (!id || id.length > MAX_SESSION_ID_LENGTH || !Number.isFinite(Date.parse(startedAt))) {
     throw new TypeError('Invalid session identity')
   }
 
@@ -83,17 +114,23 @@ export function createSession(
     ...(assessment === undefined ? {} : { assessment: structuredClone(assessment) }),
     mode: metadata.kind,
     metadata: { ...metadata },
-    entries: Array(81).fill(0),
-    notes: Array(81).fill(0),
+    entries: Array(BOARD_SIZE).fill(0),
+    notes: Array(BOARD_SIZE).fill(0),
     undoStack: [],
     redoStack: [],
     elapsedMs: 0,
-    assistance: { hintCount: 0, checkCount: 0, candidateCount: 0, assisted: false },
+    assistance: {
+      hintCount: 0,
+      checkCount: 0,
+      candidateCount: 0,
+      assisted: false,
+    },
     startedAt,
     completion: null,
   }
 }
 
+/** Compose the immutable givens and current player entries into a board. */
 export function sessionBoard(session: GameSession): Board {
   return session.puzzle.givens.map((given, cell) => (given === 0 ? session.entries[cell] : given))
 }
@@ -110,7 +147,11 @@ function sameLayers(first: BoardLayers, second: BoardLayers): boolean {
 }
 
 function unchanged(session: GameSession): SessionActionResult {
-  return { status: 'complete', session, changed: false }
+  return {
+    status: 'complete',
+    session,
+    changed: false,
+  }
 }
 
 /** Commits owned Rust edit results. Assistance is permanent; history contains board layers only. */
@@ -123,7 +164,11 @@ export function commitBoardEdit(
     return unchanged(session)
   }
   if (outcome.status === 'incomplete') {
-    return { status: 'incomplete', session, changed: false }
+    return {
+      status: 'incomplete',
+      session,
+      changed: false,
+    }
   }
 
   const before = layers(session)
@@ -156,7 +201,9 @@ export function commitBoardEdit(
   }
 }
 
-/** Updates attempt facts and history only. The workflow asks Rust whether the resulting board is complete. */
+/**
+ * Update attempt facts and history. The workflow asks Rust whether the resulting board is complete.
+ */
 export function applySessionAction(
   session: GameSession,
   action: SessionFactAction,
@@ -164,22 +211,23 @@ export function applySessionAction(
   if (session.completion) {
     return unchanged(session)
   }
+
   if (action.kind === 'undo' || action.kind === 'redo') {
-    const source = action.kind === 'undo' ? session.undoStack : session.redoStack
+    const isUndo = action.kind === 'undo'
+    const source = isUndo ? session.undoStack : session.redoStack
     const move = source.at(-1)
     if (!move) {
       return unchanged(session)
     }
+
     return {
       status: 'complete',
       changed: true,
       session: {
         ...session,
-        ...layers(action.kind === 'undo' ? move.before : move.after),
-        undoStack:
-          action.kind === 'undo' ? session.undoStack.slice(0, -1) : [...session.undoStack, move],
-        redoStack:
-          action.kind === 'redo' ? session.redoStack.slice(0, -1) : [...session.redoStack, move],
+        ...layers(isUndo ? move.before : move.after),
+        undoStack: isUndo ? session.undoStack.slice(0, -1) : [...session.undoStack, move],
+        redoStack: isUndo ? [...session.redoStack, move] : session.redoStack.slice(0, -1),
       },
     }
   }
@@ -190,16 +238,34 @@ export function applySessionAction(
   } else {
     assistance.checkCount++
   }
-  return { status: 'complete', changed: true, session: { ...session, assistance } }
+
+  return {
+    status: 'complete',
+    changed: true,
+    session: { ...session, assistance },
+  }
 }
 
+/** Record a verified completion once, using the elapsed time in milliseconds. */
 export function completeSession(
   session: GameSession,
   completedAt: string,
   elapsedMs: number,
   boardComplete: boolean,
 ): GameSession {
-  if (session.completion || !boardComplete) {
+  return recordSessionCompletion({
+    session,
+    completedAt,
+    elapsedMs,
+    isBoardComplete: boardComplete,
+  })
+}
+
+/** Publish a verified completion once, after validating the duration and timestamp. */
+export function recordSessionCompletion(completion: SessionCompletion): GameSession {
+  const { session, completedAt, elapsedMs, isBoardComplete } = completion
+
+  if (session.completion || !isBoardComplete) {
     return session
   }
 
@@ -209,5 +275,9 @@ export function completeSession(
 
   const duration = Math.floor(elapsedMs)
 
-  return { ...session, elapsedMs: duration, completion: { completedAt, elapsedMs: duration } }
+  return {
+    ...session,
+    elapsedMs: duration,
+    completion: { completedAt, elapsedMs: duration },
+  }
 }

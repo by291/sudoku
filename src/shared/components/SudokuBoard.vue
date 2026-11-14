@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, useTemplateRef, watch, nextTick } from 'vue'
-import type { Board, Digit, NoteMask } from '@/sudoku/contracts'
-import { DIGITS } from '@/sudoku/values'
+import type { Board, Digit, NoteMask, PuzzleRules } from '@/sudoku/contracts'
+import { BOX_SIZE, DIGITS, UNIT_SIZE } from '@/sudoku/values'
 import { digitsIn } from '@/shared/model/sudokuPresentation'
-import type { PuzzleRules } from '@/sudoku/contracts'
 import { getBoardGeometry, getCellRuleContext } from '@/shared/model/boardGeometry'
 import SudokuClues from '@/shared/components/SudokuClues.vue'
 import SelectedCellRules from '@/shared/components/SelectedCellRules.vue'
@@ -25,15 +24,18 @@ const props = withDefaults(
   { showSelectedRules: true },
 )
 const emit = defineEmits<{ select: [cell: number] }>()
+
 const geometry = computed(() => getBoardGeometry(props.rules))
 const cageAnchors = computed(
   () =>
     new Set(geometry.value.clues.flatMap((clue) => (clue.kind === 'cage' ? [clue.anchor] : []))),
 )
+
 const notePositions = DIGITS.map((digit) => ({
-  gridRow: Math.floor((digit - 1) / 3) + 1,
-  gridColumn: ((digit - 1) % 3) + 1,
+  gridRow: Math.floor((digit - 1) / BOX_SIZE) + 1,
+  gridColumn: ((digit - 1) % BOX_SIZE) + 1,
 }))
+
 // Selection changes must not rebuild candidate lists or their fixed 3-by-3 positions.
 const noteDigits = computed(() => props.notes.map(digitsIn))
 
@@ -58,49 +60,58 @@ function cellLabel({
   obscured,
   rules,
 }: CellLabelInput): string {
-  const row = Math.floor(cell / 9)
-  const column = cell % 9
+  const row = Math.floor(cell / UNIT_SIZE)
+  const column = cell % UNIT_SIZE
   const descriptions = [`第${row + 1}行第${column + 1}列`]
+
+  // Pausing must hide the same board facts from assistive technology as from sighted players.
   if (obscured) {
     descriptions.push('已暂停')
+    return descriptions.join('，')
+  }
+
+  if (value) {
+    descriptions.push(`数字${value}`)
+    if (given) {
+      descriptions.push('题目给定')
+    }
   } else {
-    if (value) {
-      descriptions.push(`数字${value}`)
-      if (given) {
-        descriptions.push('题目给定')
-      }
-    } else {
-      descriptions.push('空格')
-      if (notes.length) {
-        descriptions.push(`笔记${notes.join('、')}`)
-      }
+    descriptions.push('空格')
+    if (notes.length) {
+      descriptions.push(`笔记${notes.join('、')}`)
     }
+  }
 
-    if (conflicting) {
-      descriptions.push('冲突，请检查')
-    }
+  if (conflicting) {
+    descriptions.push('冲突，请检查')
+  }
+  if (highlighted) {
+    descriptions.push('提示位置')
+  }
 
-    if (highlighted) {
-      descriptions.push('提示位置')
-    }
-
-    const ruleContext = getCellRuleContext(cell, rules)
-    if (ruleContext) {
-      descriptions.push(ruleContext)
-    }
+  const ruleContext = getCellRuleContext(cell, rules)
+  if (ruleContext) {
+    descriptions.push(ruleContext)
   }
 
   return descriptions.join('，')
 }
 
+function isInternalBoxEdge(coordinate: number): boolean {
+  const nextCoordinate = coordinate + 1
+  return nextCoordinate < UNIT_SIZE && nextCoordinate % BOX_SIZE === 0
+}
+
 const cells = computed(() =>
   props.board.map((value, cell) => {
     const given = props.givens[cell] !== 0
-    const row = Math.floor(cell / 9)
-    const column = cell % 9
+    const row = Math.floor(cell / UNIT_SIZE)
+    const column = cell % UNIT_SIZE
     const notes = noteDigits.value[cell]
     const conflicting = props.conflicts.includes(cell)
     const highlighted = props.hintCells.includes(cell)
+    const usesRegularBoxes = props.rules.kind !== 'jigsaw'
+    const selectedDigit = props.selectedCell === null ? 0 : props.board[props.selectedCell]
 
     return {
       cell,
@@ -121,12 +132,9 @@ const cells = computed(() =>
       highlighted,
       selected: cell === props.selectedCell,
       peer: props.relatedCells.includes(cell),
-      matching:
-        props.selectedCell !== null &&
-        props.board[props.selectedCell] !== 0 &&
-        value === props.board[props.selectedCell],
-      boxRight: props.rules.kind !== 'jigsaw' && (column === 2 || column === 5),
-      boxBottom: props.rules.kind !== 'jigsaw' && (row === 2 || row === 5),
+      matching: selectedDigit !== 0 && value === selectedDigit,
+      boxRight: usesRegularBoxes && isInternalBoxEdge(column),
+      boxBottom: usesRegularBoxes && isInternalBoxEdge(row),
       cageAnchor: cageAnchors.value.has(cell),
     }
   }),
@@ -139,25 +147,26 @@ function navigate(event: KeyboardEvent, cell: number) {
     return
   }
 
-  const row = Math.floor(cell / 9)
-  const column = cell % 9
+  const row = Math.floor(cell / UNIT_SIZE)
+  const column = cell % UNIT_SIZE
   let next: number
   switch (event.key) {
     case 'ArrowLeft':
       next = column > 0 ? cell - 1 : cell
       break
     case 'ArrowRight':
-      next = column < 8 ? cell + 1 : cell
+      next = column < UNIT_SIZE - 1 ? cell + 1 : cell
       break
     case 'ArrowUp':
-      next = row > 0 ? cell - 9 : cell
+      next = row > 0 ? cell - UNIT_SIZE : cell
       break
     case 'ArrowDown':
-      next = row < 8 ? cell + 9 : cell
+      next = row < UNIT_SIZE - 1 ? cell + UNIT_SIZE : cell
       break
     default:
       return
   }
+
   event.preventDefault()
   event.stopPropagation()
   emit('select', next)
@@ -166,7 +175,9 @@ function navigate(event: KeyboardEvent, cell: number) {
 watch(
   () => props.selectedCell,
   async () => {
+    // Keep roving focus inside the board without stealing focus from another control.
     if (root.value?.contains(document.activeElement)) {
+      // Wait for the selected cell's tabindex to be rendered.
       await nextTick()
       root.value?.querySelector<HTMLButtonElement>('button[tabindex="0"]')?.focus()
     }

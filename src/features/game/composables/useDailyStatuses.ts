@@ -5,6 +5,8 @@ import { useGameStore } from '@/features/game/stores/useGameStore'
 import { getChallengeDate } from '@/features/game/model/daily'
 import type { DailyVariantStatus } from '@/features/game/model/daily'
 
+const CHALLENGE_DATE_REFRESH_MS = 10_000
+
 /** Owns daily summary reads and explicit maintenance without blocking route entry. */
 export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
   const runtime = useGameRuntime()
@@ -34,10 +36,12 @@ export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
   async function refreshStatuses() {
     maintenance?.abort()
     maintenance = null
+
     const epoch = ++statusLoad
     const date = today.value
     statusesLoading.value = true
     statusError.value = null
+
     const result = await runtime.repository.readDailyStatuses(date)
     if (epoch !== statusLoad) {
       return
@@ -48,6 +52,7 @@ export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
       statusError.value = '每日状态读取失败，请重试读取。'
       return
     }
+
     statusesPending.value = result.value.coverage === 'pending'
     if (!statusesPending.value) {
       statuses.value = result.value.statuses
@@ -60,9 +65,11 @@ export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
       maintenance?.abort()
       const controller = new AbortController()
       maintenance = controller
+
       const epoch = ++statusLoad
       statusesLoading.value = true
       statusError.value = null
+
       const result = await runtime.repository.maintainSummaries(controller.signal)
       if (epoch !== statusLoad) {
         return
@@ -73,6 +80,7 @@ export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
         return
       }
     }
+
     await refreshStatuses()
   }
 
@@ -85,6 +93,7 @@ export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
       statusesLoading.value = false
     }
   })
+
   watch(
     () => game.saveState,
     (state) => {
@@ -93,14 +102,17 @@ export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
       }
     },
   )
+
   watch(today, () => {
     void refreshStatuses()
   })
+
   onMounted(() => {
     timer = window.setInterval(() => {
       today.value = getChallengeDate(runtime.wallNow())
-    }, 10000)
+    }, CHALLENGE_DATE_REFRESH_MS)
   })
+
   const unsubscribe = runtime.ownership.subscribe((notice) => {
     if (notice.kind === 'reset') {
       statusDate.value = null
@@ -109,6 +121,7 @@ export function useDailyStatuses(setupOpen: Readonly<Ref<boolean>>) {
       void refreshStatuses()
     }
   })
+
   onScopeDispose(() => {
     statusLoad++
     maintenance?.abort()

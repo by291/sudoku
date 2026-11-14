@@ -7,8 +7,10 @@ import type { ThemePreference } from '@/features/settings/model/preferences'
 
 defineProps<{ preference: ThemePreference }>()
 const emit = defineEmits<{ theme: [preference: ThemePreference] }>()
+
 const preferences = usePreferencesStore()
 const route = useRoute()
+
 const backTarget = computed(() => {
   if (route.path === '/') {
     return null
@@ -35,9 +37,21 @@ function updateTheme(value: string | number | boolean) {
 }
 
 const themes: { value: ThemePreference; label: string; name: string }[] = [
-  { value: 'light', label: '浅色主题', name: '浅色' },
-  { value: 'dark', label: '深色主题', name: '深色' },
-  { value: 'system', label: '跟随系统主题', name: '系统' },
+  {
+    value: 'light',
+    label: '浅色主题',
+    name: '浅色',
+  },
+  {
+    value: 'dark',
+    label: '深色主题',
+    name: '深色',
+  },
+  {
+    value: 'system',
+    label: '跟随系统主题',
+    name: '系统',
+  },
 ]
 </script>
 
@@ -196,7 +210,7 @@ main {
     padding: 20px 0;
   }
 }
-/* A board workspace can claim the remaining viewport; recovery and small screens keep normal flow. */
+/* Board workspaces may fill the viewport. Recovery and small screens keep normal flow. */
 @media (min-width: 801px) and (min-height: 720px) and (pointer: fine) {
   .app-shell:has([data-viewport-fit]) {
     height: 100dvh;

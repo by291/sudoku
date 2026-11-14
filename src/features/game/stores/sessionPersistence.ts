@@ -14,6 +14,7 @@ export type PersistenceCheckpoint = {
   readonly attachment: number
 }
 
+/** Own one attached session save queue and its editing lease. */
 export function createSessionPersistence(
   runtime: Pick<GameRuntime, 'ownership' | 'repository' | 'createSaveQueue' | 'ownerId'>,
 ) {
@@ -29,7 +30,13 @@ export function createSessionPersistence(
   let releasing: Promise<StorageOutcome<void>> | null = null
 
   function capture(): PersistenceCheckpoint {
-    return { sessionId, token, revision, dirty, attachment }
+    return {
+      sessionId,
+      token,
+      revision,
+      dirty,
+      attachment,
+    }
   }
 
   function isCurrent(checkpoint: PersistenceCheckpoint): boolean {
@@ -165,6 +172,7 @@ export function createSessionPersistence(
     token = null
 
     const work = (async (): Promise<StorageOutcome<void>> => {
+      // The final queued write still needs the previous lease to authorize it.
       const flushed = oldQueue ? await oldQueue.flush() : { ok: true as const, value: undefined }
 
       // A release may finish after reset or installation; it must never update the new owner.
@@ -177,6 +185,7 @@ export function createSessionPersistence(
       }
 
       oldQueue?.dispose()
+
       if (oldToken) {
         await runtime.ownership.releaseOwnership(oldToken)
       }

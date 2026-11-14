@@ -4,7 +4,7 @@ import { useGameRuntime } from '@/runtime'
 import type { GameSummary } from '@/storage/readModels'
 import type { SudokuVariant } from '@/sudoku/contracts'
 
-/** Owns the setup selector's summary reads and cancellable legacy repair, without opening a game. */
+/** Read setup summaries and repair legacy rows without opening a game. */
 export function useFreeSlotStatus(
   variant: Readonly<Ref<SudokuVariant>>,
   enabled: Readonly<Ref<boolean>>,
@@ -71,10 +71,17 @@ export function useFreeSlotStatus(
   })
 
   onScopeDispose(() => {
-    // Fence reads as well as aborting repair: a late completion cannot publish after route disposal.
+    // Abort stops repair work; advancing the epoch also fences late reads after disposal.
     lookup++
     maintenance?.abort()
   })
 
-  return { summary, loading, pending, error, refresh, retry }
+  return {
+    summary,
+    loading,
+    pending,
+    error,
+    refresh,
+    retry,
+  }
 }

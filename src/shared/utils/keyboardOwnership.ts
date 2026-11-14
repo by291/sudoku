@@ -32,6 +32,7 @@ function hasOpenMenu(): boolean {
   })
 }
 
+/** Check whether another control owns the key before the board handles it. */
 export function isKeyboardOwnedByControl(event: KeyboardEvent): boolean {
   const target = event.target
 

@@ -10,6 +10,7 @@ import { getVariantPresentation } from '@/features/game/model/variants'
 import type { SessionMetadata } from '@/features/game/model/session'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { usePreferencesStore } from '@/features/settings/stores/usePreferencesStore'
+import { focusDialogOpener } from '@/features/game/composables/dialogFocus'
 import { useGameKeyboard } from '@/features/game/composables/useGameKeyboard'
 import { useGameLifecycle } from '@/features/game/composables/useGameLifecycle'
 import { DIFFICULTY_NAMES, formatDuration } from '@/features/game/model/presentation'
@@ -222,9 +223,11 @@ const confirmationContent = computed(() => {
     }
   }
 
+  const variantName = getVariantPresentation(nextVariant.value).label
   return {
     title: '开始新的一局？',
-    description: `新题准备好后将替换${getVariantPresentation(nextVariant.value).label}的存档。其他玩法会保留。取消或出题失败会保留原局。`,
+    description:
+      `新题准备好后将替换${variantName}的存档。` + '其他玩法会保留。取消或出题失败会保留原局。',
     confirmLabel: '确认开始',
   }
 })
@@ -256,9 +259,12 @@ const relatedCells = computed(() =>
 
 const saveLabel = computed(
   () =>
-    ({ idle: '尚未保存', saving: '正在保存…', saved: '已保存到本机', failed: '尚未保存' })[
-      saveState.value
-    ],
+    ({
+      idle: '尚未保存',
+      saving: '正在保存…',
+      saved: '已保存到本机',
+      failed: '尚未保存',
+    })[saveState.value],
 )
 
 useGameKeyboard()
@@ -275,6 +281,7 @@ watch(
   },
   { flush: 'sync' },
 )
+
 const livePresentation = computed(() => ({
   session: session.value,
   board: board.value,
@@ -304,15 +311,14 @@ const livePresentation = computed(() => ({
   saveLabel: saveLabel.value,
   fitViewport: fitViewport.value,
 }))
-// Keep the last painted position while saving. The inert surface blocks input until failure or exit.
+
+// Keep the last painted position while saving; inertness blocks input until failure or exit.
 const presentation = computed<typeof livePresentation.value>((previous) =>
   departing.value && previous ? previous : livePresentation.value,
 )
 
 async function requestNew(event?: MouseEvent) {
-  if (event?.currentTarget instanceof HTMLElement) {
-    event.currentTarget.focus()
-  }
+  focusDialogOpener(event)
 
   if (await entry.requestNew()) {
     confirmation.value = 'new'
@@ -320,17 +326,13 @@ async function requestNew(event?: MouseEvent) {
 }
 
 function requestReload(event: MouseEvent) {
-  if (event.currentTarget instanceof HTMLElement) {
-    event.currentTarget.focus()
-  }
+  focusDialogOpener(event)
 
   confirmation.value = 'reload'
 }
 
 function requestRestart(event?: MouseEvent) {
-  if (event?.currentTarget instanceof HTMLElement) {
-    event.currentTarget.focus()
-  }
+  focusDialogOpener(event)
 
   confirmation.value = 'restart'
 }
@@ -341,17 +343,26 @@ async function confirm() {
 
   if (intention === 'reload') {
     await game.reloadLatestSession()
-  } else if (intention === 'restart') {
-    if (props.metadata.kind === 'daily') {
-      await game.restartDaily()
-    } else {
-      const transition = await game.restartFree()
-      if (transition?.status === 'ready') {
-        await syncSessionRoute()
-      }
-    }
-  } else {
+    return
+  }
+
+  if (intention === 'new') {
     await start()
+    return
+  }
+
+  if (intention !== 'restart') {
+    return
+  }
+
+  if (props.metadata.kind === 'daily') {
+    await game.restartDaily()
+    return
+  }
+
+  const transition = await game.restartFree()
+  if (transition?.status === 'ready') {
+    await syncSessionRoute()
   }
 }
 
@@ -367,7 +378,11 @@ function enterDigit(digit: Digit) {
 
 function toggleQuickNote(digit: Digit) {
   if (inputEditable.value && selectedCell.value !== null) {
-    game.dispatch({ kind: 'toggle-note', cell: selectedCell.value, digit })
+    game.dispatch({
+      kind: 'toggle-note',
+      cell: selectedCell.value,
+      digit,
+    })
   }
 }
 

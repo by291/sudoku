@@ -7,6 +7,7 @@ export const DIFFICULTY_NAMES: Record<Difficulty, string> = {
   expert: '专家',
 }
 
+/** Render elapsed milliseconds as whole seconds in the game clock format. */
 export function formatDuration(milliseconds: number): string {
   const seconds = Math.floor(milliseconds / 1000)
 
