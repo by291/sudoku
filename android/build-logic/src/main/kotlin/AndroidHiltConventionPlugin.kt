@@ -16,7 +16,8 @@ class AndroidHiltConventionPlugin : Plugin<Project> {
                 dependencies.add("ksp", libs.findLibrary("hilt-compiler").get())
             }
 
-            // Consumers may list Hilt before Android; its configurations must exist before registration.
+            // Consumers may list Hilt before Android; its configurations must exist before
+            // registration.
             pluginManager.withPlugin("com.android.application") { configureInjection() }
             pluginManager.withPlugin("com.android.library") { configureInjection() }
         }

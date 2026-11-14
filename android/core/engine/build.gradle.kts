@@ -27,7 +27,12 @@ val buildNative = tasks.register<Exec>("buildNative") {
     workingDir(rootProject.projectDir)
     commandLine("bash", "scripts/build-native.sh", layout.buildDirectory.get().asFile.absolutePath)
     inputs.files(fileTree("../../../sudoku/core/src"), fileTree("../../ffi/src"))
-    inputs.files("../../../Cargo.toml", "../../../Cargo.lock", "../../ffi/Cargo.toml", "../../ffi/uniffi.toml")
+    inputs.files(
+        "../../../Cargo.toml",
+        "../../../Cargo.lock",
+        "../../ffi/Cargo.toml",
+        "../../ffi/uniffi.toml"
+    )
     inputs.file("../../scripts/build-native.sh")
     inputs.file("../../../rust-toolchain.toml")
     outputs.dir(layout.buildDirectory.dir("generated/uniffi"))

@@ -3,7 +3,10 @@ import org.gradle.api.Project
 import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.kotlin.dsl.getByType
 
-/** Features depend on contracts and controlled presentation, never sibling features or implementations. */
+/**
+ * Features depend on contracts and controlled presentation, never sibling features or
+ * implementations.
+ */
 class AndroidFeatureConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
@@ -25,8 +28,16 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
             }
             dependencies.add("testImplementation", libs.findLibrary("kotlin-test").get())
             dependencies.add("testImplementation", libs.findLibrary("coroutines-test").get())
-            dependencies.add("androidTestImplementation", dependencies.platform(libs.findLibrary("compose-bom").get()))
-            listOf("compose-test", "android-test-junit", "android-test-runner", "android-test-core").forEach { alias ->
+            dependencies.add(
+                "androidTestImplementation",
+                dependencies.platform(libs.findLibrary("compose-bom").get())
+            )
+            listOf(
+                "compose-test",
+                "android-test-junit",
+                "android-test-runner",
+                "android-test-core"
+            ).forEach { alias ->
                 dependencies.add("androidTestImplementation", libs.findLibrary(alias).get())
             }
             dependencies.add("debugImplementation", libs.findLibrary("compose-test-manifest").get())

@@ -33,21 +33,29 @@ val generateLessonAssets by tasks.registering {
             val stages = (lesson["exercises"] as List<*>).sumOf {
                 ((it as Map<*, *>)["stages"] as List<*>).size
             }
-            "LessonDirectoryEntry(${quoted(id)}, ${quoted(lesson["title"])}, ${quoted(lesson["introduction"])}, " +
+            "LessonDirectoryEntry(${quoted(
+                id
+            )}, ${quoted(lesson["title"])}, ${quoted(lesson["introduction"])}, " +
                 "Variant.${(lesson["practiceVariant"] as String).uppercase()}, " +
                 "Difficulty.${(lesson["practiceDifficulty"] as String).uppercase()}, $stages)"
         }
+        val directoryRows = rows.joinToString(",\n")
         kotlin.resolve("BundledLessonDirectory.kt").writeText(
             "package dev.sudoku.app.storage\n" +
                 "import dev.sudoku.app.model.learning.LessonDirectoryEntry\n" +
                 "import dev.sudoku.app.model.Variant\nimport dev.sudoku.app.model.Difficulty\n" +
-                "internal object BundledLessonDirectory { val entries = listOf(\n${rows.joinToString(",\n")}\n) }\n"
+                "internal object BundledLessonDirectory { val entries = listOf(\n" +
+                "$directoryRows\n) }\n"
         )
     }
 }
 androidComponents.onVariants { variant ->
-    variant.sources.java?.addStaticSourceDirectory(generatedLessons.get().dir("kotlin").asFile.absolutePath)
-    variant.sources.assets?.addStaticSourceDirectory(generatedLessons.get().dir("assets").asFile.absolutePath)
+    variant.sources.java?.addStaticSourceDirectory(
+        generatedLessons.get().dir("kotlin").asFile.absolutePath
+    )
+    variant.sources.assets?.addStaticSourceDirectory(
+        generatedLessons.get().dir("assets").asFile.absolutePath
+    )
     variant.androidTest?.sources?.assets?.addStaticSourceDirectory(file("schemas").absolutePath)
 }
 tasks.named("preBuild") { dependsOn(generateLessonAssets) }

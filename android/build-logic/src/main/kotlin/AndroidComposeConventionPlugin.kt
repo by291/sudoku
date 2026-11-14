@@ -14,8 +14,16 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
             extensions.configure<LibraryExtension> { buildFeatures.compose = true }
 
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
-            dependencies.add("implementation", dependencies.platform(libs.findLibrary("compose-bom").get()))
-            listOf("compose-ui", "compose-foundation", "compose-material3", "compose-icons").forEach { alias ->
+            dependencies.add(
+                "implementation",
+                dependencies.platform(libs.findLibrary("compose-bom").get())
+            )
+            listOf(
+                "compose-ui",
+                "compose-foundation",
+                "compose-material3",
+                "compose-icons"
+            ).forEach { alias ->
                 dependencies.add("implementation", libs.findLibrary(alias).get())
             }
             dependencies.add("debugImplementation", libs.findLibrary("compose-tooling").get())

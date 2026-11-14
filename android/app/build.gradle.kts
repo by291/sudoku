@@ -7,7 +7,9 @@ plugins {
 }
 
 // AGP resource shrinking requires ABI APK splits to be disabled for app bundles.
-val splitApksByAbi = providers.gradleProperty("splitApksByAbi").map(String::toBooleanStrict).orElse(true).get()
+val splitApksByAbi = providers.gradleProperty(
+    "splitApksByAbi"
+).map(String::toBooleanStrict).orElse(true).get()
 
 android {
     namespace = "dev.sudoku.app"
@@ -46,7 +48,10 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     lint { abortOnError = true }

@@ -22,12 +22,16 @@ spotless {
     kotlin {
         target("**/src/**/*.kt")
         targetExclude("**/build/**")
-        ktlint("1.7.1").setEditorConfigPath(".editorconfig")
+        ktlint("1.7.1")
+            .setEditorConfigPath(".editorconfig")
+            .editorConfigOverride(mapOf("max_line_length" to "100"))
     }
     kotlinGradle {
         target("**/*.gradle.kts")
         targetExclude("**/build/**", ".gradle/**")
-        ktlint("1.7.1").setEditorConfigPath(".editorconfig")
+        ktlint("1.7.1")
+            .setEditorConfigPath(".editorconfig")
+            .editorConfigOverride(mapOf("max_line_length" to "100"))
     }
 }
 
@@ -52,7 +56,9 @@ gradle.projectsEvaluated {
     )
     // Gradle creates container projects for nested paths; every other project needs an owner.
     val containers = allowed.keys.flatMap { path ->
-        path.split(":").drop(1).dropLast(1).runningFold("") { parent, name -> "$parent:$name" }.drop(1)
+        path.split(":").drop(1).dropLast(1).runningFold("") { parent, name ->
+            "$parent:$name"
+        }.drop(1)
     }.toSet()
     val structuralContainers = containers.filter { path ->
         val container = project(path)
@@ -62,7 +68,9 @@ gradle.projectsEvaluated {
     val configuredProjects = subprojects.map { it.path }.toSet()
     val edges = allowed.keys.associateWith { owner ->
         project(owner).configurations.flatMap { configuration ->
-            configuration.dependencies.withType<org.gradle.api.artifacts.ProjectDependency>().map { it.path }
+            configuration.dependencies.withType<org.gradle.api.artifacts.ProjectDependency>().map {
+                it.path
+            }
         }.toSet()
     }
     checkModuleDependencies.configure {
@@ -70,7 +78,9 @@ gradle.projectsEvaluated {
         inputs.property("projects", configuredProjects)
         doLast {
             val unregistered = configuredProjects - registeredProjects
-            check(unregistered.isEmpty()) { "Unregistered Android modules: ${unregistered.sorted().joinToString()}" }
+            check(unregistered.isEmpty()) {
+                "Unregistered Android modules: ${unregistered.sorted().joinToString()}"
+            }
 
             val forbidden = edges.flatMap { (owner, dependencies) ->
                 (dependencies - owner - allowed.getValue(owner)).map { "$owner -> $it" }
@@ -83,7 +93,8 @@ gradle.projectsEvaluated {
         dependsOn(
             allowed.keys.filter { owner ->
                 val plugins = project(owner).plugins
-                plugins.hasPlugin("com.android.library") || plugins.hasPlugin("com.android.application")
+                plugins.hasPlugin("com.android.library") ||
+                    plugins.hasPlugin("com.android.application")
             }.map { "$it:lintDebug" }
         )
     }
