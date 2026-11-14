@@ -2,6 +2,7 @@ package dev.sudoku.app.storage
 
 import androidx.room.Room
 import androidx.room.withTransaction
+import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.sudoku.app.model.Assistance
@@ -143,8 +144,17 @@ class RoomGameRepositoryTest {
             elapsedMs = 500,
             completion = Completion("2026-10-16T01:02:04.000Z", 500)
         )
-        for (index in 0 until 65) {
-            val session = base.copy(id = "result-${index.toString().padStart(3, '0')}")
+        val ids = List(65) { index -> "result-${index.toString().padStart(3, '0')}" }
+        for ((index, id) in ids.withIndex()) {
+            val completedAt = when (index) {
+                0 -> "2026-10-16T01:02:05.000Z"
+                ids.lastIndex -> "2026-10-16T01:02:03.500Z"
+                else -> checkNotNull(base.completion).completedAt
+            }
+            val session = base.copy(
+                id = id,
+                completion = Completion(completedAt, 500)
+            )
             repository.writeSession(
                 session,
                 0,
@@ -160,7 +170,19 @@ class RoomGameRepositoryTest {
         assertEquals(30, first.items.size)
         assertEquals(30, second.items.size)
         assertEquals(5, third.items.size)
-        assertEquals(65, (first.items + second.items + third.items).map { it.id }.toSet().size)
+        val orderedIds =
+            listOf(ids.first()) + ids.subList(1, ids.lastIndex).asReversed() + ids.last()
+        assertEquals(orderedIds, (first.items + second.items + third.items).map { it.id })
+
+        val classic = SummaryQuery.History(Variant.CLASSIC)
+        val classicFirst = reads.readPage(query = classic).value()
+        val classicSecond = reads.readPage(query = classic, cursor = classicFirst.next).value()
+        val classicThird = reads.readPage(query = classic, cursor = classicSecond.next).value()
+
+        assertEquals(orderedIds.take(30), classicFirst.items.map { it.id })
+        assertEquals(orderedIds.drop(30).take(30), classicSecond.items.map { it.id })
+        assertEquals(orderedIds.drop(60), classicThird.items.map { it.id })
+        assertEquals(null, classicThird.next)
         assertEquals(0, validationCalls)
         val cursor = checkNotNull(first.next)
         assertEquals(SummaryQuery.History(), cursor.query)
@@ -481,21 +503,32 @@ class RoomGameRepositoryTest {
 
     @Test
     fun readyPageQueryUsesItsOrderingIndexWithoutATemporarySort() {
-        val query = "EXPLAIN QUERY PLAN SELECT p.id FROM result_summaries p WHERE " +
-            CURRENT_RESULT + " AND p.variant='classic' " +
-            "AND (completedAt,id)<(9223372036854775807,'') " +
-            "ORDER BY completedAt DESC,id DESC LIMIT 31"
-        val plans = database.openHelper.readableDatabase.query(query).use { cursor ->
-            buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }
-        }
+        val query = "EXPLAIN QUERY PLAN $RESULTS_BY_VARIANT_PAGE"
+        val firstPage = Long.MAX_VALUE to ""
+        val nextPage = 1792112524000L to "result-035"
 
-        assertTrue(
-            plans.toString(),
-            plans.any {
-                it.contains("index_result_summaries_variant_completedAt_id")
+        for ((time, id) in listOf(firstPage, nextPage)) {
+            val parameters = arrayOf<Any>(
+                "classic",
+                time,
+                id,
+                31
+            )
+            val planQuery = SimpleSQLiteQuery(query, parameters)
+            val plans = database.openHelper.readableDatabase.query(planQuery).use { cursor ->
+                buildList {
+                    while (cursor.moveToNext()) {
+                        add(cursor.getString(3))
+                    }
+                }
             }
-        )
-        assertTrue(plans.toString(), plans.none { it.contains("TEMP B-TREE") })
+
+            assertTrue(
+                plans.toString(),
+                plans.any { it.contains("index_result_summaries_variant_completedAt_id") }
+            )
+            assertTrue(plans.toString(), plans.none { it.contains("TEMP B-TREE") })
+        }
     }
 
     @Test

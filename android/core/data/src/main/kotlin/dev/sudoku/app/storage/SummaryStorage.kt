@@ -54,6 +54,16 @@ internal const val CURRENT_RESULT =
         "AND source.mode=p.mode AND source.variant=p.variant AND source.challengeDate " +
         "IS p.challengeDate)"
 
+// SQLite 3.22 can use index order with the scalar bound. The tuple still breaks time ties by ID.
+internal const val RESULTS_BY_VARIANT_PAGE =
+    "SELECT p.id, 0 AS revision, p.mode, p.variant, p.difficulty, p.startedAt, " +
+        "p.elapsedMs, p.completedAt, p.assisted, p.challengeDate, p.formalAttempt, " +
+        "p.lessonId, p.filled, p.editable, p.eligibleDate FROM result_summaries p WHERE " +
+        CURRENT_RESULT +
+        " AND p.variant=:variant AND p.completedAt<=:afterTime " +
+        "AND (p.completedAt,p.id)<(:afterTime,:afterId) ORDER BY p.completedAt DESC,p.id DESC " +
+        "LIMIT :limit"
+
 @Entity(tableName = "summary_version")
 data class SummaryVersionEntity(
     @PrimaryKey val id: Int = 1,
@@ -223,14 +233,7 @@ interface SummaryDao : SummaryCoverageDao {
     )
     suspend fun results(afterTime: Long, afterId: String, limit: Int): List<SummaryRow>
 
-    @Query(
-        "SELECT p.id, 0 AS revision, p.mode, p.variant, p.difficulty, p.startedAt, " +
-            "p.elapsedMs, p.completedAt, p.assisted, p.challengeDate, p.formalAttempt, " +
-            "p.lessonId, p.filled, p.editable, p.eligibleDate FROM result_summaries p WHERE " +
-            CURRENT_RESULT +
-            " AND p.variant=:variant AND (p.completedAt,p.id)<(:afterTime,:afterId) ORDER BY " +
-            "p.completedAt DESC,p.id DESC LIMIT :limit"
-    )
+    @Query(RESULTS_BY_VARIANT_PAGE)
     suspend fun resultsByVariant(
         variant: String,
         afterTime: Long,
