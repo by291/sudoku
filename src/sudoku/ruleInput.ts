@@ -1,7 +1,7 @@
 import type { RulesDto } from '@sudoku/wasm'
 import type { PuzzleRules } from '@/sudoku/contracts'
 
-/** Copy borrowed layout data into the generated transport shape; no rule computation belongs here. */
+/** Copy borrowed layout data into an owned WASM transport payload. */
 export function copyRules(rules: PuzzleRules): RulesDto {
   switch (rules.kind) {
     case 'classic':

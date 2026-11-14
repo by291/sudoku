@@ -33,6 +33,7 @@ export interface GameRuntime {
 
 export const gameRuntimeKey: InjectionKey<GameRuntime> = Symbol('GameRuntime')
 
+/** Retrieve the runtime installed before application stores mount. */
 export function useGameRuntime(): GameRuntime {
   const runtime = inject(gameRuntimeKey)
   if (!runtime) {
@@ -42,18 +43,22 @@ export function useGameRuntime(): GameRuntime {
   return runtime
 }
 
+/** Compose browsing services and defer both engines until a computation needs them. */
 export function createGameRuntime(): GameRuntime {
   let disposed = false
   const computation = createLazyComputation()
   let workerClient: SudokuWorkerClient | null = null
   let workerOpening: Promise<SudokuWorkerClient> | null = null
+
   // Reuse one live connection; failed opens and version changes permit a fresh connection.
   let opening: ReturnType<typeof openSudokuDatabase> | null = null
+
   const provider = () => {
     if (!opening) {
       opening = openSudokuDatabase()
         .then((database) => {
           database.addEventListener('versionchange', () => {
+            // The database closes its old connection when another context upgrades it.
             opening = null
           })
 
@@ -67,6 +72,7 @@ export function createGameRuntime(): GameRuntime {
 
     return opening
   }
+
   const ownership = createOwnershipCoordinator(provider)
   const repository = createGameRepository(
     provider,
@@ -79,21 +85,28 @@ export function createGameRuntime(): GameRuntime {
       onReset: () => ownership.notifyReset(),
     },
   )
+
   const worker = createLazyWorkerClient(async () => {
     if (!workerOpening) {
       workerOpening = (async () => {
         await computation.ensureReady()
         const { createSudokuWorkerClient } = await import('@/worker/client')
+
+        // The shared import may outlive this runtime. Never publish an unowned Worker.
         if (disposed) {
           throw new Error('Computation has been disposed')
         }
+
         workerClient = createSudokuWorkerClient(computation.module, computation.engine)
+
         return workerClient
       })().catch((error: unknown) => {
+        // A later player request can retry a transient startup failure.
         workerOpening = null
         throw error
       })
     }
+
     return workerOpening
   })
 
@@ -116,11 +129,13 @@ export function createGameRuntime(): GameRuntime {
       if (disposed) {
         return
       }
+
       disposed = true
       worker.dispose()
       workerClient?.dispose()
       ownership.dispose()
       computation.dispose()
+
       if (opening) {
         void opening.then(
           (database) => database.close(),

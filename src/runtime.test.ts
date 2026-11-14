@@ -22,6 +22,7 @@ afterEach(() => {
     item.dispose?.()
   }
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 it('creates and disposes browsing services without requesting WASM', () => {
@@ -99,6 +100,24 @@ it('turns a worker initialization failure into a retryable operation outcome', a
   expect(result).toEqual({ status: 'failed', message: 'offline' })
 })
 
+it('times out while shared initialization is pending and allows it to finish for other callers', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const pending = deferred<WebAssembly.Module>()
+  vi.spyOn(moduleLoader, 'loadSudokuModule').mockReturnValue(pending.promise)
+  const value = runtime()
+  const request = value.worker.conflicts(Array(81).fill(0), { kind: 'classic' })
+  const ready = value.ensureEngine()
+
+  await vi.advanceTimersByTimeAsync(3000)
+
+  await expect(request).resolves.toEqual({ status: 'timed-out' })
+
+  pending.resolve(getTestModule())
+  await ready
+
+  expect(value.engine.deriveSeed(new Uint8Array())).toHaveLength(32)
+})
+
 it('keeps the submitted board stable while computation initializes', async () => {
   const testRuntime = await createTestRuntime()
   const conflicts = vi.spyOn(testRuntime.runtime.worker, 'conflicts')
@@ -117,7 +136,11 @@ it('keeps the submitted board stable while computation initializes', async () =>
     await request
 
     // The worker must receive the submitted board, not the caller's edits made during startup.
-    expect(conflicts).toHaveBeenCalledWith(Array(81).fill(0), { kind: 'classic' }, undefined)
+    expect(conflicts).toHaveBeenCalledWith(
+      Array(81).fill(0),
+      { kind: 'classic' },
+      expect.any(AbortSignal),
+    )
   } finally {
     testRuntime.dispose()
   }

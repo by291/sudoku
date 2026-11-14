@@ -9,8 +9,8 @@ import type { HintResult } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
 import type { AssessmentInput, LiveAssessmentOutcome, PuzzleAssessment } from '@/sudoku/contracts'
 import type { MainSudokuEngine } from '@/sudoku/mainEngine'
-import { isBoard, isRecord } from '@/sudoku/values'
-import { isRulesShape, RATING_VERSION } from '@/sudoku/guards'
+import { ALL_DIGITS_MASK, BOARD_SIZE, isBoard, isDenseArrayOf, isRecord } from '@/sudoku/values'
+import { isRulesShape, MAX_LOGICAL_STEPS, RATING_VERSION } from '@/sudoku/guards'
 import { parseGenerationInput } from '@/sudoku/generationInput'
 import type { GenerationInput } from '@/sudoku/generationInput'
 import { validatePuzzleSnapshot } from '@/sudoku/puzzleSnapshot'
@@ -81,14 +81,17 @@ function withinLimit(value: unknown, maximum: number): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= maximum
 }
 
+/** Narrow an incoming Worker job and validate its semantic input through the engine. */
 export function parseWorkerRequest(
   value: unknown,
   validator: RequestValidator,
 ): ParseResult<WorkerRequest> {
   const invalid: ParseResult<WorkerRequest> = { valid: false, issues: ['Invalid request payload'] }
+
   if (!isRecord(value) || typeof value.requestId !== 'string' || !value.requestId) {
     return { valid: false, issues: ['Invalid request envelope'] }
   }
+
   if (
     value.kind === 'conflicts' &&
     isBoard(value.board) &&
@@ -105,14 +108,15 @@ export function parseWorkerRequest(
       },
     }
   }
+
   if (value.kind === 'generate-notes' && isRecord(value.input)) {
     const input = value.input
     if (
       isBoard(input.givens) &&
       isBoard(input.entries) &&
       Array.isArray(input.notes) &&
-      input.notes.length === 81 &&
-      input.notes.every((mask: unknown) => withinLimit(mask, 511)) &&
+      input.notes.length === BOARD_SIZE &&
+      isDenseArrayOf(input.notes, (mask) => withinLimit(mask, ALL_DIGITS_MASK)) &&
       isRulesShape(input.rules) &&
       validator.validateRules(input.rules).status === 'valid'
     ) {
@@ -130,17 +134,24 @@ export function parseWorkerRequest(
         },
       }
     }
+
     return invalid
   }
+
   if (value.kind === 'generate') {
     const parsed = parseGenerationInput(value.input)
     return parsed.valid
       ? {
           valid: true,
-          value: { kind: 'generate', requestId: value.requestId, input: parsed.value },
+          value: {
+            kind: 'generate',
+            requestId: value.requestId,
+            input: parsed.value,
+          },
         }
       : parsed
   }
+
   if (value.kind === 'assess' && isRecord(value.input)) {
     const input = value.input
     if (
@@ -148,11 +159,12 @@ export function parseWorkerRequest(
       !isBoard(input.board) ||
       !isRulesShape(input.rules) ||
       !isRecord(input.limits) ||
-      !withinLimit(input.limits.maxSteps, 500) ||
+      !withinLimit(input.limits.maxSteps, MAX_LOGICAL_STEPS) ||
       validator.validateRules(input.rules).status !== 'valid'
     ) {
       return invalid
     }
+
     return {
       valid: true,
       value: {
@@ -167,18 +179,21 @@ export function parseWorkerRequest(
       },
     }
   }
+
   if (
     value.kind === 'hint' &&
     isBoard(value.board) &&
     isBoard(value.solution) &&
     isRulesShape(value.rules)
   ) {
+    // Check the solution independently of the player's possibly incorrect entries.
     const validated = validator.validatePuzzle({
-      givens: Array(81).fill(0),
+      givens: Array(BOARD_SIZE).fill(0),
       solution: value.solution,
       rules: value.rules,
       difficulty: 'easy',
     })
+
     if (validated.status === 'valid') {
       return {
         valid: true,
@@ -192,14 +207,17 @@ export function parseWorkerRequest(
       }
     }
   }
+
   return invalid
 }
 
+/** Parse a Worker outcome, checking completed payloads with the matching engine validator. */
 export function parseWorkerResponse(
   value: unknown,
   validator: ResponseValidator,
 ): ParseResult<WorkerResponse> {
   const invalid: ParseResult<WorkerResponse> = { valid: false, issues: ['Invalid worker response'] }
+
   if (
     !isRecord(value) ||
     typeof value.requestId !== 'string' ||
@@ -212,99 +230,163 @@ export function parseWorkerResponse(
   ) {
     return invalid
   }
+
   const { requestId, kind, outcome } = value
   if (outcome.status === 'cancelled' || outcome.status === 'timed-out') {
-    return { valid: true, value: { kind, requestId, outcome: { status: outcome.status } } }
+    return {
+      valid: true,
+      value: {
+        kind,
+        requestId,
+        outcome: { status: outcome.status },
+      },
+    }
   }
+
   if (
     (outcome.status === 'failed' || outcome.status === 'incomplete') &&
     typeof outcome.message === 'string'
   ) {
     return {
       valid: true,
-      value: { kind, requestId, outcome: { status: outcome.status, message: outcome.message } },
-    }
-  }
-  if (outcome.status !== 'completed') {
-    return invalid
-  }
-  if (kind === 'conflicts' || kind === 'generate-notes') {
-    if (!isRecord(outcome.value)) {
-      return invalid
-    }
-    try {
-      if (kind === 'conflicts') {
-        const computation = validator.parseConflicts(outcome.value.computation)
-        return {
-          valid: true,
-          value: {
-            kind,
-            requestId,
-            outcome: { status: 'completed', value: { computation } },
-          },
-        }
-      }
-      const computation = validator.parseEdit(outcome.value.computation)
-      return {
-        valid: true,
-        value: {
-          kind,
-          requestId,
-          outcome: { status: 'completed', value: { computation } },
-        },
-      }
-    } catch {
-      return invalid
-    }
-  }
-  if (kind === 'generate') {
-    const parsed = validatePuzzleSnapshot(outcome.value, validator)
-    if (parsed.status !== 'valid') {
-      return invalid
-    }
-    const assessment = validator.validateAssessment({
-      present: outcome.assessment !== undefined,
-      value: outcome.assessment,
-      identity: { variant: parsed.value.rules.kind, difficulty: parsed.value.difficulty },
-    })
-    return {
-      valid: true,
       value: {
         kind,
         requestId,
-        outcome: {
-          status: 'completed',
-          value: parsed.value,
-          ...(assessment.status === 'absent' ? {} : { assessment: assessment.value }),
-        },
+        outcome: { status: outcome.status, message: outcome.message },
       },
     }
   }
-  if (kind === 'assess') {
-    const parsed = validator.validateLiveAssessmentOutcome(outcome.value)
-    return parsed.valid
-      ? {
-          valid: true,
-          value: { kind, requestId, outcome: { status: 'completed', value: parsed.value } },
-        }
-      : invalid
+
+  if (outcome.status !== 'completed') {
+    return invalid
   }
-  const hint = validator.parseHint(outcome.value)
-  return hint.status === 'valid'
-    ? {
-        valid: true,
-        value: { kind, requestId, outcome: { status: 'completed', value: hint.hint } },
-      }
-    : invalid
+
+  const response = parseCompletedResponse(
+    {
+      kind,
+      requestId,
+      outcome,
+    },
+    validator,
+  )
+  return response ? { valid: true, value: response } : invalid
 }
 
+type CompletedResponseEnvelope = {
+  kind: WorkerResponse['kind']
+  requestId: string
+  outcome: Record<string, unknown>
+}
+
+function parseCompletedResponse(
+  envelope: CompletedResponseEnvelope,
+  validator: ResponseValidator,
+): WorkerResponse | null {
+  const { kind, requestId, outcome } = envelope
+
+  switch (kind) {
+    case 'conflicts':
+    case 'generate-notes':
+      return parseLiveComputation(envelope, validator)
+    case 'generate':
+      return parseGeneratedPuzzle(requestId, outcome, validator)
+    case 'assess': {
+      const parsed = validator.validateLiveAssessmentOutcome(outcome.value)
+      return parsed.valid
+        ? {
+            kind,
+            requestId,
+            outcome: { status: 'completed', value: parsed.value },
+          }
+        : null
+    }
+    case 'hint': {
+      const hint = validator.parseHint(outcome.value)
+      return hint.status === 'valid'
+        ? {
+            kind,
+            requestId,
+            outcome: { status: 'completed', value: hint.hint },
+          }
+        : null
+    }
+  }
+}
+
+function parseLiveComputation(
+  { kind, requestId, outcome }: CompletedResponseEnvelope,
+  validator: ResponseValidator,
+): WorkerResponse | null {
+  if (!isRecord(outcome.value)) {
+    return null
+  }
+
+  try {
+    if (kind === 'conflicts') {
+      const computation = validator.parseConflicts(outcome.value.computation)
+      return {
+        kind,
+        requestId,
+        outcome: { status: 'completed', value: { computation } },
+      }
+    }
+
+    if (kind === 'generate-notes') {
+      const computation = validator.parseEdit(outcome.value.computation)
+      return {
+        kind,
+        requestId,
+        outcome: { status: 'completed', value: { computation } },
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+function parseGeneratedPuzzle(
+  requestId: string,
+  outcome: Record<string, unknown>,
+  validator: ResponseValidator,
+): WorkerResponse | null {
+  const parsed = validatePuzzleSnapshot(outcome.value, validator)
+  if (parsed.status !== 'valid') {
+    return null
+  }
+
+  // Optional rating metadata belongs to the validated puzzle's variant and difficulty.
+  const assessment = validator.validateAssessment({
+    present: outcome.assessment !== undefined,
+    value: outcome.assessment,
+    identity: { variant: parsed.value.rules.kind, difficulty: parsed.value.difficulty },
+  })
+
+  return {
+    kind: 'generate',
+    requestId,
+    outcome: {
+      status: 'completed',
+      value: parsed.value,
+      ...(assessment.status === 'absent' ? {} : { assessment: assessment.value }),
+    },
+  }
+}
+
+/** Check returned hint evidence against the submitted layout and optional board. */
 export function validateHintEvidence(
   hint: HintResult,
   rules: PuzzleRules,
   board: Board | undefined,
   validator: Pick<MainSudokuEngine, 'validateHint'>,
 ): ParseResult<HintResult> {
-  const result = validator.validateHint({ hint, rules, board })
+  const result = validator.validateHint({
+    hint,
+    rules,
+    board,
+  })
+
   return result.status === 'valid'
     ? { valid: true, value: result.hint }
     : { valid: false, issues: result.issues }

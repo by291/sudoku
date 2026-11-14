@@ -24,9 +24,12 @@ export function validatePuzzleSnapshot(
   ) {
     return { status: 'invalid', issues: ['Invalid puzzle metadata'] }
   }
+
   if (!isBoard(value.givens) || !isBoard(value.solution) || !isRulesShape(value.rules)) {
     return { status: 'invalid', issues: ['Invalid puzzle board or rules'] }
   }
+
+  // Version-owned identities use canonical seeds; older seed text remains opaque.
   const version = /^sudoku-(?:variants-)?(v11|v12)$/.exec(value.puzzleVersion)?.[1]
   if (
     version &&
@@ -36,17 +39,23 @@ export function validatePuzzleSnapshot(
   ) {
     return { status: 'invalid', issues: ['Invalid versioned puzzle identity'] }
   }
+
   const content = {
     givens: [...value.givens],
     solution: [...value.solution],
     rules: copyRules(value.rules),
     difficulty: value.difficulty,
   }
+
   const result = validator.validatePuzzle(content)
   return result.status === 'valid'
     ? {
         status: 'valid',
-        value: { ...content, seed: value.seed, puzzleVersion: value.puzzleVersion },
+        value: {
+          ...content,
+          seed: value.seed,
+          puzzleVersion: value.puzzleVersion,
+        },
       }
     : result
 }

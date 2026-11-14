@@ -35,7 +35,7 @@ export interface PreparedPuzzle {
   dispose(): void
 }
 
-/** Synchronous bounded operations only. Heavy generation, assessment and hints belong to Workers. */
+/** Bound synchronous operations; Workers own generation, assessment and hint search. */
 export interface MainSudokuEngine {
   prepare(rules: PuzzleRules): PreparedPuzzle
   deriveSeed(material: Uint8Array): Uint8Array
@@ -53,17 +53,21 @@ export interface MainSudokuEngine {
   dispose(): void
 }
 
+/** Instantiate and own the main-thread engine and its prepared WASM handles. */
 export async function createMainEngine(module: WebAssembly.Module): Promise<MainSudokuEngine> {
   validateModuleExports(module)
+
   let bindings: Bindings | null = createBindings()
   await bindings.default({ module_or_path: module })
   validateEngineInfo(bindings.engine_info())
+
   const resources = new Set<PreparedPuzzle>()
 
   function active(): Bindings {
     if (!bindings) {
       throw new Error('Sudoku engine has been disposed')
     }
+
     return bindings
   }
 
@@ -72,17 +76,22 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
       let raw: InstanceType<Bindings['PreparedPuzzle']> | null = new (active().PreparedPuzzle)({
         rules: copyRules(rules),
       })
+
       function prepared() {
         if (!raw) {
           throw new Error('Prepared puzzle has been disposed')
         }
+
         return raw
       }
+
       function requireImmediate() {
+        // Full support for heavy layouts can block rendering; only the Worker runs it.
         if (prepared().liveExecution === 'worker') {
           throw new Error('This layout requires Worker computation')
         }
       }
+
       const resource: PreparedPuzzle = {
         get liveExecution() {
           return prepared().liveExecution
@@ -102,6 +111,7 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
           if (input.action.kind === 'generate-notes') {
             requireImmediate()
           }
+
           return prepared().edit(input)
         },
         reviewEntries: (board, solution) =>
@@ -115,7 +125,9 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
           }
         },
       }
+
       resources.add(resource)
+
       return resource
     },
     deriveSeed: (material) => active().derive_seed(material),
@@ -131,9 +143,11 @@ export async function createMainEngine(module: WebAssembly.Module): Promise<Main
     validateHint: (input) => active().validate_hint_evidence(input),
     transformRules: (input) => active().transform_rules(input),
     dispose() {
+      // Prepared handles need their originating bindings to release WASM memory.
       for (const resource of resources) {
         resource.dispose()
       }
+
       // Dropping the closure releases memory too; no per-instance ESM module cache is retained.
       bindings = null
     },

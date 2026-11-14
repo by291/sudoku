@@ -10,9 +10,11 @@ export function createLazyComputation() {
     if (disposed) {
       return Promise.reject(new Error('Computation has been disposed'))
     }
+
     if (ready) {
       return Promise.resolve()
     }
+
     if (!opening) {
       opening = initialize().catch((error: unknown) => {
         // A transport or instantiation failure may be transient; the next player action retries.
@@ -20,6 +22,7 @@ export function createLazyComputation() {
         throw error
       })
     }
+
     return opening
   }
 
@@ -28,18 +31,25 @@ export function createLazyComputation() {
       import('@/sudoku/wasmModule'),
       import('@/sudoku/mainEngine'),
     ])
+
     if (disposed) {
       throw new Error('Computation has been disposed')
     }
+
     const module = await loadSudokuModule()
+
     if (disposed) {
       throw new Error('Computation has been disposed')
     }
+
     const engine = await createMainEngine(module)
+
+    // The engine may finish after disposal, before it was registered as an owned resource.
     if (disposed) {
       engine.dispose()
       throw new Error('Computation has been disposed')
     }
+
     ready = { engine, module }
   }
 
@@ -47,6 +57,7 @@ export function createLazyComputation() {
     if (disposed || !ready) {
       throw new Error(disposed ? 'Computation has been disposed' : 'Computation is not ready')
     }
+
     return ready
   }
 

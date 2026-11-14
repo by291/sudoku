@@ -1,4 +1,4 @@
-import { afterAll, expect, it } from 'vitest'
+import { afterAll, expect, it, vi } from 'vitest'
 import {
   parseWorkerRequest as decodeRequest,
   parseWorkerResponse as decodeResponse,
@@ -14,6 +14,7 @@ import type { HintResult } from '@/sudoku/contracts'
 import { createTestEngine } from '../../tests/support/wasm'
 import type { Board } from '@/sudoku/contracts'
 import type { PuzzleRules } from '@/sudoku/contracts'
+import { BOARD_SIZE } from '@/sudoku/values'
 import {
   ARROW_REPEAT_BOARD,
   ARROW_REPEAT_RULES,
@@ -30,6 +31,43 @@ function parseHint(value: unknown) {
   const result = engine.parseHint(value)
   return result.status === 'valid' ? result.hint : null
 }
+
+it('rejects sparse boards, clue lists and note masks before semantic validation', () => {
+  const board = Array<number>(BOARD_SIZE).fill(0)
+  const sparseBoard = Array<number>(BOARD_SIZE)
+  const request = {
+    kind: 'conflicts',
+    requestId: 'sparse',
+    board,
+    rules: { kind: 'classic' },
+  }
+  const validateRules = vi.fn(engine.validateRules)
+  const validator = { validateRules, validatePuzzle: engine.validatePuzzle }
+
+  const boardResult = decodeRequest({ ...request, board: sparseBoard }, validator)
+  const clueResult = decodeRequest(
+    { ...request, rules: { kind: 'thermo', paths: [Array<number>(2)] } },
+    validator,
+  )
+  const noteResult = decodeRequest(
+    {
+      kind: 'generate-notes',
+      requestId: 'notes',
+      input: {
+        givens: board,
+        entries: board,
+        notes: sparseBoard,
+        rules: request.rules,
+      },
+    },
+    validator,
+  )
+
+  expect(boardResult.valid).toBe(false)
+  expect(clueResult.valid).toBe(false)
+  expect(noteResult.valid).toBe(false)
+  expect(validateRules).not.toHaveBeenCalled()
+})
 
 it('rejects an elimination payload larger than the board candidate space', () => {
   expect(

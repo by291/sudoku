@@ -1,4 +1,4 @@
-import { BOARD_SIZE, isRecord } from '@/sudoku/values'
+import { isCellIndex, isDenseArrayOf, isRecord } from '@/sudoku/values'
 import { isSudokuVariant } from '@/sudoku/catalogue'
 import type { EngineInfo } from '@sudoku/wasm'
 import type { PuzzleRules, SudokuVariant } from '@/sudoku/contracts'
@@ -7,6 +7,7 @@ export const BRIDGE_VERSION = 4
 export const PUZZLE_VERSION = 'sudoku-v12'
 export const VARIANT_PUZZLE_VERSION = 'sudoku-variants-v12'
 export const RATING_VERSION = 'sudoku-rating-v2'
+export const MAX_LOGICAL_STEPS = 500
 const REQUIRED_EXPORTS = [
   'engine_info',
   'derive_seed',
@@ -31,6 +32,7 @@ const REQUIRED_EXPORTS = [
   'preparedpuzzle_review_entries',
 ]
 
+/** Reject incompatible exports before creating a WASM instance. */
 export function validateModuleExports(module: WebAssembly.Module): void {
   const exports = new Set(
     WebAssembly.Module.exports(module)
@@ -42,6 +44,7 @@ export function validateModuleExports(module: WebAssembly.Module): void {
   }
 }
 
+/** Verify the live instance reports the bridge and algorithm identities we expect. */
 export function validateEngineInfo(info: EngineInfo): void {
   if (
     info.bridgeVersion !== BRIDGE_VERSION ||
@@ -54,40 +57,29 @@ export function validateEngineInfo(info: EngineInfo): void {
 }
 
 function cellList(value: unknown): value is number[] {
+  return isDenseArrayOf(value, isCellIndex)
+}
+
+function isCageShape(value: unknown): value is { cells: number[]; sum: number } {
   return (
-    Array.isArray(value) &&
-    value.every(
-      (cell) =>
-        typeof cell === 'number' && Number.isInteger(cell) && cell >= 0 && cell < BOARD_SIZE,
-    )
+    isRecord(value) &&
+    cellList(value.cells) &&
+    typeof value.sum === 'number' &&
+    Number.isSafeInteger(value.sum)
   )
+}
+
+function isArrowShape(value: unknown): value is { circle: number; shaft: number[] } {
+  return isRecord(value) && isCellIndex(value.circle) && cellList(value.shaft)
 }
 
 const RULE_SHAPES = {
   classic: () => true,
   diagonal: () => true,
-  jigsaw: (value) => Array.isArray(value.regions) && value.regions.every(cellList),
-  killer: (value) =>
-    Array.isArray(value.cages) &&
-    value.cages.every(
-      (cage: unknown) =>
-        isRecord(cage) &&
-        cellList(cage.cells) &&
-        typeof cage.sum === 'number' &&
-        Number.isSafeInteger(cage.sum),
-    ),
-  thermo: (value) => Array.isArray(value.paths) && value.paths.every(cellList),
-  arrow: (value) =>
-    Array.isArray(value.arrows) &&
-    value.arrows.every(
-      (arrow: unknown) =>
-        isRecord(arrow) &&
-        typeof arrow.circle === 'number' &&
-        Number.isInteger(arrow.circle) &&
-        arrow.circle >= 0 &&
-        arrow.circle < BOARD_SIZE &&
-        cellList(arrow.shaft),
-    ),
+  jigsaw: (value) => isDenseArrayOf(value.regions, cellList),
+  killer: (value) => isDenseArrayOf(value.cages, isCageShape),
+  thermo: (value) => isDenseArrayOf(value.paths, cellList),
+  arrow: (value) => isDenseArrayOf(value.arrows, isArrowShape),
 } satisfies Record<SudokuVariant, (value: Record<string, unknown>) => boolean>
 
 /** Structural transport guard only; Rust validates connected geometry, partitions and equations. */

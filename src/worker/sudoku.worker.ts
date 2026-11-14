@@ -2,138 +2,148 @@ import { createWorkerEngine } from '@/sudoku/workerEngine'
 import { BRIDGE_VERSION } from '@/sudoku/guards'
 import { isRecord } from '@/sudoku/values'
 import { parseWorkerRequest } from '@/worker/protocol'
-import type { WorkerResponse, WorkerReady, WorkerInitializationFailed } from '@/worker/protocol'
+import { isWasmTimeout } from '@/worker/deadline'
+import type {
+  GenerateOutcome,
+  WorkerInitializationFailed,
+  WorkerReady,
+  WorkerRequest,
+  WorkerResponse,
+} from '@/worker/protocol'
 
-let engine: Awaited<ReturnType<typeof createWorkerEngine>> | null = null
-let initializing = false
+type WorkerEngine = Awaited<ReturnType<typeof createWorkerEngine>>
+type GenerationResult = ReturnType<WorkerEngine['generate']>
 
-addEventListener('message', (event: MessageEvent<unknown>) => {
-  if (isRecord(event.data) && event.data.kind === 'initialize') {
-    if (initializing || engine) {
-      return
-    }
-    initializing = true
-    if (
-      event.data.bridgeVersion !== BRIDGE_VERSION ||
-      !(event.data.module instanceof WebAssembly.Module)
-    ) {
-      postMessage({
-        kind: 'initialization-failed',
-        message: 'Invalid engine initialization',
-      } satisfies WorkerInitializationFailed)
-      return
-    }
-    void createWorkerEngine(event.data.module)
-      .then((initialized) => {
-        engine = initialized
-        postMessage({ kind: 'ready', bridgeVersion: BRIDGE_VERSION } satisfies WorkerReady)
-      })
-      .catch((error: unknown) => {
-        postMessage({
-          kind: 'initialization-failed',
-          message: error instanceof Error ? error.message : 'Engine initialization failed',
-        } satisfies WorkerInitializationFailed)
-      })
+let engine: WorkerEngine | null = null
+let initializationStarted = false
+
+function reportInitializationFailure(message: string) {
+  postMessage({ kind: 'initialization-failed', message } satisfies WorkerInitializationFailed)
+}
+
+async function initialize(message: Record<string, unknown>) {
+  if (initializationStarted) {
     return
   }
-  if (!engine) {
-    if (isRecord(event.data) && typeof event.data.requestId === 'string') {
-      postMessage({
-        kind: event.data.kind,
-        requestId: event.data.requestId,
-        outcome: { status: 'failed', message: 'Worker engine is not ready' },
-      })
-    }
+
+  // The client retires a failed instance and gives a retry a fresh Worker.
+  initializationStarted = true
+  if (message.bridgeVersion !== BRIDGE_VERSION || !(message.module instanceof WebAssembly.Module)) {
+    reportInitializationFailure('Invalid engine initialization')
     return
   }
 
   try {
-    const parsed = parseWorkerRequest(event.data, engine)
-    if (!parsed.valid) {
-      if (isRecord(event.data) && typeof event.data.requestId === 'string') {
-        postMessage({
-          kind: event.data.kind,
-          requestId: event.data.requestId,
-          outcome: { status: 'failed', message: parsed.issues.join('; ') },
-        })
+    engine = await createWorkerEngine(message.module)
+    postMessage({ kind: 'ready', bridgeVersion: BRIDGE_VERSION } satisfies WorkerReady)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Engine initialization failed'
+    reportInitializationFailure(message)
+  }
+}
+
+function describeGeneration(result: GenerationResult): GenerateOutcome {
+  switch (result.status) {
+    case 'ready':
+      return {
+        status: 'completed',
+        value: result.puzzle,
+        assessment: { status: 'rated', summary: result.assessment },
       }
-      return
-    }
-    const request = parsed.value
-    let response: WorkerResponse
-    if (request.kind === 'generate') {
-      const result = engine.generate(request.input)
-      if (result.status === 'ready') {
-        response = {
-          kind: 'generate',
-          requestId: request.requestId,
-          outcome: {
-            status: 'completed',
-            value: result.puzzle,
-            assessment: { status: 'rated', summary: result.assessment },
-          },
-        }
-      } else if (result.status === 'incomplete') {
-        response = {
-          kind: 'generate',
-          requestId: request.requestId,
-          outcome: {
-            status: 'incomplete',
-            message: 'No qualifying puzzle found within the generation limits',
-          },
-        }
-      } else {
-        response = {
-          kind: 'generate',
-          requestId: request.requestId,
-          outcome: { status: 'failed', message: result.reason },
-        }
+    case 'incomplete':
+      return {
+        status: 'incomplete',
+        message: 'No qualifying puzzle found within the generation limits',
       }
-    } else if (request.kind === 'assess') {
-      response = {
-        kind: 'assess',
-        requestId: request.requestId,
+    case 'failed':
+      return { status: 'failed', message: result.reason }
+  }
+}
+
+function compute(engine: WorkerEngine, request: WorkerRequest): WorkerResponse {
+  const { kind, requestId } = request
+
+  switch (kind) {
+    case 'generate':
+      return {
+        kind,
+        requestId,
+        outcome: describeGeneration(engine.generate(request.input)),
+      }
+    case 'assess':
+      return {
+        kind,
+        requestId,
         outcome: { status: 'completed', value: engine.assess(request.input) },
       }
-    } else if (request.kind === 'conflicts') {
-      response = {
-        kind: 'conflicts',
-        requestId: request.requestId,
+    case 'conflicts':
+      return {
+        kind,
+        requestId,
         outcome: { status: 'completed', value: engine.conflicts(request.board, request.rules) },
       }
-    } else if (request.kind === 'generate-notes') {
-      response = {
-        kind: 'generate-notes',
-        requestId: request.requestId,
+    case 'generate-notes':
+      return {
+        kind,
+        requestId,
         outcome: { status: 'completed', value: engine.generateNotes(request.input) },
       }
-    } else {
-      response = {
-        kind: 'hint',
-        requestId: request.requestId,
+    case 'hint':
+      return {
+        kind,
+        requestId,
         outcome: {
           status: 'completed',
           value: engine.hint(request.board, request.solution, request.rules),
         },
       }
-    }
-    postMessage(response)
-  } catch (error: unknown) {
-    if (!isRecord(event.data) || typeof event.data.requestId !== 'string') {
+  }
+}
+
+function replyToFailure(
+  request: unknown,
+  outcome: { status: 'failed'; message: string } | { status: 'timed-out' },
+) {
+  if (!isRecord(request) || typeof request.requestId !== 'string') {
+    return
+  }
+
+  postMessage({
+    kind: request.kind,
+    requestId: request.requestId,
+    outcome,
+  })
+}
+
+addEventListener('message', (event: MessageEvent<unknown>) => {
+  const message: unknown = event.data
+  if (isRecord(message) && message.kind === 'initialize') {
+    void initialize(message)
+    return
+  }
+
+  if (!engine) {
+    replyToFailure(message, { status: 'failed', message: 'Worker engine is not ready' })
+    return
+  }
+
+  try {
+    const parsed = parseWorkerRequest(message, engine)
+    if (!parsed.valid) {
+      replyToFailure(message, { status: 'failed', message: parsed.issues.join('; ') })
       return
     }
-    postMessage({
-      kind: event.data.kind,
-      requestId: event.data.requestId,
-      outcome: {
-        ...(error instanceof Error && error.message === 'Computation timed out'
-          ? { status: 'timed-out' as const }
-          : {
-              status: 'failed' as const,
-              message: error instanceof Error ? error.message : 'Computation failed',
-            }),
-      },
-    })
+
+    postMessage(compute(engine, parsed.value))
+  } catch (error: unknown) {
+    const description = error instanceof Error ? error.message : 'Computation failed'
+    if (isWasmTimeout(error)) {
+      replyToFailure(message, { status: 'timed-out' })
+      return
+    }
+
+    replyToFailure(message, { status: 'failed', message: description })
   }
 })
+
 export {}

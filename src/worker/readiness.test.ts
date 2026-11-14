@@ -1,5 +1,7 @@
 import { afterAll, afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createSudokuWorkerClient } from '@/worker/client'
+import { createLazyWorkerClient } from '@/worker/lazyClient'
+import { BRIDGE_VERSION } from '@/sudoku/guards'
 import { encodeSeed } from '@/sudoku/seed'
 import { createTestEngine, getTestModule } from '../../tests/support/wasm'
 import { solvedBoard, uniqueBoard } from '../../tests/fixtures/sudoku'
@@ -83,6 +85,72 @@ it('request_waits_for_ready_without_losing_deadline', async () => {
   await vi.advanceTimersByTimeAsync(0)
   expect(worker.messages).toHaveLength(1)
   client.dispose()
+})
+
+it('gives a Worker only the time left after shared initialization', async () => {
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const worker = currentWorker()
+  const lazy = createLazyWorkerClient(
+    () => new Promise((resolve) => setTimeout(() => resolve(client), 2000)),
+  )
+  const pending = lazy.generate(input())
+
+  await vi.advanceTimersByTimeAsync(2999)
+  expect(worker.terminations).toBe(0)
+
+  await vi.advanceTimersByTimeAsync(1)
+
+  expect(await pending).toEqual({ status: 'timed-out' })
+  expect(worker.terminations).toBe(1)
+  lazy.dispose()
+  client.dispose()
+})
+
+it('reports timeout when shared initialization rejects after the deadline before the timer runs', async () => {
+  const now = vi.spyOn(performance, 'now').mockReturnValue(0)
+  const lazy = createLazyWorkerClient(async () => {
+    await Promise.resolve()
+    throw new Error('WASM startup failed')
+  })
+  const request = lazy.generate(input())
+
+  now.mockReturnValue(3000)
+
+  try {
+    await expect(request).resolves.toEqual({ status: 'timed-out' })
+  } finally {
+    lazy.dispose()
+    now.mockRestore()
+  }
+})
+
+it('reports timeout when the reply reaches the lazy caller after the deadline', async () => {
+  const client = createSudokuWorkerClient(getTestModule(), engine)
+  const worker = currentWorker()
+  const now = vi.spyOn(performance, 'now').mockReturnValue(0)
+  const lazy = createLazyWorkerClient(() => Promise.resolve(client))
+  const request = lazy.generate(input())
+  worker.reply({ kind: 'ready', bridgeVersion: BRIDGE_VERSION })
+  await vi.advanceTimersByTimeAsync(0)
+  const job = worker.messages[1]
+  if (!isRecord(job)) {
+    throw new Error('Missing generation request')
+  }
+
+  worker.reply({
+    kind: 'generate',
+    requestId: job.requestId,
+    outcome: { status: 'failed', message: 'Generation failed' },
+  })
+  now.mockReturnValue(3000)
+
+  try {
+    await expect(request).resolves.toEqual({ status: 'timed-out' })
+  } finally {
+    lazy.dispose()
+    client.dispose()
+    now.mockRestore()
+  }
 })
 
 it('abort_during_wasm_initialization_settles_once', async () => {
@@ -207,7 +275,7 @@ it('rejects the immediately previous Worker bridge before dispatching a job', as
   const worker = currentWorker()
   const pending = client.generate(input())
 
-  worker.reply({ kind: 'ready', bridgeVersion: 2 })
+  worker.reply({ kind: 'ready', bridgeVersion: BRIDGE_VERSION - 1 })
 
   expect(await pending).toEqual({ status: 'failed', message: 'Worker engine bridge mismatch' })
   expect(worker.messages).toHaveLength(1)

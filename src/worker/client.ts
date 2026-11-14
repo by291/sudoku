@@ -10,6 +10,7 @@ import type { GenerationInput } from '@/sudoku/generationInput'
 import { copyRules } from '@/sudoku/ruleInput'
 import { decodeSeed, equalSeeds } from '@/sudoku/seed'
 import { parseWorkerResponse, validateHintEvidence } from '@/worker/protocol'
+import { getRequestDeadline, isWasmTimeout } from '@/worker/deadline'
 import type {
   GenerateNotesInput,
   LiveComputation,
@@ -18,8 +19,6 @@ import type {
   WorkerRequest,
   WorkerInitialize,
 } from '@/worker/protocol'
-
-const REQUEST_TIMEOUT_MILLISECONDS = 3000
 
 type StartupResult = { status: 'ready' } | { status: 'failed'; message: string }
 
@@ -56,7 +55,7 @@ export interface SudokuWorkerClient {
   dispose(): void
 }
 
-/** Own idle and active instances. Only compiled code is shared; termination interrupts synchronous WASM. */
+/** Own idle and active instances. Termination interrupts an isolated synchronous WASM call. */
 export function createSudokuWorkerClient(
   module: WebAssembly.Module,
   engine: MainSudokuEngine,
@@ -156,6 +155,24 @@ export function createSudokuWorkerClient(
     }
   }
 
+  function decodeReply<T>(
+    value: unknown,
+    decode: (value: unknown) => WorkerOutcome<T> | null,
+  ): WorkerOutcome<T> {
+    const malformed = 'Worker returned malformed data'
+
+    try {
+      return decode(value) ?? { status: 'failed', message: malformed }
+    } catch (error: unknown) {
+      if (isWasmTimeout(error)) {
+        return { status: 'timed-out' }
+      }
+
+      const message = error instanceof Error ? error.message : malformed
+      return { status: 'failed', message }
+    }
+  }
+
   function takeWorker(): PreparedWorker {
     if (preparedWorker) {
       const prepared = preparedWorker
@@ -177,14 +194,15 @@ export function createSudokuWorkerClient(
     request: WorkerRequest,
     decode: (value: unknown) => WorkerOutcome<T> | null,
     signal?: AbortSignal,
-    timeoutMilliseconds = REQUEST_TIMEOUT_MILLISECONDS,
   ): Promise<WorkerOutcome<T>> {
     if (disposed || signal?.aborted) {
       return Promise.resolve({ status: 'cancelled' })
     }
 
     return new Promise((resolve) => {
-      const deadline = performance.now() + timeoutMilliseconds
+      const deadline = getRequestDeadline(signal)
+      const remainingMilliseconds = Math.max(0, deadline - performance.now())
+
       let prepared: PreparedWorker
       try {
         prepared = takeWorker()
@@ -200,7 +218,10 @@ export function createSudokuWorkerClient(
       const worker = prepared.worker
       let settled = false
       // The original deadline includes initialization; readiness never resets this timer.
-      const timeout = window.setTimeout(() => finish({ status: 'timed-out' }), timeoutMilliseconds)
+      const timeout = window.setTimeout(
+        () => finish({ status: 'timed-out' }),
+        remainingMilliseconds,
+      )
       const cancel = () => finish({ status: 'cancelled' })
 
       function finish(outcome: WorkerOutcome<T>) {
@@ -212,12 +233,15 @@ export function createSudokuWorkerClient(
         if (outcome.status === 'completed' && performance.now() >= deadline) {
           outcome = { status: 'timed-out' }
         }
+
         settled = true
         window.clearTimeout(timeout)
         signal?.removeEventListener('abort', cancel)
         worker.removeEventListener('message', receive)
         worker.removeEventListener('error', fail)
         cancellations.delete(cancel)
+
+        // A Worker serves one job. Retire its memory before warming the next instance.
         prepared.terminate()
         resolve(outcome)
         prepareWorker()
@@ -232,21 +256,8 @@ export function createSudokuWorkerClient(
           finish({ status: 'timed-out' })
           return
         }
-        try {
-          finish(
-            decode(event.data) ?? { status: 'failed', message: 'Worker returned malformed data' },
-          )
-        } catch (error: unknown) {
-          finish(
-            error instanceof Error && error.message === 'Computation timed out'
-              ? { status: 'timed-out' }
-              : {
-                  status: 'failed',
-                  message:
-                    error instanceof Error ? error.message : 'Worker returned malformed data',
-                },
-          )
-        }
+
+        finish(decodeReply(event.data, decode))
       }
 
       function fail(event: ErrorEvent) {
@@ -257,10 +268,12 @@ export function createSudokuWorkerClient(
         if (settled) {
           return
         }
+
         if (performance.now() >= deadline) {
           finish({ status: 'timed-out' })
           return
         }
+
         if (prepared.failure) {
           finish({ status: 'failed', message: prepared.failure })
           return
@@ -281,6 +294,7 @@ export function createSudokuWorkerClient(
       worker.addEventListener('message', receive)
       worker.addEventListener('error', fail)
 
+      // Recheck after attaching listeners so a cancelled request cannot reach dispatch.
       if (signal?.aborted) {
         cancel()
         return
@@ -313,7 +327,11 @@ export function createSudokuWorkerClient(
       const snapshot = { board: [...board], rules: copyRules(rules) }
 
       return run(
-        { kind: 'conflicts', requestId: crypto.randomUUID(), ...snapshot },
+        {
+          kind: 'conflicts',
+          requestId: crypto.randomUUID(),
+          ...snapshot,
+        },
         (value) => {
           const parsed = parseWorkerResponse(value, engine)
           return parsed.valid && parsed.value.kind === 'conflicts' ? parsed.value.outcome : null
@@ -331,7 +349,11 @@ export function createSudokuWorkerClient(
       }
 
       return run(
-        { kind: 'generate-notes', requestId: crypto.randomUUID(), input: snapshot },
+        {
+          kind: 'generate-notes',
+          requestId: crypto.randomUUID(),
+          input: snapshot,
+        },
         (value) => {
           const parsed = parseWorkerResponse(value, engine)
           return parsed.valid && parsed.value.kind === 'generate-notes'
@@ -345,7 +367,11 @@ export function createSudokuWorkerClient(
       const snapshot = copyGenerationInput(input)
 
       return run(
-        { kind: 'generate', requestId: crypto.randomUUID(), input: snapshot },
+        {
+          kind: 'generate',
+          requestId: crypto.randomUUID(),
+          input: snapshot,
+        },
         (value) => {
           const parsed = parseWorkerResponse(value, engine)
           if (!parsed.valid || parsed.value.kind !== 'generate') {
@@ -353,6 +379,8 @@ export function createSudokuWorkerClient(
           }
 
           const outcome = parsed.value.outcome
+
+          // A valid puzzle can still belong to a different seed or generation request.
           if (
             outcome.status === 'completed' &&
             (outcome.value.rules.kind !== snapshot.variant ||
@@ -366,7 +394,6 @@ export function createSudokuWorkerClient(
           return outcome
         },
         signal,
-        REQUEST_TIMEOUT_MILLISECONDS,
       )
     },
     assess(input, signal) {
@@ -378,7 +405,11 @@ export function createSudokuWorkerClient(
       }
 
       return run(
-        { kind: 'assess', requestId: crypto.randomUUID(), input: snapshot },
+        {
+          kind: 'assess',
+          requestId: crypto.randomUUID(),
+          input: snapshot,
+        },
         (value) => {
           const parsed = parseWorkerResponse(value, engine)
           if (!parsed.valid || parsed.value.kind !== 'assess') {
@@ -386,6 +417,8 @@ export function createSudokuWorkerClient(
           }
 
           const outcome = parsed.value.outcome
+
+          // The live rating must use the rules and policy version submitted with this job.
           if (outcome.status === 'completed' && outcome.value.status !== 'invalid') {
             const identity =
               outcome.value.status === 'rated' ? outcome.value.summary : outcome.value
@@ -403,10 +436,18 @@ export function createSudokuWorkerClient(
       )
     },
     hint(board, solution, rules, signal) {
-      const snapshot = { board: [...board], solution: [...solution], rules: copyRules(rules) }
+      const snapshot = {
+        board: [...board],
+        solution: [...solution],
+        rules: copyRules(rules),
+      }
 
       return run(
-        { kind: 'hint', requestId: crypto.randomUUID(), ...snapshot },
+        {
+          kind: 'hint',
+          requestId: crypto.randomUUID(),
+          ...snapshot,
+        },
         (value) => {
           const parsed = parseWorkerResponse(value, engine)
           if (!parsed.valid || parsed.value.kind !== 'hint') {
@@ -418,7 +459,9 @@ export function createSudokuWorkerClient(
             return outcome
           }
 
+          // Shape validation alone cannot establish evidence against the submitted board.
           const hint = validateHintEvidence(outcome.value, snapshot.rules, snapshot.board, engine)
+
           return hint.valid ? { status: 'completed', value: hint.value } : null
         },
         signal,

@@ -2,7 +2,7 @@ import { createBindings } from '@sudoku/wasm/factory'
 import type { Board, PuzzleRules } from '@/sudoku/contracts'
 import type { AssessmentInput, LiveAssessmentOutcome } from '@/sudoku/contracts'
 import type { GenerationInput } from '@/sudoku/generationInput'
-import { validateEngineInfo, validateModuleExports } from '@/sudoku/guards'
+import { MAX_LOGICAL_STEPS, validateEngineInfo, validateModuleExports } from '@/sudoku/guards'
 import { copyRules } from '@/sudoku/ruleInput'
 import type { GenerateNotesInput } from '@/worker/protocol'
 
@@ -20,9 +20,11 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
     const layout = new bindings.PreparedPuzzle({
       rules: copyRules(rules),
     })
+
     try {
       return { computation: compute(layout) }
     } finally {
+      // The WASM handle must be released even when the computation throws.
       layout.free()
     }
   }
@@ -64,7 +66,7 @@ export async function createWorkerEngine(module: WebAssembly.Module) {
         board: [...board],
         solution: [...solution],
         rules: copyRules(rules),
-        maxSteps: 500,
+        maxSteps: MAX_LOGICAL_STEPS,
       }).result
     },
   }
