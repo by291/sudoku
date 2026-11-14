@@ -7,15 +7,13 @@ async function expectPageIds(history: Locator, expectedIds: readonly string[]) {
   const rows = history.getByRole('listitem')
   const links = history.getByRole('link')
   await expect(rows).toHaveCount(expectedIds.length)
-  await expect
-    .poll(() =>
-      links.evaluateAll((elements) =>
-        elements.map(
-          (element) => element.getAttribute('href')?.split('/records/')[1]?.split('?')[0],
-        ),
-      ),
-    )
-    .toEqual(expectedIds)
+  await expect(links).toHaveCount(expectedIds.length)
+
+  // Reading the full link array with evaluateAll can crash Playwright's Firefox content process.
+  for (const [index, id] of expectedIds.entries()) {
+    await expect(links.nth(index)).toHaveAttribute('href', `#/records/${id}?variant=classic`)
+  }
+
   expect(await rows.count()).toBeLessThanOrEqual(30)
 }
 
