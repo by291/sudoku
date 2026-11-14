@@ -37,6 +37,56 @@ fn cancellation_is_an_explicit_error() {
 }
 
 #[test]
+fn analysis_validates_geometry_and_limits_before_reporting_cancellation() {
+    let token = Arc::new(CancellationToken::new());
+    token.cancel();
+    let invalid_geometry = RulesDto::Thermo {
+        paths: vec![vec![0]],
+    };
+    let valid_geometry = RulesDto::Thermo {
+        paths: vec![vec![0, 1]],
+    };
+
+    let invalid_hint = hint(
+        HintInputDto {
+            board: BoardDto(vec![0; 81]),
+            solution: BoardDto(vec![0; 81]),
+            rules: invalid_geometry,
+            max_steps: None,
+        },
+        token.clone(),
+    );
+    let excessive_analysis = analyze_logic(
+        LogicInputDto {
+            board: BoardDto(vec![0; 81]),
+            rules: valid_geometry.clone(),
+            allowed: Vec::new(),
+            max_steps: 501,
+        },
+        token.clone(),
+    );
+    let cancelled_hint = hint(
+        HintInputDto {
+            board: BoardDto(vec![0; 81]),
+            solution: BoardDto(vec![0; 81]),
+            rules: valid_geometry,
+            max_steps: None,
+        },
+        token,
+    );
+
+    assert!(matches!(
+        invalid_hint,
+        Err(NativeError::InvalidInput { .. })
+    ));
+    assert!(matches!(
+        excessive_analysis,
+        Err(NativeError::InvalidInput { .. })
+    ));
+    assert!(matches!(cancelled_hint, Err(NativeError::Cancelled)));
+}
+
+#[test]
 fn seed_and_bridge_are_current_and_checked() {
     assert_eq!(engine_info().bridge_version, 3);
     assert_eq!(derive_seed(b"daily:2026-10-16".to_vec()).len(), 32);

@@ -47,7 +47,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Run this class alone in a fresh instrumentation process to interpret the first call as cold load. */
+/**
+ * Run this class alone in a fresh instrumentation process to interpret the first call as cold load.
+ */
 @RunWith(AndroidJUnit4::class)
 class NativeAndroidMetricsTest {
     private val measurements = JSONArray()
@@ -70,18 +72,34 @@ class NativeAndroidMetricsTest {
                 "evidence",
                 "Historical sealed puzzles validate compatibility; repeated generation checks determinism only"
             )
-            .put("coldInterpretation", "First engine call is cold only when this class runs alone in a fresh process")
+            .put(
+                "coldInterpretation",
+                "First engine call is cold only when this class runs alone in a fresh process"
+            )
             .put(
                 "heapInterpretation",
                 "Process-wide allocated native heap observation; no leak or retained-memory proof"
             )
-            .put("deviceInterpretation", "Emulator observations do not establish physical-device acceptance")
+            .put(
+                "deviceInterpretation",
+                "Emulator observations do not establish physical-device acceptance"
+            )
         try {
             val engine = RustSudokuEngine()
             measure("firstNativeInformationCall") { completed(engine.information()) }
-            repeat(5) { measure("warmNativeInformationCall:$it") { completed(engine.information()) } }
-            val daily = completed(engine.deriveSeed("daily:2026-10-16".encodeToByteArray().map { it.toUByte() }))
-            // Same independent JS BLAKE3 literal as sudoku/core/tests/random.rs; this is reused evidence.
+            repeat(5) {
+                measure("warmNativeInformationCall:$it") { completed(engine.information()) }
+            }
+            val daily =
+                completed(
+                    engine.deriveSeed(
+                        "daily:2026-10-16".encodeToByteArray().map {
+                            it.toUByte()
+                        }
+                    )
+                )
+            // Same independent JS BLAKE3 literal as sudoku/core/tests/random.rs; this is reused
+            // evidence.
             assertEquals(
                 listOf(
                     192, 49, 10, 214, 144, 151, 78, 22, 90, 7, 85, 25, 27, 44, 188, 244,
@@ -127,7 +145,16 @@ class NativeAndroidMetricsTest {
                     }
                     previous = response.value.puzzle
                     measurements.getJSONObject(measurements.length() - 1)
-                        .put("sample", if (repetition == 0) "first seed invocation" else "warm same seed")
+                        .put(
+                            "sample",
+                            if (repetition ==
+                                0
+                            ) {
+                                "first seed invocation"
+                            } else {
+                                "warm same seed"
+                            }
+                        )
                 }
             }
             arithmeticAndNodeLimit(corpus)
@@ -180,7 +207,9 @@ class NativeAndroidMetricsTest {
 
         val near = corpus.getJSONObject("nearExhaustion")
         val nearInput = near.getJSONObject("input")
-        val nearRules = json.decodeFromString<PuzzleRules>(nearInput.getJSONObject("rules").toString())
+        val nearRules = json.decodeFromString<PuzzleRules>(
+            nearInput.getJSONObject("rules").toString()
+        )
         val nearToken = CancellationToken()
         val nearPrepared = preparePuzzle(PrepareInputDto(nearRules.native()), nearToken)
         try {
@@ -212,7 +241,13 @@ class NativeAndroidMetricsTest {
         } else {
             GenerationVersionDto.VARIANTS_V12
         }
-        val options = GenerationOptionsDto(request.variant.native(), request.difficulty.native(), version, null)
+        val options =
+            GenerationOptionsDto(
+                request.variant.native(),
+                request.difficulty.native(),
+                version,
+                null
+            )
         val executor = Executors.newSingleThreadExecutor()
         try {
             repeat(3) { sample ->
@@ -221,7 +256,8 @@ class NativeAndroidMetricsTest {
                 val future = executor.submit<JSONObject> {
                     started.countDown()
                     try {
-                        val result = generate(request.seed.map { it.toByte() }.toByteArray(), options, token)
+                        val result =
+                            generate(request.seed.map { it.toByte() }.toByteArray(), options, token)
                         JSONObject().put(
                             "status",
                             when (result) {
@@ -276,8 +312,14 @@ class NativeAndroidMetricsTest {
         measurements.put(
             JSONObject().put("name", "boundedAnalysisQueueDrain")
                 .put("facadeCoroutinesPendingAtSignal", activeAtSignal)
-                .put("sampleInterpretation", "Includes queued calls; direct samples establish native checkpoints")
-                .put("cancelToNextPreparedReturnMs", (SystemClock.elapsedRealtimeNanos() - signalledAt) / NANOS_PER_MS)
+                .put(
+                    "sampleInterpretation",
+                    "Includes queued calls; direct samples establish native checkpoints"
+                )
+                .put(
+                    "cancelToNextPreparedReturnMs",
+                    (SystemClock.elapsedRealtimeNanos() - signalledAt) / NANOS_PER_MS
+                )
                 .put("sampleValid", activeAtSignal == 2)
         )
     }
@@ -300,7 +342,10 @@ class NativeAndroidMetricsTest {
             .put("nativeHeapBeforeBytes", before)
             .put("nativeHeapAfterBytes", after)
             .put("nativeHeapDeltaBytes", after - before)
-            .put("interpretation", "Observation includes all process native allocations; no leak-free claim")
+            .put(
+                "interpretation",
+                "Observation includes all process native allocations; no leak-free claim"
+            )
     }
 
     private fun hardGenerationCase(cases: JSONArray): JSONObject = (0 until cases.length()).map {
@@ -318,10 +363,11 @@ class NativeAndroidMetricsTest {
 
     private fun JSONArray.integers(): List<Int> = (0 until length()).map { getInt(it) }
 
-    private fun <T> completed(outcome: EngineOutcome<T>): EngineOutcome.Completed<T> = when (outcome) {
-        is EngineOutcome.Completed -> outcome
-        else -> throw AssertionError("Native operation did not complete: $outcome")
-    }
+    private fun <T> completed(outcome: EngineOutcome<T>): EngineOutcome.Completed<T> =
+        when (outcome) {
+            is EngineOutcome.Completed -> outcome
+            else -> throw AssertionError("Native operation did not complete: $outcome")
+        }
 
     private suspend fun <T> measure(name: String, action: suspend () -> T): T {
         val startedAt = SystemClock.elapsedRealtimeNanos()
@@ -330,7 +376,10 @@ class NativeAndroidMetricsTest {
         } finally {
             measurements.put(
                 JSONObject().put("name", name)
-                    .put("durationMs", (SystemClock.elapsedRealtimeNanos() - startedAt) / NANOS_PER_MS)
+                    .put(
+                        "durationMs",
+                        (SystemClock.elapsedRealtimeNanos() - startedAt) / NANOS_PER_MS
+                    )
             )
         }
     }

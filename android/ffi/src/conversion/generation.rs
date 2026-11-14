@@ -27,6 +27,7 @@ impl From<GenerationVersion> for GenerationVersionDto {
     }
 }
 
+/// Check versioned generation identity and preserve caller-supplied local limits.
 pub fn input(
     seed: Seed,
     options: GenerationOptionsDto,
@@ -48,6 +49,7 @@ pub fn input(
     Ok((input, limits))
 }
 
+/// Project the generation result while retaining explicit exhaustion causes.
 pub fn result_to_dto(result: GenerationResult) -> CoreResult<GenerationResultDto> {
     let source = result.metrics;
     let metrics = GenerationMetricsDto {

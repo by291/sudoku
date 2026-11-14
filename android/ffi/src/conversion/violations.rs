@@ -4,6 +4,7 @@ use sudoku_core::constraints::types::{RuleViolation, ViolationCode};
 use sudoku_core::types::CoreResult;
 
 /// Copies checked violation facts without interpreting or rendering them.
+/// Copy the rule violation and its affected cells into the transport.
 pub(crate) fn violation_to_dto(violation: &RuleViolation) -> CoreResult<ViolationDto> {
     let code = match violation.code {
         ViolationCode::Duplicate => ViolationCodeDto::Duplicate,

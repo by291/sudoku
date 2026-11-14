@@ -10,8 +10,15 @@ pub use prepared::PreparedPuzzle;
 use std::sync::Arc;
 use sudoku_core::{
     random::Seed,
+    rules::{
+        context::prepare_rules,
+        types::{PreparedRules, PuzzleRules},
+    },
     types::{Board, Bounded, EngineError},
 };
+
+const BRIDGE_VERSION: u32 = 3;
+const MAX_ANALYSIS_STEPS: u32 = 500;
 
 #[derive(uniffi::Record)]
 pub struct EngineInfo {
@@ -21,21 +28,24 @@ pub struct EngineInfo {
     pub rating_version: String,
 }
 
+/// Report the versions used to check the native bridge and its algorithms.
 #[uniffi::export]
 pub fn engine_info() -> EngineInfo {
     EngineInfo {
-        bridge_version: 3,
+        bridge_version: BRIDGE_VERSION,
         puzzle_version: sudoku_core::generation::types::PUZZLE_VERSION.into(),
         variant_puzzle_version: sudoku_core::generation::types::VARIANT_PUZZLE_VERSION.into(),
         rating_version: sudoku_core::rating::types::RATING_VERSION.into(),
     }
 }
 
+/// Derive an owned, deterministic 32-byte seed from caller-supplied material.
 #[uniffi::export]
 pub fn derive_seed(material: Vec<u8>) -> Vec<u8> {
     Seed::derive(&material).as_bytes().to_vec()
 }
 
+/// Prepare immutable rules and constraint support for a caller-owned native handle.
 #[uniffi::export]
 pub fn prepare_puzzle(
     input: PrepareInputDto,
@@ -44,6 +54,7 @@ pub fn prepare_puzzle(
     Ok(Arc::new(PreparedPuzzle::new(input, token)?))
 }
 
+/// Generate a versioned puzzle from an exact binary seed and a shared cancellation signal.
 #[uniffi::export]
 pub fn generate(
     seed: Vec<u8>,
@@ -52,6 +63,7 @@ pub fn generate(
 ) -> Result<GenerationResultDto, NativeError> {
     let seed = Seed::try_from(seed.as_slice())?;
     let (input, limits) = conversion::generation::input(seed, options)?;
+
     match sudoku_core::generation::generate::generate_puzzle_controlled(&input, &limits, token)? {
         sudoku_core::control::Controlled::Complete(result) => {
             Ok(conversion::generation::result_to_dto(result)?)
@@ -61,15 +73,28 @@ pub fn generate(
 }
 
 fn checked_steps(steps: Option<u32>) -> Result<u32, NativeError> {
-    let steps = steps.unwrap_or(500);
-    if steps > 500 {
+    let steps = steps.unwrap_or(MAX_ANALYSIS_STEPS);
+    if steps > MAX_ANALYSIS_STEPS {
         return Err(
             EngineError::invalid("Logical step limits may only lower the fixed bound").into(),
         );
     }
+
     Ok(steps)
 }
 
+fn prepare_analysis_rules(
+    rules: &PuzzleRules,
+    control: &mut sudoku_core::control::ExecutionControl,
+) -> Result<PreparedRules, NativeError> {
+    let Bounded::Complete(prepared) = prepare_rules(rules, control)? else {
+        return Err(NativeError::Cancelled);
+    };
+
+    Ok(prepared)
+}
+
+/// Return one hint under the checked step cap, with the same token during preparation and replay.
 #[uniffi::export]
 pub fn hint(
     input: HintInputDto,
@@ -78,17 +103,22 @@ pub fn hint(
     let board: Board = input.board.try_into()?;
     let solution: Board = input.solution.try_into()?;
     let rules = input.rules.try_into()?;
-    let rules = sudoku_core::rules::context::compile_rules(&rules)?;
+    // DTO conversion already checks geometry, so both input errors precede cancellation.
     let steps = checked_steps(input.max_steps)?;
+
     let mut execution_control = control::execution(token)?;
+    let rules = prepare_analysis_rules(&rules, &mut execution_control)?;
+
     let result =
         sudoku_core::hint::analyze_hint(&board, &solution, &rules, steps, &mut execution_control);
     control::check(&execution_control)?;
+
     Ok(HintComputationDto {
         result: conversion::logic::hint_to_dto(&result)?,
     })
 }
 
+/// Analyze logical progress with a bounded step count and cooperative cancellation.
 #[uniffi::export]
 pub fn analyze_logic(
     input: LogicInputDto,
@@ -96,10 +126,12 @@ pub fn analyze_logic(
 ) -> Result<LogicComputationDto, NativeError> {
     let board: Board = input.board.try_into()?;
     let rules = input.rules.try_into()?;
-    let rules = sudoku_core::rules::context::compile_rules(&rules)?;
     let allowed: Vec<_> = input.allowed.into_iter().map(Into::into).collect();
     let steps = checked_steps(Some(input.max_steps))?;
+
     let mut execution_control = control::execution(token)?;
+    let rules = prepare_analysis_rules(&rules, &mut execution_control)?;
+
     let result = sudoku_core::logic::solver::analyze_logic(
         &board,
         &rules,
@@ -108,6 +140,7 @@ pub fn analyze_logic(
         &mut execution_control,
     );
     control::check(&execution_control)?;
+
     Ok(LogicComputationDto {
         result: conversion::logic::logic_to_dto(&result)?,
     })
@@ -125,6 +158,7 @@ fn run_assessment(
         .map_or_else(AssessmentLimits::default, |v| AssessmentLimits {
             max_steps: v.max_steps,
         });
+
     let snapshot = AssessmentInput {
         board,
         rules,
@@ -133,15 +167,18 @@ fn run_assessment(
             .unwrap_or_else(|| RATING_VERSION.into()),
         limits,
     };
+
     let mut execution_control = control::execution(token)?;
     let result = sudoku_core::rating::assessment::assess_puzzle_with_control(
         &snapshot,
         &mut execution_control,
     );
     control::check(&execution_control)?;
+
     Ok(result)
 }
 
+/// Rate the board and return an owned summary and its successful deduction trace.
 #[uniffi::export]
 pub fn assess(
     input: AssessmentInputDto,
@@ -153,6 +190,7 @@ pub fn assess(
     })
 }
 
+/// Rate the board without projecting its full deduction trace into the transport.
 #[uniffi::export]
 pub fn assess_summary(
     input: AssessmentInputDto,
@@ -164,6 +202,7 @@ pub fn assess_summary(
     })
 }
 
+/// Validate mathematical puzzle content while keeping cancellation distinct from corruption.
 #[uniffi::export]
 pub fn validate_puzzle(
     input: PuzzleContentDto,
@@ -171,8 +210,10 @@ pub fn validate_puzzle(
 ) -> Result<ValidationDto, NativeError> {
     let content = input.try_into()?;
     let mut execution_control = control::execution(token)?;
+
     let result = sudoku_core::puzzle::validate_puzzle_bounded(&content, &mut execution_control);
     control::check(&execution_control)?;
+
     Ok(match result {
         Ok(Bounded::Complete(())) => ValidationDto::Valid,
         Ok(Bounded::Cancelled) => ValidationDto::Incomplete,
@@ -182,6 +223,7 @@ pub fn validate_puzzle(
     })
 }
 
+/// Bind clue evidence and, if a board is supplied, replay the proof on its candidate domains.
 #[uniffi::export]
 pub fn validate_hint_evidence(
     input: HintValidationInputDto,
@@ -190,6 +232,7 @@ pub fn validate_hint_evidence(
     let hint = conversion::logic::hint_to_core(input.hint)?;
     let rules = input.rules.try_into()?;
     let board: Option<Board> = input.board.map(TryInto::try_into).transpose()?;
+
     let mut execution_control = control::execution(token)?;
     let result = sudoku_core::hint::validation::validate_hint_evidence_with_control(
         &hint,
@@ -198,6 +241,7 @@ pub fn validate_hint_evidence(
         &mut execution_control,
     );
     control::check(&execution_control)?;
+
     Ok(match result {
         Ok(hint) => HintValidationDto::Valid {
             hint: conversion::logic::hint_to_dto(&hint)?,
@@ -208,6 +252,7 @@ pub fn validate_hint_evidence(
     })
 }
 
+/// Return transformed rules after checking the spatial operation and digit complement.
 #[uniffi::export]
 pub fn transform_rules(input: TransformInputDto) -> Result<RulesDto, NativeError> {
     let rules = input.rules.try_into()?;
@@ -217,6 +262,7 @@ pub fn transform_rules(input: TransformInputDto) -> Result<RulesDto, NativeError
     )?)
 }
 
+/// Validate one authored teaching action against its supplied candidate state.
 #[uniffi::export]
 pub fn validate_teaching_step(
     input: TeachingStepInputDto,
@@ -224,14 +270,16 @@ pub fn validate_teaching_step(
 ) -> Result<ValidationDto, NativeError> {
     let board = input.board.try_into()?;
     let rules = input.rules.try_into()?;
-    let candidates = input
+    let checked_candidates = input
         .candidates
         .into_iter()
         .map(sudoku_core::types::CandidateMask::try_from)
-        .collect::<Result<Vec<_>, _>>()?
+        .collect::<Result<Vec<_>, _>>()?;
+    let candidates = checked_candidates
         .try_into()
         .map_err(|_| EngineError::invalid("Teaching state requires 81 masks"))?;
     let step = conversion::logic::step_to_core(input.step)?;
+
     let mut execution_control = control::execution(token)?;
     let result = sudoku_core::logic::teaching::validate_teaching_step_with_control(
         &board,
@@ -241,6 +289,7 @@ pub fn validate_teaching_step(
         &mut execution_control,
     );
     control::check(&execution_control)?;
+
     Ok(match result {
         Ok(()) => ValidationDto::Valid,
         Err(error) => ValidationDto::Invalid {
@@ -249,6 +298,7 @@ pub fn validate_teaching_step(
     })
 }
 
+/// Validate optional historical assessment metadata independently of playable content.
 #[uniffi::export]
 pub fn validate_assessment(
     value: Option<StoredAssessmentDto>,
@@ -257,6 +307,7 @@ pub fn validate_assessment(
     Ok(conversion::metadata::decode(value, identity)?)
 }
 
+/// Check rule geometry without preparing a layout for computation.
 #[uniffi::export]
 pub fn validate_rules(rules: RulesDto) -> ValidationDto {
     match sudoku_core::rules::types::PuzzleRules::try_from(rules) {

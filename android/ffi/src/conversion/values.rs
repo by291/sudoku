@@ -63,22 +63,28 @@ impl From<SudokuVariant> for VariantDto {
     }
 }
 
+/// Narrow a core counter to the native transport width without truncating it.
 pub fn counter(value: u64) -> CoreResult<u32> {
     u32::try_from(value).map_err(|_| {
         EngineError::invalid("Core counter exceeds the native boundary's numeric bounds")
     })
 }
 
+/// Narrow an already validated index to the transport width.
 pub fn index(value: usize) -> CoreResult<u32> {
     u32::try_from(value).map_err(|_| {
         EngineError::invalid("Core index exceeds the native boundary's numeric bounds")
     })
 }
 
+/// Copy ordered indices into native transport storage.
 pub fn indices(values: impl AsRef<[usize]>) -> CoreResult<Vec<u32>> {
-    values.as_ref().iter().copied().map(index).collect()
+    let values = values.as_ref().iter().copied();
+
+    values.map(index).collect()
 }
 
+/// Widen transport indices before their owning rule checks the board bounds.
 pub fn core_indices(values: Vec<u32>) -> CoreResult<Vec<usize>> {
     values
         .into_iter()

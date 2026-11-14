@@ -28,6 +28,7 @@ fn issues_to_dto(issues: &[AssessmentIssue]) -> CoreResult<Vec<AssessmentIssueDt
         .collect()
 }
 
+/// Project a rating using the complete ordered technique catalogue.
 pub fn summary_to_dto(summary: &DifficultyAssessment) -> CoreResult<AssessmentSummaryDto> {
     let workload = &summary.workload;
     let counts = ALL_TECHNIQUES
@@ -56,6 +57,7 @@ pub fn summary_to_dto(summary: &DifficultyAssessment) -> CoreResult<AssessmentSu
     })
 }
 
+/// Convert the full rating outcome, including the successful deduction trace.
 pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResultDto> {
     let outcome = assessment_summary_to_dto(result)?;
     let trace = match result {
@@ -92,6 +94,7 @@ pub fn assessment_to_dto(result: &AssessmentResult) -> CoreResult<AssessmentResu
     })
 }
 
+/// Convert the rating outcome without projecting the proof trace.
 pub fn assessment_summary_to_dto(
     result: &AssessmentResult,
 ) -> CoreResult<LiveAssessmentOutcomeDto> {

@@ -11,7 +11,7 @@ import dev.sudoku.app.model.AssessmentWorkload
 import dev.sudoku.app.model.PuzzleAssessment
 
 internal fun AssessmentSummaryDto.player(): AssessmentSummary = AssessmentSummary(
-    "sudoku-rating-v2",
+    RATING_VERSION,
     variant.player(),
     difficulty.player(),
     AssessmentWorkload(
@@ -58,13 +58,15 @@ internal fun AssessmentSummary.native(): AssessmentSummaryDto = AssessmentSummar
 internal fun PuzzleAssessment.native(): StoredAssessmentDto = when (this) {
     is PuzzleAssessment.Rated -> StoredAssessmentDto.Rated(
         summary.ratingVersion,
-        if (summary.ratingVersion == "sudoku-rating-v2") {
+        // Carry an unsupported version through without converting its differently shaped summary.
+        if (summary.ratingVersion == RATING_VERSION) {
             summary.native()
         } else {
             null
         }
     )
     is PuzzleAssessment.Unavailable -> StoredAssessmentDto.Unavailable(
+        // Normalize for the native check; the application keeps the original stored spelling.
         if (reason == "budget-exhausted") {
             UnavailableReasonDto.INCOMPLETE
         } else {

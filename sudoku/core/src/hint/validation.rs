@@ -5,9 +5,9 @@ use crate::logic::step_shape::{STEP_COUNT_LIMIT, valid_step_shape};
 use crate::logic::step_validation::{StepReplay, ValidationMode, invalid, validate_step_and_apply};
 use crate::logic::types::{Evidence, LogicalAction};
 use crate::logic::workspace::create_workspace;
-use crate::rules::context::compile_rules;
+use crate::rules::context::prepare_rules;
 use crate::rules::types::PuzzleRules;
-use crate::types::{BOARD_SIZE, Board, CoreResult};
+use crate::types::{BOARD_SIZE, Board, Bounded, CoreResult, EngineError};
 
 /// Clone a hint and normalize omitted related-unit lists to `Some([])`.
 /// This validates chain shape only; it does not bind clues or replay mathematical proofs.
@@ -70,7 +70,12 @@ pub fn validate_hint_evidence_with_control(
         return Ok(parsed);
     };
 
-    let context = compile_rules(rules)?;
+    // Rule topology and proof replay share the caller's cancellation signal.
+    let Bounded::Complete(context) = prepare_rules(rules, control)? else {
+        return Err(EngineError::invalid(
+            "Hint evidence validation was cancelled",
+        ));
+    };
     let mut state = board.map(|board| create_workspace(board, &context));
 
     // Each proof sees the domains left by all preceding actions.

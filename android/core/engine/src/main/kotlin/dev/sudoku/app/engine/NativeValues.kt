@@ -2,31 +2,42 @@ package dev.sudoku.app.engine
 
 import dev.sudoku.app.ffi.DifficultyDto
 import dev.sudoku.app.ffi.VariantDto
+import dev.sudoku.app.model.BOARD_SIZE
 import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.Variant
 
-// Conversions own collections on both sides; generated handles never enter player state.
+private const val MAX_DIGIT = 9
+private const val MAX_CANDIDATE_MASK = (1 shl MAX_DIGIT) - 1
 
+/** Validate digits before narrowing and snapshot the board before native dispatch. */
 internal fun List<Int>.nativeBoard(): ByteArray {
-    require(size == 81) { "A board requires exactly 81 cells" }
-    require(all { it in 0..9 }) { "Invalid board digit" }
+    require(size == BOARD_SIZE) { "A board requires exactly 81 cells" }
+    require(all { it in 0..MAX_DIGIT }) { "Invalid board digit" }
+
     return ByteArray(size) { this[it].toByte() }
 }
 
-internal fun ByteArray.playerBoard(): List<Int> = map { it.toInt() and 255 }
+/** Copy native unsigned board bytes into player state. */
+internal fun ByteArray.playerBoard(): List<Int> = map { it.toUByte().toInt() }
 
+/** Validate a cell index before converting it to the unsigned native type. */
 internal fun Int.nativeCell(): UInt {
-    require(this in 0..80) { "Invalid cell index" }
+    require(this in 0 until BOARD_SIZE) { "Invalid cell index" }
+
     return toUInt()
 }
 
+/** Validate a placed digit; zero is reserved for empty cells. */
 internal fun Int.nativeDigit(): UByte {
-    require(this in 1..9) { "Invalid digit" }
+    require(this in 1..MAX_DIGIT) { "Invalid digit" }
+
     return toUByte()
 }
 
+/** Validate that the mask uses only the candidate bits owned by Sudoku digits. */
 internal fun Int.nativeMask(): UShort {
-    require(this in 0..511) { "Invalid candidate mask" }
+    require(this in 0..MAX_CANDIDATE_MASK) { "Invalid candidate mask" }
+
     return toUShort()
 }
 

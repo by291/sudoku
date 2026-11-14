@@ -39,7 +39,9 @@ internal fun String.nativeTechnique(): TechniqueDto =
 private fun UnitDto.player(): UnitReference = UnitReference(kind.name.lowercase(), index.toInt())
 
 private fun UnitReference.native(): UnitDto {
-    val kind = UnitKindDto.entries.firstOrNull { it.name.lowercase() == this.kind } ?: error("Unknown unit kind")
+    val kind =
+        UnitKindDto.entries.firstOrNull { it.name.lowercase() == this.kind }
+            ?: error("Unknown unit kind")
     require(index in 0..8 && (kind != UnitKindDto.DIAGONAL || index < 2))
     return UnitDto(kind, index.toUInt())
 }
@@ -222,7 +224,8 @@ internal fun Evidence.native(): EvidenceDto {
         )
         is Evidence.Coloring -> {
             val coloringMode =
-                ColoringModeDto.entries.firstOrNull { it.name.lowercase() == mode } ?: error("Unknown coloring mode")
+                ColoringModeDto.entries.firstOrNull { it.name.lowercase() == mode }
+                    ?: error("Unknown coloring mode")
             EvidenceDto.Advanced(
                 AdvancedEvidenceDto.Coloring(
                     cells,
@@ -280,7 +283,9 @@ internal fun HintResultDto.player(): HintResult = when (this) {
         },
         Placement(placement.cell.toInt(), placement.digit.toInt())
     )
-    is HintResultDto.Unavailable -> HintResult.Unavailable(reason.name.lowercase().replace('_', '-'))
+    is HintResultDto.Unavailable -> HintResult.Unavailable(
+        reason.name.lowercase().replace('_', '-')
+    )
 }
 
 internal fun HintResult.native(): HintResultDto = when (this) {

@@ -18,57 +18,74 @@ import dev.sudoku.app.model.RuleUnit
 import dev.sudoku.app.model.RuleViolation
 import dev.sudoku.app.model.ViolationCode
 
+/** Snapshot clue inputs before dispatch. Rust owns geometry validation. */
 internal fun PuzzleRules.native(): RulesDto = when (this) {
     PuzzleRules.Classic -> RulesDto.Classic
     PuzzleRules.Diagonal -> RulesDto.Diagonal
     is PuzzleRules.Jigsaw -> RulesDto.Jigsaw(regions.map { it.nativeCells() })
     is PuzzleRules.Killer -> RulesDto.Killer(
-        cages.map {
-            require(it.sum in 1..45)
-            CageDto(it.cells.nativeCells(), it.sum.toUShort())
+        cages.map { cage ->
+            require(cage.sum in 1..45)
+
+            CageDto(cage.cells.nativeCells(), cage.sum.toUShort())
         }
     )
     is PuzzleRules.Thermo -> RulesDto.Thermo(paths.map { it.nativeCells() })
-    is PuzzleRules.Arrow -> RulesDto.Arrow(arrows.map { ArrowDto(it.circle.nativeCell(), it.shaft.nativeCells()) })
+    is PuzzleRules.Arrow -> RulesDto.Arrow(
+        arrows.map {
+            ArrowDto(it.circle.nativeCell(), it.shaft.nativeCells())
+        }
+    )
 }
 
 internal fun RulesDto.player(): PuzzleRules = when (this) {
     RulesDto.Classic -> PuzzleRules.Classic
     RulesDto.Diagonal -> PuzzleRules.Diagonal
     is RulesDto.Jigsaw -> PuzzleRules.Jigsaw(regions.map { it.playerCells() })
-    is RulesDto.Killer -> PuzzleRules.Killer(cages.map { Cage(it.cells.playerCells(), it.sum.toInt()) })
+    is RulesDto.Killer -> PuzzleRules.Killer(
+        cages.map {
+            Cage(it.cells.playerCells(), it.sum.toInt())
+        }
+    )
     is RulesDto.Thermo -> PuzzleRules.Thermo(paths.map { it.playerCells() })
-    is RulesDto.Arrow -> PuzzleRules.Arrow(arrows.map { ArrowClue(it.circle.toInt(), it.shaft.playerCells()) })
+    is RulesDto.Arrow -> PuzzleRules.Arrow(
+        arrows.map {
+            ArrowClue(it.circle.toInt(), it.shaft.playerCells())
+        }
+    )
 }
 
+/** Own the metadata snapshot while preserving native unit, clue and relation ordering. */
 internal fun MetadataDto.player(): RuleMetadata = RuleMetadata(
-    rules.player(),
-    units.map { RuleUnit(it.kind.name.lowercase(), it.index.toInt(), it.cells.playerCells()) },
-    constraints.map {
+    rules = rules.player(),
+    units = units.map {
+        RuleUnit(it.kind.name.lowercase(), it.index.toInt(), it.cells.playerCells())
+    },
+    constraints = constraints.map {
         when (it) {
             is ConstraintDto.Cage -> RuleConstraint.Cage(
-                it.id,
-                it.index.toInt(),
-                it.cells.playerCells(),
-                it.sum.toInt()
+                id = it.id,
+                index = it.index.toInt(),
+                cells = it.cells.playerCells(),
+                sum = it.sum.toInt()
             )
-            is ConstraintDto.Thermo -> RuleConstraint.Thermo(it.id, it.index.toInt(), it.cells.playerCells())
-            is ConstraintDto.Arrow -> RuleConstraint.Arrow(
+            is ConstraintDto.Thermo -> RuleConstraint.Thermo(
                 it.id,
                 it.index.toInt(),
-                it.circle.toInt(),
-                it.shaft.playerCells()
+                it.cells.playerCells()
+            )
+            is ConstraintDto.Arrow -> RuleConstraint.Arrow(
+                id = it.id,
+                index = it.index.toInt(),
+                circle = it.circle.toInt(),
+                shaft = it.shaft.playerCells()
             )
         }
     },
-    cellUnits.map {
-        it.playerCells()
-    },
-    cellConstraints.map {
-        it.playerCells()
-    },
-    duplicatePeers.map { it.playerCells() },
-    relatedCells.map { it.playerCells() }
+    cellUnits = cellUnits.map { it.playerCells() },
+    cellConstraints = cellConstraints.map { it.playerCells() },
+    duplicatePeers = duplicatePeers.map { it.playerCells() },
+    relatedCells = relatedCells.map { it.playerCells() }
 )
 
 internal fun ViolationDto.player(): RuleViolation = RuleViolation(
@@ -76,7 +93,10 @@ internal fun ViolationDto.player(): RuleViolation = RuleViolation(
     cells.playerCells(),
     when (val value = code) {
         ViolationCodeDto.Duplicate -> ViolationCode.Duplicate
-        is ViolationCodeDto.CageTotal -> ViolationCode.CageTotal(value.index.toLong(), value.sum.toInt())
+        is ViolationCodeDto.CageTotal -> ViolationCode.CageTotal(
+            value.index.toLong(),
+            value.sum.toInt()
+        )
         is ViolationCodeDto.ThermoOrder -> ViolationCode.ThermoOrder(value.index.toLong())
         is ViolationCodeDto.ArrowTotal -> ViolationCode.ArrowTotal(value.index.toLong())
     }

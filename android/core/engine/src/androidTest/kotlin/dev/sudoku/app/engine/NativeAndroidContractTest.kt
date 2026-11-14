@@ -41,8 +41,12 @@ class NativeAndroidContractTest {
         assertEquals(
             AssessmentResult.Invalid(
                 listOf(
-                    AssessmentIssue.Violation(RuleViolation("row:0", listOf(0, 1), ViolationCode.Duplicate)),
-                    AssessmentIssue.Violation(RuleViolation("box:0", listOf(0, 1), ViolationCode.Duplicate))
+                    AssessmentIssue.Violation(
+                        RuleViolation("row:0", listOf(0, 1), ViolationCode.Duplicate)
+                    ),
+                    AssessmentIssue.Violation(
+                        RuleViolation("box:0", listOf(0, 1), ViolationCode.Duplicate)
+                    )
                 )
             ),
             result
@@ -76,7 +80,11 @@ class NativeAndroidContractTest {
         )
         repeat(3) {
             for (rule in rules) {
-                val prepared = (engine.prepare(rule) as EngineOutcome.Completed<PreparedPuzzle>).value
+                val prepared = (
+                    engine.prepare(
+                        rule
+                    ) as EngineOutcome.Completed<PreparedPuzzle>
+                    ).value
                 assertEquals(81, prepared.metadata.duplicatePeers.size)
                 val result = prepared.edit(
                     List(81) { 0 },

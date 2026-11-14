@@ -13,6 +13,7 @@ import dev.sudoku.app.ffi.HintUnavailableDto
 import dev.sudoku.app.ffi.PreparedPuzzle as NativePreparedPuzzle
 import dev.sudoku.app.ffi.ReviewInputDto
 import dev.sudoku.app.ffi.hint
+import dev.sudoku.app.model.BOARD_SIZE
 import dev.sudoku.app.model.BoardEdit
 import dev.sudoku.app.model.BoardLayers
 import dev.sudoku.app.model.EditResult
@@ -55,7 +56,9 @@ internal class OwnedPreparedPuzzle(
         lane: NativeLane,
         operation: (NativePreparedPuzzle, CancellationToken) -> EngineOutcome<T>
     ): EngineOutcome<T> = NativeCalls.run(lane, limits.requestDeadlineMs) { token ->
+        // Acquire only when execution starts, so close need not wait on queued operations.
         val handle = acquire()
+
         try {
             operation(handle, token)
         } finally {
@@ -63,53 +66,59 @@ internal class OwnedPreparedPuzzle(
         }
     }
 
-    override suspend fun edit(givens: List<Int>, layers: BoardLayers, action: BoardEdit): EngineOutcome<EditResult> =
-        guarded {
-            require(layers.notes.size == 81) { "Notes require 81 masks" }
-            val nativeAction = when (action) {
-                is BoardEdit.Enter -> BoardEditDto.Enter(action.cell.nativeCell(), action.digit.nativeDigit())
-                is BoardEdit.Erase -> BoardEditDto.Erase(action.cell.nativeCell())
-                is BoardEdit.ToggleNote -> BoardEditDto.ToggleNote(
-                    action.cell.nativeCell(),
-                    action.digit.nativeDigit()
-                )
-                BoardEdit.GenerateNotes -> BoardEditDto.GenerateNotes
+    override suspend fun edit(
+        givens: List<Int>,
+        layers: BoardLayers,
+        action: BoardEdit
+    ): EngineOutcome<EditResult> = guarded {
+        require(layers.notes.size == BOARD_SIZE) { "Notes require 81 masks" }
+
+        val nativeAction = when (action) {
+            is BoardEdit.Enter -> BoardEditDto.Enter(
+                action.cell.nativeCell(),
+                action.digit.nativeDigit()
+            )
+            is BoardEdit.Erase -> BoardEditDto.Erase(action.cell.nativeCell())
+            is BoardEdit.ToggleNote -> BoardEditDto.ToggleNote(
+                action.cell.nativeCell(),
+                action.digit.nativeDigit()
+            )
+            BoardEdit.GenerateNotes -> BoardEditDto.GenerateNotes
+        }
+
+        val input =
+            EditInputDto(
+                givens = givens.nativeBoard(),
+                entries = layers.entries.nativeBoard(),
+                notes = layers.notes.map { it.nativeMask() },
+                action = nativeAction
+            )
+
+        use(
+            if (action == BoardEdit.GenerateNotes) {
+                NativeLane.ANALYSIS
+            } else {
+                NativeLane.INTERACTIVE
             }
-            val input =
-                EditInputDto(
-                    givens.nativeBoard(),
-                    layers.entries.nativeBoard(),
-                    layers.notes.map {
-                        it.nativeMask()
-                    },
-                    nativeAction
-                )
-            use(
-                if (action == BoardEdit.GenerateNotes) {
-                    NativeLane.ANALYSIS
-                } else {
-                    NativeLane.INTERACTIVE
-                }
-            ) { handle, token ->
-                val response = handle.edit(input, token)
-                when (val result = response.result) {
-                    is EditResultDto.Complete -> EngineOutcome.Completed(
-                        EditResult(
-                            result.entries.playerBoard(),
-                            result.notes.map {
-                                it.toInt()
-                            },
-                            result.changed,
-                            result.boardComplete
-                        )
+        ) { handle, token ->
+            val response = handle.edit(input, token)
+            when (val result = response.result) {
+                is EditResultDto.Complete -> EngineOutcome.Completed(
+                    EditResult(
+                        entries = result.entries.playerBoard(),
+                        notes = result.notes.map { it.toInt() },
+                        changed = result.changed,
+                        boardComplete = result.boardComplete
                     )
-                    EditResultDto.Incomplete -> EngineOutcome.Incomplete
-                }
+                )
+                EditResultDto.Incomplete -> EngineOutcome.Incomplete
             }
         }
+    }
 
     override suspend fun candidates(board: List<Int>): EngineOutcome<List<Int>> = guarded {
         val input = BoardQueryDto(board.nativeBoard())
+
         use(NativeLane.ANALYSIS) { handle, token ->
             val response = handle.candidates(input, token)
             when (val result = response.result) {
@@ -125,6 +134,7 @@ internal class OwnedPreparedPuzzle(
 
     override suspend fun conflicts(board: List<Int>): EngineOutcome<List<RuleViolation>> = guarded {
         val input = BoardQueryDto(board.nativeBoard())
+
         use(NativeLane.ANALYSIS) { handle, token ->
             val response = handle.conflicts(input, token)
             when (val result = response.result) {
@@ -140,28 +150,44 @@ internal class OwnedPreparedPuzzle(
 
     override suspend fun isComplete(board: List<Int>): EngineOutcome<Boolean> = guarded {
         val input = board.nativeBoard()
-        use(NativeLane.INTERACTIVE) { handle, _ -> EngineOutcome.Completed(handle.isComplete(input)) }
+
+        use(NativeLane.INTERACTIVE) { handle, _ ->
+            EngineOutcome.Completed(handle.isComplete(input))
+        }
     }
 
-    override suspend fun reviewEntries(board: List<Int>, solution: List<Int>): EngineOutcome<List<Int>> = guarded {
+    override suspend fun reviewEntries(
+        board: List<Int>,
+        solution: List<Int>
+    ): EngineOutcome<List<Int>> = guarded {
         val input = ReviewInputDto(board.nativeBoard(), solution.nativeBoard())
+
         use(NativeLane.INTERACTIVE) { handle, _ ->
             EngineOutcome.Completed(handle.reviewEntries(input).map { it.toInt() })
         }
     }
 
-    override suspend fun hint(board: List<Int>, solution: List<Int>): EngineOutcome<HintResult> = guarded {
-        val input = HintInputDto(board.nativeBoard(), solution.nativeBoard(), metadata.rules.native(), null)
-        use(NativeLane.ANALYSIS) { _, token ->
-            val response = hint(input, token)
-            val result = response.result
-            if (result is HintResultDto.Unavailable && result.reason == HintUnavailableDto.INCOMPLETE) {
-                EngineOutcome.Incomplete
-            } else {
-                EngineOutcome.Completed(result.player())
+    override suspend fun hint(board: List<Int>, solution: List<Int>): EngineOutcome<HintResult> =
+        guarded {
+            val input = HintInputDto(
+                board = board.nativeBoard(),
+                solution = solution.nativeBoard(),
+                rules = metadata.rules.native(),
+                maxSteps = null
+            )
+
+            use(NativeLane.ANALYSIS) { _, token ->
+                val response = hint(input, token)
+                val result = response.result
+                if (result is HintResultDto.Unavailable &&
+                    result.reason == HintUnavailableDto.INCOMPLETE
+                ) {
+                    EngineOutcome.Incomplete
+                } else {
+                    EngineOutcome.Completed(result.player())
+                }
             }
         }
-    }
 
     override suspend fun close() {
         synchronized(ownership) {
@@ -170,29 +196,34 @@ internal class OwnedPreparedPuzzle(
                 drained.complete(Unit)
             }
         }
-        // Coroutine cancellation cannot shorten native lifetime. Closing resumes only after every lease returns.
+
+        // Cancellation cannot shorten native lifetime. Wait until every lease returns.
         withContext(NonCancellable + Dispatchers.IO) {
             drained.await()
             synchronized(ownership) {
-                if (!destroyed) {
-                    native.close()
-                    destroyed = true
-                }
+                destroy()
             }
         }
     }
 
+    /** Close an unpublished handle rejected during delivery, before it can acquire a lease. */
     fun discard() {
         NativeCalls.release {
             synchronized(ownership) {
                 check(inFlight == 0)
                 closing = true
-                if (!destroyed) {
-                    native.close()
-                    destroyed = true
-                }
+                destroy()
                 drained.complete(Unit)
             }
         }
+    }
+
+    private fun destroy() {
+        if (destroyed) {
+            return
+        }
+
+        native.close()
+        destroyed = true
     }
 }

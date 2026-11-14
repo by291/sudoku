@@ -28,53 +28,73 @@ internal object NativeCalls {
     private val interactive = Dispatchers.IO.limitedParallelism(1)
     private val analysis = Dispatchers.IO.limitedParallelism(2)
 
+    /** Run a synchronous call within its queueing and execution budget in milliseconds. */
     suspend fun <T> run(
         lane: NativeLane,
         deadlineMs: Long,
         discard: (T) -> Unit = {},
         operation: (CancellationToken) -> EngineOutcome<T>
-    ): EngineOutcome<T> {
-        return try {
-            withTimeout(deadlineMs) {
-                suspendCancellableCoroutine { continuation ->
-                    val cancellation = TokenOwner()
-                    continuation.invokeOnCancellation { cancellation.cancel() }
-                    scope.launch(if (lane == NativeLane.ANALYSIS) analysis else interactive) {
-                        // Cancelled queued work never enters native computation.
-                        if (!continuation.isActive) {
-                            return@launch
-                        }
-                        val result = try {
-                            val token = cancellation.create()
-                            operation(token)
-                        } catch (failure: NativeException.InvalidInput) {
-                            EngineOutcome.InvalidInput(failure.reason)
-                        } catch (failure: NativeException.Cancelled) {
-                            EngineOutcome.Cancelled
-                        } catch (failure: NativeException.Incomplete) {
-                            EngineOutcome.Incomplete
-                        } catch (failure: Exception) {
-                            EngineOutcome.Failed(failure.message ?: "Native engine operation failed")
-                        } catch (failure: LinkageError) {
-                            EngineOutcome.Failed(failure.message ?: "Native engine library could not load")
-                        } finally {
-                            cancellation.close()
-                        }
-                        continuation.resume(result) { _, rejected, _ ->
-                            if (rejected is EngineOutcome.Completed) {
-                                discard(rejected.value)
-                            }
-                        }
-                    }
+    ): EngineOutcome<T> = try {
+        withTimeout(deadlineMs) {
+            awaitNativeResult(lane, discard, operation)
+        }
+    } catch (timeout: TimeoutCancellationException) {
+        EngineOutcome.TimedOut
+    } catch (cancelled: CancellationException) {
+        EngineOutcome.Cancelled
+    }
+
+    private suspend fun <T> awaitNativeResult(
+        lane: NativeLane,
+        discard: (T) -> Unit,
+        operation: (CancellationToken) -> EngineOutcome<T>
+    ): EngineOutcome<T> = suspendCancellableCoroutine { continuation ->
+        val cancellation = TokenOwner()
+        continuation.invokeOnCancellation { cancellation.cancel() }
+        val dispatcher = when (lane) {
+            NativeLane.ANALYSIS -> analysis
+            NativeLane.INTERACTIVE -> interactive
+        }
+
+        // Application scope keeps executing native calls alive until they release their resources.
+        scope.launch(dispatcher) {
+            if (!continuation.isActive) {
+                return@launch
+            }
+
+            val result = execute(cancellation, operation)
+
+            // Prompt cancellation can reject delivery even after the native call completed.
+            continuation.resume(result) { _, rejected, _ ->
+                if (rejected is EngineOutcome.Completed) {
+                    discard(rejected.value)
                 }
             }
-        } catch (timeout: TimeoutCancellationException) {
-            EngineOutcome.TimedOut
-        } catch (cancelled: CancellationException) {
-            EngineOutcome.Cancelled
         }
     }
 
+    private fun <T> execute(
+        cancellation: TokenOwner,
+        operation: (CancellationToken) -> EngineOutcome<T>
+    ): EngineOutcome<T> = try {
+        val token = cancellation.create()
+        operation(token)
+    } catch (failure: NativeException.InvalidInput) {
+        EngineOutcome.InvalidInput(failure.reason)
+    } catch (failure: NativeException.Cancelled) {
+        EngineOutcome.Cancelled
+    } catch (failure: NativeException.Incomplete) {
+        EngineOutcome.Incomplete
+    } catch (failure: Exception) {
+        EngineOutcome.Failed(failure.message ?: "Native engine operation failed")
+    } catch (failure: LinkageError) {
+        EngineOutcome.Failed(failure.message ?: "Native engine library could not load")
+    } finally {
+        // The token must remain valid until the synchronous operation returns.
+        cancellation.close()
+    }
+
+    /** Retire an unpublished native resource on the interactive dispatcher. */
     fun release(operation: () -> Unit) {
         scope.launch(interactive) { operation() }
     }
@@ -84,12 +104,15 @@ internal object NativeCalls {
         private var token: CancellationToken? = null
         private var cancelled = false
 
-        @Synchronized fun create(): CancellationToken {
+        @Synchronized
+        fun create(): CancellationToken {
             val created = CancellationToken()
             token = created
+
             if (cancelled) {
                 created.cancel()
             }
+
             return created
         }
 
@@ -98,12 +121,14 @@ internal object NativeCalls {
             scope.launch(Dispatchers.IO) { signal() }
         }
 
-        @Synchronized private fun signal() {
+        @Synchronized
+        private fun signal() {
             cancelled = true
             token?.cancel()
         }
 
-        @Synchronized fun close() {
+        @Synchronized
+        fun close() {
             token?.close()
             token = null
         }

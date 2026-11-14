@@ -40,7 +40,7 @@ App owns bootstrap, composition, typed navigation and global preferences. ViewMo
 
 ## Native execution and lifetime
 
-Rust owns Sudoku rules, edits, counting, hints, rating, generation and teaching evidence. `android/ffi` exposes named typed operations and exhaustive checked DTO conversions. Bridge version 2 transports live issues as structured violations or diagnostic messages; game presentation formats Chinese explanations. Historical saved issue strings and backup formats stay unchanged.
+Rust owns Sudoku rules, edits, counting, hints, rating, generation and teaching evidence. `android/ffi` exposes named typed operations and exhaustive checked DTO conversions. The native bridge transports live issues as structured violations or diagnostic messages; game presentation formats Chinese explanations. Historical saved issue strings and backup formats stay unchanged.
 
 `core/engine` snapshots mutable input before suspension, separates interactive and analysis execution lanes and respects finite deadlines. `OwnedPreparedPuzzle` owns a prepared native handle and its in-flight leases. A timeout may return to the caller before the native call drains; native memory is released only after actual execution ends. Rejected prepared results are closed exactly once. Cancellation tokens are sticky and must not be reused for another operation.
 

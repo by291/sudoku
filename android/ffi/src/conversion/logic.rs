@@ -98,6 +98,7 @@ fn checked_digit(digit: DigitDto) -> CoreResult<u8> {
     Ok(Digit::try_from(digit.0)?.value())
 }
 
+/// Copy rule evidence in its original clue and cell order.
 pub fn rule_to_dto(evidence: &RuleEvidence) -> CoreResult<RuleEvidenceDto> {
     let constraint_id = evidence.constraint_id.clone();
     let cells = indices(&evidence.cells)?;
@@ -451,6 +452,7 @@ fn evidence_to_core(evidence: EvidenceDto) -> CoreResult<Evidence> {
     })
 }
 
+/// Convert an owned step snapshot without altering its evidence or action.
 pub fn step_to_dto(step: &LogicalStep) -> CoreResult<LogicalStepDto> {
     let technique = step.technique.into();
     let evidence = evidence_to_dto(&step.evidence)?;
@@ -477,6 +479,7 @@ pub fn step_to_dto(step: &LogicalStep) -> CoreResult<LogicalStepDto> {
     })
 }
 
+/// Check and convert transport evidence for later semantic validation.
 pub fn step_to_core(step: LogicalStepDto) -> CoreResult<LogicalStep> {
     let (technique, evidence, action) = match step {
         LogicalStepDto::Placement {
@@ -522,6 +525,7 @@ pub fn step_to_core(step: LogicalStepDto) -> CoreResult<LogicalStep> {
     })
 }
 
+/// Project a hint and its ordered proof into owned native data.
 pub fn hint_to_dto(hint: &HintResult) -> CoreResult<HintResultDto> {
     Ok(match hint {
         HintResult::ReviewEntry { cell } => HintResultDto::ReviewEntry {
@@ -544,6 +548,7 @@ pub fn hint_to_dto(hint: &HintResult) -> CoreResult<HintResultDto> {
     })
 }
 
+/// Convert hint input before the core validates its chain and evidence.
 pub fn hint_to_core(hint: HintResultDto) -> CoreResult<HintResult> {
     Ok(match hint {
         HintResultDto::ReviewEntry { cell } => HintResult::ReviewEntry {
@@ -569,6 +574,7 @@ pub fn hint_to_core(hint: HintResultDto) -> CoreResult<HintResult> {
     })
 }
 
+/// Project a logical trace and its completion or exhaustion outcome.
 pub fn logic_to_dto(
     result: &sudoku_core::logic::types::LogicResult,
 ) -> CoreResult<crate::dto::logic::LogicResultDto> {

@@ -1,8 +1,68 @@
 use std::sync::Arc;
+use sudoku_core::constraints::conflicts::evaluate_conflicts;
+use sudoku_core::control::ExecutionControl;
+use sudoku_core::rules::context::compile_rules;
+use sudoku_core::rules::types::PuzzleRules;
+use sudoku_core::types::Board;
 use sudoku_ffi::*;
 
 fn token() -> Arc<CancellationToken> {
     Arc::new(CancellationToken::new())
+}
+
+#[test]
+fn prepared_killer_conflicts_preserve_raw_violation_order() {
+    let fixtures: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/engine-contracts/rules.json"
+    ))
+    .unwrap();
+    let fixture = fixtures
+        .iter()
+        .find(|row| row["id"] == "killer-easy")
+        .unwrap();
+    let rules: RulesDto = serde_json::from_value(fixture["input"]["rules"].clone()).unwrap();
+    let core_rules = PuzzleRules::try_from(rules.clone()).unwrap();
+    let raw_layout = compile_rules(&core_rules).unwrap();
+    let prepared = prepare_puzzle(PrepareInputDto { rules }, token()).unwrap();
+    let givens: Vec<u8> = serde_json::from_value(fixture["input"]["board"].clone()).unwrap();
+    let mut conflicting = givens.clone();
+    conflicting[0] = 9;
+    conflicting[1] = 9;
+
+    // Compare both clean and conflicting partial boards over the same cage layout.
+    for values in [givens, conflicting] {
+        let board = Board::try_from(values.as_slice()).unwrap();
+        let expected = evaluate_conflicts(&board, &raw_layout, &mut ExecutionControl::new());
+        let actual = prepared
+            .conflicts(
+                BoardQueryDto {
+                    board: BoardDto(values),
+                },
+                token(),
+            )
+            .unwrap();
+
+        let ConflictResultDto::Complete { violations } = actual.result else {
+            panic!("Expected complete conflict evaluation");
+        };
+        let actual: Vec<_> = violations
+            .iter()
+            .map(|violation| (violation.constraint_id.as_str(), violation.cells.clone()))
+            .collect();
+        let expected: Vec<_> = expected
+            .violations
+            .iter()
+            .map(|violation| {
+                let cells: Vec<_> = violation
+                    .cells
+                    .iter()
+                    .map(|&cell| u32::try_from(cell).unwrap())
+                    .collect();
+                (violation.constraint_id.as_str(), cells)
+            })
+            .collect();
+        assert_eq!(actual, expected);
+    }
 }
 
 #[test]

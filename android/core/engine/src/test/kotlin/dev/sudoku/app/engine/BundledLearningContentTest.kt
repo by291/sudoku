@@ -26,8 +26,17 @@ class BundledLearningContentTest {
 
         for (lesson in catalogue.lessons) {
             for ((index, stage) in lesson.stages.withIndex()) {
-                val result = engine.validateTeachingStep(stage.board, stage.candidates, stage.rules, stage.step)
-                val completed = assertIs<EngineOutcome.Completed<Validation>>(result, "${lesson.id} stage $index")
+                val result = engine.validateTeachingStep(
+                    stage.board,
+                    stage.candidates,
+                    stage.rules,
+                    stage.step
+                )
+                val completed =
+                    assertIs<EngineOutcome.Completed<Validation>>(
+                        result,
+                        "${lesson.id} stage $index"
+                    )
                 assertEquals(Validation.Valid, completed.value, "${lesson.id} stage $index")
             }
         }
@@ -38,7 +47,12 @@ class BundledLearningContentTest {
         val stage = catalogue().lessons.first().stages.first()
         // The authored center has only candidate 5. Digit 4 is in range but cannot follow from it.
         val falseStep = assertIs<LogicalStep.Place>(stage.step).copy(digit = 4)
-        val result = RustSudokuEngine().validateTeachingStep(stage.board, stage.candidates, stage.rules, falseStep)
+        val result = RustSudokuEngine().validateTeachingStep(
+            stage.board,
+            stage.candidates,
+            stage.rules,
+            falseStep
+        )
 
         assertIs<Validation.Invalid>(assertIs<EngineOutcome.Completed<Validation>>(result).value)
     }

@@ -14,6 +14,7 @@ use sudoku_core::editing::EditOutcome;
 use sudoku_core::search::types::SearchResult;
 use sudoku_core::types::{Board, Bounded, CoreResult};
 
+/// Project exact-search outcomes without treating an incomplete count as conclusive.
 pub fn search_to_dto(result: SearchResult) -> CoreResult<SearchResultDto> {
     Ok(match result {
         SearchResult::Complete {
@@ -40,6 +41,7 @@ pub struct PreparedPuzzle {
 
 #[uniffi::export]
 impl PreparedPuzzle {
+    /// Classify whether full live queries require the analysis lane.
     pub fn live_execution(&self) -> Result<crate::dto::operations::LiveExecutionDto, NativeError> {
         use crate::dto::operations::LiveExecutionDto;
         use sudoku_core::constraints::types::LiveComputationCost;
@@ -49,37 +51,41 @@ impl PreparedPuzzle {
         })
     }
 
+    /// Return owned layout metadata without exposing the prepared handle's state.
     pub fn metadata(&self) -> Result<MetadataDto, NativeError> {
         Ok(metadata_to_dto(self.computation.rules())?)
     }
 
+    /// Check a terminal board against every unit and clue in the layout.
     pub fn is_complete(&self, board: BoardDto) -> Result<bool, NativeError> {
         let board: Board = board.try_into()?;
+
         Ok(sudoku_core::board::is_complete(
             &board,
             self.computation.rules(),
         ))
     }
 
+    /// List nonempty entries that differ from the supplied solution.
     pub fn review_entries(
         &self,
         input: crate::dto::operations::ReviewInputDto,
     ) -> Result<Vec<u32>, NativeError> {
         let board = input.board.try_into()?;
         let solution = input.solution.try_into()?;
+
         indices(sudoku_core::board::incorrect_entries(&board, &solution)).map_err(NativeError::from)
     }
 
+    /// Return candidate masks after only duplicate-peer exclusions.
     pub fn base_candidates(&self, board: BoardDto) -> Result<Vec<u16>, NativeError> {
         let board: Board = board.try_into()?;
-        Ok(
-            sudoku_core::board::base_candidates(&board, self.computation.rules())
-                .iter()
-                .map(|mask| mask.bits())
-                .collect(),
-        )
+        let candidates = sudoku_core::board::base_candidates(&board, self.computation.rules());
+
+        Ok(candidates.iter().map(|mask| mask.bits()).collect())
     }
 
+    /// Compute full candidate masks under the caller's cancellation signal.
     pub fn candidates(
         &self,
         input: BoardQueryDto,
@@ -103,6 +109,7 @@ impl PreparedPuzzle {
         Ok(crate::dto::operations::CandidateComputationDto { result })
     }
 
+    /// Evaluate conflicts against immutable prepared support for this layout.
     pub fn conflicts(
         &self,
         input: BoardQueryDto,
@@ -111,16 +118,19 @@ impl PreparedPuzzle {
         let board: Board = input.board.try_into()?;
         let mut execution_control = control::execution(token)?;
 
-        let conflicts = sudoku_core::constraints::conflicts::evaluate_conflicts(
+        // Reuse cage catalogues while keeping the board's domains local to this request.
+        let conflicts = sudoku_core::constraints::conflicts::evaluate_prepared_conflicts(
             &board,
-            self.computation.rules(),
+            &self.computation,
             &mut execution_control,
         );
+
         let violations = conflicts
             .violations
             .iter()
             .map(violation_to_dto)
             .collect::<CoreResult<_>>()?;
+
         let result = match conflicts.status {
             ConflictStatus::Complete => ConflictResultDto::Complete { violations },
             ConflictStatus::Incomplete => ConflictResultDto::Incomplete { violations },
@@ -130,6 +140,7 @@ impl PreparedPuzzle {
         Ok(crate::dto::operations::ConflictComputationDto { result })
     }
 
+    /// Count solutions with a node bound while retaining incomplete search outcomes.
     pub fn count_solutions(
         &self,
         input: PreparedCountInputDto,
@@ -153,6 +164,7 @@ impl PreparedPuzzle {
         })
     }
 
+    /// Apply an edit to an owned snapshot; cancellation publishes no partial layers.
     pub fn edit(
         &self,
         input: EditInputDto,
@@ -188,12 +200,14 @@ impl PreparedPuzzle {
 }
 
 impl PreparedPuzzle {
+    /// Compile a complete immutable layout before handing ownership to the caller.
     pub fn new(
         input: PrepareInputDto,
         token: Arc<CancellationToken>,
     ) -> Result<PreparedPuzzle, NativeError> {
         let rules = input.rules.try_into()?;
         let mut execution_control = control::execution(token)?;
+
         let Bounded::Complete(computation) =
             sudoku_core::constraints::computation::prepare_computation(
                 &rules,

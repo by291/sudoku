@@ -33,6 +33,7 @@ fn summary_to_core(value: AssessmentSummaryDto) -> CoreResult<DifficultyAssessme
     })
 }
 
+/// Decode optional assessment metadata without regrading the stored puzzle.
 pub(crate) fn decode(
     value: Option<StoredAssessmentDto>,
     identity: AssessmentIdentityDto,

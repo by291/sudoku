@@ -70,11 +70,21 @@ class RustSudokuEngineTest {
     @Test
     fun historicalUnavailableStringsRemainUnchanged() = runBlocking<Unit> {
         for (reason in listOf("invalid-input", "budget-exhausted", "incomplete")) {
-            val value = PuzzleAssessment.Unavailable(reason, listOf("原始历史文本", "  keep whitespace  "))
+            val value = PuzzleAssessment.Unavailable(
+                reason,
+                listOf("原始历史文本", "  keep whitespace  ")
+            )
 
-            val response = RustSudokuEngine().validateAssessment(value, Variant.CLASSIC, Difficulty.EASY)
+            val response = RustSudokuEngine().validateAssessment(
+                value,
+                Variant.CLASSIC,
+                Difficulty.EASY
+            )
 
-            assertEquals(value, assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(response).value)
+            assertEquals(
+                value,
+                assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(response).value
+            )
         }
     }
 
@@ -94,7 +104,11 @@ class RustSudokuEngineTest {
         val duplicate = List(81) { cell -> if (cell == 0 || cell == 1) 1 else 0 }
         val cages = listOf(Cage(listOf(1, 0), 3)) + (2..80).map { Cage(listOf(it), 1) }
         val cases = listOf(
-            Triple(PuzzleRules.Classic, duplicate, RuleViolation("row:0", listOf(0, 1), ViolationCode.Duplicate)),
+            Triple(
+                PuzzleRules.Classic,
+                duplicate,
+                RuleViolation("row:0", listOf(0, 1), ViolationCode.Duplicate)
+            ),
             Triple(
                 PuzzleRules.Killer(cages),
                 List(81) { cell ->
@@ -133,7 +147,8 @@ class RustSudokuEngineTest {
         )
 
         for ((rules, board, violation) in cases) {
-            val outcome = assertIs<EngineOutcome.Completed<AssessmentResult>>(engine.assess(board, rules))
+            val outcome =
+                assertIs<EngineOutcome.Completed<AssessmentResult>>(engine.assess(board, rules))
             val invalid = assertIs<AssessmentResult.Invalid>(outcome.value)
 
             kotlin.test.assertTrue(AssessmentIssue.Violation(violation) in invalid.issues)
@@ -172,7 +187,9 @@ class RustSudokuEngineTest {
                 BoardEdit.Enter(0, 5)
             )
         ).value
-        val candidates = assertIs<EngineOutcome.Completed<List<Int>>>(prepared.candidates(changed.entries)).value
+        val candidates = assertIs<EngineOutcome.Completed<List<Int>>>(
+            prepared.candidates(changed.entries)
+        ).value
 
         assertEquals(5, changed.entries[0])
         assertEquals(0, layers.entries[0])
@@ -182,45 +199,48 @@ class RustSudokuEngineTest {
     }
 
     @Test
-    fun malformedOptionalMetadataDowngradesThroughRustWithoutBlockingPlayableData() = runBlocking<Unit> {
-        val engine = RustSudokuEngine()
-        val workload = AssessmentWorkload(
-            0,
-            0,
-            0,
-            0,
-            emptyMap(),
-            null,
-            null,
-            0
-        )
-        val summary = AssessmentSummary(
-            "sudoku-rating-v2",
-            Variant.CLASSIC,
-            Difficulty.EASY,
-            workload
-        )
-        val malformed = listOf(
-            PuzzleAssessment.Rated(
-                summary.copy(workload = workload.copy(steps = 4_294_967_296L))
-            ),
-            PuzzleAssessment.Rated(
-                summary.copy(workload = workload.copy(techniqueCounts = mapOf("unknown-technique" to 1L)))
-            ),
-            PuzzleAssessment.Unavailable("unknown-reason", emptyList())
-        )
-
-        for (value in malformed) {
-            val result = engine.validateAssessment(
-                value,
-                Variant.CLASSIC,
-                Difficulty.EASY
+    fun malformedOptionalMetadataDowngradesThroughRustWithoutBlockingPlayableData() =
+        runBlocking<Unit> {
+            val engine = RustSudokuEngine()
+            val workload = AssessmentWorkload(
+                0,
+                0,
+                0,
+                0,
+                emptyMap(),
+                null,
+                null,
+                0
             )
-            val completed = assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(result)
-            val unavailable = assertIs<PuzzleAssessment.Unavailable>(completed.value)
-            assertEquals("invalid-summary", unavailable.reason)
+            val summary = AssessmentSummary(
+                "sudoku-rating-v2",
+                Variant.CLASSIC,
+                Difficulty.EASY,
+                workload
+            )
+            val malformed = listOf(
+                PuzzleAssessment.Rated(
+                    summary.copy(workload = workload.copy(steps = 4_294_967_296L))
+                ),
+                PuzzleAssessment.Rated(
+                    summary.copy(
+                        workload = workload.copy(techniqueCounts = mapOf("unknown-technique" to 1L))
+                    )
+                ),
+                PuzzleAssessment.Unavailable("unknown-reason", emptyList())
+            )
+
+            for (value in malformed) {
+                val result = engine.validateAssessment(
+                    value,
+                    Variant.CLASSIC,
+                    Difficulty.EASY
+                )
+                val completed = assertIs<EngineOutcome.Completed<PuzzleAssessment?>>(result)
+                val unavailable = assertIs<PuzzleAssessment.Unavailable>(completed.value)
+                assertEquals("invalid-summary", unavailable.reason)
+            }
         }
-    }
 }
 
 class NativeCancellationTest {

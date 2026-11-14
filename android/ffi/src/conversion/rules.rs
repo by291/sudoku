@@ -8,10 +8,13 @@ use sudoku_core::rules::context::validate_rules;
 use sudoku_core::rules::types::{
     Arrow, Cage, PreparedRules, PuzzleRules, RuleConstraint, Unit, UnitKind,
 };
-use sudoku_core::types::{CoreResult, EngineError};
+use sudoku_core::types::{CoreResult, EngineError, UNIT_SIZE};
+
+const DIAGONAL_COUNT: usize = 2;
 
 impl TryFrom<RulesDto> for PuzzleRules {
     type Error = EngineError;
+
     fn try_from(value: RulesDto) -> CoreResult<Self> {
         let rules = match value {
             RulesDto::Classic => Self::Classic,
@@ -53,11 +56,14 @@ impl TryFrom<RulesDto> for PuzzleRules {
                     .collect::<CoreResult<_>>()?,
             },
         };
+
         validate_rules(&rules)?;
+
         Ok(rules)
     }
 }
 
+/// Copy the variant and its ordered geometry into a transport value.
 pub fn rules_to_dto(value: &PuzzleRules) -> CoreResult<RulesDto> {
     Ok(match value {
         PuzzleRules::Classic => RulesDto::Classic,
@@ -117,6 +123,7 @@ impl From<UnitKind> for UnitKindDto {
     }
 }
 
+/// Project a unit reference without widening its semantic meaning.
 pub fn unit_to_dto(unit: Unit) -> CoreResult<UnitDto> {
     Ok(UnitDto {
         kind: unit.kind.into(),
@@ -124,19 +131,24 @@ pub fn unit_to_dto(unit: Unit) -> CoreResult<UnitDto> {
     })
 }
 
+/// Check the unit index in the context of its kind before converting it.
 pub fn unit_to_core(unit: UnitDto) -> CoreResult<Unit> {
     let kind: UnitKind = unit.kind.into();
-    let maximum = if kind == UnitKind::Diagonal { 1 } else { 8 };
-    if unit.index > maximum {
+    let unit_count = if kind == UnitKind::Diagonal {
+        DIAGONAL_COUNT
+    } else {
+        UNIT_SIZE
+    };
+    let index = usize::try_from(unit.index)
+        .map_err(|_| EngineError::invalid("Unit index exceeds platform bounds"))?;
+    if index >= unit_count {
         return Err(EngineError::invalid("Invalid Sudoku unit index"));
     }
-    Ok(Unit {
-        kind,
-        index: usize::try_from(unit.index)
-            .map_err(|_| EngineError::invalid("Unit index exceeds platform bounds"))?,
-    })
+
+    Ok(Unit { kind, index })
 }
 
+/// Copy layout metadata without cloning an intermediate core snapshot.
 pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
     let metadata = prepared.metadata_ref();
     let units = metadata
@@ -150,49 +162,10 @@ pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
             })
         })
         .collect::<CoreResult<_>>()?;
-    let constraints = metadata
-        .constraints
-        .iter()
-        .map(|constraint| {
-            Ok(match constraint {
-                RuleConstraint::Cage {
-                    id,
-                    index: clue_index,
-                    cells,
-                    sum,
-                } => ConstraintDto::Cage {
-                    id: id.clone(),
-                    index: index(*clue_index)?,
-                    cells: indices(cells)?,
-                    sum: *sum,
-                },
-                RuleConstraint::Thermo {
-                    id,
-                    index: clue_index,
-                    cells,
-                } => ConstraintDto::Thermo {
-                    id: id.clone(),
-                    index: index(*clue_index)?,
-                    cells: indices(cells)?,
-                },
-                RuleConstraint::Arrow {
-                    id,
-                    index: clue_index,
-                    cells,
-                } => {
-                    let Some((&circle, shaft)) = cells.split_first() else {
-                        return Err(EngineError::invalid("Compiled arrow has no circle"));
-                    };
-                    ConstraintDto::Arrow {
-                        id: id.clone(),
-                        index: index(*clue_index)?,
-                        circle: index(circle)?,
-                        shaft: indices(shaft)?,
-                    }
-                }
-            })
-        })
-        .collect::<CoreResult<_>>()?;
+
+    let constraints = metadata.constraints.iter().map(constraint_to_dto);
+    let constraints = constraints.collect::<CoreResult<_>>()?;
+
     Ok(MetadataDto {
         rules: rules_to_dto(&metadata.rules)?,
         units,
@@ -217,6 +190,47 @@ pub fn metadata_to_dto(prepared: &PreparedRules) -> CoreResult<MetadataDto> {
             .iter()
             .map(indices)
             .collect::<CoreResult<_>>()?,
+    })
+}
+
+fn constraint_to_dto(constraint: &RuleConstraint) -> CoreResult<ConstraintDto> {
+    Ok(match constraint {
+        RuleConstraint::Cage {
+            id,
+            index: clue_index,
+            cells,
+            sum,
+        } => ConstraintDto::Cage {
+            id: id.clone(),
+            index: index(*clue_index)?,
+            cells: indices(cells)?,
+            sum: *sum,
+        },
+        RuleConstraint::Thermo {
+            id,
+            index: clue_index,
+            cells,
+        } => ConstraintDto::Thermo {
+            id: id.clone(),
+            index: index(*clue_index)?,
+            cells: indices(cells)?,
+        },
+        RuleConstraint::Arrow {
+            id,
+            index: clue_index,
+            cells,
+        } => {
+            // Compiled arrows store the circle first so evidence shares one ordered list.
+            let Some((&circle, shaft)) = cells.split_first() else {
+                return Err(EngineError::invalid("Compiled arrow has no circle"));
+            };
+            ConstraintDto::Arrow {
+                id: id.clone(),
+                index: index(*clue_index)?,
+                circle: index(circle)?,
+                shaft: indices(shaft)?,
+            }
+        }
     })
 }
 
