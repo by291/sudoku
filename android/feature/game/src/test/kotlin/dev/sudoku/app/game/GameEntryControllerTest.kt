@@ -41,9 +41,11 @@ class GameEntryControllerTest {
         org.junit.Assert.assertNull(loader.uiState.value.singleSaveId)
     }
 
-    @Test fun changedDatasetDropsOldPresenceEvenWhenTheRefreshFails() = runTest {
+    @Test
+    fun changedDatasetDropsOldPresenceEvenWhenTheRefreshFails() = runTest {
         val reads = EntryReads()
-        reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false, "old-save"))
+        reads.bootstrap.value =
+            BootstrapSnapshot(0, Settings(), HomePresence(true, false, "old-save"))
         val loader = GameEntryController(reads, unusedRepository(), backgroundScope)
 
         loader.invalidate(1)
@@ -56,7 +58,8 @@ class GameEntryControllerTest {
         assertTrue(loader.uiState.value.error != null)
     }
 
-    @Test fun initialHomeReusesPresenceWithoutFetchingSheetsOrDetails() = runTest {
+    @Test
+    fun initialHomeReusesPresenceWithoutFetchingSheetsOrDetails() = runTest {
         val reads = EntryReads()
         reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(true, false))
         val loader = GameEntryController(reads, unusedRepository(), backgroundScope)
@@ -67,7 +70,8 @@ class GameEntryControllerTest {
         assertTrue(loader.uiState.value.saves.isEmpty())
     }
 
-    @Test fun pendingMigrationKeepsContinueAndRefreshFailureRetainsKnownPresence() = runTest {
+    @Test
+    fun pendingMigrationKeepsContinueAndRefreshFailureRetainsKnownPresence() = runTest {
         val reads = EntryReads()
         reads.bootstrap.value = BootstrapSnapshot(0, Settings(), HomePresence(false, true))
         val loader = GameEntryController(reads, unusedRepository(), backgroundScope)

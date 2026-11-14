@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 
+/** Present the course directory and route the selected lesson to its own screen. */
 @Composable
 fun LearningRoute(onOpenLesson: (String) -> Unit) {
     val model: LearningDirectoryViewModel = hiltViewModel()

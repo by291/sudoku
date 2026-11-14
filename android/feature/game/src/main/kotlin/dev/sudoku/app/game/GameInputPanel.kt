@@ -44,26 +44,29 @@ import dev.sudoku.app.designsystem.NumberPad
 import dev.sudoku.app.designsystem.numberPadColumns
 
 /** Keeps the tool strip and digit entry together in both portrait and landscape. */
+internal data class GameInputActions(
+    val onUndo: () -> Unit,
+    val onRedo: () -> Unit,
+    val onErase: () -> Unit,
+    val onToggleNotes: () -> Unit,
+    val onHint: () -> Unit,
+    val onDigit: (Int) -> Unit,
+    val onNote: (Int) -> Unit,
+    val onRetrySave: () -> Unit,
+    val onMore: () -> Unit,
+    val moreMenu: @Composable () -> Unit
+)
+
 @Composable
-internal fun GameInputPanel(
-    state: GameUiState,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onErase: () -> Unit,
-    onToggleNotes: () -> Unit,
-    onHint: () -> Unit,
-    onDigit: (Int) -> Unit,
-    onNote: (Int) -> Unit,
-    onRetrySave: () -> Unit,
-    onMore: () -> Unit,
-    moreMenu: @Composable () -> Unit,
-    modifier: Modifier
-) {
+internal fun GameInputPanel(state: GameUiState, actions: GameInputActions, modifier: Modifier) {
     Column(modifier.padding(horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val density = LocalDensity.current
             val textMeasurer = rememberTextMeasurer()
-            val labelStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Normal)
+            val labelStyle = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Normal
+            )
             val labelWidth = remember(textMeasurer, labelStyle, density) {
                 listOf("撤销", "重做", "擦除", "笔记", "提示", "更多").maxOf {
                     textMeasurer.measure(it, labelStyle).size.width
@@ -82,21 +85,21 @@ internal fun GameInputPanel(
                     Icons.AutoMirrored.Outlined.Undo,
                     state.editable && state.session?.undoStack?.isNotEmpty() == true,
                     Modifier.weight(1f),
-                    onClick = onUndo
+                    onClick = actions.onUndo
                 )
                 GameTool(
                     "重做",
                     Icons.AutoMirrored.Outlined.Redo,
                     state.editable && state.session?.redoStack?.isNotEmpty() == true,
                     Modifier.weight(1f),
-                    onClick = onRedo
+                    onClick = actions.onRedo
                 )
                 GameTool(
                     "擦除",
                     Icons.AutoMirrored.Outlined.Backspace,
                     state.inputEditable,
                     Modifier.weight(1f),
-                    onClick = onErase
+                    onClick = actions.onErase
                 )
                 GameTool(
                     "笔记",
@@ -105,14 +108,14 @@ internal fun GameInputPanel(
                     Modifier.weight(1f),
                     active = state.noteMode,
                     toggle = true,
-                    onClick = onToggleNotes
+                    onClick = actions.onToggleNotes
                 )
                 GameTool(
                     "提示",
                     Icons.Outlined.Lightbulb,
                     state.editable && !state.hintPending,
                     Modifier.weight(1f),
-                    onClick = onHint
+                    onClick = actions.onHint
                 )
                 Box(Modifier.weight(1f)) {
                     GameTool(
@@ -120,9 +123,9 @@ internal fun GameInputPanel(
                         Icons.Outlined.MoreHoriz,
                         state.session != null,
                         Modifier.fillMaxWidth(),
-                        onClick = onMore
+                        onClick = actions.onMore
                     )
-                    moreMenu()
+                    actions.moreMenu()
                 }
             }
         }
@@ -130,8 +133,8 @@ internal fun GameInputPanel(
             enabled = state.inputEditable,
             noteMode = state.noteMode,
             noteMask = state.selectedCell?.let { state.session?.notes?.get(it) } ?: 0,
-            onDigit = onDigit,
-            onNote = onNote
+            onDigit = actions.onDigit,
+            onNote = actions.onNote
         )
         state.save.failure?.let { failure ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -141,7 +144,7 @@ internal fun GameInputPanel(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
-                TextButton(onClick = onRetrySave) { Text("重试保存") }
+                TextButton(onClick = actions.onRetrySave) { Text("重试保存") }
             }
         }
     }
@@ -184,7 +187,10 @@ private fun GameTool(
             Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
             Text(
                 label,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Normal)
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Normal
+                )
             )
         }
     }
@@ -202,7 +208,7 @@ private fun GameDigits(
         val columns = numberPadColumns(maxWidth)
         val keyGap = if (columns == 9) 4.dp else 8.dp
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            NumberPad(enabled, noteMode, onDigit)
+            NumberPad(enabled = enabled, noteMode = noteMode, onDigit = onDigit)
             repeat(9 / columns) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(keyGap)) {
                     repeat(columns) { column ->
@@ -232,7 +238,10 @@ private fun GameDigits(
                             Column(
                                 Modifier.heightIn(min = 48.dp).padding(vertical = 4.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
+                                verticalArrangement = Arrangement.spacedBy(
+                                    4.dp,
+                                    Alignment.CenterVertically
+                                )
                             ) {
                                 Text(digit.toString(), fontSize = 20.sp)
                                 Spacer(

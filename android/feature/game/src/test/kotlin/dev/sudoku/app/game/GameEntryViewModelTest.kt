@@ -66,7 +66,10 @@ class GameEntryViewModelTest {
     fun restoredContinueSelectionReloadsOnlyItsPageAndReusesTheHomeBootstrap() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val reads = SheetReads()
-        reads.pages += StorageOutcome.Success(SummaryPage(0, listOf(SummaryItem("current-save", null)), null, true))
+        reads.pages +=
+            StorageOutcome.Success(
+                SummaryPage(0, listOf(SummaryItem("current-save", null)), null, true)
+            )
         val savedState = SavedStateHandle(mapOf("entrySheet" to "continue"))
         val model = GameEntryViewModel(reads, reads.repository, savedState)
         val store = ViewModelStore().apply { put("entry", model) }
@@ -134,9 +137,16 @@ class GameEntryViewModelTest {
     fun stalePaginationRestartsTheFirstPageInsteadOfAppendingIncompatibleRows() = runTest {
         val reads = SheetReads()
         val cursor = SummaryCursor(0, 0, SummaryQuery.Saves(unfinishedOnly = true), 1, "old")
-        reads.pages += StorageOutcome.Success(SummaryPage(0, listOf(SummaryItem("old", null)), cursor, true))
-        reads.pages += StorageOutcome.Failure(StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Cursor changed"))
-        reads.pages += StorageOutcome.Success(SummaryPage(0, listOf(SummaryItem("replacement", null)), null, true))
+        reads.pages +=
+            StorageOutcome.Success(SummaryPage(0, listOf(SummaryItem("old", null)), cursor, true))
+        reads.pages +=
+            StorageOutcome.Failure(
+                StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Cursor changed")
+            )
+        reads.pages +=
+            StorageOutcome.Success(
+                SummaryPage(0, listOf(SummaryItem("replacement", null)), null, true)
+            )
         val owner = GameEntryController(reads, reads.repository, backgroundScope)
         owner.showContinue()
         runCurrent()
@@ -175,9 +185,12 @@ class GameEntryViewModelTest {
     }
 }
 
-private class SheetReads : GameReadRepository by unsupportedEntryContract(GameReadRepository::class.java) {
+private class SheetReads :
+    GameReadRepository by unsupportedEntryContract(GameReadRepository::class.java) {
     override val bootstrap =
-        MutableStateFlow<BootstrapSnapshot?>(BootstrapSnapshot(0, Settings(), HomePresence(false, false)))
+        MutableStateFlow<BootstrapSnapshot?>(
+            BootstrapSnapshot(0, Settings(), HomePresence(false, false))
+        )
     val epochs = MutableSharedFlow<Long>()
     var epoch = 0L
     var bootstrapReads = 0
@@ -185,7 +198,9 @@ private class SheetReads : GameReadRepository by unsupportedEntryContract(GameRe
     var slotGate: CompletableDeferred<Unit>? = null
     val pages = ArrayDeque<StorageOutcome<SummaryPage>>()
     val cursors = mutableListOf<SummaryCursor?>()
-    val repository = object : GameRepository by unsupportedEntryContract(GameRepository::class.java) {
+    val repository = object : GameRepository by unsupportedEntryContract(
+        GameRepository::class.java
+    ) {
         override val datasetEpochs = epochs
 
         override suspend fun readDatasetEpoch() = StorageOutcome.Success(epoch)
@@ -204,7 +219,10 @@ private class SheetReads : GameReadRepository by unsupportedEntryContract(GameRe
         return StorageOutcome.Success(checkNotNull(bootstrap.value))
     }
 
-    override suspend fun readSlotSummary(mode: GameMode, variant: Variant): StorageOutcome<SummaryItem?> {
+    override suspend fun readSlotSummary(
+        mode: GameMode,
+        variant: Variant
+    ): StorageOutcome<SummaryItem?> {
         slotGate?.await()
         return StorageOutcome.Success(null)
     }

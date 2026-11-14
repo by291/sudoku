@@ -34,35 +34,29 @@ internal fun cellRuleDescriptions(cell: Int, rules: PuzzleRules): List<String> =
     }
 }
 
-internal fun cellDescription(
-    cell: Int,
-    given: Int,
-    value: Int,
-    notes: Int,
-    conflict: Boolean,
-    evidence: Boolean,
-    rules: PuzzleRules
-): String = buildList {
+internal fun cellDescription(presentation: BoardCellPresentation): String = buildList {
+    val cell = presentation.cell
+    val value = presentation.value
     add("第${cell / 9 + 1}行第${cell % 9 + 1}列")
     if (value > 0) {
         add("数字$value")
-        if (given > 0) {
+        if (presentation.given > 0) {
             add("题目给定")
         }
     } else {
         add("空格")
-        val digits = noteDigits(notes)
+        val digits = noteDigits(presentation.noteMask)
         if (digits.isNotEmpty()) {
             add("笔记${digits.joinToString("、")}")
         }
     }
-    if (conflict) {
+    if (presentation.isConflicting) {
         add("冲突，请检查")
     }
-    if (evidence) {
+    if (presentation.hasEvidence) {
         add("推理依据位置")
     }
-    addAll(cellRuleDescriptions(cell, rules))
+    addAll(cellRuleDescriptions(cell, presentation.rules))
 }.joinToString("，")
 
 internal fun evidenceCellDescription(cell: Int, evidence: Evidence?): String = when (evidence) {

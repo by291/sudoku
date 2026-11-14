@@ -35,10 +35,15 @@ internal fun LessonZoom(
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(Modifier.fillMaxSize()) {
             Column(
-                Modifier.safeDrawingPadding().padding(16.dp).lessonKeyboard(state, onDigit, onClear),
+                Modifier.safeDrawingPadding().padding(
+                    16.dp
+                ).lessonKeyboard(state, onDigit, onClear),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

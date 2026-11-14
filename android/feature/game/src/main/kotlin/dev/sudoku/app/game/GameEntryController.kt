@@ -128,7 +128,9 @@ internal class GameEntryController(
                     observedEpoch?.let { result.value.epoch < it } == true
                 )
         ) {
-            return StorageOutcome.Failure(StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Home snapshot changed"))
+            return StorageOutcome.Failure(
+                StorageFailure(StorageFailureKind.REVISION_CONFLICT, "Home snapshot changed")
+            )
         }
 
         return when (result) {
@@ -136,7 +138,8 @@ internal class GameEntryController(
                 val snapshot = result.value
                 if (observedEpoch != snapshot.epoch) {
                     cancelSheet()
-                    mutableState.value = GameEntryUiState(epoch = snapshot.epoch, sheet = uiState.value.sheet)
+                    mutableState.value =
+                        GameEntryUiState(epoch = snapshot.epoch, sheet = uiState.value.sheet)
                 }
                 observedEpoch = snapshot.epoch
                 update {
@@ -185,7 +188,9 @@ internal class GameEntryController(
                 query = SummaryQuery.Saves(unfinishedOnly = true),
                 cursor = if (more) before.next else null
             )
-            val stale = outcome is StorageOutcome.Failure && outcome.error.kind == StorageFailureKind.REVISION_CONFLICT
+            val stale =
+                outcome is StorageOutcome.Failure &&
+                    outcome.error.kind == StorageFailureKind.REVISION_CONFLICT
             val page = (
                 if (stale) {
                     reads.readPage(
@@ -221,7 +226,8 @@ internal class GameEntryController(
                 check(repository.readDatasetEpoch().value() == before.epoch)
                 currentCoroutineContext().ensureActive()
                 // Cancellation alone cannot fence a storage call that has already committed.
-                // Only this owner publishes, after checking request, selection and dataset identity.
+                // Only this owner publishes, after checking request, selection and dataset
+                // identity.
                 if (generation == sheetGeneration && before.sheet == uiState.value.sheet &&
                     before.epoch == uiState.value.epoch
                 ) {
@@ -248,7 +254,10 @@ internal class GameEntryController(
                     check(snapshot.value.epoch == state.epoch)
                     state.copy(daily = snapshot.value.statuses, today = snapshot.value.date)
                 }
-                is SheetSnapshot.Free -> state.copy(freeSave = snapshot.summary, freePending = snapshot.pending)
+                is SheetSnapshot.Free -> state.copy(
+                    freeSave = snapshot.summary,
+                    freePending = snapshot.pending
+                )
                 is SheetSnapshot.Saves -> state.copy(saves = snapshot.items, next = snapshot.next)
             }
         }

@@ -41,7 +41,10 @@ class LessonScreenTest {
     private var nextActions = 0
     private var practice: GameLaunch.Practice? = null
 
-    private fun showLesson(id: String = "naked-single", pending: Boolean = false): MutableState<LearningUiState> {
+    private fun showLesson(
+        id: String = "naked-single",
+        pending: Boolean = false
+    ): MutableState<LearningUiState> {
         val content = InstrumentationRegistry.getInstrumentation().context.assets
             .open("lessons/catalogue.json").bufferedReader().use { it.readText() }
         val catalogue = LessonCatalogue.decode(content)
@@ -66,7 +69,13 @@ class LessonScreenTest {
                         val pair = Placement(checkNotNull(old.selectedCell), it)
                         state.value = if (old.stage?.answer is ExerciseAnswer.Eliminate) {
                             old.copy(
-                                removals = if (pair in old.removals) old.removals - pair else old.removals + pair,
+                                removals = if (pair in
+                                    old.removals
+                                ) {
+                                    old.removals - pair
+                                } else {
+                                    old.removals + pair
+                                },
                                 feedback = null
                             )
                         } else {
@@ -103,7 +112,12 @@ class LessonScreenTest {
                     onStart = { state.value = state.value.copy(exerciseStarted = true) },
                     onGuide = { state.value = state.value.copy(exerciseStarted = false) },
                     onClear = {
-                        state.value = state.value.copy(placement = null, removals = emptySet(), feedback = null)
+                        state.value =
+                            state.value.copy(
+                                placement = null,
+                                removals = emptySet(),
+                                feedback = null
+                            )
                     },
                     onPractice = { practice = it }, onBack = {}, onRetry = {}
                 )
@@ -148,8 +162,14 @@ class LessonScreenTest {
 
         assertEquals(board, compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot)
         capture("lesson-loaded")
-        assertEquals(header, compose.onNodeWithTag("lesson-header").fetchSemanticsNode().boundsInRoot)
-        assertEquals(action, compose.onNodeWithTag("start-exercise").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            header,
+            compose.onNodeWithTag("lesson-header").fetchSemanticsNode().boundsInRoot
+        )
+        assertEquals(
+            action,
+            compose.onNodeWithTag("start-exercise").fetchSemanticsNode().boundsInRoot
+        )
     }
 
     @Test
@@ -192,13 +212,21 @@ class LessonScreenTest {
         compose.onNodeWithTag("submit-answer").performClick()
         compose.runOnIdle { assertEquals(false, state.value.feedback?.correct) }
         assertEquals(board, compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot)
-        assertEquals(key, compose.onNodeWithContentDescription("填入数字4").fetchSemanticsNode().boundsInRoot)
-        assertEquals(submit, compose.onNodeWithTag("submit-answer").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            key,
+            compose.onNodeWithContentDescription("填入数字4").fetchSemanticsNode().boundsInRoot
+        )
+        assertEquals(
+            submit,
+            compose.onNodeWithTag("submit-answer").fetchSemanticsNode().boundsInRoot
+        )
         compose.onNodeWithText("学习讲解").performClick()
         compose.onNodeWithTag("start-exercise").assertTextContains("返回当前练习").performClick()
         compose.runOnIdle { assertEquals(Placement(40, 4), state.value.placement) }
         compose.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
-        compose.onNodeWithTag("cell-40").performScrollTo().performClick().assertIsFocused().performKeyInput {
+        compose.onNodeWithTag(
+            "cell-40"
+        ).performScrollTo().performClick().assertIsFocused().performKeyInput {
             pressKey(Key.Five)
         }
         compose.runOnIdle { assertEquals(Placement(40, 5), state.value.placement) }
@@ -234,15 +262,27 @@ class LessonScreenTest {
         capture("tab-guide")
 
         compose.onNodeWithText("动手练习").performClick()
-        assertEquals(initialBoard, compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            initialBoard,
+            compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot
+        )
         capture("tab-practice")
         compose.onNodeWithText("清空").performScrollTo()
         val scrolledBoard = compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithText("学习讲解").assertIsDisplayed().performClick()
-        assertEquals(scrolledBoard, compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            scrolledBoard,
+            compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot
+        )
         compose.onNodeWithText("动手练习").performClick()
-        assertEquals(scrolledBoard, compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot)
-        assertEquals(header, compose.onNodeWithTag("lesson-header").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            scrolledBoard,
+            compose.onNodeWithTag("lesson-board").fetchSemanticsNode().boundsInRoot
+        )
+        assertEquals(
+            header,
+            compose.onNodeWithTag("lesson-header").fetchSemanticsNode().boundsInRoot
+        )
         assertEquals(tabs, compose.onNodeWithText("学习讲解").fetchSemanticsNode().boundsInRoot)
     }
 

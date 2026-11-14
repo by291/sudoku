@@ -1,6 +1,7 @@
 package dev.sudoku.app.feature.learning
 
 import dev.sudoku.app.model.learning.LessonCatalogue
+import dev.sudoku.app.model.learning.LessonDirectoryEntry
 
 internal sealed interface LessonProgressStatus {
     data object Unknown : LessonProgressStatus
@@ -13,7 +14,7 @@ internal sealed interface LessonProgressStatus {
 }
 
 internal data class LearningLessonEntry(
-    val lesson: dev.sudoku.app.model.learning.LessonDirectoryEntry,
+    val lesson: LessonDirectoryEntry,
     val number: Int,
     val status: LessonProgressStatus
 ) {
@@ -34,27 +35,34 @@ internal data class LearningOverview(
     val suggested: LearningLessonEntry?
 )
 
-/** Derives presentation from authored course order and durable progress without advancing any lesson. */
+/** Build the course overview from authored order and durable progress. */
 internal fun LearningDirectoryState.overview(): LearningOverview {
     val allLessons = directory
-    val known = epoch != null
-    val completed = progress.map { it.lessonId }.toSet().intersect(allLessons.map { it.id }.toSet())
-    val course = allLessons.filter { it.practiceVariant == selectedVariant }.mapIndexed { index, lesson ->
-        val stage = settings.lessonStages?.get(lesson.id)?.takeIf { it in 0 until lesson.stageCount } ?: 0
-        val isCompleted = lesson.id in completed
+    val hasKnownProgress = epoch != null
+    val directoryIds = allLessons.map { it.id }.toSet()
+    val completedIds = progress.map { it.lessonId }.toSet().intersect(directoryIds)
+    val selectedLessons = allLessons.filter { it.practiceVariant == selectedVariant }
+
+    val course = selectedLessons.mapIndexed { index, lesson ->
+        val stage =
+            settings.lessonStages?.get(lesson.id)?.takeIf { it in 0 until lesson.stageCount } ?: 0
+        val isCompleted = lesson.id in completedIds
+        val isInProgress = lesson.id == settings.currentLessonId || stage > 0
         LearningLessonEntry(
             lesson = lesson,
             number = index + 1,
             status = when {
-                !known -> LessonProgressStatus.Unknown
+                !hasKnownProgress -> LessonProgressStatus.Unknown
                 isCompleted -> LessonProgressStatus.Completed
-                lesson.id == settings.currentLessonId || stage > 0 -> LessonProgressStatus.InProgress(stage)
+                isInProgress -> LessonProgressStatus.InProgress(stage)
                 else -> LessonProgressStatus.NotStarted
             }
         )
     }
+
+    // Unknown personal facts cannot authorize a personalized recommendation.
     val unfinished = course.filterNot { it.completed }
-    val suggested = if (!known) {
+    val suggested = if (!hasKnownProgress) {
         null
     } else {
         unfinished.firstOrNull { it.lesson.id == settings.currentLessonId }
@@ -63,10 +71,10 @@ internal fun LearningDirectoryState.overview(): LearningOverview {
     }
 
     return LearningOverview(
-        LessonCatalogue.bundledLessonCount,
-        completed.size.takeIf { known },
-        course.count { it.completed }.takeIf { known },
-        course,
-        suggested
+        totalCount = LessonCatalogue.bundledLessonCount,
+        completedCount = completedIds.size.takeIf { hasKnownProgress },
+        courseCompleted = course.count { it.completed }.takeIf { hasKnownProgress },
+        lessons = course,
+        suggested = suggested
     )
 }

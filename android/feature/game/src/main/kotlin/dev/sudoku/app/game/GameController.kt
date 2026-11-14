@@ -55,7 +55,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Owns one complete player workflow; native analysis and persistence never own mutable UI state. */
+/** Owns mutable game state across engine calls, saves, and session transitions. */
 internal class GameController(
     private val engine: SudokuEngine,
     private val repository: GameRepository,
@@ -90,6 +90,7 @@ internal class GameController(
     private var conflictsJob: Job? = null
     private var retrySeed: RetrySeed? = null
 
+    /** Resolve the route once, preferring its restored session identity. */
     fun open(launch: GameLaunch) {
         if (opened) {
             return
@@ -98,30 +99,22 @@ internal class GameController(
 
         beginTransition { generation ->
             val epoch = storage(repository.readDatasetEpoch())
-            datasetEpoch = epoch
 
             val settings = storage(repository.readSettings())
             update { it.copy(settings = settings) }
 
             val intent = restoredSessionId?.let(GameLaunch::Resume) ?: launch
             val records = recordsFor(intent)
+            val preparation = LaunchPreparation(intent, epoch, records, generation)
+
             when (intent) {
-                is GameLaunch.Resume -> {
-                    val record = records.find { it.session.id == intent.sessionId }
-                    if (record != null) {
-                        load(record, epoch)
-                    } else {
-                        val result = storage(reads.readResult(intent.sessionId))
-                            ?: throw WorkflowFailure("找不到这局已保存的数独，请返回重新选择。")
-                        load(SessionRecord(revision = 0, session = result.session), epoch, readOnly = true)
-                    }
-                }
-                is GameLaunch.Free -> generateSession(intent, epoch, records, generation)
-                is GameLaunch.Daily -> openDaily(intent, epoch, records, generation)
+                is GameLaunch.Resume -> restoreSavedGame(intent, epoch, records)
+                is GameLaunch.Free -> generateSession(preparation)
+                is GameLaunch.Daily -> openDaily(intent, preparation)
                 is GameLaunch.Practice -> {
                     val existing = records.firstOrNull { it.session.mode == GameMode.LEARNING }
                     if (existing == null) {
-                        generateSession(intent, epoch, records, generation)
+                        generateSession(preparation)
                     } else {
                         load(existing, epoch)
                         update { it.copy(practiceReplacement = intent) }
@@ -134,21 +127,13 @@ internal class GameController(
     fun startNew(launch: GameLaunch) {
         beginTransition { generation ->
             val epoch = storage(repository.readDatasetEpoch())
-            datasetEpoch = epoch
             val records = recordsFor(launch)
+            val preparation = LaunchPreparation(launch, epoch, records, generation)
 
-            if (launch is GameLaunch.Daily) {
-                openDaily(
-                    launch,
-                    epoch,
-                    records,
-                    generation
-                )
-            } else if (launch is GameLaunch.Resume) {
-                val record = records.find { it.session.id == launch.sessionId } ?: throw WorkflowFailure("找不到已保存的对局。")
-                load(record, epoch)
-            } else {
-                generateSession(launch, epoch, records, generation)
+            when (launch) {
+                is GameLaunch.Daily -> openDaily(launch, preparation)
+                is GameLaunch.Resume -> restoreSavedGame(launch, epoch, records)
+                else -> generateSession(preparation)
             }
         }
     }
@@ -176,9 +161,11 @@ internal class GameController(
         transition = scope.launch {
             try {
                 val canSwitch = actions.withLock {
+                    // The next identity must never replace a game with an unsaved snapshot.
                     pauseCurrent()
                     writer?.flush() ?: true
                 }
+
                 if (!canSwitch) {
                     throw WorkflowFailure("当前进度尚未保存，请重试保存后再切换。")
                 }
@@ -191,7 +178,7 @@ internal class GameController(
                 operation(generation)
                 currentCoroutineContext().ensureActive()
             } catch (cancelled: CancellationException) {
-                // Before commit, cancellation retains the old puzzle; started writes settle in commitPreparation.
+                // Started writes still settle in commitPreparation after cancellation.
             } catch (failure: WorkflowFailure) {
                 if (generation == transitionGeneration) {
                     update { it.copy(error = failure.message) }
@@ -201,7 +188,8 @@ internal class GameController(
                     update { it.copy(error = failure.message ?: "无法准备对局，请重试。") }
                 }
             } finally {
-                if (generation == transitionGeneration && mutableState.value.phase == GamePhase.PREPARING) {
+                val isCurrent = generation == transitionGeneration
+                if (isCurrent && mutableState.value.phase == GamePhase.PREPARING) {
                     update { it.copy(phase = settledPhase(it.session)) }
                 }
             }
@@ -226,21 +214,37 @@ internal class GameController(
         }
     }
 
+    private suspend fun restoreSavedGame(
+        launch: GameLaunch.Resume,
+        epoch: Long,
+        records: List<SessionRecord>
+    ) {
+        val record = records.find { it.session.id == launch.sessionId }
+        if (record != null) {
+            load(record, epoch)
+            return
+        }
+
+        // Completed results can outlive their active slots and never acquire an editor.
+        val result = storage(reads.readResult(launch.sessionId))
+            ?: throw WorkflowFailure("找不到这局已保存的数独，请返回重新选择。")
+        load(SessionRecord(revision = 0, session = result.session), epoch, readOnly = true)
+    }
+
     private suspend fun recordsFor(launch: GameLaunch): List<SessionRecord> = listOfNotNull(
         when (launch) {
             is GameLaunch.Resume -> storage(reads.readSession(launch.sessionId))
-            is GameLaunch.Daily -> storage(reads.readSession(dailyFormalId(launch.date, launch.variant)))
+            is GameLaunch.Daily -> {
+                val id = dailyFormalId(launch.date, launch.variant)
+                storage(reads.readSession(id))
+            }
             is GameLaunch.Free -> storage(reads.readSlot(GameMode.FREE, launch.variant))
             is GameLaunch.Practice -> storage(reads.readSlot(GameMode.LEARNING, launch.variant))
         }
     )
 
-    private suspend fun openDaily(
-        launch: GameLaunch.Daily,
-        epoch: Long,
-        records: List<SessionRecord>,
-        generation: Long
-    ) {
+    private suspend fun openDaily(launch: GameLaunch.Daily, preparation: LaunchPreparation) {
+        val (_, epoch, records, _) = preparation
         val formalId = dailyFormalId(launch.date, launch.variant)
         val unfinished = records.find { it.session.id == formalId && it.session.completion == null }
         if (unfinished != null) {
@@ -248,15 +252,11 @@ internal class GameController(
             return
         }
 
-        generateSession(launch, epoch, records, generation)
+        generateSession(preparation)
     }
 
-    private suspend fun generateSession(
-        launch: GameLaunch,
-        epoch: Long,
-        records: List<SessionRecord>,
-        generation: Long
-    ) {
+    private suspend fun generateSession(preparation: LaunchPreparation) {
+        val (launch, epoch, records, generation) = preparation
         val variant = when (launch) {
             is GameLaunch.Free -> launch.variant
             is GameLaunch.Daily -> launch.variant
@@ -270,11 +270,7 @@ internal class GameController(
             is GameLaunch.Resume -> throw WorkflowFailure("对局参数无效。")
         }
 
-        val seed = retrySeed?.takeIf { it.launch == launch }?.bytes ?: if (launch is GameLaunch.Daily) {
-            engineValue(engine.deriveSeed(dailySeedMaterial(launch.date)))
-        } else {
-            withContext(Dispatchers.IO) { ByteArray(32).also { SecureRandom().nextBytes(it) }.map { it.toUByte() } }
-        }
+        val seed = generationSeed(launch)
         retrySeed = RetrySeed(launch, seed.toList())
 
         val generated = engineValue(
@@ -314,17 +310,37 @@ internal class GameController(
         }
         val session = createSession(generated.puzzle, metadata, id, nowText(), generated.assessment)
 
-        prepareReplacement(session, records, epoch, generation, clearRetrySeed = true)
+        prepareReplacement(
+            ReplacementPreparation(
+                session = session,
+                records = records,
+                epoch = epoch,
+                generation = generation,
+                clearRetrySeed = true
+            )
+        )
+    }
+
+    private suspend fun generationSeed(launch: GameLaunch): List<UByte> {
+        val retry = retrySeed
+        if (retry?.launch == launch) {
+            return retry.bytes
+        }
+
+        if (launch is GameLaunch.Daily) {
+            return engineValue(engine.deriveSeed(dailySeedMaterial(launch.date)))
+        }
+
+        return withContext(Dispatchers.IO) {
+            val bytes = ByteArray(GENERATION_SEED_BYTES)
+            SecureRandom().nextBytes(bytes)
+            bytes.map { it.toUByte() }
+        }
     }
 
     /** Owns the prepared handle until persistence and identity adoption complete together. */
-    private suspend fun prepareReplacement(
-        session: GameSession,
-        records: List<SessionRecord>,
-        epoch: Long,
-        generation: Long,
-        clearRetrySeed: Boolean
-    ) {
+    private suspend fun prepareReplacement(preparation: ReplacementPreparation) {
+        val (session, records, epoch, generation, clearRetrySeed) = preparation
         val handle = engineValue(engine.prepare(session.puzzle.rules))
         var installed = false
 
@@ -337,10 +353,10 @@ internal class GameController(
                 currentCoroutineContext().ensureActive()
                 commitPreparation(generation) {
                     val saved = persistReplacement(session, previous, epoch)
-                    install(saved.record, handle, saved.editor, epoch)
+                    install(SessionInstallation(saved.record, handle, saved.editor, epoch))
                     installed = true
 
-                    // Clear only after generated identity adoption, even when cancellation prevents auto-resume.
+                    // Adoption consumes this retry seed even if cancellation prevents auto-resume.
                     if (clearRetrySeed) {
                         retrySeed = null
                     }
@@ -356,7 +372,7 @@ internal class GameController(
         }
     }
 
-    /** Once persistence starts, cancellation may stop auto-resume but must finish adopting the committed identity. */
+    /** Finish adopting the committed identity even if cancellation prevents auto-resume. */
     private suspend fun commitPreparation(generation: Long, operation: suspend () -> Unit) {
         update { it.copy(preparationCommitting = true) }
 
@@ -401,9 +417,11 @@ internal class GameController(
         val oldSession = mutableState.value.session
         val oldRevision = writer?.revision
 
+        var unadoptedToken: EditorToken? = null
         try {
             val previousToken = if (previous != null) {
                 val token = storage(repository.claimEditor(previous.session.id, ownerId))
+                unadoptedToken = token
                 if (token.epoch != epoch) {
                     throw WorkflowFailure("数据已更新，请返回重新打开对局。")
                 }
@@ -413,6 +431,7 @@ internal class GameController(
             }
 
             val token = storage(repository.claimEditor(session.id, ownerId))
+            unadoptedToken = token
             if (token.epoch != epoch) {
                 throw WorkflowFailure("数据已更新，请返回重新打开对局。")
             }
@@ -437,9 +456,12 @@ internal class GameController(
 
             return PersistedSession(saved, token)
         } catch (failure: Exception) {
-            // Claiming the target fences the previous editor; recover its token before permitting more saves.
-            if (oldSession != null && oldRevision != null) {
-                recoverEditor(oldSession, oldRevision, epoch)
+            // Only a successful claim displaces the prior editor.
+            if (unadoptedToken != null) {
+                repository.releaseEditor(unadoptedToken)
+                if (oldSession != null && oldRevision != null) {
+                    recoverEditor(oldSession, oldRevision, epoch)
+                }
             }
             throw failure
         }
@@ -456,7 +478,7 @@ internal class GameController(
                 currentCoroutineContext().ensureActive()
                 ensureEpoch(epoch)
 
-                // Claiming and adopting a saved revision is one transition from the caller's perspective.
+                // Claim and adopt together so cancellation cannot strand the new editor.
                 withContext(NonCancellable) {
                     var claimed: EditorToken? = null
 
@@ -465,18 +487,11 @@ internal class GameController(
                             editor?.let { storage(repository.releaseEditor(it)) }
                         } else {
                             claimed = storage(repository.claimEditor(record.session.id, ownerId))
-                            if (claimed.epoch != epoch) {
-                                throw WorkflowFailure("数据已更新，请重新打开对局。")
-                            }
-
-                            val current = storage(reads.readSession(record.session.id))
-                            if (current?.revision != record.revision) {
-                                throw WorkflowFailure("保存版本已变化，请重新打开最新的对局。")
-                            }
+                            validateClaimedRevision(record, claimed, epoch)
                         }
 
                         ensureEpoch(epoch)
-                        install(record, handle, claimed, epoch)
+                        install(SessionInstallation(record, handle, claimed, epoch))
                         installed = true
                     } catch (failure: Exception) {
                         if (claimed != null) {
@@ -504,7 +519,24 @@ internal class GameController(
         }
     }
 
-    private suspend fun install(record: SessionRecord, handle: PreparedPuzzle, token: EditorToken?, epoch: Long) {
+    private suspend fun validateClaimedRevision(
+        record: SessionRecord,
+        token: EditorToken,
+        epoch: Long
+    ) {
+        if (token.epoch != epoch) {
+            throw WorkflowFailure("数据已更新，请重新打开对局。")
+        }
+
+        // Read after claiming so the previous editor's final commit cannot pass unnoticed.
+        val current = storage(reads.readSession(record.session.id))
+        if (current?.revision != record.revision) {
+            throw WorkflowFailure("保存版本已变化，请重新打开最新的对局。")
+        }
+    }
+
+    private suspend fun install(installation: SessionInstallation) {
+        val (record, handle, token, epoch) = installation
         val oldHandle = prepared
 
         writer?.invalidate()
@@ -545,7 +577,9 @@ internal class GameController(
         writer = next
         editor = token
 
-        saveObserver = scope.launch { next.state.collectLatest { save -> update { it.copy(save = save) } } }
+        saveObserver = scope.launch {
+            next.state.collectLatest { save -> update { it.copy(save = save) } }
+        }
     }
 
     private suspend fun recoverEditor(session: GameSession, revision: Long, epoch: Long): Boolean {
@@ -650,6 +684,7 @@ internal class GameController(
         if (!outcome.changed) {
             return
         }
+
         invalidateAnalysis()
         val next = timed(outcome.session)
         val completed = if (result.boardComplete) {
@@ -668,6 +703,7 @@ internal class GameController(
                 message = null
             )
         }
+
         writer?.stage(completed)
         if (completed.completion != null) {
             ticker?.cancel()
@@ -707,28 +743,30 @@ internal class GameController(
         }
     }
 
-    fun resume() = resume(null)
+    fun resume() = resume(transitionGeneration)
 
-    private fun resume(expectedGeneration: Long?) {
+    private fun resume(expectedGeneration: Long) {
         scope.launch {
             actions.withLock {
-                if (disposed || (expectedGeneration != null && expectedGeneration != transitionGeneration)) {
+                if (disposed || expectedGeneration != transitionGeneration) {
                     return@withLock
                 }
                 if (mutableState.value.phase != GamePhase.PAUSED || editor == null) {
                     return@withLock
                 }
                 val epoch = repository.readDatasetEpoch()
+
+                // Pause or leave can supersede a resume while the epoch read is suspended.
+                if (disposed || expectedGeneration != transitionGeneration) {
+                    return@withLock
+                }
                 if (epoch !is StorageOutcome.Success || epoch.value != editor?.epoch) {
                     writer?.invalidate()
                     editor = null
                     update { it.copy(error = "本机数据或编辑权已变化，请重新打开已保存的对局。") }
                     return@withLock
                 }
-                // An epoch read can suspend after the user has already paused or left this preparation.
-                if (disposed || (expectedGeneration != null && expectedGeneration != transitionGeneration)) {
-                    return@withLock
-                }
+
                 clock?.resume(monotonicMs())
                 update { it.copy(phase = GamePhase.PLAYING, error = null) }
                 startTicker()
@@ -751,6 +789,7 @@ internal class GameController(
         invalidateAnalysis()
         val elapsed = clock?.pause(monotonicMs()) ?: session.elapsedMs
         ticker?.cancel()
+
         val snapshot = session.copy(elapsedMs = elapsed)
         update { it.copy(phase = settledPhase(snapshot), session = snapshot, elapsedMs = elapsed) }
         if (editor != null) {
@@ -788,6 +827,7 @@ internal class GameController(
         val session = mutableState.value.session ?: return
         val handle = prepared ?: return
         val fence = fence() ?: return
+
         update { it.copy(notesPending = true, error = null) }
         notesJob = scope.launch {
             val result = handle.edit(
@@ -819,6 +859,7 @@ internal class GameController(
         val session = mutableState.value.session ?: return
         val handle = prepared ?: return
         val fence = fence() ?: return
+
         update { it.copy(hintPending = true, error = null) }
         hintJob = scope.launch {
             val result = handle.hint(sessionBoard(session), session.puzzle.solution)
@@ -827,47 +868,49 @@ internal class GameController(
                 if (!isCurrent(fence)) {
                     return@withLock
                 }
+
                 update { it.copy(hintPending = false) }
-                when (result) {
-                    is EngineOutcome.Completed -> {
-                        when (val hint = result.value) {
-                            is HintResult.Deduction -> {
-                                val current = mutableState.value.session ?: return@withLock
-                                val assisted = timed(
-                                    applySessionAction(
-                                        current,
-                                        SessionFactAction.HINT_SHOWN
-                                    ).session
-                                )
-                                hintFence = fence
-                                update { it.copy(session = assisted, hint = hint, hintStep = 0) }
-                                writer?.stage(assisted)
-                            }
-                            is HintResult.ReviewEntry -> update {
-                                it.copy(
-                                    reviewCells = setOf(hint.cell),
-                                    message = "请先检查标记格的填写，再继续推理。"
-                                )
-                            }
-                            is HintResult.Unavailable -> {
-                                val message = if (hint.reason == "complete") {
-                                    "当前棋盘已完成。"
-                                } else {
-                                    "暂时没有可用的逻辑提示，请继续尝试。"
-                                }
-                                update { it.copy(message = message) }
-                            }
-                        }
-                    }
-                    else -> showEngineFailure(result)
+                if (result is EngineOutcome.Completed) {
+                    publishHint(result.value, fence)
+                } else {
+                    showEngineFailure(result)
                 }
+            }
+        }
+    }
+
+    private fun publishHint(hint: HintResult, fence: AnalysisFence) {
+        when (hint) {
+            is HintResult.Deduction -> {
+                val current = mutableState.value.session ?: return
+                val action = applySessionAction(current, SessionFactAction.HINT_SHOWN)
+                val assisted = timed(action.session)
+
+                hintFence = fence
+                update { it.copy(session = assisted, hint = hint, hintStep = 0) }
+                writer?.stage(assisted)
+            }
+            is HintResult.ReviewEntry -> update {
+                it.copy(
+                    reviewCells = setOf(hint.cell),
+                    message = "请先检查标记格的填写，再继续推理。"
+                )
+            }
+            is HintResult.Unavailable -> {
+                val message = if (hint.reason == "complete") {
+                    "当前棋盘已完成。"
+                } else {
+                    "暂时没有可用的逻辑提示，请继续尝试。"
+                }
+                update { it.copy(message = message) }
             }
         }
     }
 
     fun nextHint() {
         update { state ->
-            state.copy(hintStep = (state.hintStep + 1).coerceAtMost(state.hint?.steps?.lastIndex ?: 0))
+            val lastStep = state.hint?.steps?.lastIndex ?: 0
+            state.copy(hintStep = (state.hintStep + 1).coerceAtMost(lastStep))
         }
     }
 
@@ -895,14 +938,21 @@ internal class GameController(
                 if (!mutableState.value.editable) {
                     return@withLock
                 }
-                when (val result = handle.reviewEntries(sessionBoard(session), session.puzzle.solution)) {
+                val result = handle.reviewEntries(sessionBoard(session), session.puzzle.solution)
+                when (result) {
                     is EngineOutcome.Completed -> {
-                        val snapshot = timed(applySessionAction(session, SessionFactAction.CHECK).session)
+                        val checked = applySessionAction(session, SessionFactAction.CHECK)
+                        val snapshot = timed(checked.session)
+                        val message = if (result.value.isEmpty()) {
+                            "当前填写均正确；本次检查已记为辅助。"
+                        } else {
+                            "已标记需要检查的填写；本次检查已记为辅助。"
+                        }
                         update {
                             it.copy(
                                 session = snapshot,
                                 reviewCells = result.value.toSet(),
-                                message = if (result.value.isEmpty()) "当前填写均正确；本次检查已记为辅助。" else "已标记需要检查的填写；本次检查已记为辅助。"
+                                message = message
                             )
                         }
                         writer?.stage(snapshot)
@@ -961,48 +1011,68 @@ internal class GameController(
                 }
 
                 if (session.mode == GameMode.DAILY && session.completion == null) {
-                    val snapshot = restartDailySession(timed(session))
-
-                    clock = SessionClock(snapshot.elapsedMs)
-                    update {
-                        it.copy(
-                            session = snapshot,
-                            elapsedMs = snapshot.elapsedMs,
-                            phase = GamePhase.PAUSED,
-                            reviewCells = emptySet(),
-                            conflicts = emptySet(),
-                            message = "已清空填写；累计用时和辅助记录已保留。"
-                        )
-                    }
-                    writer?.stage(snapshot)
-                } else {
-                    beginTransition { generation ->
-                        val epoch = storage(repository.readDatasetEpoch())
-                        val records = if (session.mode == GameMode.DAILY) {
-                            emptyList()
-                        } else {
-                            listOfNotNull(storage(reads.readSlot(session.mode, session.puzzle.rules.variant)))
-                        }
-
-                        val previousMetadata = session.metadata
-                        val metadata = if (previousMetadata is SessionMetadata.Daily) {
-                            previousMetadata.copy(formalAttempt = false)
-                        } else {
-                            previousMetadata
-                        }
-                        val restarted = createSession(
-                            session.puzzle,
-                            metadata,
-                            UUID.randomUUID().toString(),
-                            nowText(),
-                            session.assessment
-                        )
-
-                        prepareReplacement(restarted, records, epoch, generation, clearRetrySeed = false)
-                    }
+                    restartDailyAttempt(session)
+                    return@withLock
                 }
+
+                // The old puzzle and its installed epoch must travel together across suspension.
+                val epoch = datasetEpoch ?: return@withLock
+                beginTransition { generation -> restartAsReplacement(session, epoch, generation) }
             }
         }
+    }
+
+    private fun restartDailyAttempt(session: GameSession) {
+        val snapshot = restartDailySession(timed(session))
+
+        clock = SessionClock(snapshot.elapsedMs)
+        update {
+            it.copy(
+                session = snapshot,
+                elapsedMs = snapshot.elapsedMs,
+                phase = GamePhase.PAUSED,
+                reviewCells = emptySet(),
+                conflicts = emptySet(),
+                message = "已清空填写；累计用时和辅助记录已保留。"
+            )
+        }
+
+        writer?.stage(snapshot)
+    }
+
+    private suspend fun restartAsReplacement(session: GameSession, epoch: Long, generation: Long) {
+        ensureEpoch(epoch)
+
+        val records = if (session.mode == GameMode.DAILY) {
+            emptyList()
+        } else {
+            val slot = storage(reads.readSlot(session.mode, session.puzzle.rules.variant))
+            listOfNotNull(slot)
+        }
+
+        val previousMetadata = session.metadata
+        val metadata = if (previousMetadata is SessionMetadata.Daily) {
+            previousMetadata.copy(formalAttempt = false)
+        } else {
+            previousMetadata
+        }
+        val restarted = createSession(
+            session.puzzle,
+            metadata,
+            UUID.randomUUID().toString(),
+            nowText(),
+            session.assessment
+        )
+
+        prepareReplacement(
+            ReplacementPreparation(
+                session = restarted,
+                records = records,
+                epoch = epoch,
+                generation = generation,
+                clearRetrySeed = false
+            )
+        )
     }
 
     fun retrySave() {
@@ -1039,12 +1109,15 @@ internal class GameController(
                         update { it.copy(settings = result.value) }
                         refreshConflicts()
                     }
-                    is StorageOutcome.Failure -> update { it.copy(error = "设置保存失败：${result.error.message}") }
+                    is StorageOutcome.Failure -> {
+                        update { it.copy(error = "设置保存失败：${result.error.message}") }
+                    }
                 }
             }
         }
     }
 
+    /** Pause and save before releasing resources. A failed save keeps the game attached. */
     suspend fun leave(): Boolean {
         cancelPreparation()
         return actions.withLock {
@@ -1070,6 +1143,7 @@ internal class GameController(
         }
     }
 
+    /** Settle and release the session in a cleanup job independent of the ViewModel scope. */
     fun dispose(): Job {
         disposal?.let { return it }
         disposed = true
@@ -1084,32 +1158,45 @@ internal class GameController(
         return cleanupScope.launch {
             try {
                 actions.withLock {
-                    pauseCurrent()
-                    writer?.invalidate()
-                    saveObserver?.cancel()
-                    writer = null
-                    val handle = prepared
-                    val token = editor
-                    prepared = null
-                    editor = null
-
                     try {
-                        handle?.close()
+                        pauseCurrent()
+
+                        // The ViewModel worker may already be cancelled, so flush in this scope.
+                        writer?.flush()
                     } finally {
-                        if (token != null) {
-                            when (val result = repository.releaseEditor(token)) {
-                                is StorageOutcome.Failure -> update {
-                                    it.copy(error = "无法释放编辑权：${result.error.message}")
-                                }
-                                is StorageOutcome.Success -> Unit
-                            }
-                        }
+                        detachAndRelease()
                     }
                 }
             } finally {
                 cleanupScope.coroutineContext[Job]?.cancel()
             }
         }.also { disposal = it }
+    }
+
+    private suspend fun detachAndRelease() {
+        writer?.invalidate()
+        saveObserver?.cancel()
+        writer = null
+
+        val handle = prepared
+        val token = editor
+        prepared = null
+        editor = null
+
+        closeAndRelease(handle, token)
+    }
+
+    private suspend fun closeAndRelease(handle: PreparedPuzzle?, token: EditorToken?) {
+        try {
+            handle?.close()
+        } finally {
+            if (token != null) {
+                val result = repository.releaseEditor(token)
+                if (result is StorageOutcome.Failure) {
+                    update { it.copy(error = "无法释放编辑权：${result.error.message}") }
+                }
+            }
+        }
     }
 
     private fun invalidateAnalysis() {
@@ -1120,7 +1207,13 @@ internal class GameController(
         conflictsJob?.cancel()
         hintFence = null
         update {
-            it.copy(notesPending = false, hintPending = false, conflictPending = false, hint = null, hintStep = 0)
+            it.copy(
+                notesPending = false,
+                hintPending = false,
+                conflictPending = false,
+                hint = null,
+                hintStep = 0
+            )
         }
     }
 
@@ -1150,6 +1243,11 @@ internal class GameController(
             return false
         }
         val result = repository.readDatasetEpoch()
+
+        // A superseded analysis must not invalidate editing ownership on a late read failure.
+        if (!matches(fence)) {
+            return false
+        }
         if (result !is StorageOutcome.Success || result.value != fence.epoch) {
             invalidateAnalysis()
             pauseCurrent()
@@ -1158,7 +1256,7 @@ internal class GameController(
             update { it.copy(error = "本机数据已变化，请返回重新打开对局。") }
             return false
         }
-        return matches(fence)
+        return true
     }
 
     private suspend fun ensureEpoch(expected: Long) {
@@ -1208,6 +1306,28 @@ internal class GameController(
     }
 }
 
+private data class LaunchPreparation(
+    val launch: GameLaunch,
+    val epoch: Long,
+    val records: List<SessionRecord>,
+    val generation: Long
+)
+
+private data class ReplacementPreparation(
+    val session: GameSession,
+    val records: List<SessionRecord>,
+    val epoch: Long,
+    val generation: Long,
+    val clearRetrySeed: Boolean
+)
+
+private data class SessionInstallation(
+    val record: SessionRecord,
+    val handle: PreparedPuzzle,
+    val token: EditorToken?,
+    val epoch: Long
+)
+
 private data class AnalysisFence(
     val sessionId: String,
     val puzzleSeed: String,
@@ -1218,6 +1338,7 @@ private data class AnalysisFence(
 
 private class WorkflowFailure(message: String) : IllegalStateException(message)
 
+private const val GENERATION_SEED_BYTES = 32
 private const val CLOCK_TICK_MILLIS = 250L
 private const val CHECKPOINT_INTERVAL_MILLIS = 5_000L
 

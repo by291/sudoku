@@ -18,7 +18,11 @@ class LearningOverviewTest {
 
     @Test
     fun unknownProgressNeverSuggestsAnUnstartedLesson() {
-        val overview = LearningDirectoryState(directory = catalogue.lessons.map { it.directoryEntry() }).overview()
+        val overview = LearningDirectoryState(
+            directory = catalogue.lessons.map {
+                it.directoryEntry()
+            }
+        ).overview()
 
         org.junit.Assert.assertNull(overview.suggested)
         org.junit.Assert.assertNull(overview.completedCount)
@@ -56,7 +60,10 @@ class LearningOverviewTest {
             loading = false,
             epoch = 0,
             directory = catalogue.lessons.map { it.directoryEntry() },
-            settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1)),
+            settings = Settings(
+                currentLessonId = "hidden-single",
+                lessonStages = mapOf("hidden-single" to 1)
+            ),
             progress = listOf(completed("rules"), completed("removed-legacy-lesson"))
         ).overview()
 
@@ -103,7 +110,9 @@ class LearningOverviewTest {
             loading = false,
             epoch = 0,
             directory = catalogue.lessons.map { it.directoryEntry() },
-            progress = catalogue.lessons.filter { it.practiceVariant == Variant.CLASSIC }.map { completed(it.id) }
+            progress = catalogue.lessons.filter {
+                it.practiceVariant == Variant.CLASSIC
+            }.map { completed(it.id) }
         ).overview()
 
         assertEquals(12, overview.courseCompleted)

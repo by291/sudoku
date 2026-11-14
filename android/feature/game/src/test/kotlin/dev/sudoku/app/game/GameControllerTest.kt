@@ -4,6 +4,7 @@ import dev.sudoku.app.model.BackupExport
 import dev.sudoku.app.model.BackupPreview
 import dev.sudoku.app.model.BoardEdit
 import dev.sudoku.app.model.BoardLayers
+import dev.sudoku.app.model.Completion
 import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.EditResult
 import dev.sudoku.app.model.EditorToken
@@ -105,7 +106,7 @@ class GameControllerTest {
         assertTrue(controller.leave())
         runCurrent()
 
-        assertTrue("Leaving must not insert a cancellation caption above the board", messages.all { it == null })
+        assertTrue(messages.all { it == null })
         assertEquals(GamePhase.PAUSED, controller.uiState.value.phase)
     }
 
@@ -142,8 +143,16 @@ class GameControllerTest {
         val repository = ControllerRepository()
         val prepared = ControllerPrepared()
         val controller =
-            GameController(ControllerEngine(prepared), repository, repository.reads, backgroundScope, "saved", {
-            }, { testScheduler.currentTime })
+            GameController(
+                ControllerEngine(prepared),
+                repository,
+                repository.reads,
+                backgroundScope,
+                "saved",
+                {
+                },
+                { testScheduler.currentTime }
+            )
         controller.open(GameLaunch.Resume("saved"))
         runCurrent()
         controller.resume()
@@ -155,7 +164,13 @@ class GameControllerTest {
         controller.selectCell(0)
         controller.enterDigit(5)
         runCurrent()
-        prepared.notes.complete(EngineOutcome.Completed(EditResult(List(81) { 0 }, List(81) { 511 }, true, false)))
+        val staleNotes = EditResult(
+            entries = List(81) { 0 },
+            notes = List(81) { 511 },
+            changed = true,
+            boardComplete = false
+        )
+        prepared.notes.complete(EngineOutcome.Completed(staleNotes))
         runCurrent()
 
         assertEquals(5, controller.uiState.value.session?.entries?.first())
@@ -188,7 +203,12 @@ class GameControllerTest {
                     listOf(
                         LogicalStep.Place(
                             "naked-single",
-                            Evidence.Unit(listOf(7), listOf(9), UnitReference("row", 0), emptyList()),
+                            Evidence.Unit(
+                                listOf(7),
+                                listOf(9),
+                                UnitReference("row", 0),
+                                emptyList()
+                            ),
                             placement
                         )
                     ),
@@ -216,8 +236,16 @@ class GameControllerTest {
         val repository = ControllerRepository()
         val prepared = ControllerPrepared()
         val controller =
-            GameController(ControllerEngine(prepared), repository, repository.reads, backgroundScope, "saved", {
-            }, { testScheduler.currentTime })
+            GameController(
+                ControllerEngine(prepared),
+                repository,
+                repository.reads,
+                backgroundScope,
+                "saved",
+                {
+                },
+                { testScheduler.currentTime }
+            )
         controller.open(GameLaunch.Resume("saved"))
         runCurrent()
         controller.resume()
@@ -399,7 +427,7 @@ class GameControllerTest {
     }
 
     @Test
-    fun disposeDuringSavedSessionAdoptionClosesBothDistinctHandlesAndReleasesFinalToken() = runTest {
+    fun disposalDuringSavedSessionAdoptionClosesBothHandlesAndReleasesTheToken() = runTest {
         val ownerScope = CoroutineScope(backgroundScope.coroutineContext + Job())
         val repository = ControllerRepository()
         val original = ControllerPrepared()
@@ -416,7 +444,9 @@ class GameControllerTest {
         controller.open(GameLaunch.Resume("saved"))
         runCurrent()
         repository.records +=
-            repository.records.single().copy(session = repository.records.single().session.copy(id = "other"))
+            repository.records.single().let { record ->
+                record.copy(session = record.session.copy(id = "other"))
+            }
         val gate = CompletableDeferred<Unit>()
         repository.adoptionGate = gate
         controller.startNew(GameLaunch.Resume("other"))
@@ -442,7 +472,10 @@ class GameControllerTest {
         val gate = CompletableDeferred<Unit>()
         val repository = ControllerRepository(gate)
         val generated = GeneratedPuzzle(
-            repository.records.single().session.puzzle.copy(difficulty = Difficulty.MEDIUM, seed = "11".repeat(32)),
+            repository.records.single().session.puzzle.copy(
+                difficulty = Difficulty.MEDIUM,
+                seed = "11".repeat(32)
+            ),
             null
         )
         val controller = GameController(
@@ -486,7 +519,10 @@ class GameControllerTest {
         val gate = CompletableDeferred<Unit>()
         val repository = ControllerRepository(gate)
         val generated = GeneratedPuzzle(
-            repository.records.single().session.puzzle.copy(difficulty = Difficulty.MEDIUM, seed = "11".repeat(32)),
+            repository.records.single().session.puzzle.copy(
+                difficulty = Difficulty.MEDIUM,
+                seed = "11".repeat(32)
+            ),
             null
         )
         val controller = GameController(
@@ -555,6 +591,147 @@ class GameControllerTest {
         assertFalse(controller.uiState.value.preparationCommitting)
         assertFalse(phases.contains(GamePhase.PLAYING))
     }
+
+    @Test
+    fun disposalFlushesTheLatestElapsedSnapshotBeforeReleasingTheEditor() = runTest {
+        val repository = ControllerRepository()
+        val controller = GameController(
+            ControllerEngine(),
+            repository,
+            repository.reads,
+            backgroundScope,
+            "saved",
+            {},
+            monotonicMs = { testScheduler.currentTime }
+        )
+        controller.open(GameLaunch.Resume("saved"))
+        runCurrent()
+        controller.resume()
+        runCurrent()
+        advanceTimeBy(1_000)
+
+        controller.dispose().join()
+
+        assertEquals(1_050L, repository.records.single().session.elapsedMs)
+        assertEquals(null, repository.activeToken)
+    }
+
+    @Test
+    fun restartingAnOldPuzzleCannotReplaceASaveInARestoredDataset() = runTest {
+        val repository = ControllerRepository()
+        val controller = GameController(
+            ControllerEngine(),
+            repository,
+            repository.reads,
+            backgroundScope,
+            "saved",
+            {},
+            monotonicMs = { testScheduler.currentTime }
+        )
+        controller.open(GameLaunch.Resume("saved"))
+        runCurrent()
+        val original = repository.records.single()
+        repository.beforeEpochRead = {
+            repository.epoch = 1
+            repository.activeToken = null
+            repository.records.clear()
+            repository.records += original.copy(session = original.session.copy(id = "restored"))
+        }
+
+        controller.restart()
+        runCurrent()
+
+        assertEquals("restored", repository.records.single().session.id)
+        assertFalse(repository.commitStarted.isCompleted)
+    }
+
+    @Test
+    fun failedFirstReplacementReleasesItsUnadoptedEditor() = runTest {
+        val repository = ControllerRepository()
+        val puzzle = repository.records.single().session.puzzle
+        repository.records.clear()
+        repository.failReplacement = true
+        val controller = GameController(
+            ControllerEngine(generated = GeneratedPuzzle(puzzle, null)),
+            repository,
+            repository.reads,
+            backgroundScope,
+            null,
+            {}
+        )
+
+        controller.open(GameLaunch.Daily(Variant.CLASSIC, "2026-10-16"))
+        runCurrent()
+
+        assertTrue(repository.commitStarted.isCompleted)
+        assertEquals(null, repository.activeToken)
+        assertTrue(repository.records.isEmpty())
+    }
+
+    @Test
+    fun retryLoadsACompletedResultThatHasNoActiveSession() = runTest {
+        val repository = ControllerRepository()
+        val completed = repository.records.single().session.copy(
+            completion = Completion(
+                completedAt = "2026-10-16T00:00:01.000Z",
+                elapsedMs = 50
+            )
+        )
+        repository.records.clear()
+        repository.completedResult = ResultRecord(session = completed)
+        repository.failResultRead = true
+        val controller = GameController(
+            ControllerEngine(),
+            repository,
+            repository.reads,
+            backgroundScope,
+            null,
+            {}
+        )
+        val launch = GameLaunch.Resume("saved")
+        controller.open(launch)
+        runCurrent()
+        repository.failResultRead = false
+
+        controller.startNew(launch)
+        runCurrent()
+
+        assertEquals(GamePhase.COMPLETED, controller.uiState.value.phase)
+        assertEquals(completed, controller.uiState.value.session)
+        assertEquals(null, repository.activeToken)
+    }
+
+    @Test
+    fun pauseSupersedesAnInFlightResumeEvenWhenItsEpochReadFails() = runTest {
+        val repository = ControllerRepository()
+        val controller = GameController(
+            ControllerEngine(),
+            repository,
+            repository.reads,
+            backgroundScope,
+            "saved",
+            {},
+            monotonicMs = { testScheduler.currentTime }
+        )
+        controller.open(GameLaunch.Resume("saved"))
+        runCurrent()
+        val epochRead = CompletableDeferred<StorageOutcome<Long>>()
+        repository.nextEpochRead = epochRead
+
+        controller.resume()
+        runCurrent()
+        controller.pause()
+        epochRead.complete(
+            StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Offline"))
+        )
+        runCurrent()
+
+        assertEquals(GamePhase.PAUSED, controller.uiState.value.phase)
+        assertEquals(null, controller.uiState.value.error)
+        controller.resume()
+        runCurrent()
+        assertEquals(GamePhase.PLAYING, controller.uiState.value.phase)
+    }
 }
 
 private class ControllerEngine(
@@ -569,7 +746,7 @@ private class ControllerEngine(
         EngineOutcome.Completed(List(32) { 1.toUByte() })
 
     override suspend fun generate(request: GenerationRequest): EngineOutcome<GeneratedPuzzle> =
-        EngineOutcome.Completed(generated ?: throw UnsupportedOperationException("No generation fixture"))
+        EngineOutcome.Completed(checkNotNull(generated) { "No generation fixture" })
 
     override suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle> {
         prepareGate?.await()
@@ -598,25 +775,29 @@ private class ControllerPrepared : PreparedPuzzle {
     val notes = CompletableDeferred<EngineOutcome<EditResult>>()
     val hints = CompletableDeferred<EngineOutcome<HintResult>>()
 
-    override suspend fun edit(givens: List<Int>, layers: BoardLayers, action: BoardEdit): EngineOutcome<EditResult> =
-        when (action) {
-            BoardEdit.GenerateNotes -> notes.await()
-            is BoardEdit.Enter -> EngineOutcome.Completed(
-                EditResult(
-                    List(81) {
-                        if (it == action.cell) action.digit else layers.entries[it]
-                    },
-                    layers.notes,
-                    true,
-                    false
-                )
+    override suspend fun edit(
+        givens: List<Int>,
+        layers: BoardLayers,
+        action: BoardEdit
+    ): EngineOutcome<EditResult> = when (action) {
+        BoardEdit.GenerateNotes -> notes.await()
+        is BoardEdit.Enter -> EngineOutcome.Completed(
+            EditResult(
+                List(81) {
+                    if (it == action.cell) action.digit else layers.entries[it]
+                },
+                layers.notes,
+                true,
+                false
             )
-            else -> throw UnsupportedOperationException()
-        }
+        )
+        else -> throw UnsupportedOperationException()
+    }
 
     override suspend fun candidates(board: List<Int>) = throw UnsupportedOperationException()
 
-    override suspend fun conflicts(board: List<Int>) = EngineOutcome.Completed(emptyList<RuleViolation>())
+    override suspend fun conflicts(board: List<Int>): EngineOutcome<List<RuleViolation>> =
+        EngineOutcome.Completed(emptyList())
 
     override suspend fun isComplete(board: List<Int>) = EngineOutcome.Completed(false)
 
@@ -633,7 +814,8 @@ private class ControllerPrepared : PreparedPuzzle {
     }
 }
 
-private class ControllerRepository(private val commitGate: CompletableDeferred<Unit>? = null) : GameRepository {
+private class ControllerRepository(private val commitGate: CompletableDeferred<Unit>? = null) :
+    GameRepository {
     override val datasetEpochs = kotlinx.coroutines.flow.MutableSharedFlow<Long>(replay = 1)
     val reads = object : GameReadRepository by (
         java.lang.reflect.Proxy.newProxyInstance(
@@ -648,7 +830,14 @@ private class ControllerRepository(private val commitGate: CompletableDeferred<U
             return StorageOutcome.Success(records.find { it.session.id == id })
         }
 
-        override suspend fun readResult(id: String) = StorageOutcome.Success<ResultRecord?>(null)
+        override suspend fun readResult(id: String): StorageOutcome<ResultRecord?> {
+            if (failResultRead) {
+                val failure = StorageFailure(StorageFailureKind.UNAVAILABLE, "Offline")
+                return StorageOutcome.Failure(failure)
+            }
+
+            return StorageOutcome.Success(completedResult?.takeIf { it.session.id == id })
+        }
 
         override suspend fun readSlot(mode: GameMode, variant: Variant) =
             StorageOutcome.Success(records.singleOrNull { it.session.mode == mode })
@@ -678,15 +867,24 @@ private class ControllerRepository(private val commitGate: CompletableDeferred<U
             )
         )
     private var generation = 0L
+    var epoch = 0L
+    var beforeEpochRead: (() -> Unit)? = null
+    var nextEpochRead: CompletableDeferred<StorageOutcome<Long>>? = null
+    var failReplacement = false
+    var failResultRead = false
+    var completedResult: ResultRecord? = null
     var ownershipLost = false
     var claimCalls = 0
     var activeToken: EditorToken? = null
     var adoptionGate: CompletableDeferred<Unit>? = null
 
-    override suspend fun claimEditor(sessionId: String, ownerId: String): StorageOutcome<EditorToken> {
+    override suspend fun claimEditor(
+        sessionId: String,
+        ownerId: String
+    ): StorageOutcome<EditorToken> {
         claimCalls += 1
         ownershipLost = false
-        val token = EditorToken(ownerId, sessionId, 0, ++generation)
+        val token = EditorToken(ownerId, sessionId, epoch, ++generation)
         activeToken = token
         return StorageOutcome.Success(token)
     }
@@ -701,7 +899,7 @@ private class ControllerRepository(private val commitGate: CompletableDeferred<U
         expectedRevision: Long,
         token: EditorToken
     ): StorageOutcome<SessionRecord> {
-        if (ownershipLost) {
+        if (ownershipLost || token.epoch != epoch) {
             return StorageOutcome.Failure(
                 StorageFailure(
                     StorageFailureKind.OWNERSHIP_LOST,
@@ -712,6 +910,10 @@ private class ControllerRepository(private val commitGate: CompletableDeferred<U
         if (session.id != "saved") {
             commitStarted.complete(Unit)
             commitGate?.await()
+            if (failReplacement) {
+                val failure = StorageFailure(StorageFailureKind.WRITE_FAILED, "Disk")
+                return StorageOutcome.Failure(failure)
+            }
         }
         val record = SessionRecord(revision = expectedRevision + 1, session = session)
         records.removeAll { it.session.id == session.id }
@@ -726,6 +928,9 @@ private class ControllerRepository(private val commitGate: CompletableDeferred<U
     ): StorageOutcome<SessionRecord> {
         commitStarted.complete(Unit)
         commitGate?.await()
+        if (failReplacement) {
+            return StorageOutcome.Failure(StorageFailure(StorageFailureKind.WRITE_FAILED, "Disk"))
+        }
         val record = SessionRecord(revision = 1, session = session)
         records.removeAll { it.session.id == previous?.id }
         records += record
@@ -742,7 +947,14 @@ private class ControllerRepository(private val commitGate: CompletableDeferred<U
     override suspend fun writeLessonProgress(progress: LessonProgress, expectedEpoch: Long) =
         StorageOutcome.Success(Unit)
 
-    override suspend fun readDatasetEpoch() = StorageOutcome.Success(0L)
+    override suspend fun readDatasetEpoch(): StorageOutcome<Long> {
+        beforeEpochRead?.invoke()
+        beforeEpochRead = null
+
+        val pending = nextEpochRead
+        nextEpochRead = null
+        return pending?.await() ?: StorageOutcome.Success(epoch)
+    }
 
     override suspend fun exportBackup(exportedAt: String): StorageOutcome<BackupExport> =
         throw UnsupportedOperationException()
@@ -753,7 +965,8 @@ private class ControllerRepository(private val commitGate: CompletableDeferred<U
     override suspend fun restoreBackup(preview: BackupPreview): StorageOutcome<Unit> =
         throw UnsupportedOperationException()
 
-    override suspend fun clearAll(expectedEpoch: Long): StorageOutcome<Unit> = throw UnsupportedOperationException()
+    override suspend fun clearAll(expectedEpoch: Long): StorageOutcome<Unit> =
+        throw UnsupportedOperationException()
 
     override suspend fun countQuarantined() = StorageOutcome.Success(0)
 

@@ -78,7 +78,9 @@ class GameScreenTest {
             SudokuTheme { ControlledGame(playingGame(), onDigit = digits::add) }
         }
         useKeyboard()
-        compose.onNodeWithTag("cell-0").performClick().assertIsFocused().performKeyInput { pressKey(Key.Three) }
+        compose.onNodeWithTag("cell-0").performClick().assertIsFocused().performKeyInput {
+            pressKey(Key.Three)
+        }
         compose.runOnIdle { assertEquals(listOf(3), digits) }
         compose.onNodeWithContentDescription("对局设置与规则").performClick()
 
@@ -86,7 +88,9 @@ class GameScreenTest {
         compose.runOnIdle { assertEquals(listOf(3), digits) }
 
         compose.onNodeWithText("关闭").performClick()
-        compose.onNodeWithTag("cell-0").performClick().assertIsFocused().performKeyInput { pressKey(Key.Five) }
+        compose.onNodeWithTag("cell-0").performClick().assertIsFocused().performKeyInput {
+            pressKey(Key.Five)
+        }
         compose.runOnIdle { assertEquals(listOf(3, 5), digits) }
     }
 
@@ -114,7 +118,9 @@ class GameScreenTest {
         }
 
         useKeyboard()
-        compose.onNodeWithTag("cell-0").performClick().assertIsFocused().performKeyInput { pressKey(Key.Nine) }
+        compose.onNodeWithTag("cell-0").performClick().assertIsFocused().performKeyInput {
+            pressKey(Key.Nine)
+        }
         compose.runOnIdle {
             assertEquals(listOf(9), digits)
             state.value = state.value.copy(hint = hint)
@@ -153,31 +159,39 @@ private fun ControlledGame(
     GameScreen(
         state = state,
         departing = false,
-        onLeave = {},
-        onRecords = {},
-        onRetryPreparation = {},
-        onCheckEntries = {},
-        onGenerateNotes = {},
-        onPause = {},
-        onSelectCell = {},
-        onResume = {},
-        onCancelPreparation = {},
-        onRetrySave = {},
-        onSetShowTimer = {},
-        onSetHighlightConflicts = {},
-        onCancelPracticeReplacement = {},
-        onConfirmPracticeReplacement = {},
-        onRestart = {},
-        onDismissHint = {},
-        onNextHint = {},
-        onApplyHint = onApplyHint,
-        onEnterDigit = onDigit,
-        onToggleNote = {},
-        onToggleNotes = onToggleNotes,
-        onUndo = onUndo,
-        onRedo = onRedo,
-        onRequestHint = {},
-        onErase = onErase
+        actions = GameScreenActions(
+            navigation = GameNavigationActions(
+                onLeave = {},
+                onRecords = {}
+            ),
+            session = GameSessionActions(
+                onRetryPreparation = {},
+                onPause = {},
+                onResume = {},
+                onCancelPreparation = {},
+                onRetrySave = {},
+                onSetShowTimer = {},
+                onSetHighlightConflicts = {},
+                onCancelPracticeReplacement = {},
+                onConfirmPracticeReplacement = {},
+                onRestart = {}
+            ),
+            board = GameBoardActions(
+                onCheckEntries = {},
+                onGenerateNotes = {},
+                onSelectCell = {},
+                onDismissHint = {},
+                onNextHint = {},
+                onApplyHint = onApplyHint,
+                onEnterDigit = onDigit,
+                onToggleNote = {},
+                onToggleNotes = onToggleNotes,
+                onUndo = onUndo,
+                onRedo = onRedo,
+                onRequestHint = {},
+                onErase = onErase
+            )
+        )
     )
 }
 

@@ -65,7 +65,10 @@ internal fun ContinueGameSheet(
         fitContent = !hasMore && (saves.isNotEmpty() || !loading)
     ) { entranceFinished ->
         val presentation =
-            rememberEntryPresentation(SaveListPresentation(saves, loading, error, hasMore), entranceFinished)
+            rememberEntryPresentation(
+                SaveListPresentation(saves, loading, error, hasMore),
+                entranceFinished
+            )
         val content = when {
             presentation.saves.isNotEmpty() -> SaveListContent.RECORDS
             presentation.error != null -> SaveListContent.ERROR
@@ -76,7 +79,10 @@ internal fun ContinueGameSheet(
         // by the window and keep Material's nested scrolling and full-screen expansion.
         AnimatedContent(
             targetState = content,
-            modifier = Modifier.weight(1f, fill = false).fillMaxWidth().testTag("continue-viewport"),
+            modifier = Modifier.weight(
+                1f,
+                fill = false
+            ).fillMaxWidth().testTag("continue-viewport"),
             transitionSpec = {
                 // Outgoing skeletons must not determine the incoming list's measured height.
                 // The shell animates that height while these two contents fade together.
@@ -108,7 +114,9 @@ internal fun ContinueGameSheet(
                     Modifier.fillMaxWidth().testTag("continue-saves"),
                     contentPadding = PaddingValues(bottom = 20.dp)
                 ) {
-                    itemsIndexed(presentation.saves, key = { _, session -> session.id }) { index, session ->
+                    itemsIndexed(presentation.saves, key = { _, session ->
+                        session.id
+                    }) { index, session ->
                         val summary = remember(session, zone, currentYear) {
                             session.summary?.savedGameSummary(zone, currentYear)
                                 ?: SavedGameSummary("待确认的存档", "", "本机存档", null, "点按读取对局", "")
@@ -119,14 +127,21 @@ internal fun ContinueGameSheet(
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                             )
                         }
-                        SavedGameRow(summary, session.id, first = index == 0, onResume = { onResume(session.id) })
+                        SavedGameRow(summary, session.id, first = index == 0, onResume = {
+                            onResume(session.id)
+                        })
                     }
                     item(key = "list-status") {
                         // Pagination and errors stay after the rows. A background refresh must not
                         // grow a compact sheet just to display a transient loading label.
                         when {
-                            presentation.error != null -> TextButton(onClick = onRetry) { Text(presentation.error) }
-                            presentation.hasMore -> TextButton(onClick = onMore, enabled = !loading) {
+                            presentation.error != null -> TextButton(onClick = onRetry) {
+                                Text(presentation.error)
+                            }
+                            presentation.hasMore -> TextButton(
+                                onClick = onMore,
+                                enabled = !loading
+                            ) {
                                 Text(if (showLoading) "正在读取…" else "加载更多")
                             }
                         }
@@ -147,10 +162,18 @@ private data class SaveListPresentation(
 private enum class SaveListContent { LOADING, RECORDS, ERROR, EMPTY }
 
 @Composable
-private fun SavedGameRow(summary: SavedGameSummary, id: String, first: Boolean, onResume: () -> Unit) {
+private fun SavedGameRow(
+    summary: SavedGameSummary,
+    id: String,
+    first: Boolean,
+    onResume: () -> Unit
+) {
     Surface(
         onClick = onResume,
-        modifier = Modifier.fillMaxWidth().testTag("continue-save-$id").semantics { role = Role.Button },
+        modifier = Modifier.fillMaxWidth().testTag("continue-save-$id").semantics {
+            role =
+                Role.Button
+        },
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -162,7 +185,10 @@ private fun SavedGameRow(summary: SavedGameSummary, id: String, first: Boolean, 
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 FlowRow(
                     Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

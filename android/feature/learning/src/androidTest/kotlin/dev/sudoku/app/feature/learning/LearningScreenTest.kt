@@ -46,11 +46,13 @@ class LearningScreenTest {
             .bufferedReader().use { it.readText() }
     )
 
-    @Test fun delayedProgressKeepsCourseAndFirstLessonBoundsAtNormalFontScale() {
+    @Test
+    fun delayedProgressKeepsCourseAndFirstLessonBoundsAtNormalFontScale() {
         verifyDelayedProgressBounds(fontScale = 1f)
     }
 
-    @Test fun delayedProgressKeepsCourseAndFirstLessonBoundsAtEnlargedFontScale() {
+    @Test
+    fun delayedProgressKeepsCourseAndFirstLessonBoundsAtEnlargedFontScale() {
         verifyDelayedProgressBounds(fontScale = 1.8f)
     }
 
@@ -61,7 +63,8 @@ class LearningScreenTest {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                 SudokuTheme(ThemePreference.SYSTEM) {
-                    // Keep both target rows composed so lazy scroll anchoring cannot mask a layout shift.
+                    // Keep both target rows composed so lazy scroll anchoring cannot mask a layout
+                    // shift.
                     Box(Modifier.requiredWidth(360.dp).requiredHeight(1800.dp)) {
                         LearningScreen(state.value, {}, {}, {})
                     }
@@ -78,7 +81,10 @@ class LearningScreenTest {
             state.value = state.value.copy(
                 loading = false,
                 epoch = 0,
-                settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1))
+                settings = Settings(
+                    currentLessonId = "hidden-single",
+                    lessonStages = mapOf("hidden-single" to 1)
+                )
             )
         }
 
@@ -95,7 +101,14 @@ class LearningScreenTest {
     @Test
     fun fixedCourseHeadingAppearsImmediatelyAndProgressDoesNotMoveIt() {
         val catalogue = catalogue()
-        val state = mutableStateOf(LearningDirectoryState(directory = catalogue.lessons.map { it.directoryEntry() }))
+        val state =
+            mutableStateOf(
+                LearningDirectoryState(
+                    directory = catalogue.lessons.map {
+                        it.directoryEntry()
+                    }
+                )
+            )
         compose.setContent {
             SudokuTheme(ThemePreference.SYSTEM) {
                 LearningScreen(state.value, {}, {}, {})
@@ -104,7 +117,9 @@ class LearningScreenTest {
 
         val subtitle = compose.onNodeWithText("32 节互动课程，按自己的节奏来").assertIsDisplayed()
         val subtitleBounds = subtitle.getUnclippedBoundsInRoot()
-        val choicesBounds = compose.onNodeWithContentDescription("标准数独").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val choicesBounds = compose.onNodeWithContentDescription(
+            "标准数独"
+        ).assertIsDisplayed().getUnclippedBoundsInRoot()
         compose.onNodeWithText("0 / 32").assertDoesNotExist()
         compose.onNodeWithContentDescription("全部课程学习进度").assertDoesNotExist()
         compose.onNodeWithTag("suggested-lesson-action").assertDoesNotExist()
@@ -121,11 +136,15 @@ class LearningScreenTest {
         compose.onNodeWithText("32 节互动课程，按自己的节奏来").assertIsDisplayed()
         compose.onNodeWithText("1 / 32").assertIsDisplayed()
         assertEquals(subtitleBounds, subtitle.getUnclippedBoundsInRoot())
-        assertEquals(choicesBounds, compose.onNodeWithContentDescription("标准数独").getUnclippedBoundsInRoot())
+        assertEquals(
+            choicesBounds,
+            compose.onNodeWithContentDescription("标准数独").getUnclippedBoundsInRoot()
+        )
         compose.onNodeWithContentDescription("全部课程学习进度").assertIsDisplayed()
     }
 
-    @Test fun progressFailureKeepsStaticLessonsBrowsable() {
+    @Test
+    fun progressFailureKeepsStaticLessonsBrowsable() {
         val courses = catalogue()
         compose.setContent {
             SudokuTheme(ThemePreference.SYSTEM) {
@@ -190,7 +209,10 @@ class LearningScreenTest {
             loading = false,
             epoch = 0,
             directory = catalogue().lessons.map { it.directoryEntry() },
-            settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1)),
+            settings = Settings(
+                currentLessonId = "hidden-single",
+                lessonStages = mapOf("hidden-single" to 1)
+            ),
             progress = listOf(LessonProgress("rules", "2026-10-17T00:00:00.000Z"))
         )
         var opened: String? = null
@@ -200,10 +222,14 @@ class LearningScreenTest {
             }
         }
 
-        compose.onNodeWithTag("suggested-lesson-action").performScrollTo().assertTextContains("继续学习").performClick()
+        compose.onNodeWithTag(
+            "suggested-lesson-action"
+        ).performScrollTo().assertTextContains("继续学习").performClick()
         compose.runOnIdle { assertEquals("hidden-single", opened) }
         compose.onNodeWithText("第 2 / 2 阶段").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("learning-courses").performScrollToNode(hasTestTag("lesson-simple-coloring"))
+        compose.onNodeWithTag(
+            "learning-courses"
+        ).performScrollToNode(hasTestTag("lesson-simple-coloring"))
         compose.onNodeWithTag("lesson-simple-coloring").performClick()
         compose.runOnIdle { assertEquals("simple-coloring", opened) }
     }
@@ -216,7 +242,9 @@ class LearningScreenTest {
                 loading = false,
                 epoch = 0,
                 directory = catalogue.lessons.map { it.directoryEntry() },
-                progress = catalogue.lessons.map { LessonProgress(it.id, "2026-10-17T00:00:00.000Z") }
+                progress = catalogue.lessons.map {
+                    LessonProgress(it.id, "2026-10-17T00:00:00.000Z")
+                }
             )
         )
         var opened: String? = null
@@ -226,7 +254,9 @@ class LearningScreenTest {
             }
         }
 
-        compose.onNodeWithTag("suggested-lesson-action").performScrollTo().assertTextContains("复习课程").performClick()
+        compose.onNodeWithTag(
+            "suggested-lesson-action"
+        ).performScrollTo().assertTextContains("复习课程").performClick()
         compose.runOnIdle { assertEquals("rules", opened) }
         compose.runOnIdle { state.value = state.value.copy(loading = true) }
         compose.onNodeWithTag("suggested-lesson-action").assertIsDisplayed()

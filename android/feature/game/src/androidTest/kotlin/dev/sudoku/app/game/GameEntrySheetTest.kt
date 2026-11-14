@@ -31,13 +31,17 @@ import org.junit.Test
 class GameEntrySheetTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun saveArrivingDuringEntranceWaitsBeforeExpandingSetup() {
+    @Test
+    fun saveArrivingDuringEntranceWaitsBeforeExpandingSetup() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         compose.mainClock.autoAdvance = false
         compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.mainClock.advanceTimeBy(80)
 
-        compose.runOnIdle { state.value = state.value.copy(sheetLoading = false, freeSave = save("early").summary) }
+        compose.runOnIdle {
+            state.value =
+                state.value.copy(sheetLoading = false, freeSave = save("early").summary)
+        }
         compose.mainClock.advanceTimeBy(80)
         compose.onNodeWithText("继续存档").assertDoesNotExist()
         compose.onNodeWithTag("setup-start").assertIsNotEnabled()
@@ -46,7 +50,8 @@ class GameEntrySheetTest {
         compose.onNodeWithText("继续存档").assertIsDisplayed()
     }
 
-    @Test fun delayedSaveListShrinksThenKeepsRowsStableOnRefresh() {
+    @Test
+    fun delayedSaveListShrinksThenKeepsRowsStableOnRefresh() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         var resumed: String? = null
         compose.setContent {
@@ -67,7 +72,10 @@ class GameEntrySheetTest {
 
         compose.runOnIdle {
             state.value =
-                state.value.copy(sheetLoading = false, saves = listOf(save("first"), save("second")))
+                state.value.copy(
+                    sheetLoading = false,
+                    saves = listOf(save("first"), save("second"))
+                )
         }
         compose.waitForIdle()
         val compactHeader = compose.onNodeWithText("继续存档").fetchSemanticsNode().boundsInRoot
@@ -76,17 +84,25 @@ class GameEntrySheetTest {
         val row = compose.onNodeWithTag("continue-save-first").fetchSemanticsNode().boundsInRoot
         compose.runOnIdle { state.value = state.value.copy(sheetLoading = true) }
         compose.mainClock.advanceTimeBy(500)
-        assertEquals(row, compose.onNodeWithTag("continue-save-first").fetchSemanticsNode().boundsInRoot)
+        assertEquals(
+            row,
+            compose.onNodeWithTag("continue-save-first").fetchSemanticsNode().boundsInRoot
+        )
         compose.onNodeWithTag("continue-skeleton").assertDoesNotExist()
         compose.runOnIdle {
             state.value =
-                state.value.copy(sheetLoading = false, saves = state.value.saves + (1..20).map { save("more-$it") })
+                state.value.copy(
+                    sheetLoading = false,
+                    saves =
+                    state.value.saves + (1..20).map { save("more-$it") }
+                )
         }
         compose.onNodeWithTag("continue-save-first").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("first", resumed) }
     }
 
-    @Test fun freeSaveExpandsGraduallyWhileTheStartButtonStaysAtTheBottom() {
+    @Test
+    fun freeSaveExpandsGraduallyWhileTheStartButtonStaysAtTheBottom() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.mainClock.advanceTimeBy(500)
@@ -97,7 +113,10 @@ class GameEntrySheetTest {
         capture("setup-compact")
         compose.mainClock.autoAdvance = false
 
-        compose.runOnIdle { state.value = state.value.copy(sheetLoading = false, freeSave = save("free").summary) }
+        compose.runOnIdle {
+            state.value =
+                state.value.copy(sheetLoading = false, freeSave = save("free").summary)
+        }
         compose.mainClock.advanceTimeBy(80)
         val intermediate = compose.onNodeWithText("开始一局").fetchSemanticsNode().boundsInRoot.top
         assertEquals(button, compose.onNodeWithTag("setup-start").fetchSemanticsNode().boundsInRoot)
@@ -113,7 +132,8 @@ class GameEntrySheetTest {
         compose.onNodeWithText("继续存档").assertIsDisplayed()
     }
 
-    @Test fun noSaveKeepsSetupCompactWithoutAnEmptySaveRegion() {
+    @Test
+    fun noSaveKeepsSetupCompactWithoutAnEmptySaveRegion() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.waitForIdle()
@@ -124,12 +144,14 @@ class GameEntrySheetTest {
         compose.onNodeWithText("继续存档").assertDoesNotExist()
     }
 
-    @Test fun fastSaveQueryKeepsSkeletonUntilRowsCanBeRevealed() {
+    @Test
+    fun fastSaveQueryKeepsSkeletonUntilRowsCanBeRevealed() {
         val loading = mutableStateOf(true)
         compose.mainClock.autoAdvance = false
         compose.setContent {
             SudokuTheme {
-                ContinueGameSheet(if (loading.value) emptyList() else listOf(save("fast")), {}, {}, loading.value)
+                ContinueGameSheet(if (loading.value) emptyList() else listOf(save("fast")), {
+                }, {}, loading.value)
             }
         }
         compose.mainClock.advanceTimeBy(80)
@@ -144,13 +166,17 @@ class GameEntrySheetTest {
         compose.onNodeWithTag("continue-save-fast").assertIsDisplayed()
     }
 
-    @Test fun setupErrorArrivingDuringEntranceWaitsBeforeResizing() {
+    @Test
+    fun setupErrorArrivingDuringEntranceWaitsBeforeResizing() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         compose.mainClock.autoAdvance = false
         compose.setContent { SudokuTheme { GameSetupSheet(state.value, {}, {}) } }
         compose.mainClock.advanceTimeBy(80)
 
-        compose.runOnIdle { state.value = state.value.copy(sheetLoading = false, sheetError = "读取失败") }
+        compose.runOnIdle {
+            state.value =
+                state.value.copy(sheetLoading = false, sheetError = "读取失败")
+        }
         compose.mainClock.advanceTimeBy(80)
         compose.onNodeWithText("读取失败").assertDoesNotExist()
 
@@ -159,10 +185,13 @@ class GameEntrySheetTest {
         compose.onNodeWithTag("setup-start").assertIsNotEnabled()
     }
 
-    @Test fun preloadedSaveContentIsIncludedInTheInitialSheet() {
+    @Test
+    fun preloadedSaveContentIsIncludedInTheInitialSheet() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            SudokuTheme { GameSetupSheet(GameEntryUiState(freeSave = save("cached").summary), {}, {}) }
+            SudokuTheme {
+                GameSetupSheet(GameEntryUiState(freeSave = save("cached").summary), {}, {})
+            }
         }
         compose.mainClock.advanceTimeBy(80)
         compose.onNodeWithText("继续存档").assertExists()
@@ -170,7 +199,8 @@ class GameEntrySheetTest {
         compose.onNodeWithText("继续存档").assertIsDisplayed()
     }
 
-    @Test fun failedAndEmptyQueriesStayVisibleAndAllowRetry() {
+    @Test
+    fun failedAndEmptyQueriesStayVisibleAndAllowRetry() {
         val state = mutableStateOf(GameEntryUiState(sheetLoading = true))
         var retries = 0
         compose.setContent {
@@ -187,7 +217,10 @@ class GameEntrySheetTest {
         }
         compose.mainClock.advanceTimeBy(500)
         val viewport = compose.onNodeWithTag("continue-viewport").fetchSemanticsNode().boundsInRoot
-        compose.runOnIdle { state.value = state.value.copy(sheetLoading = false, sheetError = "读取失败") }
+        compose.runOnIdle {
+            state.value =
+                state.value.copy(sheetLoading = false, sheetError = "读取失败")
+        }
         compose.onNodeWithText("重新读取").performClick()
         compose.mainClock.autoAdvance = false
         compose.runOnIdle {
@@ -201,14 +234,18 @@ class GameEntrySheetTest {
         compose.waitForIdle()
         compose.onNodeWithText("暂无未完成的存档").assertIsDisplayed()
         assertTrue(
-            compose.onNodeWithTag("continue-viewport").fetchSemanticsNode().boundsInRoot.height < viewport.height
+            compose.onNodeWithTag("continue-viewport").fetchSemanticsNode().boundsInRoot.height <
+                viewport.height
         )
     }
 
-    @Test fun savedGamesOpenHalfwayAndCanExpandAndScrollToTheLastSave() {
+    @Test
+    fun savedGamesOpenHalfwayAndCanExpandAndScrollToTheLastSave() {
         var resumed: String? = null
         compose.setContent {
-            SudokuTheme { ContinueGameSheet((1..20).map { save("item-$it") }, {}, { resumed = it }) }
+            SudokuTheme {
+                ContinueGameSheet((1..20).map { save("item-$it") }, {}, { resumed = it })
+            }
         }
         compose.waitForIdle()
         val partialTop = compose.onNodeWithText("继续存档").fetchSemanticsNode().boundsInRoot.top
@@ -222,16 +259,20 @@ class GameEntrySheetTest {
         assertTrue("Dragging up must expand the sheet", expandedTop < partialTop * 0.3f)
         capture("continue-full")
 
-        compose.onNodeWithTag("continue-saves").performScrollToNode(hasTestTag("continue-save-item-20"))
+        compose.onNodeWithTag(
+            "continue-saves"
+        ).performScrollToNode(hasTestTag("continue-save-item-20"))
         compose.onNodeWithTag("continue-save-item-20").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals("item-20", resumed) }
     }
 
-    @Test fun shortSaveListShrinksFromTheDefaultHeightThroughAnIntermediatePosition() {
+    @Test
+    fun shortSaveListShrinksFromTheDefaultHeightThroughAnIntermediatePosition() {
         val loading = mutableStateOf(true)
         compose.setContent {
             SudokuTheme {
-                ContinueGameSheet(if (loading.value) emptyList() else listOf(save("short")), {}, {}, loading.value)
+                ContinueGameSheet(if (loading.value) emptyList() else listOf(save("short")), {
+                }, {}, loading.value)
             }
         }
         compose.waitForIdle()
@@ -257,7 +298,8 @@ class GameEntrySheetTest {
         capture("continue-short")
     }
 
-    @Test fun aShortPageWithMoreResultsKeepsTheDefaultHeight() {
+    @Test
+    fun aShortPageWithMoreResultsKeepsTheDefaultHeight() {
         val loading = mutableStateOf(true)
         var moreRequests = 0
         compose.setContent {
@@ -282,19 +324,23 @@ class GameEntrySheetTest {
         compose.runOnIdle { assertEquals(1, moreRequests) }
     }
 
-    @Test fun loadingSheetMovesContinuouslyPastTheBottomEdge() {
+    @Test
+    fun loadingSheetMovesContinuouslyPastTheBottomEdge() {
         assertContinuousEntrance(emptyList(), loading = true)
     }
 
-    @Test fun cachedSheetMovesContinuouslyPastTheBottomEdge() {
+    @Test
+    fun cachedSheetMovesContinuouslyPastTheBottomEdge() {
         assertContinuousEntrance(listOf(save("cached")), loading = false)
     }
 
-    @Test fun cachedShortListOpensDirectlyAtItsContentHeight() {
+    @Test
+    fun cachedShortListOpensDirectlyAtItsContentHeight() {
         assertDirectCompactEntrance(loading = false)
     }
 
-    @Test fun refreshingCachedShortListOpensDirectlyAtItsContentHeight() {
+    @Test
+    fun refreshingCachedShortListOpensDirectlyAtItsContentHeight() {
         assertDirectCompactEntrance(loading = true)
     }
 
@@ -327,15 +373,30 @@ class GameEntrySheetTest {
         }
         // Window insets settle during the first frames. They must not stall the native entrance
         // for the duration of the content-size animation before the title is even on screen.
-        assertTrue("The sheet must keep moving between 80 ms and 160 ms: $positions", positions[9] < positions[4] - 8f)
+        assertTrue(
+            "The sheet must keep moving between 80 ms and 160 ms: $positions",
+            positions[9] < positions[4] - 8f
+        )
     }
 
-    @Test fun shortResultsShrinkWhileTheSkeletonIsStillFadingOut() {
+    @Test
+    fun shortResultsShrinkWhileTheSkeletonIsStillFadingOut() {
         val loading = mutableStateOf(true)
         compose.setContent {
             SudokuTheme {
-                ContinueGameSheet(if (loading.value) emptyList() else listOf(save("synchronized")), {
-                }, {}, loading.value)
+                ContinueGameSheet(
+                    if (loading.value) {
+                        emptyList()
+                    } else {
+                        listOf(
+                            save("synchronized")
+                        )
+                    },
+                    {
+                    },
+                    {},
+                    loading.value
+                )
             }
         }
         compose.waitForIdle()
@@ -347,7 +408,10 @@ class GameEntrySheetTest {
         compose.onNodeWithTag("continue-skeleton").assertExists()
         compose.onNodeWithTag("continue-save-synchronized").assertExists()
         val movingTop = compose.onNodeWithText("继续存档").getUnclippedBoundsInRoot().top.value
-        assertTrue("The sheet must already shrink while the skeleton fades", movingTop > initialTop + 1f)
+        assertTrue(
+            "The sheet must already shrink while the skeleton fades",
+            movingTop > initialTop + 1f
+        )
         capture("continue-transition")
 
         var fadeFinishedTop: Float? = null
@@ -356,18 +420,27 @@ class GameEntrySheetTest {
             if (fadeFinishedTop == null &&
                 compose.onAllNodesWithTag("continue-skeleton").fetchSemanticsNodes().isEmpty()
             ) {
-                fadeFinishedTop = compose.onNodeWithText("继续存档").getUnclippedBoundsInRoot().top.value
+                fadeFinishedTop =
+                    compose.onNodeWithText("继续存档").getUnclippedBoundsInRoot().top.value
             }
         }
         val finalTop = compose.onNodeWithText("继续存档").getUnclippedBoundsInRoot().top.value
-        assertEquals("Resizing must finish with the content fade", finalTop, checkNotNull(fadeFinishedTop), 2f)
+        assertEquals(
+            "Resizing must finish with the content fade",
+            finalTop,
+            checkNotNull(fadeFinishedTop),
+            2f
+        )
     }
 
     private fun capture(name: String) {
         if (InstrumentationRegistry.getArguments().getString("captureSheets") != "true") return
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val screenshot = instrumentation.uiAutomation.takeScreenshot()
-        File(instrumentation.targetContext.getExternalFilesDir(null), "$name.png").outputStream().use {
+        File(
+            instrumentation.targetContext.getExternalFilesDir(null),
+            "$name.png"
+        ).outputStream().use {
             screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)
         }
         screenshot.recycle()

@@ -13,7 +13,10 @@ internal fun ruleDescription(rules: PuzzleRules): String = when (rules) {
     is PuzzleRules.Arrow -> "遵循标准规则。箭杆上的数字之和等于圆圈数字；标准规则允许时，箭杆数字可以重复。"
 }
 
-/** Translates owned proof facts; no candidate inference or logical validation happens in presentation. */
+/**
+ * Translates owned proof facts; no candidate inference or logical validation happens in
+ * presentation.
+ */
 internal fun explainStep(step: LogicalStep): String {
     val reasoning = when (step.technique) {
         "naked-single" -> "唯一候选数：此格只剩一个合法候选。"
@@ -39,12 +42,17 @@ internal fun explainStep(step: LogicalStep): String {
         is Evidence.Cage -> "笼总和为 ${value.sum}。"
         is Evidence.Thermo -> "温度计路径：${value.path.joinToString(" → ", transform = ::position)}。"
         is Evidence.Arrow -> "圆圈位于 ${position(value.circle)}。"
-        else -> "观察 ${value.cells.joinToString("、", transform = ::position)}，候选数字 ${value.digits.joinToString("、")}。"
+        else -> "观察 ${value.cells.joinToString(
+            "、",
+            transform = ::position
+        )}，候选数字 ${value.digits.joinToString("、")}。"
     }
     val action = when (step) {
         is LogicalStep.Place -> "在 ${position(step.placement.cell)} 填入 ${step.placement.digit}。"
-        is LogicalStep.Eliminate -> "排除：" + step.removals.joinToString("；") { "${position(it.cell)} 的 ${it.digit}" } +
-            "。"
+        is LogicalStep.Eliminate ->
+            "排除：" +
+                step.removals.joinToString("；") { "${position(it.cell)} 的 ${it.digit}" } +
+                "。"
     }
     return "$reasoning\n$evidence\n$action"
 }

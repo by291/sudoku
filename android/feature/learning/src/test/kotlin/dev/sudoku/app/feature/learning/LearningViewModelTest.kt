@@ -40,11 +40,16 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LearningViewModelTest {
-    @Test fun `replacement observed during unknown progress fences a suspended old final read`() = runTest {
+    @Test
+    fun `replacement fences a suspended progress read`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val backing = LearningRepository()
-            backing.settings = Settings(currentLessonId = "hidden-single", lessonStages = mapOf("hidden-single" to 1))
+            backing.settings =
+                Settings(
+                    currentLessonId = "hidden-single",
+                    lessonStages = mapOf("hidden-single" to 1)
+                )
             backing.progress += LessonProgress("rules", "2026-10-17T00:00:00.000Z")
             backing.datasetEpochs.emit(0)
             val finalReadCaptured = CompletableDeferred<Unit>()
@@ -68,7 +73,8 @@ class LearningViewModelTest {
                     object : LearningContentRepository {
                         override val directory = courses.lessons.map { it.directoryEntry() }
 
-                        override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
+                        override suspend fun loadLesson(id: String) =
+                            EngineOutcome.Completed(courses)
                     }
                 )
             )
@@ -129,7 +135,8 @@ class LearningViewModelTest {
                         object : LearningContentRepository {
                             override val directory = courses.lessons.map { it.directoryEntry() }
 
-                            override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
+                            override suspend fun loadLesson(id: String) =
+                                EngineOutcome.Completed(courses)
                         }
                     )
                 )
@@ -183,7 +190,8 @@ class LearningViewModelTest {
         }
     }
 
-    @Test fun `dataset replacement clears personal progress even if subsequent progress reads fail`() = runTest {
+    @Test
+    fun `replacement clears progress when the next read fails`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = LearningRepository()
@@ -196,7 +204,8 @@ class LearningViewModelTest {
                         object : LearningContentRepository {
                             override val directory = courses.lessons.map { it.directoryEntry() }
 
-                            override suspend fun loadLesson(id: String) = EngineOutcome.Completed(courses)
+                            override suspend fun loadLesson(id: String) =
+                                EngineOutcome.Completed(courses)
                         }
                     )
                 )
@@ -219,7 +228,9 @@ class LearningViewModelTest {
     }
 
     private fun catalogue(): LessonCatalogue = LessonCatalogue.decode(
-        checkNotNull(javaClass.classLoader.getResourceAsStream("lessons/catalogue.json")).bufferedReader().use {
+        checkNotNull(
+            javaClass.classLoader.getResourceAsStream("lessons/catalogue.json")
+        ).bufferedReader().use {
             it.readText()
         }
     )
@@ -380,7 +391,7 @@ class LearningViewModelTest {
     }
 
     @Test
-    fun `restores a saved stage and records completion only after all remaining answers`() = runTest {
+    fun `restored course completes after its remaining answers`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = LearningRepository().apply {
@@ -409,7 +420,7 @@ class LearningViewModelTest {
     }
 
     @Test
-    fun `dataset replacement rejects a pending answer and restores the new dataset cursor`() = runTest {
+    fun `replacement rejects the old answer and restores the new cursor`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             val repository = LearningRepository()
@@ -460,10 +471,13 @@ class LearningViewModelTest {
     }
 
     @Test
-    fun `retry after completion cursor failure retains the original committed timestamp`() = runTest {
+    fun `retry retains the original completion timestamp`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val repository = LearningRepository().apply { settings = Settings(lessonStages = mapOf("rules" to 1)) }
+            val repository = LearningRepository().apply {
+                settings =
+                    Settings(lessonStages = mapOf("rules" to 1))
+            }
             val model = model(repository)
             model.open("rules")
             advanceUntilIdle()
@@ -503,22 +517,33 @@ private class LearningRepository : GameRepository {
 
     override suspend fun readSettings() = StorageOutcome.Success(settings)
 
-    override suspend fun readLessonProgress(): StorageOutcome<List<LessonProgress>> = if (failProgress) {
-        StorageOutcome.Failure(StorageFailure(StorageFailureKind.UNAVAILABLE, "Progress unavailable"))
-    } else {
-        StorageOutcome.Success(progress.toList())
-    }
+    override suspend fun readLessonProgress(): StorageOutcome<List<LessonProgress>> =
+        if (failProgress) {
+            StorageOutcome.Failure(
+                StorageFailure(StorageFailureKind.UNAVAILABLE, "Progress unavailable")
+            )
+        } else {
+            StorageOutcome.Success(progress.toList())
+        }
 
-    override suspend fun updateSettings(update: SettingsUpdate, expectedEpoch: Long): StorageOutcome<Settings> {
+    override suspend fun updateSettings(
+        update: SettingsUpdate,
+        expectedEpoch: Long
+    ): StorageOutcome<Settings> {
         pendingSettings?.await()
         if (failSettings || expectedEpoch != epoch) {
-            return StorageOutcome.Failure(StorageFailure(StorageFailureKind.WRITE_FAILED, "Test save failure"))
+            return StorageOutcome.Failure(
+                StorageFailure(StorageFailureKind.WRITE_FAILED, "Test save failure")
+            )
         }
         settings = settings.updated(update)
         return StorageOutcome.Success(settings)
     }
 
-    override suspend fun writeLessonProgress(progress: LessonProgress, expectedEpoch: Long): StorageOutcome<Unit> {
+    override suspend fun writeLessonProgress(
+        progress: LessonProgress,
+        expectedEpoch: Long
+    ): StorageOutcome<Unit> {
         check(expectedEpoch == epoch)
         if (this.progress.none { it.lessonId == progress.lessonId }) {
             this.progress += progress
@@ -526,10 +551,13 @@ private class LearningRepository : GameRepository {
         return StorageOutcome.Success(Unit)
     }
 
-    override suspend fun claimEditor(sessionId: String, ownerId: String): StorageOutcome<EditorToken> =
-        error("Unused player operation")
+    override suspend fun claimEditor(
+        sessionId: String,
+        ownerId: String
+    ): StorageOutcome<EditorToken> = error("Unused player operation")
 
-    override suspend fun releaseEditor(token: EditorToken): StorageOutcome<Unit> = error("Unused player operation")
+    override suspend fun releaseEditor(token: EditorToken): StorageOutcome<Unit> =
+        error("Unused player operation")
 
     override suspend fun writeSession(
         session: GameSession,
@@ -546,13 +574,17 @@ private class LearningRepository : GameRepository {
     override suspend fun exportBackup(exportedAt: String): StorageOutcome<BackupExport> =
         error("Unused player operation")
 
-    override suspend fun previewBackup(text: String): StorageOutcome<BackupPreview> = error("Unused player operation")
+    override suspend fun previewBackup(text: String): StorageOutcome<BackupPreview> =
+        error("Unused player operation")
 
-    override suspend fun restoreBackup(preview: BackupPreview): StorageOutcome<Unit> = error("Unused player operation")
+    override suspend fun restoreBackup(preview: BackupPreview): StorageOutcome<Unit> =
+        error("Unused player operation")
 
-    override suspend fun clearAll(expectedEpoch: Long): StorageOutcome<Unit> = error("Unused player operation")
+    override suspend fun clearAll(expectedEpoch: Long): StorageOutcome<Unit> =
+        error("Unused player operation")
 
     override suspend fun countQuarantined(): StorageOutcome<Int> = error("Unused player operation")
 
-    override suspend fun removeQuarantined(): StorageOutcome<Unit> = error("Unused player operation")
+    override suspend fun removeQuarantined(): StorageOutcome<Unit> =
+        error("Unused player operation")
 }

@@ -26,9 +26,11 @@ internal data class LearningDirectoryState(
 
 /** Directory choices and personal progress never own a lesson answer or an exercise cursor. */
 @HiltViewModel
-internal class LearningDirectoryViewModel @Inject constructor(private val loader: LearningSnapshotLoader) :
-    ViewModel() {
-    private val mutableState = MutableStateFlow(LearningDirectoryState(directory = loader.snapshot.directory))
+internal class LearningDirectoryViewModel @Inject constructor(
+    private val loader: LearningSnapshotLoader
+) : ViewModel() {
+    private val mutableState =
+        MutableStateFlow(LearningDirectoryState(directory = loader.snapshot.directory))
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
     private var observedEpoch: Long? = null
@@ -47,7 +49,9 @@ internal class LearningDirectoryViewModel @Inject constructor(private val loader
             if (operation != generation) {
                 return@launch
             }
-            if (epoch is StorageOutcome.Success && mutableState.value.epoch?.let { it != epoch.value } == true) {
+            if (epoch is StorageOutcome.Success &&
+                mutableState.value.epoch?.let { it != epoch.value } == true
+            ) {
                 // A hidden directory may miss replacement observations; erase its personal facts
                 // before a potentially slow progress read can expose the replacement dataset.
                 mutableState.value = LearningDirectoryState(
@@ -78,13 +82,17 @@ internal class LearningDirectoryViewModel @Inject constructor(private val loader
         }
     }
 
-    /** A visible return rereads facts; epoch changes immediately discard the old dataset's progress. */
+    /**
+     * A visible return rereads facts; epoch changes immediately discard the old dataset's progress.
+     */
     suspend fun observe() {
         open()
         loader.datasetEpochs.collect { epoch ->
             val previous = observedEpoch
             observedEpoch = epoch
-            if ((previous != null && previous != epoch) || mutableState.value.epoch?.let { it != epoch } == true) {
+            if ((previous != null && previous != epoch) ||
+                mutableState.value.epoch?.let { it != epoch } == true
+            ) {
                 invalidate()
                 open()
             }

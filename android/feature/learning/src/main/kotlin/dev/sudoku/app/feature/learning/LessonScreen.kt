@@ -72,6 +72,7 @@ import dev.sudoku.app.designsystem.NumberPad
 import dev.sudoku.app.designsystem.variantLabel
 import dev.sudoku.app.model.GameLaunch
 import dev.sudoku.app.model.learning.ExerciseAnswer
+import dev.sudoku.app.model.learning.ExerciseStage
 import dev.sudoku.app.model.learning.Lesson
 
 @Composable
@@ -88,10 +89,8 @@ internal fun LessonScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit
 ) {
-    val showLoading = rememberDelayedProgress(state.loading)
-    val lesson = state.lesson
     val entry = state.lessonEntry
-    val stage = if (state.exerciseStarted) state.stage else lesson?.guided
+    val stage = if (state.exerciseStarted) state.stage else state.lesson?.guided
     var zoomed by remember(state.lessonId) { mutableStateOf(false) }
     val keyboard = Modifier.lessonKeyboard(state, onDigit, onClear)
 
@@ -106,81 +105,24 @@ internal fun LessonScreen(
                     }
                     else -> {
                         Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)) {
-                            LessonModeTabs(state.exerciseStarted, state.exerciseReady && !state.busy, onGuide, onStart)
+                            LessonModeTabs(
+                                state.exerciseStarted,
+                                state.exerciseReady && !state.busy,
+                                onGuide,
+                                onStart
+                            )
                         }
-                        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                            val density = LocalDensity.current
-                            val measurer = rememberTextMeasurer()
-                            val textWidth = with(density) { (maxWidth - 64.dp).roundToPx().coerceAtLeast(1) }
-                            val introduction = measurer.measure(
-                                entry.introduction,
-                                MaterialTheme.typography.bodyMedium,
-                                constraints = Constraints(maxWidth = textWidth)
-                            )
-                            val heading = measurer.measure(
-                                "这一课，记住一点",
-                                MaterialTheme.typography.titleSmall,
-                                constraints = Constraints(
-                                    maxWidth = (textWidth - with(density) { 26.dp.roundToPx() })
-                                        .coerceAtLeast(1)
-                                )
-                            )
-                            val messageHeight = maxOf(
-                                76.dp * density.fontScale.coerceAtLeast(1f),
-                                with(density) { (introduction.size.height + heading.size.height).toDp() } + 32.dp
-                            )
-                            val scroll = rememberScrollState()
-                            var retainedHeight by remember(entry.id, maxWidth, density) { mutableIntStateOf(0) }
-                            // Keep the visited scroll extent when the other tab has a shorter explanation/input area.
-                            // Otherwise ScrollState clamps its offset and moves the board during the switch.
-                            Column(
-                                Modifier.fillMaxWidth().verticalScroll(scroll)
-                                    .heightIn(min = with(density) { retainedHeight.toDp() })
-                                    .onSizeChanged { retainedHeight = maxOf(retainedHeight, it.height) }
-                                    .padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                if (state.exerciseStarted) {
-                                    ExerciseMessage(state, messageHeight)
-                                } else {
-                                    LessonPrinciple(entry.introduction, messageHeight)
-                                }
-                                LessonBoardHeading(state) { zoomed = true }
-                                Box(
-                                    Modifier.fillMaxWidth().aspectRatio(1f).testTag("lesson-board"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (stage != null) {
-                                        LessonBoard(stage, state, onCell, Modifier.fillMaxWidth())
-                                    } else {
-                                        Surface(
-                                            Modifier.fillMaxSize(),
-                                            color = MaterialTheme.colorScheme.surface,
-                                            border = BorderStroke(
-                                                1.dp,
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-                                            )
-                                        ) { }
-                                        if (showLoading) CircularProgressIndicator()
-                                        if (state.error != null) {
-                                            Column(
-                                                Modifier.padding(20.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally
-                                            ) {
-                                                Text(state.error, color = MaterialTheme.colorScheme.error)
-                                                TextButton(onClick = onRetry) { Text("重新读取课程") }
-                                            }
-                                        }
-                                    }
-                                }
-                                Spacer(Modifier.height(12.dp))
-                                if (state.exerciseStarted) {
-                                    ExerciseInput(state, onDigit, onClear)
-                                } else if (lesson != null) {
-                                    LessonExplanation(lesson)
-                                }
-                            }
-                        }
+                        LessonScrollableContent(
+                            content = LessonContent(state, stage, entry.id, entry.introduction),
+                            actions = LessonContentActions(
+                                selectCell = onCell,
+                                enterDigit = onDigit,
+                                clear = onClear,
+                                zoom = { zoomed = true },
+                                retry = onRetry
+                            ),
+                            modifier = Modifier.weight(1f).fillMaxWidth()
+                        )
                         LessonPrimaryAction(state, onStart, onSubmit, onNext, onRetry)
                     }
                 }
@@ -189,6 +131,126 @@ internal fun LessonScreen(
     }
     if (zoomed && stage != null) {
         LessonZoom(stage, state, onCell, onDigit, onClear) { zoomed = false }
+    }
+}
+
+private data class LessonContent(
+    val state: LearningUiState,
+    val stage: ExerciseStage?,
+    val entryId: String,
+    val introduction: String
+)
+
+private data class LessonContentActions(
+    val selectCell: (Int) -> Unit,
+    val enterDigit: (Int) -> Unit,
+    val clear: () -> Unit,
+    val zoom: () -> Unit,
+    val retry: () -> Unit
+)
+
+@Composable
+private fun LessonScrollableContent(
+    content: LessonContent,
+    actions: LessonContentActions,
+    modifier: Modifier
+) {
+    val (state, stage, entryId, introduction) = content
+    val lesson = state.lesson
+
+    BoxWithConstraints(modifier) {
+        val density = LocalDensity.current
+        val messageHeight = lessonMessageHeight(introduction, maxWidth)
+
+        val scroll = rememberScrollState()
+        var retainedHeight by remember(entryId, maxWidth, density) { mutableIntStateOf(0) }
+        // Keep the visited scroll extent when the other tab has a shorter explanation/input area.
+        // Otherwise ScrollState clamps its offset and moves the board during the switch.
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(scroll)
+                .heightIn(min = with(density) { retainedHeight.toDp() })
+                .onSizeChanged { retainedHeight = maxOf(retainedHeight, it.height) }
+                .padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (state.exerciseStarted) {
+                ExerciseMessage(state, messageHeight)
+            } else {
+                LessonPrinciple(introduction, messageHeight)
+            }
+            LessonBoardHeading(state, actions.zoom)
+            LessonBoardRegion(stage, state, actions)
+            Spacer(Modifier.height(12.dp))
+            if (state.exerciseStarted) {
+                ExerciseInput(state, actions.enterDigit, actions.clear)
+            } else if (lesson != null) {
+                LessonExplanation(lesson)
+            }
+        }
+    }
+}
+
+@Composable
+private fun lessonMessageHeight(introduction: String, width: Dp): Dp {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val textWidth = with(density) { (width - 64.dp).roundToPx().coerceAtLeast(1) }
+    val measuredIntroduction = measurer.measure(
+        introduction,
+        MaterialTheme.typography.bodyMedium,
+        constraints = Constraints(maxWidth = textWidth)
+    )
+    val heading = measurer.measure(
+        "这一课，记住一点",
+        MaterialTheme.typography.titleSmall,
+        constraints = Constraints(
+            maxWidth = (textWidth - with(density) { 26.dp.roundToPx() })
+                .coerceAtLeast(1)
+        )
+    )
+    return maxOf(
+        76.dp * density.fontScale.coerceAtLeast(1f),
+        with(density) { (measuredIntroduction.size.height + heading.size.height).toDp() } + 32.dp
+    )
+}
+
+@Composable
+private fun LessonBoardRegion(
+    stage: ExerciseStage?,
+    state: LearningUiState,
+    actions: LessonContentActions
+) {
+    val showLoading = rememberDelayedProgress(state.loading)
+
+    Box(
+        Modifier.fillMaxWidth().aspectRatio(1f).testTag("lesson-board"),
+        contentAlignment = Alignment.Center
+    ) {
+        if (stage != null) {
+            LessonBoard(stage, state, actions.selectCell, Modifier.fillMaxWidth())
+        } else {
+            Surface(
+                Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                )
+            ) {}
+
+            if (showLoading) {
+                CircularProgressIndicator()
+            }
+            if (state.error != null) {
+                Column(
+                    Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(state.error, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = actions.retry) { Text("重新读取课程") }
+                }
+            }
+        }
     }
 }
 
@@ -206,7 +268,9 @@ private fun LessonHeader(
     TopAppBar(
         modifier = Modifier.testTag("lesson-header"),
         windowInsets = WindowInsets(0, 0, 0, 0),
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background
+        ),
         navigationIcon = {
             IconButton(onClick = onBack, enabled = !state.busy) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回课程")
@@ -222,8 +286,15 @@ private fun LessonHeader(
                     modifier = Modifier.semantics { heading() }
                 )
                 if (entry != null) {
-                    val courseLessons = state.directory.filter { it.practiceVariant == entry.practiceVariant }
-                    val number = (courseLessons.indexOfFirst { it.id == entry.id } + 1).toString().padStart(2, '0')
+                    val courseLessons = state.directory.filter {
+                        it.practiceVariant ==
+                            entry.practiceVariant
+                    }
+                    val number = (
+                        courseLessons.indexOfFirst {
+                            it.id == entry.id
+                        } + 1
+                        ).toString().padStart(2, '0')
                     Text(
                         "${variantLabel(entry.practiceVariant)} · 第 $number 课",
                         style = MaterialTheme.typography.labelSmall,
@@ -236,7 +307,11 @@ private fun LessonHeader(
         },
         actions = {
             Box {
-                IconButton(onClick = { menuOpen = true }, enabled = lesson != null && !state.loading && !state.busy) {
+                IconButton(
+                    onClick = { menuOpen = true },
+                    enabled =
+                    lesson != null && !state.loading && !state.busy
+                ) {
                     Icon(Icons.Outlined.MoreHoriz, "课程更多选项")
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -253,7 +328,11 @@ private fun LessonHeader(
                         menuOpen = false
                         if (lesson != null) {
                             onPractice(
-                                GameLaunch.Practice(lesson.id, lesson.practiceVariant, lesson.practiceDifficulty)
+                                GameLaunch.Practice(
+                                    lesson.id,
+                                    lesson.practiceVariant,
+                                    lesson.practiceDifficulty
+                                )
                             )
                         }
                     })
@@ -264,7 +343,12 @@ private fun LessonHeader(
 }
 
 @Composable
-private fun LessonModeTabs(exercise: Boolean, enabled: Boolean, onGuide: () -> Unit, onExercise: () -> Unit) {
+private fun LessonModeTabs(
+    exercise: Boolean,
+    enabled: Boolean,
+    onGuide: () -> Unit,
+    onExercise: () -> Unit
+) {
     Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(Modifier.fillMaxWidth().padding(2.dp).selectableGroup()) {
             listOf("学习讲解", "动手练习").forEachIndexed { index, label ->
@@ -286,8 +370,15 @@ private fun LessonModeTabs(exercise: Boolean, enabled: Boolean, onGuide: () -> U
                         MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 ) {
-                    Box(Modifier.heightIn(min = 48.dp).padding(8.dp), contentAlignment = Alignment.Center) {
-                        Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        Modifier.heightIn(min = 48.dp).padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
@@ -306,8 +397,16 @@ private fun LessonPrinciple(introduction: String, height: Dp) {
             Modifier.verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Lightbulb, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Outlined.Lightbulb,
+                    null,
+                    Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
                 Text(
                     "这一课，记住一点",
                     color = MaterialTheme.colorScheme.primary,
@@ -327,7 +426,11 @@ private fun LessonExplanation(lesson: Lesson) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("这一步，怎么想", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+            Text(
+                "这一步，怎么想",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleSmall
+            )
             Text(
                 lesson.explanation,
                 Modifier.testTag("lesson-explanation"),
@@ -347,7 +450,12 @@ private fun LessonBoardHeading(state: LearningUiState, onZoom: () -> Unit) {
     } else {
         "示例棋盘"
     }
-    val detail = if (state.exerciseStarted) "第${index + 1} / ${lesson?.stages?.size ?: 0}阶段" else "推理依据已标记"
+    val stageCount = lesson?.stages?.size ?: 0
+    val detail = if (state.exerciseStarted) {
+        "第${index + 1} / ${stageCount}阶段"
+    } else {
+        "推理依据已标记"
+    }
     Row(
         Modifier.fillMaxWidth().height(48.dp * LocalDensity.current.fontScale.coerceAtLeast(1f))
             .testTag("lesson-stage"),
@@ -367,7 +475,9 @@ private fun LessonBoardHeading(state: LearningUiState, onZoom: () -> Unit) {
             maxLines = 1,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        IconButton(onClick = onZoom, enabled = lesson != null) { Icon(Icons.Outlined.Fullscreen, "放大棋盘") }
+        IconButton(onClick = onZoom, enabled = lesson != null) {
+            Icon(Icons.Outlined.Fullscreen, "放大棋盘")
+        }
     }
 }
 
@@ -387,20 +497,25 @@ private fun ExerciseMessage(state: LearningUiState, height: Dp) {
     } else {
         "点选空格，再填入你判断的数字。"
     }
-    val failed = state.error != null || feedback?.correct == false
+    val hasFailed = state.error != null || feedback?.correct == false
+    val colors = MaterialTheme.colorScheme
     // Reserve feedback space so submission never moves the board or the digit keys.
     // Long authored explanations remain scrollable and fully exposed to accessibility.
     Surface(
         Modifier.fillMaxWidth().height(height).testTag("exercise-message")
             .semantics { liveRegion = LiveRegionMode.Polite },
         shape = RoundedCornerShape(18.dp),
-        color = if (failed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+        color = if (hasFailed) colors.errorContainer else colors.primaryContainer
     ) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
             Text(message, style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -415,7 +530,12 @@ internal fun lessonDigitLabel(state: LearningUiState, digit: Int): String =
 @Composable
 private fun ExerciseInput(state: LearningUiState, onDigit: (Int) -> Unit, onClear: () -> Unit) {
     val elimination = state.stage?.answer is ExerciseAnswer.Eliminate
-    NumberPad(state.canEnterAnswer(), elimination, onDigit, digitLabel = { lessonDigitLabel(state, it) })
+    NumberPad(
+        enabled = state.canEnterAnswer(),
+        noteMode = elimination,
+        onDigit = onDigit,
+        digitLabel = { lessonDigitLabel(state, it) }
+    )
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         val summary = if (state.removals.isEmpty()) {
             "想回看思路？点上方「学习讲解」"
@@ -427,7 +547,9 @@ private fun ExerciseInput(state: LearningUiState, onDigit: (Int) -> Unit, onClea
         // Marked candidates remain readable without growing the input region after each edit.
         Text(
             summary,
-            Modifier.weight(1f).height(48.dp).verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
+            Modifier.weight(
+                1f
+            ).height(48.dp).verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -451,12 +573,14 @@ private fun LessonPrimaryAction(
     val showReading = rememberDelayedProgress(state.loading && state.lesson != null)
     val correct = state.feedback?.correct == true
     val retry = !state.loading && state.error != null && !state.exerciseReady
+    val hasDraft = state.feedback != null || state.placement != null || state.removals.isNotEmpty()
+    val stageIndex = state.cursor?.stageIndex ?: 0
     val label = when {
         retry -> "重试读取课程"
         showReading -> "正在读取进度…"
         !state.exerciseStarted -> when {
-            state.feedback != null || state.placement != null || state.removals.isNotEmpty() -> "返回当前练习"
-            (state.cursor?.stageIndex ?: 0) > 0 -> "继续第${(state.cursor?.stageIndex ?: 0) + 1}阶段"
+            hasDraft -> "返回当前练习"
+            stageIndex > 0 -> "继续第${stageIndex + 1}阶段"
             state.lessonId in state.completedIds -> "开始复习练习"
             else -> "开始课程练习"
         }

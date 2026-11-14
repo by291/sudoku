@@ -29,7 +29,11 @@ import androidx.compose.ui.unit.dp
 import dev.sudoku.app.model.Variant
 
 @Composable
-fun VariantSelection(selected: Variant, onSelect: (Variant) -> Unit, emphasizeSelected: Boolean = true) {
+fun VariantSelection(
+    selected: Variant,
+    onSelect: (Variant) -> Unit,
+    emphasizeSelected: Boolean = true
+) {
     val colors = MaterialTheme.colorScheme
     val fontScale = LocalDensity.current.fontScale
     BoxWithConstraints {
@@ -59,14 +63,28 @@ fun VariantSelection(selected: Variant, onSelect: (Variant) -> Unit, emphasizeSe
                             )
                         ) {
                             Row(
-                                Modifier.selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(choice) })
+                                Modifier.selectable(
+                                    selected = isSelected,
+                                    role = Role.RadioButton,
+                                    onClick = { onSelect(choice) }
+                                )
                                     .semantics { contentDescription = variantLabel(choice) }
-                                    .heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                                    .heightIn(
+                                        min = 48.dp
+                                    ).padding(horizontal = 8.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(
+                                    4.dp,
+                                    Alignment.CenterHorizontally
+                                ),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 if (isSelected) {
-                                    Icon(Icons.Outlined.Check, null, Modifier.size(14.dp), tint = colors.primary)
+                                    Icon(
+                                        Icons.Outlined.Check,
+                                        null,
+                                        Modifier.size(14.dp),
+                                        tint = colors.primary
+                                    )
                                 }
                                 Text(
                                     shortVariantLabel(choice),
@@ -78,7 +96,11 @@ fun VariantSelection(selected: Variant, onSelect: (Variant) -> Unit, emphasizeSe
                                     } else {
                                         FontWeight.Normal
                                     },
-                                    color = if (isSelected) colors.primary else colors.onSurfaceVariant
+                                    color = if (isSelected) {
+                                        colors.primary
+                                    } else {
+                                        colors.onSurfaceVariant
+                                    }
                                 )
                             }
                         }

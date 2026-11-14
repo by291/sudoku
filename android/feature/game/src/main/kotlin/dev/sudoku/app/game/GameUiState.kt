@@ -30,5 +30,6 @@ internal data class GameUiState(
     val error: String? = null
 ) {
     val editable: Boolean get() = phase == GamePhase.PLAYING && session?.completion == null
-    val inputEditable: Boolean get() = editable && selectedCell?.let { session?.puzzle?.givens?.get(it) == 0 } == true
+    val inputEditable: Boolean get() = editable &&
+        selectedCell?.let { session?.puzzle?.givens?.get(it) == 0 } == true
 }

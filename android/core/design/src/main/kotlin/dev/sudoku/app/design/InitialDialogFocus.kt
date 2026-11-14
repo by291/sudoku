@@ -18,7 +18,7 @@ fun InitialDialogFocus(requester: FocusRequester) {
 
     LaunchedEffect(windowFocused, requested) {
         if (windowFocused && !requested) {
-            // A parent composition can run before the dialog gains a window and places its focus targets.
+            // Wait for the dialog window to place its focus targets before requesting focus.
             withFrameNanos { }
             requested = requester.requestFocus()
         }

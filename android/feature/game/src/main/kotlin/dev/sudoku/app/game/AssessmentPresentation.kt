@@ -15,12 +15,17 @@ internal fun violationMessage(violation: RuleViolation): String = when (val code
 
 internal fun assessmentIssueMessage(issue: AssessmentIssue): String = when (issue) {
     is AssessmentIssue.Message -> issue.message
-    is AssessmentIssue.Violation -> "${issue.violation.constraintId}: ${violationMessage(issue.violation)}"
+    is AssessmentIssue.Violation -> "${issue.violation.constraintId}: ${violationMessage(
+        issue.violation
+    )}"
 }
 
 /** Historical metadata stores rendered strings; the engine never constructs that presentation. */
 internal fun AssessmentResult.toStoredAssessment(): PuzzleAssessment = when (this) {
     is AssessmentResult.Rated -> PuzzleAssessment.Rated(summary)
     is AssessmentResult.Ungraded -> PuzzleAssessment.Unavailable("ungraded", emptyList())
-    is AssessmentResult.Invalid -> PuzzleAssessment.Unavailable("invalid-input", issues.map(::assessmentIssueMessage))
+    is AssessmentResult.Invalid -> PuzzleAssessment.Unavailable(
+        "invalid-input",
+        issues.map(::assessmentIssueMessage)
+    )
 }

@@ -27,6 +27,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+private const val DIGIT_COUNT = 9
+private const val COMPACT_COLUMNS = 3
+
 /** Touch and accessibility actions report the same digit to the session owner. */
 @Composable
 fun NumberPad(
@@ -38,14 +41,17 @@ fun NumberPad(
     digitLabel: (Int) -> String = { if (noteMode) "笔记数字$it" else "填入数字$it" }
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val columns = numberPadColumns(maxWidth, expandedTargets)
-        val gap = if (columns == 9) 4.dp else 8.dp
+        val columns = numberPadColumns(maxWidth, expandedTargets = expandedTargets)
+        val gap = if (columns == DIGIT_COUNT) 4.dp else 8.dp
+
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            repeat(9 / columns) { row ->
+            repeat(DIGIT_COUNT / columns) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                     repeat(columns) { column ->
                         val digit = row * columns + column + 1
-                        DigitKey(digit, enabled, digitLabel(digit), { onDigit(digit) }, Modifier.weight(1f))
+                        val key =
+                            DigitKeyPresentation(digit, digitLabel(digit), isEnabled = enabled)
+                        DigitKey(key, Modifier.weight(1f)) { onDigit(digit) }
                     }
                 }
             }
@@ -60,31 +66,36 @@ fun numberPadColumns(availableWidth: Dp, expandedTargets: Boolean = false): Int 
     val measurer = rememberTextMeasurer()
     val style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp)
     val digitWidth = remember(measurer, style, density) {
-        (1..9).maxOf { measurer.measure(it.toString(), style).size.width }
+        (1..DIGIT_COUNT).maxOf { measurer.measure(it.toString(), style).size.width }
     }
+
     // Nine compact keys preserve direct access on phones. The zoom view offers 48 dp-wide targets.
     val minimum = if (expandedTargets) 48.dp else 28.dp
     val keyWidth = maxOf(minimum, with(density) { digitWidth.toDp() } + 12.dp)
-    return if (availableWidth >= keyWidth * 9 + 32.dp) 9 else 3
+    return if (availableWidth >= keyWidth * DIGIT_COUNT + 32.dp) DIGIT_COUNT else COMPACT_COLUMNS
 }
 
+private data class DigitKeyPresentation(val digit: Int, val label: String, val isEnabled: Boolean)
+
 @Composable
-private fun DigitKey(digit: Int, enabled: Boolean, label: String, onClick: () -> Unit, modifier: Modifier) {
+private fun DigitKey(key: DigitKeyPresentation, modifier: Modifier, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val colors = MaterialTheme.colorScheme
+
     Surface(
         onClick = onClick,
-        enabled = enabled,
+        enabled = key.isEnabled,
         interactionSource = interactionSource,
-        modifier = modifier.semantics { contentDescription = label },
+        modifier = modifier.semantics { contentDescription = key.label },
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.35f)),
         color = if (pressed) colors.primaryContainer else colors.surface,
-        contentColor = colors.primary.copy(alpha = if (enabled) 1f else 0.38f)
+        contentColor = colors.primary.copy(alpha = if (key.isEnabled) 1f else 0.38f)
     ) {
         Box(Modifier.heightIn(min = 52.dp), contentAlignment = Alignment.Center) {
-            Text(digit.toString(), style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp))
+            val style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp)
+            Text(key.digit.toString(), style = style)
         }
     }
 }

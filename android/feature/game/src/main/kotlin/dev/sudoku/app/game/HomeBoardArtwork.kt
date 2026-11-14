@@ -61,14 +61,24 @@ internal fun HomeBoardArtwork(modifier: Modifier = Modifier) {
                     drawText(
                         label,
                         topLeft =
-                        origin + Offset((cellSize - label.size.width) / 2, (cellSize - label.size.height) / 2)
+                        origin +
+                            Offset(
+                                (cellSize - label.size.width) / 2,
+                                (cellSize - label.size.height) / 2
+                            )
                     )
                 }
             }
             for (line in 1 until 9) {
                 val major = line % 3 == 0
                 val stroke = if (major) 0.8.dp.toPx() else 0.35.dp.toPx()
-                val color = if (major) colors.primary.copy(alpha = 0.6f) else colors.outline.copy(alpha = 0.3f)
+                val color = if (major) {
+                    colors.primary.copy(
+                        alpha = 0.6f
+                    )
+                } else {
+                    colors.outline.copy(alpha = 0.3f)
+                }
                 val position = line * cellSize
                 drawLine(color, Offset(position, 0f), Offset(position, size.height), stroke)
                 drawLine(color, Offset(0f, position), Offset(size.width, position), stroke)

@@ -34,7 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sudoku.app.model.learning.LessonDirectoryEntry
 
-/** Reserves the current course's largest authored card, independently of unknown personal progress. */
+/**
+ * Reserves the current course's largest authored card, independently of unknown personal progress.
+ */
 @Composable
 internal fun LearningSuggestion(
     course: List<LessonDirectoryEntry>,
@@ -49,7 +51,9 @@ internal fun LearningSuggestion(
                 SuggestionSizing(lesson, number = index + 1)
             }
             if (suggested != null) {
-                SuggestedLesson(suggested, checkNotNull(courseCompleted)) { onOpen(suggested.lesson.id) }
+                SuggestedLesson(suggested, checkNotNull(courseCompleted)) {
+                    onOpen(suggested.lesson.id)
+                }
             }
         }
     ) { measurables, constraints ->
@@ -88,9 +92,15 @@ private fun SuggestionSizing(lesson: LessonDirectoryEntry, number: Int) {
                 SUGGESTION_ACTIONS.forEach { label ->
                     // Match Material3 1.4.0 Button's documented minimum and content layout,
                     // using only noninteractive layout nodes rather than hidden/focusable controls.
-                    Box(suggestionActionModifier().minimumInteractiveComponentSize(), propagateMinConstraints = true) {
+                    Box(
+                        suggestionActionModifier().minimumInteractiveComponentSize(),
+                        propagateMinConstraints = true
+                    ) {
                         Row(
-                            Modifier.defaultMinSize(ButtonDefaults.MinWidth, ButtonDefaults.MinHeight)
+                            Modifier.defaultMinSize(
+                                ButtonDefaults.MinWidth,
+                                ButtonDefaults.MinHeight
+                            )
                                 .padding(SUGGESTION_ACTION_PADDING),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
@@ -109,7 +119,10 @@ private fun SuggestionSizing(lesson: LessonDirectoryEntry, number: Int) {
 private fun LargestSuggestionSlot(content: @Composable () -> Unit) {
     Layout(content = content) { measurables, constraints ->
         val alternatives = measurables.map { it.measure(constraints) }
-        layout(alternatives.maxOfOrNull { it.width } ?: 0, alternatives.maxOfOrNull { it.height } ?: 0) {}
+        layout(
+            alternatives.maxOfOrNull { it.width } ?: 0,
+            alternatives.maxOfOrNull { it.height } ?: 0
+        ) {}
     }
 }
 
@@ -177,23 +190,35 @@ private fun SuggestionBody(
 
 @Composable
 private fun SuggestionHeader(caption: String, stage: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(
             caption,
             Modifier.weight(1f),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary
         )
-        Text(stage, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stage,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
-private fun suggestionActionModifier() = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 4.dp)
+private fun suggestionActionModifier() =
+    Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 4.dp)
 
 @Composable
 private fun SuggestionActionContent(label: String) {
     Text(label, style = MaterialTheme.typography.titleSmall)
-    Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.padding(start = 10.dp).size(20.dp))
+    Icon(
+        Icons.AutoMirrored.Outlined.ArrowForward,
+        null,
+        Modifier.padding(start = 10.dp).size(20.dp)
+    )
 }
 
 private const val REVIEW_ACTION = "复习课程"
@@ -204,6 +229,8 @@ private const val REVIEW_CAPTION = "全部学完了，再巩固一次"
 private const val CONTINUE_CAPTION = "接着上次的思路"
 private const val NEXT_LESSON_CAPTION = "下一步，试试这节课"
 private const val START_CAPTION = "推荐从这里开始"
-private val SUGGESTION_CAPTIONS = listOf(REVIEW_CAPTION, CONTINUE_CAPTION, NEXT_LESSON_CAPTION, START_CAPTION)
-private val SUGGESTION_ACTIONS = listOf(REVIEW_ACTION, CONTINUE_ACTION, NEXT_LESSON_ACTION, START_ACTION)
+private val SUGGESTION_CAPTIONS =
+    listOf(REVIEW_CAPTION, CONTINUE_CAPTION, NEXT_LESSON_CAPTION, START_CAPTION)
+private val SUGGESTION_ACTIONS =
+    listOf(REVIEW_ACTION, CONTINUE_ACTION, NEXT_LESSON_ACTION, START_ACTION)
 private val SUGGESTION_ACTION_PADDING = PaddingValues(horizontal = 16.dp, vertical = 12.dp)

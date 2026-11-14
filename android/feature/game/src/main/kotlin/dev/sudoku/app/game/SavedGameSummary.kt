@@ -35,7 +35,13 @@ internal fun GameSummary.savedGameSummary(zone: ZoneId, currentYear: Int): Saved
     }
     val started = Instant.parse(startedAt).atZone(zone)
     // Retain the year for older saves so a compact date never confuses sessions across years.
-    val timeFormat = if (started.year == currentYear) savedGameTimeFormat else savedGameFullTimeFormat
+    val timeFormat = if (started.year ==
+        currentYear
+    ) {
+        savedGameTimeFormat
+    } else {
+        savedGameFullTimeFormat
+    }
     return SavedGameSummary(
         title = variantLabel(variant),
         difficulty = difficultyLabel(difficulty),

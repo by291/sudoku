@@ -30,16 +30,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sudoku.app.design.rememberDelayedProgress
 import dev.sudoku.app.designsystem.SudokuBoard
+import dev.sudoku.app.designsystem.SudokuBoardPresentation
 import dev.sudoku.app.designsystem.formatElapsedTime
 import dev.sudoku.app.model.SessionMetadata
+
+internal data class BoardWorkspaceActions(
+    val onSelect: (Int) -> Unit,
+    val onResume: () -> Unit,
+    val onCancelPreparation: () -> Unit,
+    val onRetry: () -> Unit
+)
 
 @Composable
 internal fun BoardWorkspace(
     state: GameUiState,
-    onSelect: (Int) -> Unit,
-    onResume: () -> Unit,
-    onCancelPreparation: () -> Unit,
-    onRetry: () -> Unit,
+    actions: BoardWorkspaceActions,
     modifier: Modifier
 ) {
     val session = state.session
@@ -49,7 +54,7 @@ internal fun BoardWorkspace(
         contentAlignment = Alignment.Center
     ) {
         if (session == null || state.phase == GamePhase.PREPARING) {
-            BoardPreparation(state, onCancelPreparation, onRetry)
+            BoardPreparation(state, actions.onCancelPreparation, actions.onRetry)
         } else if (state.phase == GamePhase.PAUSED) {
             androidx.compose.material3.Surface(
                 Modifier.fillMaxWidth().aspectRatio(1f),
@@ -62,8 +67,10 @@ internal fun BoardWorkspace(
                 ) {
                     Text("对局已暂停", style = MaterialTheme.typography.headlineSmall)
                     Button(
-                        onClick = onResume,
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        onClick = actions.onResume,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        ),
                         enabled = state.phase == GamePhase.PAUSED,
                         modifier = Modifier.padding(top = 16.dp)
                     ) { Text("继续对局") }
@@ -72,30 +79,33 @@ internal fun BoardWorkspace(
         } else {
             val step = state.hint?.steps?.getOrNull(state.hintStep)
             SudokuBoard(
-                givens = session.puzzle.givens,
-                entries = session.entries,
-                notes = session.notes,
-                rules = session.puzzle.rules,
-                selectedCell = state.selectedCell,
-                onSelect = onSelect,
-                modifier = Modifier.fillMaxWidth(),
-                relatedCells = state.selectedCell?.let {
-                    state.metadata?.relatedCells?.getOrNull(it)?.toSet()
-                }.orEmpty(),
+                presentation = SudokuBoardPresentation(
+                    givens = session.puzzle.givens,
+                    entries = session.entries,
+                    notes = session.notes,
+                    rules = session.puzzle.rules,
+                    selectedCell = state.selectedCell,
+                    relatedCells = state.selectedCell?.let {
+                        state.metadata?.relatedCells?.getOrNull(it)?.toSet()
+                    }.orEmpty(),
 
-                conflictCells = if (state.settings.highlightConflicts) {
-                    state.conflicts + state.reviewCells
-                } else {
-                    state.reviewCells
-                },
+                    conflictCells = if (state.settings.highlightConflicts) {
+                        state.conflicts + state.reviewCells
+                    } else {
+                        state.reviewCells
+                    },
 
-                evidenceCells = step?.evidence?.cells?.toSet().orEmpty(),
-                matchingDigit = state.selectedCell?.let { cell ->
-                    session.puzzle.givens[cell].takeIf { it != 0 } ?: session.entries[cell].takeIf { it != 0 }
-                },
+                    evidenceCells = step?.evidence?.cells?.toSet().orEmpty(),
+                    matchingDigit = state.selectedCell?.let { cell ->
+                        session.puzzle.givens[cell].takeIf { it != 0 }
+                            ?: session.entries[cell].takeIf { it != 0 }
+                    },
 
-                enabled = state.phase != GamePhase.PREPARING,
-                evidence = step?.evidence
+                    enabled = state.phase != GamePhase.PREPARING,
+                    evidence = step?.evidence
+                ),
+                onSelect = actions.onSelect,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
@@ -118,12 +128,18 @@ private fun BoardPreparation(state: GameUiState, onCancel: () -> Unit, onRetry: 
                 if (showProgress) {
                     CircularProgressIndicator(Modifier.size(24.dp))
                     Text(if (state.preparationCommitting) "正在保存新对局…" else "正在准备对局…")
-                    TextButton(onClick = onCancel, enabled = !state.preparationCommitting) { Text("取消") }
+                    TextButton(onClick = onCancel, enabled = !state.preparationCommitting) {
+                        Text("取消")
+                    }
                 }
                 if (state.session == null) {
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    if (state.phase != GamePhase.PREPARING && (state.error != null || state.message != null)) {
+                    state.message?.let {
+                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (state.phase != GamePhase.PREPARING &&
+                        (state.error != null || state.message != null)
+                    ) {
                         Button(onClick = onRetry) { Text("重试") }
                     }
                 }
@@ -138,7 +154,8 @@ internal fun BoardStatus(state: GameUiState) {
     val showNotes = rememberDelayedProgress(state.notesPending)
     val showHint = rememberDelayedProgress(state.hintPending)
 
-    val statusLineHeight = with(LocalDensity.current) { MaterialTheme.typography.bodyLarge.lineHeight.toDp() }
+    val statusLineHeight =
+        with(LocalDensity.current) { MaterialTheme.typography.bodyLarge.lineHeight.toDp() }
     Row(
         Modifier.fillMaxWidth().padding(bottom = 12.dp).heightIn(min = statusLineHeight),
         verticalAlignment = Alignment.CenterVertically
@@ -149,7 +166,9 @@ internal fun BoardStatus(state: GameUiState) {
             showNotes -> "正在生成候选数；继续填写会取消本次计算。"
             showHint -> "正在寻找可验证的逻辑推理…"
             showConflicts -> "正在检查当前棋盘规则…"
-            else -> daily?.let { "${it.challengeDate} · ${if (it.formalAttempt) "正式挑战" else "每日练习"}" }.orEmpty()
+            else -> daily?.let {
+                "${it.challengeDate} · ${if (it.formalAttempt) "正式挑战" else "每日练习"}"
+            }.orEmpty()
         }
         Text(
             status,

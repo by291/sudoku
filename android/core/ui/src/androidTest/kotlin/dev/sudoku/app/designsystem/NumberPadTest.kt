@@ -23,7 +23,12 @@ class NumberPadTest {
         var chosen = 0
         compose.setContent {
             SudokuTheme(ThemePreference.LIGHT) {
-                NumberPad(true, false, { chosen = it }, Modifier.width(width.value))
+                NumberPad(
+                    enabled = true,
+                    noteMode = false,
+                    onDigit = { chosen = it },
+                    modifier = Modifier.width(width.value)
+                )
             }
         }
 
@@ -36,8 +41,12 @@ class NumberPadTest {
             width.value = 240.dp
         }
 
-        val wrappedFirst = compose.onNodeWithContentDescription("填入数字1").fetchSemanticsNode().boundsInRoot
-        val wrappedLast = compose.onNodeWithContentDescription("填入数字9").fetchSemanticsNode().boundsInRoot
+        val wrappedFirst = compose.onNodeWithContentDescription(
+            "填入数字1"
+        ).fetchSemanticsNode().boundsInRoot
+        val wrappedLast = compose.onNodeWithContentDescription(
+            "填入数字9"
+        ).fetchSemanticsNode().boundsInRoot
         assertTrue(wrappedLast.top > wrappedFirst.bottom)
         compose.onNodeWithContentDescription("填入数字9").performClick()
         compose.runOnIdle { assertEquals(9, chosen) }
@@ -49,7 +58,13 @@ class NumberPadTest {
         var chosen = 0
         compose.setContent {
             SudokuTheme(ThemePreference.DARK) {
-                NumberPad(enabled.value, true, { chosen = it }, Modifier.width(320.dp), expandedTargets = true)
+                NumberPad(
+                    enabled = enabled.value,
+                    noteMode = true,
+                    onDigit = { chosen = it },
+                    modifier = Modifier.width(320.dp),
+                    expandedTargets = true
+                )
             }
         }
 

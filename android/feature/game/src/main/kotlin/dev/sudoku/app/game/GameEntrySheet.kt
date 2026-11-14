@@ -52,7 +52,10 @@ import kotlinx.coroutines.flow.first
 
 internal const val ENTRY_CONTENT_TRANSITION_MILLIS = 240
 
-/** Shared home entry shell keeps setup and saved-game selection visually and behaviorally consistent. */
+/**
+ * Shared home entry shell keeps setup and saved-game selection visually and behaviorally
+ * consistent.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GameEntrySheet(
@@ -68,9 +71,13 @@ internal fun GameEntrySheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = !expandable)
     var entranceFinished by remember { mutableStateOf(false) }
     LaunchedEffect(sheetState) {
-        snapshotFlow { sheetState.currentValue != SheetValue.Hidden && !sheetState.isAnimationRunning }
+        snapshotFlow {
+            sheetState.currentValue != SheetValue.Hidden &&
+                !sheetState.isAnimationRunning
+        }
             .first { it }
-        // Latch once: later dismissals and predictive back must not restore the initial loading content.
+        // Latch once: later dismissals and predictive back must not restore the initial loading
+        // content.
         entranceFinished = true
     }
     ModalBottomSheet(
@@ -87,17 +94,20 @@ internal fun GameEntrySheet(
         BoxWithConstraints {
             val availableHeight = maxHeight
             val density = LocalDensity.current
-            val halfWindow = with(density) { LocalWindowInfo.current.containerSize.height.toDp() / 2 }
+            val halfWindow =
+                with(density) { LocalWindowInfo.current.containerSize.height.toDp() / 2 }
             var naturalSize by remember { mutableStateOf(IntSize.Zero) }
             val naturalHeight = with(density) { naturalSize.height.toDp() }
-            val compact = (entranceFinished || initiallyFitContent) && fitContent && naturalSize.height > 0 &&
-                naturalHeight < availableHeight - halfWindow
+            val compact =
+                (entranceFinished || initiallyFitContent) && fitContent && naturalSize.height > 0 &&
+                    naturalHeight < availableHeight - halfWindow
             var compactStart by remember(compact) {
                 mutableStateOf(
                     if (compact && entranceFinished) {
                         // A partially expanded sheet still measures full-screen behind the bottom
                         // edge. Start resizing at its visible height, not that offscreen extent.
-                        val visibleHeight = with(density) { availableHeight.toPx() } - sheetState.requireOffset()
+                        val visibleHeight =
+                            with(density) { availableHeight.toPx() } - sheetState.requireOffset()
                         IntSize(naturalSize.width, visibleHeight.roundToInt().coerceAtLeast(0))
                     } else {
                         null
@@ -122,14 +132,23 @@ internal fun GameEntrySheet(
             val sizing = if (expandable) {
                 // Initial window-inset changes must settle immediately. Animating them retargets
                 // Material's entrance every frame and leaves only the drag handle visible.
-                Modifier.animateContentSize(resizeSpec, finishedListener = { _, _ -> compactStart = null })
+                Modifier.animateContentSize(resizeSpec, finishedListener = { _, _ ->
+                    compactStart =
+                        null
+                })
                     .layout { measurable, constraints ->
                         val placeable = measurable.measure(constraints.copy(minHeight = 0))
                         // Cached rows must establish the final anchors in the first measure pass.
                         // Waiting for onSizeChanged would let show() select the half-screen anchor.
                         val initiallyCompact = initiallyFitContent && !entranceFinished &&
                             placeable.height < constraints.maxHeight - halfWindow.roundToPx()
-                        val height = if (initiallyCompact || compact) placeable.height else constraints.maxHeight
+                        val height = if (initiallyCompact ||
+                            compact
+                        ) {
+                            placeable.height
+                        } else {
+                            constraints.maxHeight
+                        }
                         layout(placeable.width, height) { placeable.placeRelative(0, 0) }
                     }
                     .onSizeChanged { naturalSize = it }
@@ -157,8 +176,15 @@ internal fun GameEntrySheet(
                             )
                         }
                     }
-                    IconButton(onClick = onDismiss, modifier = Modifier.focusRequester(closeFocus)) {
-                        Icon(Icons.Outlined.Close, "关闭选择面板", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.focusRequester(closeFocus)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            "关闭选择面板",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
                 content(entranceFinished)
@@ -172,7 +198,10 @@ internal fun GameEntrySheet(
 private fun EntryDragHandle(modifier: Modifier = Modifier) {
     Box(
         modifier.padding(top = 10.dp, bottom = 4.dp).size(32.dp, 4.dp)
-            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), RoundedCornerShape(2.dp))
+            .background(
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                RoundedCornerShape(2.dp)
+            )
     )
 }
 

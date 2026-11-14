@@ -12,6 +12,7 @@ import dev.sudoku.app.model.learning.ExerciseAnswer
 import dev.sudoku.app.model.learning.ExerciseSubmission
 import dev.sudoku.app.model.learning.LessonCatalogue
 import dev.sudoku.app.model.learning.LessonCursor
+import dev.sudoku.app.model.learning.LessonDirectoryEntry
 import dev.sudoku.app.model.learning.directoryEntry
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -35,7 +36,7 @@ internal sealed interface ExerciseFeedback {
 internal data class LearningUiState(
     val loading: Boolean = true,
     val catalogue: LessonCatalogue? = null,
-    val directory: List<dev.sudoku.app.model.learning.LessonDirectoryEntry> = catalogue?.lessons?.map {
+    val directory: List<LessonDirectoryEntry> = catalogue?.lessons?.map {
         it.directoryEntry()
     }.orEmpty(),
     val progress: List<LessonProgress> = emptyList(),
@@ -64,7 +65,8 @@ internal class LearningViewModel @Inject constructor(
     private val repository: LearningProgressRepository,
     private val loader: LearningSnapshotLoader
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(LearningUiState(directory = loader.snapshot.directory))
+    private val mutableState =
+        MutableStateFlow(LearningUiState(directory = loader.snapshot.directory))
     val uiState = mutableState.asStateFlow()
     private var generation = 0L
     private var observedEpoch: Long? = null
@@ -100,16 +102,22 @@ internal class LearningViewModel @Inject constructor(
         )
     }
 
+    /** Load the selected lesson and attach it to the current personal dataset. */
     fun open(lessonId: String) {
         requestedLessonId = lessonId
         loading?.cancel()
         submission?.cancel()
         val operation = ++generation
+
         mutableState.value = LearningUiState(
-            catalogue = mutableState.value.catalogue.takeIf { mutableState.value.lessonId == lessonId },
+            catalogue = mutableState.value.catalogue.takeIf {
+                mutableState.value.lessonId ==
+                    lessonId
+            },
             lessonId = lessonId,
             directory = loader.snapshot.directory
         )
+
         loading = viewModelScope.launch {
             val loaded = loader.read(lessonId) { catalogue ->
                 if (operation == generation) {
@@ -119,11 +127,14 @@ internal class LearningViewModel @Inject constructor(
             if (operation != generation) {
                 return@launch
             }
+
+            // An epoch observation can overtake the last read before the lesson is delivered.
             if (loaded.epoch != null && observedEpoch?.let { loaded.epoch != it } == true) {
                 invalidatePersonalState()
                 requestedLessonId?.let(::open)
                 return@launch
             }
+
             val catalogue = loaded.catalogue
             if (loaded.error != null) {
                 failLoad(checkNotNull(loaded.error))
@@ -134,7 +145,11 @@ internal class LearningViewModel @Inject constructor(
                 failLoad("找不到这节课程，请返回学习列表。")
                 return@launch
             }
-            val cursor = catalogue.restoreCursor(lessonId, loaded.settings.lessonStages?.get(lessonId) ?: 0)
+
+            val cursor = catalogue.restoreCursor(
+                lessonId,
+                loaded.settings.lessonStages?.get(lessonId) ?: 0
+            )
             mutableState.value = LearningUiState(
                 loading = false,
                 catalogue = catalogue,
@@ -162,7 +177,9 @@ internal class LearningViewModel @Inject constructor(
     }
 
     fun startExercise() {
-        if (mutableState.value.exerciseReady && mutableState.value.stage != null && !mutableState.value.busy) {
+        if (mutableState.value.exerciseReady && mutableState.value.stage != null &&
+            !mutableState.value.busy
+        ) {
             mutableState.value = mutableState.value.copy(exerciseStarted = true, error = null)
         }
     }
@@ -185,7 +202,8 @@ internal class LearningViewModel @Inject constructor(
         val state = mutableState.value
         val stage = state.stage ?: return
         val cell = state.selectedCell ?: return
-        if (!state.exerciseStarted || state.busy || state.feedback?.correct == true || digit !in 1..9 ||
+        if (!state.exerciseStarted || state.busy || state.feedback?.correct == true ||
+            digit !in 1..9 ||
             stage.board[cell] != 0
         ) {
             return
@@ -200,7 +218,13 @@ internal class LearningViewModel @Inject constructor(
                     return
                 }
                 val pair = Placement(cell, digit)
-                val removals = if (pair in state.removals) state.removals - pair else state.removals + pair
+                val removals = if (pair in
+                    state.removals
+                ) {
+                    state.removals - pair
+                } else {
+                    state.removals + pair
+                }
                 mutableState.value = state.copy(removals = removals, feedback = null, error = null)
             }
         }
@@ -209,10 +233,16 @@ internal class LearningViewModel @Inject constructor(
     fun clearAnswer() {
         if (!mutableState.value.busy && mutableState.value.feedback?.correct != true) {
             mutableState.value =
-                mutableState.value.copy(placement = null, removals = emptySet(), feedback = null, error = null)
+                mutableState.value.copy(
+                    placement = null,
+                    removals = emptySet(),
+                    feedback = null,
+                    error = null
+                )
         }
     }
 
+    /** Check the draft and expose advancement only after the accepted answer is saved. */
     fun submit() {
         val state = mutableState.value
         val cursor = state.cursor ?: return
@@ -222,6 +252,7 @@ internal class LearningViewModel @Inject constructor(
         if (!state.exerciseStarted || state.busy || state.feedback?.correct == true) {
             return
         }
+
         val answer = when (stage.answer) {
             is ExerciseAnswer.Place -> state.placement?.let { ExerciseAnswer.Place(it) }
             is ExerciseAnswer.Eliminate -> state.removals.takeIf {
@@ -232,28 +263,44 @@ internal class LearningViewModel @Inject constructor(
             mutableState.value = state.copy(error = "请先选择格子和数字，再提交答案。")
             return
         }
-        val result = catalogue.submit(cursor, answer)
-        if (result is ExerciseSubmission.Rejected) {
-            mutableState.value =
-                state.copy(feedback = ExerciseFeedback.Incorrect(result.explanation), error = null)
-            return
+
+        when (val result = catalogue.submit(cursor, answer)) {
+            is ExerciseSubmission.Rejected -> {
+                val feedback = ExerciseFeedback.Incorrect(result.explanation)
+                mutableState.value = state.copy(feedback = feedback, error = null)
+            }
+            is ExerciseSubmission.Accepted -> persistAnswer(result, state, epoch)
         }
+    }
+
+    private fun persistAnswer(
+        result: ExerciseSubmission.Accepted,
+        state: LearningUiState,
+        epoch: Long
+    ) {
+        // A lesson or dataset switch invalidates the publication, even after a durable write.
         val operation = generation
         mutableState.value = state.copy(busy = true, error = null)
-        if (result !is ExerciseSubmission.Accepted) {
-            return
-        }
+
         submission = viewModelScope.launch {
-            when (val saved = progressWriter.save(result, epoch, state.progress)) {
+            val saved = progressWriter.save(result, epoch, state.progress)
+            if (operation != generation) {
+                return@launch
+            }
+
+            when (saved) {
                 LearningWriteResult.DatasetChanged -> {
-                    if (operation == generation) {
-                        invalidatePersonalState()
-                        requestedLessonId?.let(::open)
-                    }
+                    invalidatePersonalState()
+                    requestedLessonId?.let(::open)
                 }
-                is LearningWriteResult.Failed -> saveFailed(operation)
-                is LearningWriteResult.Saved -> if (operation == generation) {
-                    // The committed cursor authorizes Next, but explicit player input changes the shown stage.
+                is LearningWriteResult.Failed -> {
+                    mutableState.value = state.copy(
+                        busy = false,
+                        error = "答题正确，但学习进度尚未保存。请再次提交以重试。"
+                    )
+                }
+                is LearningWriteResult.Saved -> {
+                    // The committed cursor authorizes Next; the player still advances explicitly.
                     mutableState.value = state.copy(
                         busy = false,
                         settings = saved.settings,
@@ -285,11 +332,5 @@ internal class LearningViewModel @Inject constructor(
 
     private fun failLoad(message: String) {
         mutableState.value = mutableState.value.copy(loading = false, error = message)
-    }
-
-    private fun saveFailed(operation: Long) {
-        if (operation == generation) {
-            mutableState.value = mutableState.value.copy(busy = false, error = "答题正确，但学习进度尚未保存。请再次提交以重试。")
-        }
     }
 }

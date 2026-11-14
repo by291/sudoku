@@ -65,12 +65,13 @@ internal enum class DailyEntryStatus(val label: String) {
     PENDING("待确认")
 }
 
-internal fun GameEntryUiState.dailyStatus(variant: Variant): DailyEntryStatus = when (daily[variant]) {
-    DailyStatus.COMPLETED -> DailyEntryStatus.COMPLETED
-    DailyStatus.IN_PROGRESS -> DailyEntryStatus.IN_PROGRESS
-    DailyStatus.NOT_STARTED -> DailyEntryStatus.NOT_STARTED
-    else -> DailyEntryStatus.PENDING
-}
+internal fun GameEntryUiState.dailyStatus(variant: Variant): DailyEntryStatus =
+    when (daily[variant]) {
+        DailyStatus.COMPLETED -> DailyEntryStatus.COMPLETED
+        DailyStatus.IN_PROGRESS -> DailyEntryStatus.IN_PROGRESS
+        DailyStatus.NOT_STARTED -> DailyEntryStatus.NOT_STARTED
+        else -> DailyEntryStatus.PENDING
+    }
 
 /** Mobile entry keeps choices close to the primary action without navigating away from Home. */
 @Composable
@@ -111,7 +112,10 @@ internal fun GameSetupSheet(
         }
 
         Column(
-            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
+            Modifier.weight(
+                1f,
+                fill = false
+            ).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -189,7 +193,10 @@ internal fun GameSetupSheet(
                     }
                     val displayedSave = details.save
                     if (displayedSave != null) {
-                        Column(Modifier.padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(
+                            Modifier.padding(top = 18.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Surface(
                                 onClick = { onPlay(GameLaunch.Resume(displayedSave.id)) },
                                 enabled = ready && saved?.id == displayedSave.id,
@@ -197,10 +204,16 @@ internal fun GameSetupSheet(
                                 color = MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                                    Modifier.fillMaxWidth().padding(
+                                        horizontal = 14.dp,
+                                        vertical = 10.dp
+                                    ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Column(
+                                        Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
                                         Text("继续存档", style = MaterialTheme.typography.labelLarge)
                                         Text(
                                             "${variantLabel(
@@ -229,10 +242,22 @@ internal fun GameSetupSheet(
                 }
             }
         }
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             Button(
                 onClick = {
-                    onPlay(if (daily) GameLaunch.Daily(variant, state.today) else GameLaunch.Free(variant, difficulty))
+                    onPlay(
+                        if (daily) {
+                            GameLaunch.Daily(
+                                variant,
+                                state.today
+                            )
+                        } else {
+                            GameLaunch.Free(variant, difficulty)
+                        }
+                    )
                 },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("setup-start"),
                 enabled = ready,
@@ -264,7 +289,11 @@ internal fun GameSetupSheet(
 private data class SetupDetails(val error: String?, val save: GameSummary?)
 
 @Composable
-private fun VariantOptions(selected: Variant, onSelect: (Variant) -> Unit, status: ((Variant) -> DailyEntryStatus)?) {
+private fun VariantOptions(
+    selected: Variant,
+    onSelect: (Variant) -> Unit,
+    status: ((Variant) -> DailyEntryStatus)?
+) {
     BoxWithConstraints {
         val columns = if (LocalDensity.current.fontScale > 1.3f || maxWidth < 280.dp) 2 else 3
         Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -282,11 +311,18 @@ private fun VariantOptions(selected: Variant, onSelect: (Variant) -> Unit, statu
                             }
                         ) {
                             Column(
-                                Modifier.selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(choice) })
+                                Modifier.selectable(isSelected, role = Role.RadioButton, onClick = {
+                                    onSelect(choice)
+                                })
                                     .semantics { contentDescription = variantLabel(choice) }
-                                    .heightIn(min = 48.dp).padding(horizontal = 6.dp, vertical = 10.dp),
+                                    .heightIn(
+                                        min = 48.dp
+                                    ).padding(horizontal = 6.dp, vertical = 10.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically)
+                                verticalArrangement = Arrangement.spacedBy(
+                                    4.dp,
+                                    Alignment.CenterVertically
+                                )
                             ) {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -327,10 +363,21 @@ private fun VariantOptions(selected: Variant, onSelect: (Variant) -> Unit, statu
 }
 
 @Composable
-private fun DifficultyOptions(variant: Variant, selected: Difficulty, onSelect: (Difficulty) -> Unit) {
+private fun DifficultyOptions(
+    variant: Variant,
+    selected: Difficulty,
+    onSelect: (Difficulty) -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("选择难度", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+        Text(
+            "选择难度",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
             Row(Modifier.fillMaxWidth().padding(4.dp).selectableGroup()) {
                 variant.difficulties.forEach { choice ->
                     val isSelected = selected == choice
@@ -345,7 +392,9 @@ private fun DifficultyOptions(variant: Variant, selected: Difficulty, onSelect: 
                         shadowElevation = if (isSelected) 1.dp else 0.dp
                     ) {
                         Box(
-                            Modifier.selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(choice) })
+                            Modifier.selectable(isSelected, role = Role.RadioButton, onClick = {
+                                onSelect(choice)
+                            })
                                 .heightIn(min = 48.dp).padding(6.dp),
                             contentAlignment = Alignment.Center
                         ) {

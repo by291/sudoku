@@ -14,6 +14,7 @@ import dev.sudoku.app.model.challengeRefreshDelay
 import java.time.Instant
 import kotlinx.coroutines.delay
 
+/** Connect Home entry sheets and save selection to navigation. */
 @Composable
 fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: () -> Unit) {
     val model: GameEntryViewModel = hiltViewModel()
@@ -25,7 +26,7 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (dailyOpen) {
-            model.loadSheet(true, Variant.CLASSIC)
+            model.loadSheet(daily = true, variant = Variant.CLASSIC)
         }
     }
     LaunchedEffect(dailyOpen) {
@@ -33,7 +34,7 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
             while (true) {
                 delay(challengeRefreshDelay(Instant.now()))
                 if (model.uiState.value.today != challengeDate(Instant.now())) {
-                    model.loadSheet(true, Variant.CLASSIC)
+                    model.loadSheet(daily = true, variant = Variant.CLASSIC)
                 }
             }
         }
@@ -42,7 +43,7 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
     HomeScreen(
         state = state,
         hasSaves = state.hasSaves,
-        onStart = { model.showSetup(false) },
+        onStart = { model.showSetup(daily = false) },
         onContinue = {
             val single = state.singleSaveId
             if (single != null) {
@@ -53,7 +54,7 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
         },
         onLearning = onLearning,
         onDaily = {
-            model.showSetup(true)
+            model.showSetup(daily = true)
         },
         onRecords = onRecords,
         onRetry = model::refresh
@@ -76,7 +77,7 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
             onDismiss = model::dismissSheet,
             onPlay = {
                 if (it is GameLaunch.Daily && it.date != challengeDate(Instant.now())) {
-                    model.loadSheet(true, it.variant)
+                    model.loadSheet(daily = true, variant = it.variant)
                 } else {
                     model.dismissSheet()
                     onPlay(it)
@@ -88,7 +89,7 @@ fun HomeRoute(onPlay: (GameLaunch) -> Unit, onLearning: () -> Unit, onRecords: (
             loading = state.sheetLoading,
             error = state.sheetError,
             hasMore = state.next != null,
-            onMore = { model.loadSaves(true) },
+            onMore = { model.loadSaves(more = true) },
             onRetry = { model.loadSaves() },
             onDismiss = model::dismissSheet,
             onResume = {

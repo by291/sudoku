@@ -43,6 +43,7 @@ internal class LearningSnapshotLoader @Inject constructor(
         snapshot = LearningSnapshot(directory = content.directory)
     }
 
+    /** Return personal facts only when both epoch reads agree. */
     internal suspend fun read(
         lessonId: String? = null,
         onLessonLoaded: (LessonCatalogue) -> Unit = {}
@@ -51,7 +52,9 @@ internal class LearningSnapshotLoader @Inject constructor(
         // Publish it early, but only the complete snapshot below may authorize an exercise.
         val catalogueRead = async {
             lessonId?.let { content.loadLesson(it) }.also { result ->
-                if (result is EngineOutcome.Completed) onLessonLoaded(result.value)
+                if (result is EngineOutcome.Completed) {
+                    onLessonLoaded(result.value)
+                }
             }
         }
         reads.withLock {
@@ -63,14 +66,20 @@ internal class LearningSnapshotLoader @Inject constructor(
                 val settings = settingsRead.await()
                 val progress = progressRead.await()
                 val currentEpoch = repository.readDatasetEpoch()
+
                 when {
-                    epoch !is StorageOutcome.Success || currentEpoch !is StorageOutcome.Success ||
-                        settings !is StorageOutcome.Success || progress !is StorageOutcome.Success ->
+                    epoch !is StorageOutcome.Success ||
+                        currentEpoch !is StorageOutcome.Success ||
+                        settings !is StorageOutcome.Success ||
+                        progress !is StorageOutcome.Success ->
                         LearningSnapshot(loading = false, error = "学习进度暂时无法读取，请重试。")
                     epoch.value != currentEpoch.value ->
                         LearningSnapshot(loading = false, error = "本地资料已更新，请重新读取课程。")
                     lessonId != null && catalogue !is EngineOutcome.Completed ->
-                        LearningSnapshot(loading = false, error = contentFailure(checkNotNull(catalogue)))
+                        LearningSnapshot(
+                            loading = false,
+                            error = contentFailure(checkNotNull(catalogue))
+                        )
                     else -> LearningSnapshot(
                         loading = false,
                         catalogue = (catalogue as? EngineOutcome.Completed)?.value,
@@ -81,8 +90,10 @@ internal class LearningSnapshotLoader @Inject constructor(
                     )
                 }
             }
-            // Publish only a complete epoch-consistent snapshot, never partial or cancelled reads.
+            // Only a snapshot with an epoch can authorize an exercise. Keep bundled lesson
+            // boards out of this shared personal snapshot, even after a successful load.
             snapshot = result.copy(catalogue = null, directory = content.directory)
+
             result.copy(directory = content.directory)
         }
     }

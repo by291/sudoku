@@ -24,6 +24,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -47,36 +48,52 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.sudoku.app.model.BOARD_SIZE
 import dev.sudoku.app.model.Evidence
 import dev.sudoku.app.model.PuzzleRules
 
-/** Controlled drawing and input only. The caller supplies all mathematical relationships and conflicts. */
+private const val BOARD_SIDE = 9
+private const val MAX_NOTE_MASK = 511
+
+/** Immutable presentation inputs supplied by the owner of game or lesson state. */
+data class SudokuBoardPresentation(
+    val givens: List<Int>,
+    val entries: List<Int>,
+    val notes: List<Int>,
+    val rules: PuzzleRules,
+    val selectedCell: Int?,
+    val relatedCells: Set<Int> = emptySet(),
+    val conflictCells: Set<Int> = emptySet(),
+    val evidenceCells: Set<Int> = emptySet(),
+    val matchingDigit: Int? = null,
+    val enabled: Boolean = true,
+    val evidence: Evidence? = null
+)
+
+/**
+ * Draw caller-owned facts and report selections without applying Sudoku rules or editing the board.
+ */
 @Composable
 fun SudokuBoard(
-    givens: List<Int>,
-    entries: List<Int>,
-    notes: List<Int>,
-    rules: PuzzleRules,
-    selectedCell: Int?,
+    presentation: SudokuBoardPresentation,
     onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    relatedCells: Set<Int> = emptySet(),
-    conflictCells: Set<Int> = emptySet(),
-    evidenceCells: Set<Int> = emptySet(),
-    matchingDigit: Int? = null,
-    enabled: Boolean = true,
-    evidence: Evidence? = null
+    modifier: Modifier = Modifier
 ) {
-    require(givens.size == 81 && entries.size == 81 && notes.size == 81) {
+    val givens = presentation.givens
+    val entries = presentation.entries
+    val notes = presentation.notes
+    val rules = presentation.rules
+
+    require(givens.size == BOARD_SIZE && entries.size == BOARD_SIZE && notes.size == BOARD_SIZE) {
         "Board drawing requires complete owned layers"
     }
-    require(
-        givens.all {
-            it in 0..9
-        } && entries.all { it in 0..9 } && notes.all { it in 0..511 }
-    ) { "Invalid board drawing value" }
+    val hasValidDigits = givens.all { it in 0..BOARD_SIDE } &&
+        entries.all { it in 0..BOARD_SIDE }
+    val hasValidNotes = notes.all { it in 0..MAX_NOTE_MASK }
+    require(hasValidDigits && hasValidNotes) { "Invalid board drawing value" }
+
     val colors = LocalBoardColors.current
-    val focusRequesters = remember { List(81) { FocusRequester() } }
+    val focusRequesters = remember { List(BOARD_SIZE) { FocusRequester() } }
     val noteMeasurer = rememberTextMeasurer(cacheSize = 64)
     val displayed = givens.indices.map { if (givens[it] != 0) givens[it] else entries[it] }
     val sumLabels = remember(rules) {
@@ -86,20 +103,28 @@ fun SudokuBoard(
             emptyMap()
         }
     }
-    val allEvidenceCells = evidenceCells + (evidence?.cells ?: emptyList())
+    val evidence = presentation.evidence
+    val allEvidenceCells = presentation.evidenceCells + evidence?.cells.orEmpty()
 
-    BoxWithConstraints(modifier.aspectRatio(1f).semantics { collectionInfo = CollectionInfo(9, 9) }) {
+    val collection = modifier.aspectRatio(1f).semantics {
+        collectionInfo = CollectionInfo(BOARD_SIDE, BOARD_SIDE)
+    }
+    BoxWithConstraints(collection) {
         // Capture this receiver's width before entering nested layout scopes.
-        val cellSize = maxWidth / 9
+        val cellSize = maxWidth / BOARD_SIDE
+
+        // Interactive cells own the labels; the drawing canvas has no separate accessible content.
         Canvas(Modifier.fillMaxSize().clearAndSetSemantics {}) {
             drawBoardBackground(
                 colors,
-                selectedCell,
-                relatedCells,
-                conflictCells,
-                allEvidenceCells,
-                displayed,
-                matchingDigit
+                BoardBackground(
+                    selectedCell = presentation.selectedCell,
+                    relatedCells = presentation.relatedCells,
+                    conflictCells = presentation.conflictCells,
+                    evidenceCells = allEvidenceCells,
+                    displayed = displayed,
+                    matchingDigit = presentation.matchingDigit
+                )
             )
             drawRuleClues(rules, colors)
             drawEvidence(evidence, colors)
@@ -107,31 +132,33 @@ fun SudokuBoard(
         }
 
         Column(Modifier.fillMaxSize()) {
-            repeat(9) { row ->
+            repeat(BOARD_SIDE) { row ->
                 Row(Modifier.fillMaxWidth().weight(1f)) {
-                    repeat(9) { column ->
-                        val cell = row * 9 + column
-                        BoardCell(
+                    repeat(BOARD_SIDE) { column ->
+                        val cell = row * BOARD_SIDE + column
+                        val cellPresentation = BoardCellPresentation(
                             cell = cell,
                             given = givens[cell],
                             value = displayed[cell],
                             noteMask = notes[cell],
-                            noteMeasurer = noteMeasurer,
-                            selected = cell == selectedCell,
-                            conflict = cell in conflictCells,
-                            evidence = cell in allEvidenceCells,
+                            isSelected = cell == presentation.selectedCell,
+                            isConflicting = cell in presentation.conflictCells,
+                            hasEvidence = cell in allEvidenceCells,
                             clueLabel = sumLabels[cell],
                             evidenceDescription = evidenceCellDescription(cell, evidence),
                             rules = rules,
-                            enabled = enabled,
+                            isEnabled = presentation.enabled
+                        )
+                        val layout = BoardCellLayout(
+                            noteMeasurer = noteMeasurer,
                             cellSize = cellSize,
                             focusRequester = focusRequesters[cell],
-                            modifier = Modifier.weight(1f).fillMaxSize(),
-                            onSelect = {
-                                focusRequesters[it].requestFocus()
-                                onSelect(it)
-                            }
+                            modifier = Modifier.weight(1f).fillMaxSize()
                         )
+                        BoardCell(cellPresentation, layout) { selected ->
+                            focusRequesters[selected].requestFocus()
+                            onSelect(selected)
+                        }
                     }
                 }
             }
@@ -139,25 +166,57 @@ fun SudokuBoard(
     }
 }
 
+internal data class BoardCellPresentation(
+    val cell: Int,
+    val given: Int,
+    val value: Int,
+    val noteMask: Int,
+    val isSelected: Boolean,
+    val isConflicting: Boolean,
+    val hasEvidence: Boolean,
+    val clueLabel: String?,
+    val evidenceDescription: String,
+    val rules: PuzzleRules,
+    val isEnabled: Boolean
+)
+
+private data class BoardCellLayout(
+    val noteMeasurer: TextMeasurer,
+    val cellSize: Dp,
+    val focusRequester: FocusRequester,
+    val modifier: Modifier
+)
+
+private fun adjacentCell(event: KeyEvent, cell: Int): Int? {
+    // Modified keys belong to the enclosing game or lesson shortcut handler.
+    if (event.type != KeyEventType.KeyDown ||
+        event.isCtrlPressed || event.isAltPressed || event.isMetaPressed
+    ) {
+        return null
+    }
+
+    val row = cell / BOARD_SIDE
+    val column = cell % BOARD_SIDE
+    return when (event.key) {
+        Key.DirectionLeft -> if (column > 0) cell - 1 else cell
+        Key.DirectionRight -> if (column < BOARD_SIDE - 1) cell + 1 else cell
+        Key.DirectionUp -> if (row > 0) cell - BOARD_SIDE else cell
+        Key.DirectionDown -> if (row < BOARD_SIDE - 1) cell + BOARD_SIDE else cell
+        else -> null
+    }
+}
+
 @Composable
 private fun BoardCell(
-    cell: Int,
-    given: Int,
-    value: Int,
-    noteMask: Int,
-    noteMeasurer: TextMeasurer,
-    selected: Boolean,
-    conflict: Boolean,
-    evidence: Boolean,
-    clueLabel: String?,
-    evidenceDescription: String,
-    rules: PuzzleRules,
-    enabled: Boolean,
-    cellSize: Dp,
-    focusRequester: FocusRequester,
-    modifier: Modifier,
+    presentation: BoardCellPresentation,
+    layout: BoardCellLayout,
     onSelect: (Int) -> Unit
 ) {
+    val cell = presentation.cell
+    val given = presentation.given
+    val value = presentation.value
+    val clueLabel = presentation.clueLabel
+    val cellSize = layout.cellSize
     val colors = LocalBoardColors.current
     val density = LocalDensity.current
     // Convert each geometric size separately: Android font scaling is nonlinear.
@@ -166,49 +225,39 @@ private fun BoardCell(
     val noteSize = with(density) { (cellSize * 0.22f).toSp() }
     val markerSize = with(density) { (cellSize * 0.27f).toSp() }
     var focused by remember { mutableStateOf(false) }
-    val label = listOf(
-        cellDescription(cell, given, value, noteMask, conflict, evidence, rules),
-        evidenceDescription
-    ).filter { it.isNotBlank() }.joinToString("，")
-    val outline = when {
-        focused -> colors.accent
-        selected -> colors.accent
-        else -> Color.Transparent
-    }
+    val label = listOf(cellDescription(presentation), presentation.evidenceDescription)
+        .filter { it.isNotBlank() }
+        .joinToString("，")
+    val outline = if (focused || presentation.isSelected) colors.accent else Color.Transparent
     val valueColor = if (given > 0) colors.accent else colors.text
 
+    val focusModifier = layout.modifier
+        .testTag("cell-$cell")
+        .focusRequester(layout.focusRequester)
+        .onFocusChanged { focused = it.isFocused }
+    val keyboardModifier = focusModifier.onPreviewKeyEvent { event ->
+        if (!presentation.isEnabled) {
+            return@onPreviewKeyEvent false
+        }
+
+        val next = adjacentCell(event, cell) ?: return@onPreviewKeyEvent false
+        onSelect(next)
+        true
+    }
+    val selectionModifier = keyboardModifier.selectable(
+        selected = presentation.isSelected,
+        enabled = presentation.isEnabled,
+        role = Role.Button,
+        onClick = { onSelect(cell) }
+    )
+
     Box(
-        modifier
-            .testTag("cell-$cell")
-            .focusRequester(focusRequester)
-            .onFocusChanged { focused = it.isFocused }
-            .onPreviewKeyEvent { event ->
-                if (!enabled || event.type != KeyEventType.KeyDown || event.isCtrlPressed || event.isAltPressed ||
-                    event.isMetaPressed
-                ) {
-                    false
-                } else {
-                    val next = when (event.key) {
-                        Key.DirectionLeft -> if (cell % 9 > 0) cell - 1 else cell
-                        Key.DirectionRight -> if (cell % 9 < 8) cell + 1 else cell
-                        Key.DirectionUp -> if (cell >= 9) cell - 9 else cell
-                        Key.DirectionDown -> if (cell < 72) cell + 9 else cell
-                        else -> null
-                    }
-                    if (next != null) {
-                        onSelect(next)
-                        true
-                    } else {
-                        false
-                    }
-                }
-            }
-            .selectable(selected = selected, enabled = enabled, role = Role.Button, onClick = { onSelect(cell) })
+        selectionModifier
             .border(if (focused) 3.dp else 2.dp, outline)
             .semantics(mergeDescendants = true) {
                 contentDescription = label
-                collectionItemInfo = CollectionItemInfo(cell / 9, 1, cell % 9, 1)
-                if (conflict) {
+                collectionItemInfo = CollectionItemInfo(cell / BOARD_SIDE, 1, cell % BOARD_SIDE, 1)
+                if (presentation.isConflicting) {
                     error("冲突，请检查")
                 }
             },
@@ -225,7 +274,7 @@ private fun BoardCell(
                 modifier = Modifier.clearAndSetSemantics {}
             )
         } else {
-            CandidateNotes(noteMask, noteSize, noteMeasurer)
+            CandidateNotes(presentation.noteMask, noteSize, layout.noteMeasurer)
         }
         if (clueLabel != null) {
             Text(
@@ -235,10 +284,13 @@ private fun BoardCell(
                 lineHeight = noteSize,
                 maxLines = 1,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 3.dp, top = 1.dp).clearAndSetSemantics {}
+                modifier = Modifier.align(
+                    Alignment.TopStart
+                ).padding(start = 3.dp, top = 1.dp).clearAndSetSemantics {
+                }
             )
         }
-        if (evidence && !conflict) {
+        if (presentation.hasEvidence && !presentation.isConflicting) {
             Text(
                 "•",
                 color = colors.text,
@@ -246,7 +298,10 @@ private fun BoardCell(
                 lineHeight = markerSize,
                 maxLines = 1,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp).clearAndSetSemantics {}
+                modifier = Modifier.align(
+                    Alignment.BottomEnd
+                ).padding(end = 3.dp).clearAndSetSemantics {
+                }
             )
         }
     }

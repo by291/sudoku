@@ -118,7 +118,10 @@ internal fun LearningScreen(
                 )
             }
             item(key = "footer") {
-                Box(Modifier.fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.fillMaxWidth().padding(top = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         "课程自由选择，学过的也可以随时复习",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -214,13 +217,18 @@ private fun LessonRow(
     val bottomRadius = if (last) 18.dp else 0.dp
     Surface(
         onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().testTag("lesson-${entry.lesson.id}").semantics { stateDescription = status },
+        modifier = Modifier.fillMaxWidth().testTag("lesson-${entry.lesson.id}").semantics {
+            stateDescription =
+                status
+        },
         shape = RoundedCornerShape(topRadius, topRadius, bottomRadius, bottomRadius),
         color = colors.surface
     ) {
         Column {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 76.dp).padding(horizontal = 14.dp, vertical = 16.dp),
+                Modifier.fillMaxWidth().heightIn(
+                    min = 76.dp
+                ).padding(horizontal = 14.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -235,7 +243,12 @@ private fun LessonRow(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (entry.completed) {
-                            Icon(Icons.Outlined.Check, null, Modifier.size(16.dp), tint = colors.primary)
+                            Icon(
+                                Icons.Outlined.Check,
+                                null,
+                                Modifier.size(16.dp),
+                                tint = colors.primary
+                            )
                         } else {
                             Text(
                                 entry.number.toString().padStart(2, '0'),
@@ -257,7 +270,11 @@ private fun LessonRow(
                             fontWeight = FontWeight.SemiBold
                         )
                         if (entry.completed || entry.inProgress) {
-                            Text(status, color = colors.primary, style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                status,
+                                color = colors.primary,
+                                style = MaterialTheme.typography.labelSmall
+                            )
                         }
                     }
                     Text(

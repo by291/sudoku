@@ -31,7 +31,8 @@ internal fun CandidateNotes(mask: Int, noteSize: TextUnit, measurer: TextMeasure
     )
     Spacer(
         Modifier.fillMaxSize().padding(3.dp).clearAndSetSemantics {}.drawWithCache {
-            // Match Compose Row/Column weight rounding, including remainder pixels in the first slots.
+            // Match Compose Row/Column weight rounding, including remainder pixels in the first
+            // slots.
             val widths = noteSlotSizes(size.width.roundToInt())
             val heights = noteSlotSizes(size.height.roundToInt())
             val glyphs = (1..9).filter { mask and (1 shl (it - 1)) != 0 }.map { digit ->

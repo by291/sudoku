@@ -16,9 +16,15 @@ class AssessmentPresentationTest {
     private val issues = listOf(
         AssessmentIssue.Message("  original diagnostic  "),
         AssessmentIssue.Violation(RuleViolation("row:0", listOf(0, 1), ViolationCode.Duplicate)),
-        AssessmentIssue.Violation(RuleViolation("cage:2", listOf(12, 3), ViolationCode.CageTotal(2, 11))),
-        AssessmentIssue.Violation(RuleViolation("thermo:4", listOf(20, 11, 2), ViolationCode.ThermoOrder(4))),
-        AssessmentIssue.Violation(RuleViolation("arrow:6", listOf(30, 21, 12), ViolationCode.ArrowTotal(6)))
+        AssessmentIssue.Violation(
+            RuleViolation("cage:2", listOf(12, 3), ViolationCode.CageTotal(2, 11))
+        ),
+        AssessmentIssue.Violation(
+            RuleViolation("thermo:4", listOf(20, 11, 2), ViolationCode.ThermoOrder(4))
+        ),
+        AssessmentIssue.Violation(
+            RuleViolation("arrow:6", listOf(30, 21, 12), ViolationCode.ArrowTotal(6))
+        )
     )
     private val messages = listOf(
         "  original diagnostic  ",

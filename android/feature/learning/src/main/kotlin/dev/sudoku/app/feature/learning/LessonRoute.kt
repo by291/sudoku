@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.sudoku.app.model.GameLaunch
 
+/** Connect one lesson to its lifecycle, exercise actions and practice destination. */
 @Composable
 fun LessonRoute(lessonId: String, onPractice: (GameLaunch.Practice) -> Unit, onBack: () -> Unit) {
     val model: LearningViewModel = hiltViewModel()

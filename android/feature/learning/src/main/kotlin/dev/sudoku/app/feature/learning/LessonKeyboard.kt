@@ -11,27 +11,31 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 
 /** Both the inline and zoomed boards dispatch keys through the same lesson operations. */
-internal fun Modifier.lessonKeyboard(state: LearningUiState, onDigit: (Int) -> Unit, onClear: () -> Unit): Modifier =
-    onPreviewKeyEvent { event ->
-        if (!state.exerciseStarted || state.busy || state.feedback?.correct == true ||
-            event.type != KeyEventType.KeyDown || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed
-        ) {
-            false
-        } else {
-            val digit = LESSON_DIGIT_KEYS[event.key]
-            when {
-                digit != null -> {
-                    onDigit(digit)
-                    true
-                }
-                event.key == Key.Backspace || event.key == Key.Delete -> {
-                    onClear()
-                    true
-                }
-                else -> false
+internal fun Modifier.lessonKeyboard(
+    state: LearningUiState,
+    onDigit: (Int) -> Unit,
+    onClear: () -> Unit
+): Modifier = onPreviewKeyEvent { event ->
+    if (!state.exerciseStarted || state.busy || state.feedback?.correct == true ||
+        event.type != KeyEventType.KeyDown || event.isCtrlPressed || event.isAltPressed ||
+        event.isMetaPressed
+    ) {
+        false
+    } else {
+        val digit = LESSON_DIGIT_KEYS[event.key]
+        when {
+            digit != null -> {
+                onDigit(digit)
+                true
             }
+            event.key == Key.Backspace || event.key == Key.Delete -> {
+                onClear()
+                true
+            }
+            else -> false
         }
     }
+}
 
 private val LESSON_DIGIT_KEYS = mapOf(
     Key.One to 1, Key.Two to 2, Key.Three to 3,

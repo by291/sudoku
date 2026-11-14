@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.sudoku.app.model.GameLaunch
 import kotlinx.coroutines.launch
 
+/** Attach one game workflow to navigation, lifecycle, and save-before-leave. */
 @Composable
 fun GameRoute(
     launch: GameLaunch,
@@ -84,31 +85,39 @@ fun GameRoute(
     GameScreen(
         state = departureState ?: currentState,
         departing = departureState != null,
-        onLeave = { leave() },
-        onRecords = { leave(onRecords) },
-        onRetryPreparation = { model.startNew(launch) },
-        onCheckEntries = model::checkEntries,
-        onGenerateNotes = model::generateNotes,
-        onPause = model::pause,
-        onSelectCell = model::selectCell,
-        onResume = model::resume,
-        onCancelPreparation = model::cancelPreparation,
-        onRetrySave = model::retrySave,
-        onSetShowTimer = model::setShowTimer,
-        onSetHighlightConflicts = model::setHighlightConflicts,
-        onCancelPracticeReplacement = model::cancelPracticeReplacement,
-        onConfirmPracticeReplacement = model::confirmPracticeReplacement,
-        onRestart = model::restart,
-        onDismissHint = model::dismissHint,
-        onNextHint = model::nextHint,
-        onApplyHint = model::applyHint,
-        onEnterDigit = model::enterDigit,
-        onToggleNote = model::toggleNote,
-        onToggleNotes = model::toggleNotes,
-        onUndo = model::undo,
-        onRedo = model::redo,
-        onRequestHint = model::requestHint,
-        onErase = model::erase
+        actions = GameScreenActions(
+            navigation = GameNavigationActions(
+                onLeave = { leave() },
+                onRecords = { leave(onRecords) }
+            ),
+            session = GameSessionActions(
+                onRetryPreparation = { model.startNew(launch) },
+                onPause = model::pause,
+                onResume = model::resume,
+                onCancelPreparation = model::cancelPreparation,
+                onRetrySave = model::retrySave,
+                onSetShowTimer = model::setShowTimer,
+                onSetHighlightConflicts = model::setHighlightConflicts,
+                onCancelPracticeReplacement = model::cancelPracticeReplacement,
+                onConfirmPracticeReplacement = model::confirmPracticeReplacement,
+                onRestart = model::restart
+            ),
+            board = GameBoardActions(
+                onCheckEntries = model::checkEntries,
+                onGenerateNotes = model::generateNotes,
+                onSelectCell = model::selectCell,
+                onDismissHint = model::dismissHint,
+                onNextHint = model::nextHint,
+                onApplyHint = model::applyHint,
+                onEnterDigit = model::enterDigit,
+                onToggleNote = model::toggleNote,
+                onToggleNotes = model::toggleNotes,
+                onUndo = model::undo,
+                onRedo = model::redo,
+                onRequestHint = model::requestHint,
+                onErase = model::erase
+            )
+        )
     )
 }
 

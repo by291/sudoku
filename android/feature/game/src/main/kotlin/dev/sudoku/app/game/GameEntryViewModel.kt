@@ -79,13 +79,14 @@ internal class GameEntryViewModel @Inject constructor(
     fun loadSaves(more: Boolean = false) = controller.loadSaves(more)
 }
 
-private fun restoredSheet(savedState: SavedStateHandle): EntrySheet? = when (savedState.get<String>("entrySheet")) {
-    "setup" -> EntrySheet.Setup(
-        Variant.entries.find {
-            it.name == savedState.get<String>("entryVariant")
-        } ?: Variant.CLASSIC
-    )
-    "daily" -> EntrySheet.Daily
-    "continue" -> EntrySheet.Continue
-    else -> null
-}
+private fun restoredSheet(savedState: SavedStateHandle): EntrySheet? =
+    when (savedState.get<String>("entrySheet")) {
+        "setup" -> EntrySheet.Setup(
+            Variant.entries.find {
+                it.name == savedState.get<String>("entryVariant")
+            } ?: Variant.CLASSIC
+        )
+        "daily" -> EntrySheet.Daily
+        "continue" -> EntrySheet.Continue
+        else -> null
+    }

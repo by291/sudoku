@@ -15,17 +15,19 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 internal sealed interface LearningWriteResult {
-    data class Saved(val settings: Settings, val progress: List<LessonProgress>) : LearningWriteResult
+    data class Saved(val settings: Settings, val progress: List<LessonProgress>) :
+        LearningWriteResult
 
     data object DatasetChanged : LearningWriteResult
 
     data class Failed(val failure: StorageFailure) : LearningWriteResult
 }
 
-/** Serializes completion-before-cursor writes; neither a partial write nor cancellation permits Next. */
+/** Serialize completion before the cursor write so only durable progress permits Next. */
 internal class LearningProgressWriter(private val repository: LearningProgressRepository) {
     private val writes = Mutex()
 
+    /** Save the accepted answer under its original dataset epoch. */
     suspend fun save(
         accepted: ExerciseSubmission.Accepted,
         epoch: Long,
@@ -35,6 +37,7 @@ internal class LearningProgressWriter(private val repository: LearningProgressRe
         val firstCompletion = accepted is ExerciseSubmission.Completed && progress.none {
             it.lessonId == accepted.cursor.lessonId
         }
+
         when (val before = repository.readDatasetEpoch()) {
             is StorageOutcome.Failure -> return@withLock LearningWriteResult.Failed(before.error)
             is StorageOutcome.Success -> if (before.value != epoch) {
@@ -45,7 +48,7 @@ internal class LearningProgressWriter(private val repository: LearningProgressRe
 
         val lessonId = accepted.cursor.lessonId
         if (firstCompletion) {
-            // The repository retains the first completion even if the following cursor write needs retry.
+            // Keep the first completion timestamp even if the cursor write needs retry.
             val completion = LessonProgress(lessonId, isoInstant(Instant.now()))
             val result = repository.writeLessonProgress(completion, epoch)
             currentCoroutineContext().ensureActive()
@@ -53,6 +56,7 @@ internal class LearningProgressWriter(private val repository: LearningProgressRe
                 return@withLock failure(result.error, epoch)
             }
         }
+
         val intent = SettingsUpdate.LessonCursor(
             lessonId,
             accepted.cursor.stageIndex.takeUnless { accepted is ExerciseSubmission.Completed }
@@ -66,8 +70,10 @@ internal class LearningProgressWriter(private val repository: LearningProgressRe
         val retained = repository.readLessonProgress()
         val after = repository.readDatasetEpoch()
         currentCoroutineContext().ensureActive()
+
+        val hasDatasetChanged = after is StorageOutcome.Success && after.value != epoch
         when {
-            after is StorageOutcome.Success && after.value != epoch -> LearningWriteResult.DatasetChanged
+            hasDatasetChanged -> LearningWriteResult.DatasetChanged
             after is StorageOutcome.Failure -> LearningWriteResult.Failed(after.error)
             retained is StorageOutcome.Failure -> LearningWriteResult.Failed(retained.error)
             settings is StorageOutcome.Success && retained is StorageOutcome.Success ->

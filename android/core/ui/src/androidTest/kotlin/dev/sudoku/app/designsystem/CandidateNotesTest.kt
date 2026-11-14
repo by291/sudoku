@@ -110,7 +110,8 @@ private fun LegacyCandidateNotes(mask: Int, noteSize: TextUnit) {
                     val digit = row * 3 + column + 1
                     Box(Modifier.weight(1f).fillMaxSize(), contentAlignment = Alignment.Center) {
                         if (mask and (1 shl (digit - 1)) != 0) {
-                            // A note owns a third-cell; the inherited body line height clips its glyph.
+                            // A note owns a third-cell; the inherited body line height clips its
+                            // glyph.
                             Text(
                                 digit.toString(),
                                 color = colors.muted,

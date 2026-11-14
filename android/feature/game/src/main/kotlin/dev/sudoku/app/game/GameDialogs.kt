@@ -56,16 +56,13 @@ internal fun GameSettingsDialog(
     )
 }
 
+internal data class ZoomBoardActions(
+    val workspace: BoardWorkspaceActions,
+    val onEnterDigit: (Int) -> Unit
+)
+
 @Composable
-internal fun GameZoomDialog(
-    state: GameUiState,
-    onSelectCell: (Int) -> Unit,
-    onResume: () -> Unit,
-    onCancelPreparation: () -> Unit,
-    onRetryPreparation: () -> Unit,
-    onEnterDigit: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
+internal fun GameZoomDialog(state: GameUiState, actions: ZoomBoardActions, onDismiss: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -78,24 +75,26 @@ internal fun GameZoomDialog(
                 Text("检查棋盘", style = MaterialTheme.typography.titleLarge)
                 Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                     BoardWorkspace(
-                        state,
-                        onSelectCell,
-                        onResume,
-                        onCancelPreparation,
-                        onRetryPreparation,
-                        Modifier.width(540.dp)
+                        state = state,
+                        actions = actions.workspace,
+                        modifier = Modifier.width(540.dp)
                     )
                 }
                 Text(selectedDescription(state))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
-                        onSelectCell(((state.selectedCell ?: 0) + 80) % 81)
+                        actions.workspace.onSelect(((state.selectedCell ?: 0) + 80) % 81)
                     }) { Text("上一格") }
                     OutlinedButton(onClick = {
-                        onSelectCell(((state.selectedCell ?: 0) + 1) % 81)
+                        actions.workspace.onSelect(((state.selectedCell ?: 0) + 1) % 81)
                     }) { Text("下一格") }
                 }
-                NumberPad(state.inputEditable, state.noteMode, onEnterDigit, expandedTargets = true)
+                NumberPad(
+                    enabled = state.inputEditable,
+                    noteMode = state.noteMode,
+                    onDigit = actions.onEnterDigit,
+                    expandedTargets = true
+                )
                 TextButton(onClick = onDismiss) { Text("关闭") }
             }
         }
@@ -143,7 +142,11 @@ private fun SettingSwitch(label: String, checked: Boolean, onChange: (Boolean) -
 }
 
 @Composable
-internal fun PracticeReplacementDialog(onCancel: () -> Unit, onContinue: () -> Unit, onReplace: () -> Unit) {
+internal fun PracticeReplacementDialog(
+    onCancel: () -> Unit,
+    onContinue: () -> Unit,
+    onReplace: () -> Unit
+) {
     val cancelFocus = remember { FocusRequester() }
 
     AlertDialog(

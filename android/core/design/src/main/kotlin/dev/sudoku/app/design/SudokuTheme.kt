@@ -9,7 +9,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/** Board-specific tokens mirror the shared Web palette; platform controls use the matching Material scheme. */
+/**
+ * Board-specific tokens mirror the shared Web palette; platform controls use the matching Material
+ * scheme.
+ */
 @Immutable
 data class SudokuPalette(
     val surface: Color,

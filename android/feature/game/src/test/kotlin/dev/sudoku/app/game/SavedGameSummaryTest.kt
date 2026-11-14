@@ -25,7 +25,12 @@ class SavedGameSummaryTest {
 
     @Test
     fun countsEnteredEmptyCellsWithoutClaimingTheyAreCorrectOrCountingNotes() {
-        val session = createSession(puzzle, SessionMetadata.Free, "free", "2026-10-16T17:20:00.000Z").copy(
+        val session = createSession(
+            puzzle,
+            SessionMetadata.Free,
+            "free",
+            "2026-10-16T17:20:00.000Z"
+        ).copy(
             entries = List(81) { if (it == 0) 8 else 0 },
             notes = List(81) { if (it == 1) 511 else 0 },
             elapsedMs = 512_000
@@ -42,7 +47,8 @@ class SavedGameSummaryTest {
 
     @Test
     fun keepsTheYearForSavesFromAnotherYear() {
-        val session = createSession(puzzle, SessionMetadata.Free, "older", "2025-10-16T17:20:00.000Z")
+        val session =
+            createSession(puzzle, SessionMetadata.Free, "older", "2025-10-16T17:20:00.000Z")
 
         val summary = session.savedGameSummary(ZoneId.of("UTC"), 2026)
 
@@ -61,7 +67,10 @@ class SavedGameSummaryTest {
             val session = createSession(puzzle, metadata, "saved", "2026-10-16T17:20:00.000Z")
             val summary = session.savedGameSummary(ZoneId.of("UTC"), 2026)
 
-            assertEquals(expected, listOfNotNull(summary.source, summary.sourceDetail).joinToString(" · "))
+            assertEquals(
+                expected,
+                listOfNotNull(summary.source, summary.sourceDetail).joinToString(" · ")
+            )
             assertEquals("10-16 17:20 开始", summary.startedAt)
         }
     }
@@ -71,7 +80,11 @@ private fun GameSession.savedGameSummary(zone: java.time.ZoneId, year: Int): Sav
     val cells = puzzle.givens.indices.filter { puzzle.givens[it] == 0 }
     return GameSummary(
         id, 1, puzzle.rules.variant, puzzle.difficulty, metadata,
-        startedAt, elapsedMs, completion, assistance.assisted, cells.count { entries[it] != 0 }, cells.size
+        startedAt, elapsedMs, completion, assistance.assisted,
+        cells.count {
+            entries[it] != 0
+        },
+        cells.size
     )
         .savedGameSummary(zone, year)
 }

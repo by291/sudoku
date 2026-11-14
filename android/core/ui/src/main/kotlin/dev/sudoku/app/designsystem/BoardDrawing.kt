@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import dev.sudoku.app.model.ArrowClue
 import dev.sudoku.app.model.Evidence
 import dev.sudoku.app.model.PuzzleRules
 import dev.sudoku.app.model.UnitReference
@@ -17,29 +18,42 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 
+private const val DIAGONAL_STROKE_RATIO = 0.10f
+private const val CAGE_INSET_RATIO = 0.09f
+private const val THERMO_LINE_RATIO = 0.24f
+private const val THERMO_BULB_RATIO = 0.30f
+private const val ARROW_CIRCLE_RATIO = 0.33f
+private const val ARROW_STROKE_RATIO = 0.045f
+private const val ARROW_START_RATIO = 0.34f
+private const val ARROW_HEAD_RATIO = 0.22f
+
 private fun DrawScope.center(cell: Int): Offset {
     val side = size.width / 9
     return Offset((cell % 9 + 0.5f) * side, (cell / 9 + 0.5f) * side)
 }
 
-internal fun DrawScope.drawBoardBackground(
-    colors: BoardColors,
-    selectedCell: Int?,
-    relatedCells: Set<Int>,
-    conflicts: Set<Int>,
-    evidence: Set<Int>,
-    values: List<Int>,
-    matchingDigit: Int?
-) {
+internal data class BoardBackground(
+    val selectedCell: Int?,
+    val relatedCells: Set<Int>,
+    val conflictCells: Set<Int>,
+    val evidenceCells: Set<Int>,
+    val displayed: List<Int>,
+    val matchingDigit: Int?
+)
+
+internal fun DrawScope.drawBoardBackground(colors: BoardColors, presentation: BoardBackground) {
+    val matchingDigit = presentation.matchingDigit
     drawRect(colors.surface)
     val side = size.width / 9
     for (cell in 0 until 81) {
+        val isMatchingDigit = matchingDigit != null && matchingDigit != 0 &&
+            presentation.displayed[cell] == matchingDigit
         val background = when {
-            cell in conflicts -> colors.errorSoft
-            cell == selectedCell -> colors.accentSoft
-            cell in evidence -> colors.evidence
-            matchingDigit != null && matchingDigit != 0 && values[cell] == matchingDigit -> colors.accentSoft
-            cell in relatedCells -> colors.peer
+            cell in presentation.conflictCells -> colors.errorSoft
+            cell == presentation.selectedCell -> colors.accentSoft
+            cell in presentation.evidenceCells -> colors.evidence
+            isMatchingDigit -> colors.accentSoft
+            cell in presentation.relatedCells -> colors.peer
             else -> Color.Transparent
         }
         drawRect(background, Offset(cell % 9 * side, cell / 9 * side), Size(side, side))
@@ -62,120 +76,153 @@ internal fun DrawScope.drawBoardGrid(rules: PuzzleRules, colors: BoardColors) {
             val x = cell % 9 * side
             val y = cell / 9 * side
             if (cell % 9 < 8 && regions[cell] != regions[cell + 1]) {
-                drawLine(colors.accent, Offset(x + side, y), Offset(x + side, y + side), 1.dp.toPx())
+                drawLine(
+                    colors.accent,
+                    Offset(x + side, y),
+                    Offset(x + side, y + side),
+                    1.dp.toPx()
+                )
             }
             if (cell < 72 && regions[cell] != regions[cell + 9]) {
-                drawLine(colors.accent, Offset(x, y + side), Offset(x + side, y + side), 1.dp.toPx())
+                drawLine(
+                    colors.accent,
+                    Offset(x, y + side),
+                    Offset(x + side, y + side),
+                    1.dp.toPx()
+                )
             }
         }
     }
     drawRect(colors.accent, style = Stroke(1.dp.toPx()))
 }
 
-/** Only geometry is drawn here; mathematical support and constraints remain supplied by Rust. */
+/** Draw variant clue shapes using the caller-supplied geometry. */
 internal fun DrawScope.drawRuleClues(rules: PuzzleRules, colors: BoardColors) {
     val side = size.width / 9
     when (rules) {
-        PuzzleRules.Classic -> Unit
-        PuzzleRules.Diagonal -> {
-            val stroke = Stroke(
-                side * 0.10f,
-                pathEffect = PathEffect.dashPathEffect(
-                    floatArrayOf(side * 0.16f, side * 0.10f)
-                )
-            )
-            val path = Path().apply {
-                moveTo(center(0).x, center(0).y)
-                lineTo(center(80).x, center(80).y)
-                moveTo(center(8).x, center(8).y)
-                lineTo(center(72).x, center(72).y)
-            }
-            drawPath(path, colors.clueFill, style = stroke)
+        PuzzleRules.Classic, is PuzzleRules.Jigsaw -> Unit
+        PuzzleRules.Diagonal -> drawDiagonals(side, colors)
+        is PuzzleRules.Killer -> rules.cages.forEach { drawCage(it.cells, side, colors) }
+        is PuzzleRules.Thermo -> rules.paths.forEach { drawThermometer(it, side, colors) }
+        is PuzzleRules.Arrow -> rules.arrows.forEach { drawArrow(it, side, colors) }
+    }
+}
+
+private fun DrawScope.drawDiagonals(side: Float, colors: BoardColors) {
+    val stroke = Stroke(
+        side * DIAGONAL_STROKE_RATIO,
+        pathEffect = PathEffect.dashPathEffect(
+            floatArrayOf(side * 0.16f, side * DIAGONAL_STROKE_RATIO)
+        )
+    )
+    val path = Path().apply {
+        moveTo(center(0).x, center(0).y)
+        lineTo(center(80).x, center(80).y)
+        moveTo(center(8).x, center(8).y)
+        lineTo(center(72).x, center(72).y)
+    }
+    drawPath(path, colors.clueFill, style = stroke)
+}
+
+private fun DrawScope.drawCage(cells: List<Int>, side: Float, colors: BoardColors) {
+    val members = cells.toSet()
+    val inset = side * CAGE_INSET_RATIO
+    val path = Path()
+
+    // Leave shared edges open so each cage reads as one connected outline.
+    for (cell in cells) {
+        val x = cell % 9 * side
+        val y = cell / 9 * side
+        val left = cell % 9 > 0 && cell - 1 in members
+        val right = cell % 9 < 8 && cell + 1 in members
+        val top = cell >= 9 && cell - 9 in members
+        val bottom = cell < 72 && cell + 9 in members
+        val x1 = x + if (left) 0f else inset
+        val x2 = x + side - if (right) 0f else inset
+        val y1 = y + if (top) 0f else inset
+        val y2 = y + side - if (bottom) 0f else inset
+        if (!top) {
+            path.moveTo(x1, y1)
+            path.lineTo(x2, y1)
         }
-        is PuzzleRules.Jigsaw -> Unit
-        is PuzzleRules.Killer -> rules.cages.forEach { cage ->
-            val members = cage.cells.toSet()
-            val inset = side * 0.09f
-            val path = Path()
-            for (cell in cage.cells) {
-                val x = cell % 9 * side
-                val y = cell / 9 * side
-                val left = cell % 9 > 0 && cell - 1 in members
-                val right = cell % 9 < 8 && cell + 1 in members
-                val top = cell >= 9 && cell - 9 in members
-                val bottom = cell < 72 && cell + 9 in members
-                val x1 = x + if (left) 0f else inset
-                val x2 = x + side - if (right) 0f else inset
-                val y1 = y + if (top) 0f else inset
-                val y2 = y + side - if (bottom) 0f else inset
-                if (!top) {
-                    path.moveTo(x1, y1)
-                    path.lineTo(x2, y1)
-                }
-                if (!bottom) {
-                    path.moveTo(x1, y2)
-                    path.lineTo(x2, y2)
-                }
-                if (!left) {
-                    path.moveTo(x1, y1)
-                    path.lineTo(x1, y2)
-                }
-                if (!right) {
-                    path.moveTo(x2, y1)
-                    path.lineTo(x2, y2)
-                }
-            }
-            drawPath(
-                path,
-                colors.clueStroke,
-                style = Stroke(
-                    1.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(side * 0.07f, side * 0.05f))
-                )
-            )
+        if (!bottom) {
+            path.moveTo(x1, y2)
+            path.lineTo(x2, y2)
         }
-        is PuzzleRules.Thermo -> rules.paths.forEach { cells ->
-            val path = pathThrough(cells)
-            drawPath(path, colors.clueFill, style = Stroke(side * 0.24f, cap = StrokeCap.Round))
-            cells.firstOrNull()?.let { drawCircle(colors.clueFill, side * 0.30f, center(it)) }
+        if (!left) {
+            path.moveTo(x1, y1)
+            path.lineTo(x1, y2)
         }
-        is PuzzleRules.Arrow -> rules.arrows.forEach { arrow ->
-            val start = center(arrow.circle)
-            drawCircle(colors.clueStroke, side * 0.33f, start, style = Stroke(side * 0.045f))
-            if (arrow.shaft.isNotEmpty()) {
-                val next = center(arrow.shaft.first())
-                val delta = next - start
-                val distance = hypot(delta.x, delta.y)
-                val path = Path().apply {
-                    if (distance > 0) {
-                        moveTo(start.x + delta.x * side * 0.34f / distance, start.y + delta.y * side * 0.34f / distance)
-                    } else {
-                        moveTo(start.x, start.y)
-                    }
-                    arrow.shaft.forEach {
-                        val point = center(it)
-                        lineTo(point.x, point.y)
-                    }
-                }
-                drawPath(path, colors.clueStroke, style = Stroke(side * 0.045f, cap = StrokeCap.Round))
-                val tip = center(arrow.shaft.last())
-                val before = center(arrow.shaft.dropLast(1).lastOrNull() ?: arrow.circle)
-                val angle = atan2(tip.y - before.y, tip.x - before.x)
-                val length = side * 0.22f
-                for (offset in listOf(-Math.PI.toFloat() / 5, Math.PI.toFloat() / 5)) {
-                    drawLine(
-                        colors.clueStroke,
-                        tip,
-                        Offset(
-                            tip.x - length * cos(angle + offset),
-                            tip.y - length * sin(angle + offset)
-                        ),
-                        side * 0.045f,
-                        StrokeCap.Round
-                    )
-                }
-            }
+        if (!right) {
+            path.moveTo(x2, y1)
+            path.lineTo(x2, y2)
         }
+    }
+    drawPath(
+        path,
+        colors.clueStroke,
+        style = Stroke(
+            1.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(side * 0.07f, side * 0.05f))
+        )
+    )
+}
+
+private fun DrawScope.drawThermometer(cells: List<Int>, side: Float, colors: BoardColors) {
+    val path = pathThrough(cells)
+    drawPath(path, colors.clueFill, style = Stroke(side * THERMO_LINE_RATIO, cap = StrokeCap.Round))
+    cells.firstOrNull()?.let { drawCircle(colors.clueFill, side * THERMO_BULB_RATIO, center(it)) }
+}
+
+private fun DrawScope.drawArrow(arrow: ArrowClue, side: Float, colors: BoardColors) {
+    val start = center(arrow.circle)
+    drawCircle(
+        colors.clueStroke,
+        side * ARROW_CIRCLE_RATIO,
+        start,
+        style = Stroke(side * ARROW_STROKE_RATIO)
+    )
+    if (arrow.shaft.isEmpty()) {
+        return
+    }
+
+    val next = center(arrow.shaft.first())
+    val delta = next - start
+    val distance = hypot(delta.x, delta.y)
+    // Start outside the circle so the shaft does not cross the clue digit.
+    val path = Path().apply {
+        if (distance > 0) {
+            val x = start.x + delta.x * side * ARROW_START_RATIO / distance
+            val y = start.y + delta.y * side * ARROW_START_RATIO / distance
+            moveTo(x, y)
+        } else {
+            moveTo(start.x, start.y)
+        }
+        arrow.shaft.forEach {
+            val point = center(it)
+            lineTo(point.x, point.y)
+        }
+    }
+    drawPath(
+        path,
+        colors.clueStroke,
+        style = Stroke(side * ARROW_STROKE_RATIO, cap = StrokeCap.Round)
+    )
+    val tip = center(arrow.shaft.last())
+    val before = center(arrow.shaft.dropLast(1).lastOrNull() ?: arrow.circle)
+    val angle = atan2(tip.y - before.y, tip.x - before.x)
+    val length = side * ARROW_HEAD_RATIO
+    for (offset in listOf(-Math.PI.toFloat() / 5, Math.PI.toFloat() / 5)) {
+        drawLine(
+            colors.clueStroke,
+            tip,
+            Offset(
+                tip.x - length * cos(angle + offset),
+                tip.y - length * sin(angle + offset)
+            ),
+            side * ARROW_STROKE_RATIO,
+            StrokeCap.Round
+        )
     }
 }
 
@@ -198,7 +245,9 @@ internal fun DrawScope.drawEvidence(evidence: Evidence?, colors: BoardColors) {
     val side = size.width / 9
     val color = colors.accent.copy(alpha = 0.65f)
     when (evidence) {
-        is Evidence.Wing -> evidence.wings.forEach { drawLine(color, center(evidence.pivot), center(it), 2.dp.toPx()) }
+        is Evidence.Wing -> evidence.wings.forEach {
+            drawLine(color, center(evidence.pivot), center(it), 2.dp.toPx())
+        }
         is Evidence.Coloring -> {
             evidence.links.forEach { link ->
                 if (link.cells.size == 2) {
@@ -236,6 +285,12 @@ private fun DrawScope.drawEvidenceUnit(unit: UnitReference, color: Color, dashed
         center(ends.first),
         center(ends.second),
         2.dp.toPx(),
-        pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())) else null
+        pathEffect = if (dashed) {
+            PathEffect.dashPathEffect(
+                floatArrayOf(6.dp.toPx(), 4.dp.toPx())
+            )
+        } else {
+            null
+        }
     )
 }

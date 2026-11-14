@@ -90,7 +90,14 @@ internal fun HomeScreen(
                         showDescription = availableHeight >= 400.dp,
                         modifier = Modifier.weight(1.2f)
                     )
-                    HomeDestinations(state, onLearning, onDaily, onRecords, !short || largeText, Modifier.weight(1f))
+                    HomeDestinations(
+                        state,
+                        onLearning,
+                        onDaily,
+                        onRecords,
+                        !short || largeText,
+                        Modifier.weight(1f)
+                    )
                 }
             } else {
                 HomeHero(
@@ -124,7 +131,11 @@ private fun HomeHero(
     // Refreshing an existing snapshot must not replace the home actions beneath a sheet.
     val showLoading = rememberDelayedProgress(state.loading && !state.hasLoadedSnapshot)
 
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = colors.primaryContainer) {
+    Surface(
+        modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = colors.primaryContainer
+    ) {
         Column(
             Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -166,7 +177,8 @@ private fun HomeHero(
                             )
                         }
                     }
-                    // Natural-width copy leaves spare width for the artwork instead of an empty text column.
+                    // Natural-width copy leaves spare width for the artwork instead of an empty
+                    // text column.
                     HomeBoardArtwork(
                         Modifier.weight(1f, fill = false)
                             .widthIn(max = if (showDescription) 280.dp else 112.dp)
@@ -177,17 +189,35 @@ private fun HomeHero(
 
             when {
                 state.error != null -> Column {
-                    Text(state.error, color = colors.error, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        state.error,
+                        color = colors.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                     TextButton(onClick = onRetry) { Text("重新读取存档") }
                 }
                 largeText -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StartButton(onStart, Modifier.fillMaxWidth(), enabled = !state.loading, showLoading = showLoading)
+                    StartButton(
+                        onStart,
+                        Modifier.fillMaxWidth(),
+                        enabled = !state.loading,
+                        showLoading = showLoading
+                    )
                     if (hasSaves) {
-                        ContinueButton(onContinue, Modifier.fillMaxWidth(), enabled = !state.loading)
+                        ContinueButton(
+                            onContinue,
+                            Modifier.fillMaxWidth(),
+                            enabled = !state.loading
+                        )
                     }
                 }
                 else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StartButton(onStart, Modifier.weight(1f), enabled = !state.loading, showLoading = showLoading)
+                    StartButton(
+                        onStart,
+                        Modifier.weight(1f),
+                        enabled = !state.loading,
+                        showLoading = showLoading
+                    )
                     if (hasSaves) {
                         ContinueButton(onContinue, enabled = !state.loading)
                     }
@@ -235,7 +265,11 @@ private fun StartButton(
 }
 
 @Composable
-private fun ContinueButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+private fun ContinueButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -273,7 +307,13 @@ private fun HomeDestinations(
             SecondaryEntry("学习数独", "32 节课，步步有解", Icons.AutoMirrored.Outlined.MenuBook, onLearning)
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SecondaryEntry("每日挑战", "每天一道新题", Icons.Outlined.CalendarMonth, onDaily, Modifier.weight(1f))
+                SecondaryEntry(
+                    "每日挑战",
+                    "每天一道新题",
+                    Icons.Outlined.CalendarMonth,
+                    onDaily,
+                    Modifier.weight(1f)
+                )
                 SecondaryEntry(
                     "学习数独",
                     "32 节推理小课",
@@ -340,10 +380,23 @@ private fun SecondaryEntry(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(icon, null, Modifier.size(24.dp), tint = colors.primary)
-                Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp), tint = colors.onSurfaceVariant)
+                Icon(
+                    Icons.Outlined.ChevronRight,
+                    null,
+                    Modifier.size(18.dp),
+                    tint = colors.onSurfaceVariant
+                )
             }
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant
+            )
         }
     }
 }

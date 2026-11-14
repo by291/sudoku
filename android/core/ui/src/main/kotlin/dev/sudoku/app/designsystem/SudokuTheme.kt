@@ -13,7 +13,10 @@ internal val LocalBoardColors = LocalSudokuPalette
 
 /** Adapts the portable preference to the independent visual theme. */
 @Composable
-fun SudokuTheme(preference: ThemePreference = ThemePreference.SYSTEM, content: @Composable () -> Unit) {
+fun SudokuTheme(
+    preference: ThemePreference = ThemePreference.SYSTEM,
+    content: @Composable () -> Unit
+) {
     val dark = when (preference) {
         ThemePreference.LIGHT -> false
         ThemePreference.DARK -> true

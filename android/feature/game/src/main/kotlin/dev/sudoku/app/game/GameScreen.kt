@@ -50,37 +50,46 @@ import dev.sudoku.app.model.GameMode
 import dev.sudoku.app.model.variant
 
 /** Controlled game presentation; platform lifecycle and durable departure remain in GameRoute. */
+internal data class GameNavigationActions(val onLeave: () -> Unit, val onRecords: () -> Unit)
+
+internal data class GameSessionActions(
+    val onRetryPreparation: () -> Unit,
+    val onPause: () -> Unit,
+    val onResume: () -> Unit,
+    val onCancelPreparation: () -> Unit,
+    val onRetrySave: () -> Unit,
+    val onSetShowTimer: (Boolean) -> Unit,
+    val onSetHighlightConflicts: (Boolean) -> Unit,
+    val onCancelPracticeReplacement: () -> Unit,
+    val onConfirmPracticeReplacement: () -> Unit,
+    val onRestart: () -> Unit
+)
+
+internal data class GameBoardActions(
+    val onCheckEntries: () -> Unit,
+    val onGenerateNotes: () -> Unit,
+    val onSelectCell: (Int) -> Unit,
+    val onDismissHint: () -> Unit,
+    val onNextHint: () -> Unit,
+    val onApplyHint: () -> Unit,
+    val onEnterDigit: (Int) -> Unit,
+    val onToggleNote: (Int) -> Unit,
+    val onToggleNotes: () -> Unit,
+    val onUndo: () -> Unit,
+    val onRedo: () -> Unit,
+    val onRequestHint: () -> Unit,
+    val onErase: () -> Unit
+)
+
+internal data class GameScreenActions(
+    val navigation: GameNavigationActions,
+    val session: GameSessionActions,
+    val board: GameBoardActions
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun GameScreen(
-    state: GameUiState,
-    departing: Boolean,
-    onLeave: () -> Unit,
-    onRecords: () -> Unit,
-    onRetryPreparation: () -> Unit,
-    onCheckEntries: () -> Unit,
-    onGenerateNotes: () -> Unit,
-    onPause: () -> Unit,
-    onSelectCell: (Int) -> Unit,
-    onResume: () -> Unit,
-    onCancelPreparation: () -> Unit,
-    onRetrySave: () -> Unit,
-    onSetShowTimer: (Boolean) -> Unit,
-    onSetHighlightConflicts: (Boolean) -> Unit,
-    onCancelPracticeReplacement: () -> Unit,
-    onConfirmPracticeReplacement: () -> Unit,
-    onRestart: () -> Unit,
-    onDismissHint: () -> Unit,
-    onNextHint: () -> Unit,
-    onApplyHint: () -> Unit,
-    onEnterDigit: (Int) -> Unit,
-    onToggleNote: (Int) -> Unit,
-    onToggleNotes: () -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onRequestHint: () -> Unit,
-    onErase: () -> Unit
-) {
+internal fun GameScreen(state: GameUiState, departing: Boolean, actions: GameScreenActions) {
     var menuOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var restartOpen by remember { mutableStateOf(false) }
@@ -90,12 +99,16 @@ internal fun GameScreen(
 
     val moreMenu: @Composable () -> Unit = {
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            Text("辅助工具 · 使用后记为辅助完成", Modifier.padding(16.dp), style = MaterialTheme.typography.labelMedium)
+            Text(
+                "辅助工具 · 使用后记为辅助完成",
+                Modifier.padding(16.dp),
+                style = MaterialTheme.typography.labelMedium
+            )
             DropdownMenuItem(
                 text = { Text("检查填写") },
                 onClick = {
                     menuOpen = false
-                    onCheckEntries()
+                    actions.board.onCheckEntries()
                 },
                 enabled = state.editable
             )
@@ -103,7 +116,7 @@ internal fun GameScreen(
                 text = { Text("生成候选数") },
                 onClick = {
                     menuOpen = false
-                    onGenerateNotes()
+                    actions.board.onGenerateNotes()
                 },
                 enabled = state.editable && !state.notesPending
             )
@@ -132,10 +145,46 @@ internal fun GameScreen(
                 text = { Text(if (state.session?.mode == GameMode.DAILY) "选择其他挑战" else "返回选择") },
                 onClick = {
                     menuOpen = false
-                    onLeave()
+                    actions.navigation.onLeave()
                 }
             )
         }
+    }
+
+    val boardWorkspaceActions = BoardWorkspaceActions(
+        onSelect = actions.board.onSelectCell,
+        onResume = actions.session.onResume,
+        onCancelPreparation = actions.session.onCancelPreparation,
+        onRetry = actions.session.onRetryPreparation
+    )
+    val boardContent: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier) {
+            BoardStatus(state)
+            BoardWorkspace(
+                state = state,
+                actions = boardWorkspaceActions,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    val inputContent: @Composable (Modifier) -> Unit = { modifier ->
+        GameInputPanel(
+            state = state,
+            actions = GameInputActions(
+                onUndo = actions.board.onUndo,
+                onRedo = actions.board.onRedo,
+                onErase = actions.board.onErase,
+                onToggleNotes = actions.board.onToggleNotes,
+                onHint = actions.board.onRequestHint,
+                onDigit = actions.board.onEnterDigit,
+                onNote = actions.board.onToggleNote,
+                onRetrySave = actions.session.onRetrySave,
+                onMore = { menuOpen = true },
+                moreMenu = moreMenu
+            ),
+            modifier = modifier
+        )
     }
 
     Scaffold(
@@ -145,7 +194,8 @@ internal fun GameScreen(
                 if (departing) {
                     awaitPointerEventScope {
                         while (true) {
-                            awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            event.changes.forEach { it.consume() }
                         }
                     }
                 }
@@ -153,14 +203,7 @@ internal fun GameScreen(
                 if (modalOpen || !state.editable || event.type != KeyEventType.KeyDown) {
                     return@onPreviewKeyEvent false
                 }
-                handleGameKey(
-                    event,
-                    onEnterDigit = onEnterDigit,
-                    onUndo = onUndo,
-                    onRedo = onRedo,
-                    onErase = onErase,
-                    onToggleNotes = onToggleNotes
-                )
+                handleGameKey(event, actions.board)
             },
         topBar = {
             CenterAlignedTopAppBar(
@@ -170,7 +213,7 @@ internal fun GameScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 navigationIcon = {
-                    IconButton(onClick = { onLeave() }) {
+                    IconButton(onClick = { actions.navigation.onLeave() }) {
                         Icon(
                             Icons.AutoMirrored.Outlined.ArrowBack,
                             "暂停保存并返回"
@@ -194,7 +237,7 @@ internal fun GameScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onPause, enabled = state.editable) {
+                    IconButton(onClick = actions.session.onPause, enabled = state.editable) {
                         Icon(Icons.Outlined.Pause, "暂停")
                     }
                     IconButton(onClick = { settingsOpen = true }) {
@@ -216,7 +259,9 @@ internal fun GameScreen(
             ) {
                 if (state.session != null) {
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    state.message?.let { message ->
+                        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val expanded = maxWidth >= 600.dp
@@ -226,31 +271,8 @@ internal fun GameScreen(
                             horizontalArrangement = Arrangement.spacedBy(24.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(Modifier.width(boardSize)) {
-                                BoardStatus(state)
-                                BoardWorkspace(
-                                    state,
-                                    onSelectCell,
-                                    onResume,
-                                    onCancelPreparation,
-                                    onRetryPreparation,
-                                    Modifier.fillMaxWidth()
-                                )
-                            }
-                            GameInputPanel(
-                                state = state,
-                                onUndo = onUndo,
-                                onRedo = onRedo,
-                                onErase = onErase,
-                                onToggleNotes = onToggleNotes,
-                                onHint = onRequestHint,
-                                onDigit = onEnterDigit,
-                                onNote = onToggleNote,
-                                onRetrySave = onRetrySave,
-                                onMore = { menuOpen = true },
-                                moreMenu = moreMenu,
-                                modifier = Modifier.weight(1f)
-                            )
+                            boardContent(Modifier.width(boardSize))
+                            inputContent(Modifier.weight(1f))
                         }
                     } else {
                         Column(
@@ -258,41 +280,20 @@ internal fun GameScreen(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column {
-                                BoardStatus(state)
-                                BoardWorkspace(
-                                    state,
-                                    onSelectCell,
-                                    onResume,
-                                    onCancelPreparation,
-                                    onRetryPreparation,
-                                    Modifier.fillMaxWidth()
-                                )
-                            }
-                            GameInputPanel(
-                                state = state,
-                                onUndo = onUndo,
-                                onRedo = onRedo,
-                                onErase = onErase,
-                                onToggleNotes = onToggleNotes,
-                                onHint = onRequestHint,
-                                onDigit = onEnterDigit,
-                                onNote = onToggleNote,
-                                onRetrySave = onRetrySave,
-                                onMore = { menuOpen = true },
-                                moreMenu = moreMenu,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            boardContent(Modifier)
+                            inputContent(Modifier.fillMaxWidth())
                         }
                     }
                 }
                 if (state.phase == GamePhase.COMPLETED) {
                     Text("完成了！", style = MaterialTheme.typography.headlineMedium)
-                    Text(
-                        "用时 ${formatElapsedTime(state.elapsedMs)} · " +
-                            "${if (state.session?.assistance?.assisted == true) "辅助完成" else "无辅助完成"}"
-                    )
-                    Button(onClick = { onRecords() }) { Text("查看记录") }
+                    val assistance = if (state.session?.assistance?.assisted == true) {
+                        "辅助完成"
+                    } else {
+                        "无辅助完成"
+                    }
+                    Text("用时 ${formatElapsedTime(state.elapsedMs)} · $assistance")
+                    Button(onClick = { actions.navigation.onRecords() }) { Text("查看记录") }
                 }
             }
         }
@@ -301,42 +302,51 @@ internal fun GameScreen(
     if (state.practiceReplacement != null) {
         PracticeReplacementDialog(
             onCancel = {
-                onCancelPracticeReplacement()
-                onLeave()
+                actions.session.onCancelPracticeReplacement()
+                actions.navigation.onLeave()
             },
             onContinue = {
-                onCancelPracticeReplacement()
-                onResume()
+                actions.session.onCancelPracticeReplacement()
+                actions.session.onResume()
             },
-            onReplace = onConfirmPracticeReplacement
+            onReplace = actions.session.onConfirmPracticeReplacement
         )
     }
 
     if (settingsOpen) {
-        GameSettingsDialog(state, onSetShowTimer, onSetHighlightConflicts, onDismiss = { settingsOpen = false })
+        GameSettingsDialog(
+            state = state,
+            onSetShowTimer = actions.session.onSetShowTimer,
+            onSetHighlightConflicts = actions.session.onSetHighlightConflicts,
+            onDismiss = { settingsOpen = false }
+        )
     }
     if (restartOpen) {
         RestartConfirmation(
             onDismiss = { restartOpen = false },
             onConfirm = {
                 restartOpen = false
-                onRestart()
+                actions.session.onRestart()
             }
         )
     }
     if (zoomOpen) {
         GameZoomDialog(
-            state,
-            onSelectCell,
-            onResume,
-            onCancelPreparation,
-            onRetryPreparation,
-            onEnterDigit,
+            state = state,
+            actions = ZoomBoardActions(
+                workspace = boardWorkspaceActions,
+                onEnterDigit = actions.board.onEnterDigit
+            ),
             onDismiss = { zoomOpen = false }
         )
     }
 
     if (state.hint != null) {
-        GameHintSheet(state, onDismissHint, onNextHint, onApplyHint)
+        GameHintSheet(
+            state,
+            actions.board.onDismissHint,
+            actions.board.onNextHint,
+            actions.board.onApplyHint
+        )
     }
 }
