@@ -13,111 +13,130 @@ import kotlinx.serialization.json.jsonPrimitive
 /** Wire compatibility and shape normalization; no mathematical validation or storage ownership. */
 internal class PortableNormalization(private val json: Json) {
 
-    fun normalizeBackup(tree: JsonElement, transferLimits: Boolean): JsonObject {
+    fun normalizeBackup(tree: JsonElement, hasTransferLimits: Boolean): JsonObject {
         val root = tree as? JsonObject ?: throw InvalidPortableData("Backup object required")
-        val settings = root["settings"] as? JsonObject ?: throw InvalidPortableData("Settings object required")
-        requireData(
-            setOf(
-                "theme",
-                "showTimer",
-                "highlightConflicts"
-            ).all(settings::containsKey),
-            "Missing settings fields"
-        )
-        requireData(
-            settings["formatVersion"]?.jsonPrimitive?.content.let { it == null || it == "1" },
-            "Unsupported settings format"
-        )
-        (root["lessons"] as? JsonArray)?.forEach { raw ->
-            val lesson = raw as? JsonObject ?: throw InvalidPortableData("Invalid lesson record")
-            requireData(
-                lesson["formatVersion"]?.jsonPrimitive?.content.let { it == null || it == "1" },
-                "Unsupported lesson format"
-            )
-        }
+        validateSettingsShape(root)
+        validateLessonFormats(root)
+
         return JsonObject(
             root.mapValues { (key, value) ->
-                if (key !in setOf("sessions", "results")) {
-                    return@mapValues value
+                if (key == "sessions" || key == "results") {
+                    normalizeRecords(value, transferLimits = hasTransferLimits)
+                } else {
+                    value
                 }
-                val records = value as? JsonArray ?: throw InvalidPortableData("Backup collections required")
-                JsonArray(
-                    records.map { raw ->
-                        val record = raw as? JsonObject ?: throw InvalidPortableData("Invalid record")
-                        val version = record["formatVersion"]?.jsonPrimitive?.content
-                        requireData(version == "1" || version == "2", "Unsupported record format")
-                        val session = record["session"] as? JsonObject ?: throw InvalidPortableData("Invalid session")
-                        requireData(
-                            setOf(
-                                "id",
-                                "puzzle",
-                                "mode",
-                                "entries",
-                                "notes",
-                                "undoStack",
-                                "redoStack",
-                                "elapsedMs",
-                                "assistance",
-                                "startedAt",
-                                "completion",
-                                "metadata"
-                            ).all(session::containsKey),
-                            "Missing session fields"
-                        )
-                        val assistance =
-                            session["assistance"] as? JsonObject ?: throw InvalidPortableData("Missing assistance")
-                        requireData(
-                            setOf(
-                                "hintCount",
-                                "checkCount",
-                                "candidateCount",
-                                "assisted"
-                            ).all(assistance::containsKey),
-                            "Missing assistance fields"
-                        )
-                        // Local serialization uses null for absent metadata.
-                        // Portable imports retain separate validation.
-                        val assessment = session["assessment"]
-                            ?.takeUnless { it == JsonNull && !transferLimits }
-                            ?.let { raw ->
-                                try {
-                                    json.decodeFromJsonElement(PuzzleAssessment.serializer(), raw)
-                                } catch (error: IllegalArgumentException) {
-                                    PuzzleAssessment.Unavailable("invalid-input", listOf("Invalid assessment shape"))
-                                }
-                            }
-                        val normalizedSession = if (assessment == null) {
-                            session
-                        } else {
-                            JsonObject(
-                                session + (
-                                    "assessment" to json.encodeToJsonElement(
-                                        PuzzleAssessment.serializer(),
-                                        assessment
-                                    )
-                                    )
-                            )
-                        }
-                        val puzzle = session["puzzle"] as? JsonObject ?: throw InvalidPortableData("Invalid puzzle")
-                        val normalizedPuzzle = if (version == "1") {
-                            val rules = puzzle["rules"] ?: buildJsonObject { put("kind", JsonPrimitive("classic")) }
-                            requireData(
-                                rules.jsonObject["kind"]?.jsonPrimitive?.content == "classic",
-                                "Legacy records only support Classic"
-                            )
-                            JsonObject(puzzle + ("rules" to rules))
-                        } else {
-                            puzzle
-                        }
-                        validateRuleFields(normalizedPuzzle["rules"])
-                        JsonObject(
-                            record + ("formatVersion" to JsonPrimitive(2)) +
-                                ("session" to JsonObject(normalizedSession + ("puzzle" to normalizedPuzzle)))
-                        )
-                    }
-                )
             }
         )
+    }
+
+    private fun validateSettingsShape(root: JsonObject) {
+        val settings = root["settings"] as? JsonObject
+            ?: throw InvalidPortableData("Settings object required")
+        val required = setOf(
+            "theme",
+            "showTimer",
+            "highlightConflicts"
+        )
+        requireData(required.all(settings::containsKey), "Missing settings fields")
+
+        val version = settings["formatVersion"]?.jsonPrimitive?.content
+        requireData(version == null || version == "1", "Unsupported settings format")
+    }
+
+    private fun validateLessonFormats(root: JsonObject) {
+        val lessons = root["lessons"] as? JsonArray ?: return
+        for (raw in lessons) {
+            val lesson = raw as? JsonObject ?: throw InvalidPortableData("Invalid lesson record")
+            val version = lesson["formatVersion"]?.jsonPrimitive?.content
+            requireData(version == null || version == "1", "Unsupported lesson format")
+        }
+    }
+
+    private fun normalizeRecords(value: JsonElement, transferLimits: Boolean): JsonArray {
+        val records =
+            value as? JsonArray ?: throw InvalidPortableData("Backup collections required")
+
+        return JsonArray(records.map { normalizeRecord(it, transferLimits = transferLimits) })
+    }
+
+    private fun normalizeRecord(value: JsonElement, transferLimits: Boolean): JsonObject {
+        val record = value as? JsonObject ?: throw InvalidPortableData("Invalid record")
+        val version = record["formatVersion"]?.jsonPrimitive?.content
+        requireData(version == "1" || version == "2", "Unsupported record format")
+
+        val session =
+            record["session"] as? JsonObject ?: throw InvalidPortableData("Invalid session")
+        validateSessionShape(session)
+        val normalizedSession = normalizeAssessment(session, transferLimits = transferLimits)
+        val puzzle = normalizePuzzle(session, isLegacy = version == "1")
+
+        return JsonObject(
+            record + ("formatVersion" to JsonPrimitive(2)) +
+                ("session" to JsonObject(normalizedSession + ("puzzle" to puzzle)))
+        )
+    }
+
+    private fun validateSessionShape(session: JsonObject) {
+        val required = setOf(
+            "id",
+            "puzzle",
+            "mode",
+            "entries",
+            "notes",
+            "undoStack",
+            "redoStack",
+            "elapsedMs",
+            "assistance",
+            "startedAt",
+            "completion",
+            "metadata"
+        )
+        requireData(required.all(session::containsKey), "Missing session fields")
+
+        val assistance = session["assistance"] as? JsonObject
+            ?: throw InvalidPortableData("Missing assistance")
+        val counters = setOf(
+            "hintCount",
+            "checkCount",
+            "candidateCount",
+            "assisted"
+        )
+        requireData(counters.all(assistance::containsKey), "Missing assistance fields")
+    }
+
+    private fun normalizeAssessment(session: JsonObject, transferLimits: Boolean): JsonObject {
+        // Local serialization uses null for absent metadata. Explicit portable null is invalid.
+        val value = session["assessment"] ?: return session
+        if (value == JsonNull && !transferLimits) {
+            return session
+        }
+
+        val assessment = try {
+            json.decodeFromJsonElement(PuzzleAssessment.serializer(), value)
+        } catch (error: IllegalArgumentException) {
+            PuzzleAssessment.Unavailable("invalid-input", listOf("Invalid assessment shape"))
+        }
+        val normalized = json.encodeToJsonElement(PuzzleAssessment.serializer(), assessment)
+
+        return JsonObject(session + ("assessment" to normalized))
+    }
+
+    private fun normalizePuzzle(session: JsonObject, isLegacy: Boolean): JsonObject {
+        val puzzle = session["puzzle"] as? JsonObject ?: throw InvalidPortableData("Invalid puzzle")
+        if (!isLegacy) {
+            validateRuleFields(puzzle["rules"])
+            return puzzle
+        }
+
+        // Older records only represented Classic and could omit its rule object.
+        val rules = puzzle["rules"] ?: buildJsonObject { put("kind", JsonPrimitive("classic")) }
+        requireData(
+            rules.jsonObject["kind"]?.jsonPrimitive?.content == "classic",
+            "Legacy records only support Classic"
+        )
+        validateRuleFields(rules)
+
+        return JsonObject(puzzle + ("rules" to rules))
     }
 
     private fun validateRuleFields(value: JsonElement?) {

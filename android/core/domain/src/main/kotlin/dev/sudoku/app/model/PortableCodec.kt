@@ -18,15 +18,19 @@ class SnapshotValidationUnavailable(message: String) : IllegalStateException(mes
 
 private val canonicalInstant = DateTimeFormatterBuilder().appendInstant(3).toFormatter()
 
+/** Checks the canonical millisecond UTC instant used by portable data. */
 fun isIsoInstant(value: String): Boolean = runCatching {
     val instant = Instant.parse(value)
     instant.toEpochMilli() in -8_640_000_000_000_000L..8_640_000_000_000_000L &&
         canonicalInstant.format(instant) == value
 }.getOrDefault(false)
 
+/** Formats an instant in canonical millisecond UTC form. */
 fun isoInstant(value: Instant): String = canonicalInstant.format(value)
 
-/** Parses portable facts separately from the injected mathematical authority; never owns storage. */
+/**
+ * Parses portable facts separately from the injected mathematical authority; never owns storage.
+ */
 class PortableCodec(validator: MathematicalValidator) {
     val json = Json {
         classDiscriminator = "kind"
@@ -37,8 +41,12 @@ class PortableCodec(validator: MathematicalValidator) {
     private val normalization = PortableNormalization(json)
     private val sessions = PortableSessionValidator(json, validator)
 
+    /** Decodes a bounded transfer and validates every record before returning it. */
     suspend fun decodeBackup(text: String): LocalBackup {
-        requireData(text.toByteArray(Charsets.UTF_8).size <= BackupLimits.BYTES, "Backup exceeds the 25 MiB limit")
+        requireData(
+            text.toByteArray(Charsets.UTF_8).size <= BackupLimits.BYTES,
+            "Backup exceeds the 25 MiB limit"
+        )
         preflightDepth(text)
 
         val tree = try {
@@ -56,7 +64,7 @@ class PortableCodec(validator: MathematicalValidator) {
         }
 
         val normalized = try {
-            normalization.normalizeBackup(tree, transferLimits)
+            normalization.normalizeBackup(tree, hasTransferLimits = transferLimits)
         } catch (error: InvalidPortableData) {
             throw error
         } catch (error: IllegalArgumentException) {
@@ -69,7 +77,7 @@ class PortableCodec(validator: MathematicalValidator) {
             throw InvalidPortableData(error.message ?: "Invalid backup shape")
         }
 
-        validateBackup(backup, transferLimits)
+        validateBackup(backup, transferLimits = transferLimits)
 
         return backup.copy(
             sessions = backup.sessions.map { it.copy(session = validateSession(it.session)) },
@@ -77,14 +85,17 @@ class PortableCodec(validator: MathematicalValidator) {
         )
     }
 
+    /** Decodes a local session without applying portable transfer quotas. */
     suspend fun decodeSessionRecord(text: String): SessionRecord = decodeRecordEnvelope(
         text,
-        false
+        isResult = false
     ).sessions.single()
 
-    suspend fun decodeResultRecord(text: String): ResultRecord = decodeRecordEnvelope(text, true).results.single()
+    /** Decodes a local result and validates its recorded completion. */
+    suspend fun decodeResultRecord(text: String): ResultRecord =
+        decodeRecordEnvelope(text, isResult = true).results.single()
 
-    private suspend fun decodeRecordEnvelope(text: String, result: Boolean): LocalBackup {
+    private suspend fun decodeRecordEnvelope(text: String, isResult: Boolean): LocalBackup {
         preflightDepth(text)
 
         val record = try {
@@ -96,20 +107,25 @@ class PortableCodec(validator: MathematicalValidator) {
         val envelope = buildJsonObject {
             put("backupVersion", JsonPrimitive(1))
             put("exportedAt", JsonPrimitive("2000-01-01T00:00:00.000Z"))
-            put("sessions", JsonArray(if (result) emptyList() else listOf(record)))
-            put("results", JsonArray(if (result) listOf(record) else emptyList()))
+            put("sessions", JsonArray(if (isResult) emptyList() else listOf(record)))
+            put("results", JsonArray(if (isResult) listOf(record) else emptyList()))
             put("lessons", JsonArray(emptyList()))
             put("settings", json.encodeToJsonElement(Settings.serializer(), Settings()))
         }
 
-        // Transfer quotas must never turn an accepted local save into corrupt data on its next read.
+        // Transfer quotas must never turn an accepted local save into corrupt data on its next
+        // read.
         return decodeEnvelope(envelope, transferLimits = false)
     }
 
-    /** Encodes local facts without transfer normalization or quotas; callers validate before writing. */
+    /**
+     * Encodes local facts without transfer normalization or quotas; callers validate before
+     * writing.
+     */
     fun <T> encodeRecord(serializer: SerializationStrategy<T>, value: T): String =
         escapeSurrogates(json.encodeToString(serializer, value))
 
+    /** Encodes portable facts with their canonical UTF-16 escape representation. */
     fun encodeBackup(backup: LocalBackup): String {
         val tree = json.encodeToJsonElement(LocalBackup.serializer(), backup)
         val text = normalization.stripAbsent(tree).toString()
@@ -123,7 +139,8 @@ class PortableCodec(validator: MathematicalValidator) {
         return escaped
     }
 
-    // Escape UTF-16 units before UTF-8 transport: replacing malformed surrogates loses legacy metadata.
+    // Escape UTF-16 units before UTF-8 transport: replacing malformed surrogates loses legacy
+    // metadata.
     private fun escapeSurrogates(text: String): String = buildString(text.length) {
         text.forEach { character ->
             if (character.isSurrogate()) {
@@ -135,8 +152,10 @@ class PortableCodec(validator: MathematicalValidator) {
         }
     }
 
+    /** Returns an owned snapshot after structural and mathematical validation. */
     suspend fun validateSession(input: GameSession): GameSession = sessions.validate(input)
 
+    /** Validates the selected lesson and saved exercise cursors. */
     fun validateSettings(settings: Settings) {
         requireData(
             settings.currentLessonId == null || settings.currentLessonId in LessonIdentity.ids,
@@ -155,9 +174,13 @@ class PortableCodec(validator: MathematicalValidator) {
         )
     }
 
+    /** Validates an original lesson completion without requiring the current catalogue. */
     fun validateLesson(progress: LessonProgress) {
         // Historical completion IDs deliberately remain valid after a catalogue revision.
-        requireData(identifier(progress.lessonId) && isIsoInstant(progress.completedAt), "Invalid lesson progress")
+        requireData(
+            identifier(progress.lessonId) && isIsoInstant(progress.completedAt),
+            "Invalid lesson progress"
+        )
     }
 
     private fun validateBackup(backup: LocalBackup, transferLimits: Boolean) {
@@ -167,7 +190,8 @@ class PortableCodec(validator: MathematicalValidator) {
         )
         if (transferLimits) {
             requireData(
-                backup.sessions.size + backup.results.size + backup.lessons.size <= BackupLimits.RECORDS,
+                backup.sessions.size + backup.results.size + backup.lessons.size <=
+                    BackupLimits.RECORDS,
                 "Too many records"
             )
         }

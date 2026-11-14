@@ -4,8 +4,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/** Freezes mutable caller data before suspension and validates current and historical session facts. */
-internal class PortableSessionValidator(private val json: Json, private val validator: MathematicalValidator) {
+/**
+ * Freezes mutable caller data before suspension and validates current and historical session facts.
+ */
+internal class PortableSessionValidator(
+    private val json: Json,
+    private val validator: MathematicalValidator
+) {
 
     suspend fun validate(input: GameSession): GameSession {
         // Capture every nested layer before the first suspension; callers may mutate their lists.
@@ -17,7 +22,8 @@ internal class PortableSessionValidator(private val json: Json, private val vali
             )
         )
         requireData(
-            identifier(session.id) && isIsoInstant(session.startedAt) && safeInteger(session.elapsedMs),
+            identifier(session.id) && isIsoInstant(session.startedAt) &&
+                safeInteger(session.elapsedMs),
             "Invalid session identity or duration"
         )
 
@@ -25,7 +31,10 @@ internal class PortableSessionValidator(private val json: Json, private val vali
         requireData(session.mode == session.metadata.mode, "Mode metadata mismatch")
         when (val metadata = session.metadata) {
             SessionMetadata.Free -> Unit
-            is SessionMetadata.Learning -> requireData(identifier(metadata.lessonId), "Invalid lesson identity")
+            is SessionMetadata.Learning -> requireData(
+                identifier(metadata.lessonId),
+                "Invalid lesson identity"
+            )
             is SessionMetadata.Daily -> {
                 requireData(isChallengeDate(metadata.challengeDate), "Invalid challenge date")
                 requireData(
@@ -40,56 +49,8 @@ internal class PortableSessionValidator(private val json: Json, private val vali
             }
         }
 
-        val assistance = session.assistance
-        requireData(
-            listOf(
-                assistance.hintCount,
-                assistance.checkCount,
-                assistance.candidateCount
-            ).all(::safeInteger),
-            "Invalid assistance counters"
-        )
-        requireData(
-            assistance.assisted || listOf(
-                assistance.hintCount,
-                assistance.checkCount,
-                assistance.candidateCount
-            ).all { it == 0L },
-            "Assistance cannot be revoked"
-        )
-
-        val current = BoardLayers(session.entries, session.notes)
-        validateLayers(current, session.puzzle.givens)
-        listOf(session.undoStack, session.redoStack).forEach { history ->
-            history.forEach { move ->
-                validateLayers(move.before, session.puzzle.givens)
-                validateLayers(move.after, session.puzzle.givens)
-                requireData(move.before != move.after, "History contains an empty move")
-            }
-        }
-        requireData(
-            session.undoStack.zipWithNext().all { (
-                first,
-                next
-            ) ->
-                first.after == next.before
-            },
-            "Disconnected undo history"
-        )
-        requireData(
-            session.redoStack.zipWithNext().all { (
-                first,
-                next
-            ) ->
-                first.before == next.after
-            },
-            "Disconnected redo history"
-        )
-        requireData(
-            session.undoStack.lastOrNull()?.after?.let { it == current } != false &&
-                session.redoStack.lastOrNull()?.before?.let { it == current } != false,
-            "History does not match current board"
-        )
+        validateAssistance(session.assistance)
+        validateHistory(session)
 
         validateMath(session.puzzle.content())
         session.completion?.let { completion ->
@@ -109,13 +70,65 @@ internal class PortableSessionValidator(private val json: Json, private val vali
             )
         }
 
-        // A serializer round trip gives every nested collection independent ownership across awaits.
+        // The validator may own mutable assessment lists, so detach its output as well.
         return json.decodeFromString(
             GameSession.serializer(),
             json.encodeToString(
                 GameSession.serializer(),
                 session.copy(assessment = assessment)
             )
+        )
+    }
+
+    private fun validateAssistance(assistance: Assistance) {
+        val counts = listOf(
+            assistance.hintCount,
+            assistance.checkCount,
+            assistance.candidateCount
+        )
+        requireData(counts.all(::safeInteger), "Invalid assistance counters")
+        requireData(
+            assistance.assisted || counts.all { it == 0L },
+            "Assistance cannot be revoked"
+        )
+    }
+
+    private fun validateHistory(session: GameSession) {
+        val current = BoardLayers(session.entries, session.notes)
+        validateLayers(current, session.puzzle.givens)
+        listOf(session.undoStack, session.redoStack).forEach { history ->
+            history.forEach { move ->
+                validateLayers(move.before, session.puzzle.givens)
+                validateLayers(move.after, session.puzzle.givens)
+                requireData(move.before != move.after, "History contains an empty move")
+            }
+        }
+
+        requireData(
+            session.undoStack.zipWithNext().all { (
+                first,
+                next
+            ) ->
+                first.after == next.before
+            },
+            "Disconnected undo history"
+        )
+
+        // Undo pops the most recent move first, so redo history records reversed adjacency.
+        requireData(
+            session.redoStack.zipWithNext().all { (
+                first,
+                next
+            ) ->
+                first.before == next.after
+            },
+            "Disconnected redo history"
+        )
+
+        requireData(
+            session.undoStack.lastOrNull()?.after?.let { it == current } != false &&
+                session.redoStack.lastOrNull()?.before?.let { it == current } != false,
+            "History does not match current board"
         )
     }
 
@@ -128,8 +141,14 @@ internal class PortableSessionValidator(private val json: Json, private val vali
 
     private fun validatePuzzleShape(puzzle: Puzzle) {
         requireData(board(puzzle.givens) && board(puzzle.solution), "Invalid board values")
-        requireData(puzzle.difficulty in puzzle.rules.variant.difficulties, "Unsupported variant difficulty")
-        requireData(puzzle.seed.isNotEmpty() && puzzle.puzzleVersion.isNotEmpty(), "Missing puzzle metadata")
+        requireData(
+            puzzle.difficulty in puzzle.rules.variant.difficulties,
+            "Unsupported variant difficulty"
+        )
+        requireData(
+            puzzle.seed.isNotEmpty() && puzzle.puzzleVersion.isNotEmpty(),
+            "Missing puzzle metadata"
+        )
         val version = when (puzzle.puzzleVersion) {
             "sudoku-v11", "sudoku-variants-v11" -> "v11"
             "sudoku-v12", "sudoku-variants-v12" -> "v12"
@@ -139,7 +158,13 @@ internal class PortableSessionValidator(private val json: Json, private val vali
             requireData(
                 puzzle.seed.matches(Regex("[0-9a-f]{64}")) &&
                     puzzle.puzzleVersion ==
-                    if (puzzle.rules == PuzzleRules.Classic) "sudoku-$version" else "sudoku-variants-$version",
+                    if (puzzle.rules ==
+                        PuzzleRules.Classic
+                    ) {
+                        "sudoku-$version"
+                    } else {
+                        "sudoku-variants-$version"
+                    },
                 "Invalid current-generation identity"
             )
         }
@@ -175,8 +200,12 @@ internal class PortableSessionValidator(private val json: Json, private val vali
         is EngineOutcome.Completed -> outcome.value
         is EngineOutcome.Incomplete ->
             throw SnapshotValidationUnavailable("Semantic validation did not complete")
-        EngineOutcome.Cancelled -> throw SnapshotValidationUnavailable("Semantic validation cancelled")
-        EngineOutcome.TimedOut -> throw SnapshotValidationUnavailable("Semantic validation timed out")
+        EngineOutcome.Cancelled -> throw SnapshotValidationUnavailable(
+            "Semantic validation cancelled"
+        )
+        EngineOutcome.TimedOut -> throw SnapshotValidationUnavailable(
+            "Semantic validation timed out"
+        )
         is EngineOutcome.InvalidInput -> throw InvalidPortableData(outcome.message)
         is EngineOutcome.Failed -> throw SnapshotValidationUnavailable(outcome.message)
     }

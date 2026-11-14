@@ -10,6 +10,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Update
 
 @Entity(tableName = "sessions", indices = [Index("mode"), Index("variant"), Index("challengeDate")])
 data class SessionEntity(
@@ -30,6 +31,13 @@ data class ResultEntity(
     val payload: String
 )
 
+data class ResultIndexIdentity(
+    val id: String,
+    val mode: String,
+    val variant: String,
+    val challengeDate: String?
+)
+
 @Entity(tableName = "lessons")
 data class LessonEntity(@PrimaryKey val id: String, val payload: String)
 
@@ -46,7 +54,12 @@ data class DatasetEntity(
 )
 
 @Entity(tableName = "quarantine")
-data class QuarantineEntity(@PrimaryKey val id: String, val source: String, val payload: String, val reason: String)
+data class QuarantineEntity(
+    @PrimaryKey val id: String,
+    val source: String,
+    val payload: String,
+    val reason: String
+)
 
 @Dao
 interface SudokuDao {
@@ -79,6 +92,9 @@ interface SudokuDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun putOriginalResult(value: ResultEntity): Long
+
+    @Update(entity = ResultEntity::class)
+    suspend fun updateResultIdentity(value: ResultIndexIdentity)
 
     // Repeated completion saves retain the original timestamp; restore inserts only after clearing.
     @Insert(onConflict = OnConflictStrategy.IGNORE)

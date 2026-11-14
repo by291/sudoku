@@ -12,27 +12,59 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LessonCatalogueTest {
-    private fun content(): String = checkNotNull(javaClass.classLoader.getResourceAsStream("lessons/catalogue.json")) {
-        "Shared lesson catalogue must be packaged as a model test resource"
-    }.bufferedReader().use { it.readText() }
+    private fun content(): String =
+        checkNotNull(javaClass.classLoader.getResourceAsStream("lessons/catalogue.json")) {
+            "Shared lesson catalogue must be packaged as a model test resource"
+        }.bufferedReader().use { it.readText() }
 
     @Test
     fun `loads the original thirty two course identities and all eighty four stages`() {
         val catalogue = LessonCatalogue.decode(content())
         val expectedIds = listOf(
-            "rules", "naked-single", "hidden-single", "locked-candidate", "naked-pair", "hidden-pair",
-            "naked-triple", "hidden-triple", "x-wing", "swordfish", "xy-wing", "simple-coloring",
-            "diagonal-rules", "diagonal-singles", "diagonal-intersections", "diagonal-combined",
-            "jigsaw-rules", "jigsaw-singles", "jigsaw-intersections", "jigsaw-combined",
-            "killer-rules", "killer-remainder", "killer-combinations", "killer-combined",
-            "thermo-rules", "thermo-bounds", "thermo-interactions", "thermo-combined",
-            "arrow-rules", "arrow-equations", "arrow-combinations", "arrow-combined"
+            "rules",
+            "naked-single",
+            "hidden-single",
+            "locked-candidate",
+            "naked-pair",
+            "hidden-pair",
+            "naked-triple",
+            "hidden-triple",
+            "x-wing",
+            "swordfish",
+            "xy-wing",
+            "simple-coloring",
+            "diagonal-rules",
+            "diagonal-singles",
+            "diagonal-intersections",
+            "diagonal-combined",
+            "jigsaw-rules",
+            "jigsaw-singles",
+            "jigsaw-intersections",
+            "jigsaw-combined",
+            "killer-rules",
+            "killer-remainder",
+            "killer-combinations",
+            "killer-combined",
+            "thermo-rules",
+            "thermo-bounds",
+            "thermo-interactions",
+            "thermo-combined",
+            "arrow-rules",
+            "arrow-equations",
+            "arrow-combinations",
+            "arrow-combined"
         )
 
         assertEquals(expectedIds, catalogue.lessons.map { it.id })
         assertEquals(84, catalogue.lessons.sumOf { it.stages.size })
-        assertEquals(ExerciseAnswer.Place(Placement(40, 5)), catalogue.lesson("rules")?.guided?.answer)
-        assertEquals(ExerciseAnswer.Place(Placement(40, 2)), catalogue.lesson("arrow-rules")?.guided?.answer)
+        assertEquals(
+            ExerciseAnswer.Place(Placement(40, 5)),
+            catalogue.lesson("rules")?.guided?.answer
+        )
+        assertEquals(
+            ExerciseAnswer.Place(Placement(40, 2)),
+            catalogue.lesson("arrow-rules")?.guided?.answer
+        )
         assertEquals(Variant.ARROW, catalogue.lesson("arrow-combined")?.practiceVariant)
         assertNull(catalogue.lesson("unknown-historical-completion"))
 
@@ -40,7 +72,10 @@ class LessonCatalogueTest {
             assertEquals(if (lesson.id.endsWith("-combined")) 6 else 2, lesson.stages.size)
             assertEquals(lesson.guided, lesson.stages.first())
             assertTrue(lesson.practiceDifficulty in lesson.practiceVariant.difficulties)
-            assertNotEquals(lesson.exercises[0].stages.first().answer, lesson.exercises[1].stages.first().answer)
+            assertNotEquals(
+                lesson.exercises[0].stages.first().answer,
+                lesson.exercises[1].stages.first().answer
+            )
             assertTrue(
                 lesson.stages.all { stage ->
                     stage.board.size == 81 && stage.candidates.size == 81 &&
@@ -89,8 +124,15 @@ class LessonCatalogueTest {
                 ExerciseAnswer.Eliminate(answer.expected.reversed() + answer.expected.first())
             ).correct
         )
-        assertFalse(catalogue.submit(cursor, ExerciseAnswer.Eliminate(answer.expected.drop(1))).correct)
-        assertFalse(catalogue.submit(cursor, ExerciseAnswer.Eliminate(answer.expected + Placement(80, 9))).correct)
+        assertFalse(
+            catalogue.submit(cursor, ExerciseAnswer.Eliminate(answer.expected.drop(1))).correct
+        )
+        assertFalse(
+            catalogue.submit(
+                cursor,
+                ExerciseAnswer.Eliminate(answer.expected + Placement(80, 9))
+            ).correct
+        )
     }
 
     @Test
@@ -98,7 +140,9 @@ class LessonCatalogueTest {
         val json = content()
 
         assertFailsWith<IllegalArgumentException> {
-            LessonCatalogue.decode(json.replaceFirst("\"schemaVersion\": 1", "\"schemaVersion\": 2"))
+            LessonCatalogue.decode(
+                json.replaceFirst("\"schemaVersion\": 1", "\"schemaVersion\": 2")
+            )
         }
         assertFailsWith<IllegalArgumentException> {
             LessonCatalogue.decode(json.replaceFirst("\"id\": \"rules\"", "\"id\": \"other\""))

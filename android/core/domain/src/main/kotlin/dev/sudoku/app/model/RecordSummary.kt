@@ -14,7 +14,12 @@ data class RecordSummary(
     val longestStreak: Int
 )
 
-fun summarizeRecords(results: List<ResultRecord>, today: String, variant: Variant = Variant.CLASSIC): RecordSummary {
+/** Aggregates original completions for one variant on the challenge calendar. */
+fun summarizeRecords(
+    results: List<ResultRecord>,
+    today: String,
+    variant: Variant = Variant.CLASSIC
+): RecordSummary {
     require(isChallengeDate(today))
     val statistics = RecordStatistics()
     val seen = mutableSetOf<String>()
@@ -26,16 +31,23 @@ fun summarizeRecords(results: List<ResultRecord>, today: String, variant: Varian
         if (session.puzzle.rules.variant != variant || !seen.add(session.id)) {
             continue
         }
+
         val assisted = session.assistance.assisted
         if (session.mode == GameMode.FREE) {
-            statistics.includeFree(session.puzzle.difficulty, assisted, session.elapsedMs)
+            statistics.includeFree(
+                session.puzzle.difficulty,
+                assisted = assisted,
+                elapsedMs = session.elapsedMs
+            )
         }
+
         val metadata = session.metadata
         if (metadata is SessionMetadata.Daily && metadata.formalAttempt) {
-            statistics.includeFormalDaily(assisted)
+            statistics.includeFormalDaily(assisted = assisted)
 
             // A completion after Beijing midnight counts in totals but cannot create a streak day.
-            val eligibleDate = eligibleChallengeDate(metadata, Instant.parse(completion.completedAt))
+            val eligibleDate =
+                eligibleChallengeDate(metadata, Instant.parse(completion.completedAt))
             if (eligibleDate != null && eligibleDate <= today) {
                 eligibleDays += LocalDate.parse(eligibleDate).toEpochDay()
             }
@@ -49,20 +61,22 @@ fun summarizeRecords(results: List<ResultRecord>, today: String, variant: Varian
 /** Day numbers use the challenge calendar; a current streak may end yesterday. */
 data class StreakSummary(val current: Int, val longest: Int)
 
+/** Summarizes eligible days, allowing the current streak to end yesterday. */
 fun summarizeStreak(eligibleDays: Set<Long>, today: Long): StreakSummary {
     val statistics = StreakStatistics(today)
     eligibleDays.sortedDescending().forEach(statistics::include)
     return statistics.summary()
 }
 
-/** Consumes eligible epoch-day numbers no later than today, in descending order, without retaining history. */
+/** Consumes eligible epoch days in descending order without retaining history. */
 class StreakStatistics(private val today: Long) {
     private var previousDay: Long? = null
     private var run = 0
     private var longest = 0
     private var current = 0
-    private var currentRunOpen = false
+    private var isCurrentRunOpen = false
 
+    /** Includes one eligible day no later than the requested challenge date. */
     fun include(day: Long) {
         require(day <= today) { "Future dates cannot contribute to challenge streaks" }
         val previous = previousDay
@@ -71,20 +85,24 @@ class StreakStatistics(private val today: Long) {
             return
         }
 
-        val consecutive = previous != null && day == previous - 1
-        run = if (consecutive) run + 1 else 1
+        val isConsecutive = previous != null && day == previous - 1
+        run = if (isConsecutive) run + 1 else 1
         longest = maxOf(longest, run)
+
+        // A current run can still be continued today if it reached yesterday.
         if (previous == null) {
-            currentRunOpen = day == today || day == today - 1
-        } else if (!consecutive) {
-            currentRunOpen = false
+            isCurrentRunOpen = day == today || day == today - 1
+        } else if (!isConsecutive) {
+            isCurrentRunOpen = false
         }
-        if (currentRunOpen) {
+        if (isCurrentRunOpen) {
             current++
         }
+
         previousDay = day
     }
 
+    /** Returns the computed current and historical streak lengths. */
     fun summary(): StreakSummary = StreakSummary(current, longest)
 }
 
@@ -94,6 +112,7 @@ class RecordStatistics {
     private var assistedDaily = 0
     private var unassistedDaily = 0
 
+    /** Retains the best elapsed milliseconds in the matching free-play category. */
     fun includeFree(difficulty: Difficulty, assisted: Boolean, elapsedMs: Long) {
         val previous = bests.getValue(difficulty)
         bests[difficulty] = if (assisted) {
@@ -103,6 +122,7 @@ class RecordStatistics {
         }
     }
 
+    /** Adds original formal completions in their recorded assistance category. */
     fun includeFormalDaily(assisted: Boolean, count: Int = 1) {
         if (assisted) {
             assistedDaily += count
@@ -111,10 +131,11 @@ class RecordStatistics {
         }
     }
 
+    /** Returns an owned snapshot of the accumulated result facts. */
     fun summary(streak: StreakSummary): RecordSummary = RecordSummary(
-        bests.toMap(),
-        DailyTotals(assistedDaily, unassistedDaily),
-        streak.current,
-        streak.longest
+        freeBests = bests.toMap(),
+        dailyTotals = DailyTotals(assistedDaily, unassistedDaily),
+        currentStreak = streak.current,
+        longestStreak = streak.longest
     )
 }

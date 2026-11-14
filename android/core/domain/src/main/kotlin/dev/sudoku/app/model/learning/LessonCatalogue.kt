@@ -95,13 +95,16 @@ sealed interface ExerciseSubmission {
     val correct: Boolean get() = this is Accepted
     val completed: Boolean get() = this is Completed
 
-    data class Rejected(override val cursor: LessonCursor, override val explanation: String) : ExerciseSubmission
+    data class Rejected(override val cursor: LessonCursor, override val explanation: String) :
+        ExerciseSubmission
 
     sealed interface Accepted : ExerciseSubmission
 
-    data class Advanced(override val cursor: LessonCursor, override val explanation: String) : Accepted
+    data class Advanced(override val cursor: LessonCursor, override val explanation: String) :
+        Accepted
 
-    data class Completed(override val cursor: LessonCursor, override val explanation: String) : Accepted
+    data class Completed(override val cursor: LessonCursor, override val explanation: String) :
+        Accepted
 }
 
 @Serializable
@@ -119,18 +122,20 @@ private data class CatalogueDocument(
     val lessons: List<Lesson>
 )
 
-/** Owns authored presentation and structural decoding; bundled mathematical evidence is checked at build time. */
+/** Decodes authored teaching content whose mathematical evidence is checked during builds. */
 class LessonCatalogue private constructor(val lessons: List<Lesson>) {
     private val byId = lessons.associateBy { it.id }
 
+    /** Finds the authored lesson matching its stable identity. */
     fun lesson(id: String): Lesson? = byId[id]
 
+    /** Resumes a valid stage or starts the selected lesson from the beginning. */
     fun restoreCursor(lessonId: String, stageIndex: Int = 0): LessonCursor? {
         val lesson = lesson(lessonId) ?: return null
         return LessonCursor(lessonId, stageIndex.takeIf { it in lesson.stages.indices } ?: 0)
     }
 
-    /** Returns a proposed transition; the owner persists it with the dataset epoch before publishing progress. */
+    /** Propose a transition for the owner to persist under the current epoch. */
     fun submit(
         cursor: LessonCursor,
         answer: ExerciseAnswer,
@@ -145,10 +150,10 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
             return ExerciseSubmission.Rejected(cursor, "还差一点。请重新检查单元内候选数的位置，可以继续尝试。")
         }
 
-        val completed = cursor.stageIndex == lesson.stages.lastIndex
-        val next = LessonCursor(cursor.lessonId, if (completed) 0 else cursor.stageIndex + 1)
+        val isCompleted = cursor.stageIndex == lesson.stages.lastIndex
+        val next = LessonCursor(cursor.lessonId, if (isCompleted) 0 else cursor.stageIndex + 1)
         val explanation = "推理正确！" + stage.explanation
-        return if (completed) {
+        return if (isCompleted) {
             ExerciseSubmission.Completed(next, explanation)
         } else {
             ExerciseSubmission.Advanced(next, explanation)
@@ -158,18 +163,44 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
     companion object {
         private val json = Json { classDiscriminator = "kind" }
         private val stableIds = listOf(
-            "rules", "naked-single", "hidden-single", "locked-candidate", "naked-pair", "hidden-pair",
-            "naked-triple", "hidden-triple", "x-wing", "swordfish", "xy-wing", "simple-coloring",
-            "diagonal-rules", "diagonal-singles", "diagonal-intersections", "diagonal-combined",
-            "jigsaw-rules", "jigsaw-singles", "jigsaw-intersections", "jigsaw-combined",
-            "killer-rules", "killer-remainder", "killer-combinations", "killer-combined",
-            "thermo-rules", "thermo-bounds", "thermo-interactions", "thermo-combined",
-            "arrow-rules", "arrow-equations", "arrow-combinations", "arrow-combined"
+            "rules",
+            "naked-single",
+            "hidden-single",
+            "locked-candidate",
+            "naked-pair",
+            "hidden-pair",
+            "naked-triple",
+            "hidden-triple",
+            "x-wing",
+            "swordfish",
+            "xy-wing",
+            "simple-coloring",
+            "diagonal-rules",
+            "diagonal-singles",
+            "diagonal-intersections",
+            "diagonal-combined",
+            "jigsaw-rules",
+            "jigsaw-singles",
+            "jigsaw-intersections",
+            "jigsaw-combined",
+            "killer-rules",
+            "killer-remainder",
+            "killer-combinations",
+            "killer-combined",
+            "thermo-rules",
+            "thermo-bounds",
+            "thermo-interactions",
+            "thermo-combined",
+            "arrow-rules",
+            "arrow-equations",
+            "arrow-combinations",
+            "arrow-combined"
         )
 
-        /** Available without asset I/O; decoding verifies the bundled catalogue against these identities. */
+        /** Read lesson identities without loading assets; decoding checks the same order. */
         val bundledLessonCount: Int get() = stableIds.size
 
+        /** Decodes and structurally validates a selected bundled lesson asset. */
         fun decodeLesson(source: String): LessonCatalogue {
             val lesson = json.decodeFromString<Lesson>(source)
             require(lesson.id in stableIds) { "Unknown course identity" }
@@ -191,6 +222,8 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
                         hasChineseCopy(it.title) && it.stages.isNotEmpty()
                     }
             ) { "Missing focused or transfer exercise in ${lesson.id}" }
+
+            // Persisted cursors use stage indices, so changing the stage count needs migration.
             require(lesson.stages.size == LessonIdentity.stageCount(lesson.id)) {
                 "Changed stage count in ${lesson.id}"
             }
@@ -198,16 +231,20 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
                 "Guided stage must match the first exercise in ${lesson.id}"
             }
             require(
-                lesson.transfer.kind != TeachingTransform.SWAP_ROWS || lesson.practiceVariant == Variant.CLASSIC
+                lesson.transfer.kind != TeachingTransform.SWAP_ROWS ||
+                    lesson.practiceVariant == Variant.CLASSIC
             ) {
                 "Row permutations cannot change variant clues"
             }
-            require((lesson.transfer.source == TransferSource.AUTHORED_ALTERNATE) == (lesson.id == "arrow-rules")) {
+            val usesAlternate = lesson.transfer.source == TransferSource.AUTHORED_ALTERNATE
+            require(usesAlternate == (lesson.id == "arrow-rules")) {
                 "Unexpected authored transfer source"
             }
 
             for (stage in lesson.stages) {
-                require(stage.rules.variant == lesson.practiceVariant) { "Mismatched course rules in ${lesson.id}" }
+                require(stage.rules.variant == lesson.practiceVariant) {
+                    "Mismatched course rules in ${lesson.id}"
+                }
                 require(
                     stage.board.size == BOARD_SIZE && stage.board.all {
                         it in 0..9
@@ -236,16 +273,19 @@ class LessonCatalogue private constructor(val lessons: List<Lesson>) {
             }
         }
 
+        /** Decodes the complete authored catalogue and verifies its stable identities. */
         fun decode(source: String): LessonCatalogue {
             val document = json.decodeFromString<CatalogueDocument>(source)
             require(document.schemaVersion == 1) { "Unsupported lesson catalogue schema" }
             require(
-                document.provenance.source.isNotBlank() && document.provenance.snapshot.isNotBlank() &&
+                document.provenance.source.isNotBlank() &&
+                    document.provenance.snapshot.isNotBlank() &&
                     document.provenance.sha256.matches(Regex("[0-9a-f]{64}"))
             ) {
                 "Missing authored catalogue provenance"
             }
-            require(document.lessons.map { it.id } == stableIds) { "Course identities or order changed" }
+            val documentIds = document.lessons.map { it.id }
+            require(documentIds == stableIds) { "Course identities or order changed" }
 
             document.lessons.forEach(::validateLesson)
             return LessonCatalogue(document.lessons)
@@ -266,8 +306,11 @@ private fun answerPairs(answer: ExerciseAnswer): List<Placement> = when (answer)
 }
 
 private fun sameAnswer(expected: ExerciseAnswer, supplied: ExerciseAnswer): Boolean = when {
-    expected is ExerciseAnswer.Place && supplied is ExerciseAnswer.Place -> expected.expected == supplied.expected
-    expected is ExerciseAnswer.Eliminate && supplied is ExerciseAnswer.Eliminate -> expected.expected.toSet() ==
-        supplied.expected.toSet()
+    expected is ExerciseAnswer.Place && supplied is ExerciseAnswer.Place -> {
+        expected.expected == supplied.expected
+    }
+    expected is ExerciseAnswer.Eliminate && supplied is ExerciseAnswer.Eliminate -> {
+        expected.expected.toSet() == supplied.expected.toSet()
+    }
     else -> false
 }

@@ -13,7 +13,9 @@ sealed interface EngineOutcome<out T> {
 
     data object TimedOut : EngineOutcome<Nothing>
 
-    /** Conclusive input rejection; unlike execution failure it may establish invalid persisted data. */
+    /**
+     * Conclusive input rejection; unlike execution failure it may establish invalid persisted data.
+     */
     data class InvalidInput(val message: String) : EngineOutcome<Nothing>
 
     data class Failed(val message: String) : EngineOutcome<Nothing>
@@ -32,7 +34,11 @@ data class EngineInformation(
     val ratingVersion: String
 )
 
-data class GenerationRequest(val variant: Variant, val difficulty: Difficulty, val seed: List<UByte>)
+data class GenerationRequest(
+    val variant: Variant,
+    val difficulty: Difficulty,
+    val seed: List<UByte>
+)
 
 data class GeneratedPuzzle(val puzzle: Puzzle, val assessment: PuzzleAssessment?)
 
@@ -44,13 +50,25 @@ sealed interface RuleConstraint {
     val index: Int
     val cells: List<Int>
 
-    data class Cage(override val id: String, override val index: Int, override val cells: List<Int>, val sum: Int) :
-        RuleConstraint
+    data class Cage(
+        override val id: String,
+        override val index: Int,
+        override val cells: List<Int>,
+        val sum: Int
+    ) : RuleConstraint
 
-    data class Thermo(override val id: String, override val index: Int, override val cells: List<Int>) : RuleConstraint
+    data class Thermo(
+        override val id: String,
+        override val index: Int,
+        override val cells: List<Int>
+    ) : RuleConstraint
 
-    data class Arrow(override val id: String, override val index: Int, val circle: Int, val shaft: List<Int>) :
-        RuleConstraint {
+    data class Arrow(
+        override val id: String,
+        override val index: Int,
+        val circle: Int,
+        val shaft: List<Int>
+    ) : RuleConstraint {
         override val cells: List<Int> get() = listOf(circle) + shaft
     }
 }
@@ -188,8 +206,12 @@ sealed interface LogicalStep {
 
     @Serializable
     @SerialName("placement")
-    data class Place(override val technique: String, override val evidence: Evidence, val cell: Int, val digit: Int) :
-        LogicalStep {
+    data class Place(
+        override val technique: String,
+        override val evidence: Evidence,
+        val cell: Int,
+        val digit: Int
+    ) : LogicalStep {
         constructor(
             technique: String,
             evidence: Evidence,
@@ -224,37 +246,53 @@ sealed interface AssessmentIssue {
 }
 
 sealed interface AssessmentResult {
-    data class Rated(val summary: AssessmentSummary, val trace: List<LogicalStep>) : AssessmentResult
+    data class Rated(val summary: AssessmentSummary, val trace: List<LogicalStep>) :
+        AssessmentResult
 
     data class Ungraded(val variant: Variant) : AssessmentResult
 
     data class Invalid(val issues: List<AssessmentIssue>) : AssessmentResult
 }
 
-/** Main-safe calls own input snapshots. Close waits for executing native calls to release ownership. */
+/**
+ * Main-safe calls own input snapshots. Close waits for executing native calls to release ownership.
+ */
 interface PreparedPuzzle {
     val metadata: RuleMetadata
 
-    suspend fun edit(givens: List<Int>, layers: BoardLayers, action: BoardEdit): EngineOutcome<EditResult>
+    /** Evaluates a player edit with the prepared rules without changing caller-owned layers. */
+    suspend fun edit(
+        givens: List<Int>,
+        layers: BoardLayers,
+        action: BoardEdit
+    ): EngineOutcome<EditResult>
 
+    /** Computes candidate masks for the supplied board. */
     suspend fun candidates(board: List<Int>): EngineOutcome<List<Int>>
 
+    /** Returns the rule violations present on the supplied board. */
     suspend fun conflicts(board: List<Int>): EngineOutcome<List<RuleViolation>>
 
+    /** Checks whether the board is full and satisfies the prepared rules. */
     suspend fun isComplete(board: List<Int>): EngineOutcome<Boolean>
 
+    /** Identifies incorrect filled entries against the supplied solution. */
     suspend fun reviewEntries(board: List<Int>, solution: List<Int>): EngineOutcome<List<Int>>
 
+    /** Finds an explained deduction or reports why a hint is unavailable. */
     suspend fun hint(board: List<Int>, solution: List<Int>): EngineOutcome<HintResult>
 
+    /** Releases the prepared rules after in-flight use has settled. */
     suspend fun close()
 }
 
 /** Storage validates copies before opening transactions and sends no historical text into Rust. */
 interface MathematicalValidator {
 
+    /** Checks puzzle content without assuming that validation will complete. */
     suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation>
 
+    /** Decodes a stored assessment against the expected puzzle identity. */
     suspend fun validateAssessment(
         value: PuzzleAssessment?,
         variant: Variant,
@@ -264,20 +302,36 @@ interface MathematicalValidator {
 
 interface SudokuEngine : MathematicalValidator {
 
+    /** Reads the active engine and binding version information. */
     suspend fun information(): EngineOutcome<EngineInformation>
 
+    /** Derives the fixed-length engine seed from stable byte material. */
     suspend fun deriveSeed(material: List<UByte>): EngineOutcome<List<UByte>>
 
+    /** Generates a puzzle under the request policy and reports incomplete work. */
     suspend fun generate(request: GenerationRequest): EngineOutcome<GeneratedPuzzle>
 
+    /** Prepares reusable rule geometry whose owner must close it. */
     suspend fun prepare(rules: PuzzleRules): EngineOutcome<PreparedPuzzle>
 
+    /** Assesses the supplied board without mutating its cells. */
     suspend fun assess(board: List<Int>, rules: PuzzleRules): EngineOutcome<AssessmentResult>
 
-    suspend fun validateHint(hint: HintResult, board: List<Int>, rules: PuzzleRules): EngineOutcome<Validation>
+    /** Validates the supplied deduction against its starting board and rules. */
+    suspend fun validateHint(
+        hint: HintResult,
+        board: List<Int>,
+        rules: PuzzleRules
+    ): EngineOutcome<Validation>
 
-    suspend fun transformRules(rules: PuzzleRules, symmetry: Int, complement: Boolean): EngineOutcome<PuzzleRules>
+    /** Transforms a layout using the requested symmetry and digit complement. */
+    suspend fun transformRules(
+        rules: PuzzleRules,
+        symmetry: Int,
+        complement: Boolean
+    ): EngineOutcome<PuzzleRules>
 
+    /** Validates the authored deduction against its candidate preconditions. */
     suspend fun validateTeachingStep(
         board: List<Int>,
         candidates: List<Int>,

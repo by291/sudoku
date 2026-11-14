@@ -66,12 +66,16 @@ class RoomGameRepositoryTest {
 
     @After fun closeDatabase() = database.close()
 
-    @Test fun staleGamePreferenceWritePreservesLaterThemeAndLearningCursor() = runTest {
+    @Test
+    fun staleGamePreferenceWritePreservesLaterThemeAndLearningCursor() = runTest {
         val cachedGameSettings = repository.readSettings().value()
         repository.updateSettings(SettingsUpdate.Theme(ThemePreference.DARK), 0).value()
         repository.updateSettings(SettingsUpdate.LessonCursor("rules", 1), 0).value()
 
-        repository.updateSettings(SettingsUpdate.ShowTimer(!cachedGameSettings.showTimer), 0).value()
+        repository.updateSettings(
+            SettingsUpdate.ShowTimer(!cachedGameSettings.showTimer),
+            0
+        ).value()
 
         val settings = repository.readSettings().value()
         assertEquals(ThemePreference.DARK, settings.theme)
@@ -80,7 +84,8 @@ class RoomGameRepositoryTest {
         assertEquals(false, settings.showTimer)
     }
 
-    @Test fun obsoleteAndMalformedProjectionsNeverAuthorizeDailyCompletion() = runTest {
+    @Test
+    fun obsoleteAndMalformedProjectionsNeverAuthorizeDailyCompletion() = runTest {
         val date = "2026-10-16"
         val id = dev.sudoku.app.model.dailyFormalId(date, Variant.CLASSIC)
         val session = fixture().copy(
@@ -107,25 +112,44 @@ class RoomGameRepositoryTest {
         }
     }
 
-    @Test fun obsoleteResultProjectionDoesNotContributeToOverview() = runTest {
-        val session = fixture().copy(elapsedMs = 500, completion = Completion("2026-10-16T01:02:04.000Z", 500))
-        repository.writeSession(session, 0, repository.claimEditor(session.id, "owner").value()).value()
+    @Test
+    fun obsoleteResultProjectionDoesNotContributeToOverview() = runTest {
+        val session = fixture().copy(
+            elapsedMs = 500,
+            completion = Completion("2026-10-16T01:02:04.000Z", 500)
+        )
+        repository.writeSession(
+            session,
+            0,
+            repository.claimEditor(session.id, "owner").value()
+        ).value()
         val summary = requireNotNull(database.summaryDao().result(session.id))
         database.summaryDao().deleteResult(session.id)
         database.summaryDao().putResult(summary.copy(version = 0))
 
-        val overview = RoomReadRepository(database, validator).readOverview(Variant.CLASSIC, "2026-10-16").value()
+        val overview = RoomReadRepository(
+            database,
+            validator
+        ).readOverview(Variant.CLASSIC, "2026-10-16").value()
 
         assertEquals(null, overview.summary.freeBests.getValue(Difficulty.EASY).unassisted)
         assertTrue(overview.pending)
         assertTrue(database.sudokuDao().result(session.id) != null)
     }
 
-    @Test fun historyPagesHaveStableTieBreakingAndRejectAnOldDatasetCursor() = runTest {
-        val base = fixture().copy(elapsedMs = 500, completion = Completion("2026-10-16T01:02:04.000Z", 500))
+    @Test
+    fun historyPagesHaveStableTieBreakingAndRejectAnOldDatasetCursor() = runTest {
+        val base = fixture().copy(
+            elapsedMs = 500,
+            completion = Completion("2026-10-16T01:02:04.000Z", 500)
+        )
         for (index in 0 until 65) {
             val session = base.copy(id = "result-${index.toString().padStart(3, '0')}")
-            repository.writeSession(session, 0, repository.claimEditor(session.id, "owner").value()).value()
+            repository.writeSession(
+                session,
+                0,
+                repository.claimEditor(session.id, "owner").value()
+            ).value()
         }
         val reads = RoomReadRepository(database, validator)
         validationCalls = 0
@@ -142,8 +166,14 @@ class RoomGameRepositoryTest {
         assertEquals(SummaryQuery.History(), cursor.query)
         val wrongSource = reads.readPage(SummaryQuery.Saves(), cursor)
         val wrongVariant = reads.readPage(SummaryQuery.History(Variant.DIAGONAL), cursor)
-        assertEquals(StorageFailureKind.REVISION_CONFLICT, (wrongSource as StorageOutcome.Failure).error.kind)
-        assertEquals(StorageFailureKind.REVISION_CONFLICT, (wrongVariant as StorageOutcome.Failure).error.kind)
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (wrongSource as StorageOutcome.Failure).error.kind
+        )
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (wrongVariant as StorageOutcome.Failure).error.kind
+        )
         repository.clearAll(first.epoch).value()
         assertTrue(
             reads.readPage(
@@ -153,10 +183,15 @@ class RoomGameRepositoryTest {
         )
     }
 
-    @Test fun backfillInvalidatesPaginationBeforePendingRowsCanRepeat() = runTest {
+    @Test
+    fun backfillInvalidatesPaginationBeforePendingRowsCanRepeat() = runTest {
         for (index in 0 until 35) {
             val session = fixture().copy(id = "pending-${index.toString().padStart(2, '0')}")
-            repository.writeSession(session, 0, repository.claimEditor(session.id, "owner").value()).value()
+            repository.writeSession(
+                session,
+                0,
+                repository.claimEditor(session.id, "owner").value()
+            ).value()
         }
         database.summaryDao().clearSessions()
         val reads = RoomReadRepository(database, validator)
@@ -170,7 +205,10 @@ class RoomGameRepositoryTest {
             cursor = first.next
         )
 
-        assertEquals(StorageFailureKind.REVISION_CONFLICT, (stale as StorageOutcome.Failure).error.kind)
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (stale as StorageOutcome.Failure).error.kind
+        )
         val refreshed = reads.readPage(query = SummaryQuery.Saves(unfinishedOnly = true)).value()
         val rest = reads.readPage(
             query = SummaryQuery.Saves(unfinishedOnly = true),
@@ -179,7 +217,8 @@ class RoomGameRepositoryTest {
         assertEquals(35, (refreshed.items + rest.items).map { it.id }.toSet().size)
     }
 
-    @Test fun summaryReadsStayBoundedAcrossHistorySizesWithoutDecodingPayloads() = runTest {
+    @Test
+    fun summaryReadsStayBoundedAcrossHistorySizesWithoutDecodingPayloads() = runTest {
         val reads = RoomReadRepository(database, validator)
         val facts = fixture().copy(
             elapsedMs = 500,
@@ -193,7 +232,9 @@ class RoomGameRepositoryTest {
             database.withTransaction {
                 for (index in inserted until count) {
                     val id = "history-${index.toString().padStart(5, '0')}"
-                    database.sudokuDao().putOriginalResult(ResultEntity(id, "FREE", "classic", null, opaque))
+                    database.sudokuDao().putOriginalResult(
+                        ResultEntity(id, "FREE", "classic", null, opaque)
+                    )
                     database.summaryDao().insertResult(ResultSummaryEntity(id, facts))
                 }
                 database.summaryDao().changed()
@@ -220,7 +261,8 @@ class RoomGameRepositoryTest {
         }
     }
 
-    @Test fun malformedPracticeProjectionCannotBecomeAFormalDailyResult() = runTest {
+    @Test
+    fun malformedPracticeProjectionCannotBecomeAFormalDailyResult() = runTest {
         val date = "2026-10-16"
         val cases = listOf(
             Triple(PuzzleRules.Classic, "practice", Variant.CLASSIC),
@@ -230,7 +272,13 @@ class RoomGameRepositoryTest {
             val session = createSession(
                 fixture().puzzle.copy(
                     rules = rules,
-                    puzzleVersion = if (variant == Variant.CLASSIC) "sudoku-v11" else "sudoku-variants-v11"
+                    puzzleVersion = if (variant ==
+                        Variant.CLASSIC
+                    ) {
+                        "sudoku-v11"
+                    } else {
+                        "sudoku-variants-v11"
+                    }
                 ),
                 SessionMetadata.Daily(date, false),
                 id,
@@ -259,7 +307,8 @@ class RoomGameRepositoryTest {
         }
     }
 
-    @Test fun historicalShanghaiSummerTimeRetainsAValidFormalResult() = runTest {
+    @Test
+    fun historicalShanghaiSummerTimeRetainsAValidFormalResult() = runTest {
         // Shanghai observed UTC+9 on this date: 15:30 UTC is 00:30 on July 2.
         val id = "daily:1990-07-02:formal"
         val session = createSession(
@@ -286,7 +335,8 @@ class RoomGameRepositoryTest {
         assertEquals(canonical, database.sudokuDao().result(id))
     }
 
-    @Test fun malformedCalendarInvalidatesAnAppendedPageAndBackfillRepairsOnlyItsProjection() = runTest {
+    @Test
+    fun malformedCalendarInvalidatesAnAppendedPageAndBackfillRepairsOnlyItsProjection() = runTest {
         val start = java.time.LocalDate.parse("2026-08-01")
         for (offset in 0 until 35) {
             val date = start.plusDays(offset.toLong()).toString()
@@ -296,20 +346,29 @@ class RoomGameRepositoryTest {
                 "daily:$date:formal",
                 "${date}T00:00:00.000Z"
             ).copy(elapsedMs = 200, completion = Completion("${date}T01:00:00.000Z", 200))
-            repository.writeSession(session, 0, repository.claimEditor(session.id, "owner").value()).value()
+            repository.writeSession(
+                session,
+                0,
+                repository.claimEditor(session.id, "owner").value()
+            ).value()
         }
         val reads = RoomReadRepository(database, validator)
         val first = reads.readPage(query = SummaryQuery.History()).value()
         val id = "daily:2026-08-01:formal"
         val canonical = database.sudokuDao().result(id)
         val projection = requireNotNull(database.summaryDao().result(id))
-        // Simulate malformed persisted projection bytes without cooperating with coverage/generation writes.
+        // Bypass normal writes to simulate a corrupt persisted projection.
         database.summaryDao().removeResult(id)
-        database.summaryDao().insertResult(projection.copy(facts = projection.facts.copy(eligibleDate = null)))
+        database.summaryDao().insertResult(
+            projection.copy(facts = projection.facts.copy(eligibleDate = null))
+        )
 
         val appended = reads.readPage(query = SummaryQuery.History(), cursor = first.next)
 
-        assertEquals(StorageFailureKind.REVISION_CONFLICT, (appended as StorageOutcome.Failure).error.kind)
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (appended as StorageOutcome.Failure).error.kind
+        )
         assertEquals(null, database.summaryDao().selectResult(id))
         val refreshed = reads.readPage(query = SummaryQuery.History()).value()
         assertEquals(id, refreshed.items.first().id)
@@ -326,13 +385,16 @@ class RoomGameRepositoryTest {
         assertEquals(canonical, database.sudokuDao().result(id))
 
         database.summaryDao().removeResult(id)
-        database.summaryDao().insertResult(projection.copy(facts = projection.facts.copy(eligibleDate = null)))
+        database.summaryDao().insertResult(
+            projection.copy(facts = projection.facts.copy(eligibleDate = null))
+        )
         assertEquals(null, database.summaryDao().result(id))
         reads.readResult(id).value()
         assertEquals(canonical, database.sudokuDao().result(id))
     }
 
-    @Test fun dailyStatisticsCrossMultipleCompactBatchesWithoutPayloadValidation() = runTest {
+    @Test
+    fun dailyStatisticsCrossMultipleCompactBatchesWithoutPayloadValidation() = runTest {
         val start = java.time.LocalDate.parse("2026-01-01")
         for (offset in 0 until 260) {
             val date = start.plusDays(offset.toLong()).toString()
@@ -342,11 +404,18 @@ class RoomGameRepositoryTest {
                 "daily:$date:formal",
                 "${date}T00:00:00.000Z"
             ).copy(elapsedMs = 200, completion = Completion("${date}T01:00:00.000Z", 200))
-            repository.writeSession(session, 0, repository.claimEditor(session.id, "owner").value()).value()
+            repository.writeSession(
+                session,
+                0,
+                repository.claimEditor(session.id, "owner").value()
+            ).value()
         }
         validationCalls = 0
 
-        val overview = RoomReadRepository(database, validator).readOverview(Variant.CLASSIC, "2026-09-17").value()
+        val overview = RoomReadRepository(
+            database,
+            validator
+        ).readOverview(Variant.CLASSIC, "2026-09-17").value()
 
         assertEquals(DailyTotals(unassisted = 260), overview.summary.dailyTotals)
         assertEquals(260, overview.summary.currentStreak)
@@ -355,7 +424,8 @@ class RoomGameRepositoryTest {
         assertEquals(0, validationCalls)
     }
 
-    @Test fun dailyStatisticsQueryUsesItsCalendarOrderingIndexWithoutATemporarySort() {
+    @Test
+    fun dailyStatisticsQueryUsesItsCalendarOrderingIndexWithoutATemporarySort() {
         val query = "EXPLAIN QUERY PLAN SELECT p.id FROM result_summaries p WHERE " +
             CURRENT_RESULT + " AND p.variant='classic' AND p.mode='DAILY' " +
             "AND (p.challengeDate,p.id)<('9999-12-32','') ORDER BY p.challengeDate DESC,p.id DESC LIMIT 128"
@@ -363,11 +433,17 @@ class RoomGameRepositoryTest {
             buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }
         }
 
-        assertTrue(plans.toString(), plans.any { it.contains("index_result_summaries_variant_mode_challengeDate_id") })
+        assertTrue(
+            plans.toString(),
+            plans.any {
+                it.contains("index_result_summaries_variant_mode_challengeDate_id")
+            }
+        )
         assertTrue(plans.toString(), plans.none { it.contains("TEMP B-TREE") })
     }
 
-    @Test fun overviewRetainsFormalTotalsAndExcludesLateCompletionsFromStreaks() = runTest {
+    @Test
+    fun overviewRetainsFormalTotalsAndExcludesLateCompletionsFromStreaks() = runTest {
         val rows = listOf(
             Triple("2026-10-14", "2026-10-14T15:59:00.000Z", false),
             Triple("2026-10-15", "2026-10-15T15:59:00.000Z", true),
@@ -385,7 +461,11 @@ class RoomGameRepositoryTest {
                     completion = Completion(completion, 200),
                     assistance = Assistance(assisted = assisted)
                 )
-            repository.writeSession(session, 0, repository.claimEditor(session.id, "owner").value()).value()
+            repository.writeSession(
+                session,
+                0,
+                repository.claimEditor(session.id, "owner").value()
+            ).value()
         }
         val reads = RoomReadRepository(database, validator)
         val summary = reads.readOverview(Variant.CLASSIC, "2026-10-16").value().summary
@@ -393,10 +473,14 @@ class RoomGameRepositoryTest {
         assertEquals(DailyTotals(1, 2), summary.dailyTotals)
         assertEquals(2, summary.currentStreak)
         assertEquals(2, summary.longestStreak)
-        assertEquals(0, reads.readOverview(Variant.CLASSIC, "2026-10-17").value().summary.currentStreak)
+        assertEquals(
+            0,
+            reads.readOverview(Variant.CLASSIC, "2026-10-17").value().summary.currentStreak
+        )
     }
 
-    @Test fun readyPageQueryUsesItsOrderingIndexWithoutATemporarySort() {
+    @Test
+    fun readyPageQueryUsesItsOrderingIndexWithoutATemporarySort() {
         val query = "EXPLAIN QUERY PLAN SELECT p.id FROM result_summaries p WHERE " +
             CURRENT_RESULT + " AND p.variant='classic' " +
             "AND (completedAt,id)<(9223372036854775807,'') " +
@@ -405,13 +489,23 @@ class RoomGameRepositoryTest {
             buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }
         }
 
-        assertTrue(plans.toString(), plans.any { it.contains("index_result_summaries_variant_completedAt_id") })
+        assertTrue(
+            plans.toString(),
+            plans.any {
+                it.contains("index_result_summaries_variant_completedAt_id")
+            }
+        )
         assertTrue(plans.toString(), plans.none { it.contains("TEMP B-TREE") })
     }
 
-    @Test fun clearingDuringDetailValidationCannotResurrectAProjection() = runTest {
+    @Test
+    fun clearingDuringDetailValidationCannotResurrectAProjection() = runTest {
         val session = fixture()
-        repository.writeSession(session, 0, repository.claimEditor(session.id, "owner").value()).value()
+        repository.writeSession(
+            session,
+            0,
+            repository.claimEditor(session.id, "owner").value()
+        ).value()
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val blocked = object : MathematicalValidator by validator {
@@ -431,7 +525,8 @@ class RoomGameRepositoryTest {
         assertTrue(reads.readPage().value().items.isEmpty())
     }
 
-    @Test fun presentationReadsNeverDecodeOrValidateFullPayloads() = runTest {
+    @Test
+    fun presentationReadsNeverDecodeOrValidateFullPayloads() = runTest {
         val session = fixture()
         val token = repository.claimEditor(session.id, "owner").value()
         repository.writeSession(session, 0, token).value()
@@ -450,12 +545,15 @@ class RoomGameRepositoryTest {
         assertTrue(validationCalls > 0)
     }
 
-    @Test fun legacyRowsArePendingAndSelectedReadsIgnoreUnrelatedCorruption() = runTest {
+    @Test
+    fun legacyRowsArePendingAndSelectedReadsIgnoreUnrelatedCorruption() = runTest {
         val session = fixture()
         val token = repository.claimEditor(session.id, "owner").value()
         repository.writeSession(session, 0, token).value()
         database.summaryDao().clearSessions()
-        database.sudokuDao().putSession(SessionEntity("corrupt", 1, "FREE", "classic", null, "broken"))
+        database.sudokuDao().putSession(
+            SessionEntity("corrupt", 1, "FREE", "classic", null, "broken")
+        )
         val reads = RoomReadRepository(database, validator)
 
         assertTrue(reads.readBootstrap().value().home.pending)
@@ -467,8 +565,12 @@ class RoomGameRepositoryTest {
         assertTrue(!reads.readBootstrap().value().home.pending)
     }
 
-    @Test fun originalResultProjectionRetainsFirstCompletionAndImportRebuildsIt() = runTest {
-        val session = fixture().copy(elapsedMs = 500, completion = Completion("2026-10-16T01:02:04.000Z", 500))
+    @Test
+    fun originalResultProjectionRetainsFirstCompletionAndImportRebuildsIt() = runTest {
+        val session = fixture().copy(
+            elapsedMs = 500,
+            completion = Completion("2026-10-16T01:02:04.000Z", 500)
+        )
         val token = repository.claimEditor(session.id, "owner").value()
         repository.writeSession(session, 0, token).value()
         repository.writeSession(
@@ -497,7 +599,8 @@ class RoomGameRepositoryTest {
         assertTrue(!reads.readBootstrap().value().home.pending)
     }
 
-    @Test fun staleRevisionAndReplacedDatasetRejectQueuedWrites() = runTest {
+    @Test
+    fun staleRevisionAndReplacedDatasetRejectQueuedWrites() = runTest {
         val session = fixture()
         val token = repository.claimEditor(session.id, "owner").value()
         repository.writeSession(session, 0, token).value()
@@ -508,16 +611,25 @@ class RoomGameRepositoryTest {
         repository.restoreBackup(preview).value()
         val staleEpoch = repository.writeSession(session, 1, token)
 
-        assertEquals(StorageFailureKind.REVISION_CONFLICT, (staleRevision as StorageOutcome.Failure).error.kind)
-        assertEquals(StorageFailureKind.REVISION_CONFLICT, (staleEpoch as StorageOutcome.Failure).error.kind)
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (staleRevision as StorageOutcome.Failure).error.kind
+        )
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (staleEpoch as StorageOutcome.Failure).error.kind
+        )
         assertEquals(
             1L,
-            requireNotNull(RoomReadRepository(database, validator).readSession(session.id).value()).revision
+            requireNotNull(
+                RoomReadRepository(database, validator).readSession(session.id).value()
+            ).revision
         )
         assertEquals(1L, repository.readDatasetEpoch().value())
     }
 
-    @Test fun lessonCompletionRetryPreservesItsFirstTimestamp() = runTest {
+    @Test
+    fun lessonCompletionRetryPreservesItsFirstTimestamp() = runTest {
         val epoch = repository.readDatasetEpoch().value()
         val first = LessonProgress("rules", "2026-10-16T01:02:03.004Z")
         val retried = first.copy(completedAt = "2026-10-16T01:02:04.005Z")
@@ -528,21 +640,30 @@ class RoomGameRepositoryTest {
         assertEquals(listOf(first), repository.readLessonProgress().value())
     }
 
-    @Test fun firstCompletionRemainsOriginalAcrossReplayedWrites() = runTest {
+    @Test
+    fun firstCompletionRemainsOriginalAcrossReplayedWrites() = runTest {
         val session = fixture()
-        val original = session.copy(elapsedMs = 500, completion = Completion("2026-10-16T01:02:04.000Z", 500))
+        val original = session.copy(
+            elapsedMs = 500,
+            completion = Completion("2026-10-16T01:02:04.000Z", 500)
+        )
         val token = repository.claimEditor(session.id, "owner").value()
         repository.writeSession(original, 0, token).value()
 
         repository.writeSession(
-            original.copy(elapsedMs = 900, completion = Completion("2026-10-16T01:02:05.000Z", 900)),
+            original.copy(
+                elapsedMs = 900,
+                completion = Completion("2026-10-16T01:02:05.000Z", 900)
+            ),
             1,
             token
         ).value()
 
         assertEquals(
             500L,
-            requireNotNull(RoomReadRepository(database, validator).readResult(session.id).value()).session.elapsedMs
+            requireNotNull(
+                RoomReadRepository(database, validator).readResult(session.id).value()
+            ).session.elapsedMs
         )
         assertEquals(
             "2026-10-16T01:02:04.000Z",
@@ -552,7 +673,8 @@ class RoomGameRepositoryTest {
         )
     }
 
-    @Test fun previewConflictPreservesSettingsAndEveryCollection() = runTest {
+    @Test
+    fun previewConflictPreservesSettingsAndEveryCollection() = runTest {
         val epoch = repository.readDatasetEpoch().value()
         val backup = repository.exportBackup("2026-10-16T01:02:03.000Z").value()
         val preview = repository.previewBackup(backup.text).value()
@@ -566,7 +688,8 @@ class RoomGameRepositoryTest {
         assertEquals(1L, repository.readDatasetEpoch().value())
     }
 
-    @Test fun inconclusiveValidationDoesNotQuarantineStoredFacts() = runTest {
+    @Test
+    fun inconclusiveValidationDoesNotQuarantineStoredFacts() = runTest {
         val session = fixture()
         val token = repository.claimEditor(session.id, "owner").value()
         repository.writeSession(session, 0, token).value()
@@ -580,18 +703,24 @@ class RoomGameRepositoryTest {
             )
         for (outcome in outcomes) {
             val unavailable = object : MathematicalValidator by validator {
-                override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> = outcome
+                override suspend fun validatePuzzle(
+                    content: PuzzleContent
+                ): EngineOutcome<Validation> = outcome
             }
 
             val result = RoomReadRepository(database, unavailable).readSession(session.id)
 
-            assertEquals(StorageFailureKind.UNAVAILABLE, (result as StorageOutcome.Failure).error.kind)
+            assertEquals(
+                StorageFailureKind.UNAVAILABLE,
+                (result as StorageOutcome.Failure).error.kind
+            )
             assertEquals(canonical, database.sudokuDao().session(session.id))
             assertEquals(0, repository.countQuarantined().value())
         }
     }
 
-    @Test fun replacementFailureRollsBackEveryCollectionAndEpoch() = runTest {
+    @Test
+    fun replacementFailureRollsBackEveryCollectionAndEpoch() = runTest {
         val session = fixture()
         val token = repository.claimEditor(session.id, "owner").value()
         repository.writeSession(session, 0, token).value()
@@ -608,12 +737,15 @@ class RoomGameRepositoryTest {
         assertEquals(0L, repository.readDatasetEpoch().value())
         assertEquals(
             session.id,
-            requireNotNull(RoomReadRepository(database, validator).readSession(session.id).value()).session.id
+            requireNotNull(
+                RoomReadRepository(database, validator).readSession(session.id).value()
+            ).session.id
         )
         assertEquals(ThemePreference.DARK, repository.readSettings().value().theme)
     }
 
-    @Test fun validatorReturningAfterAnotherRepositoryRestoreCannotRepopulateDataset() = runTest {
+    @Test
+    fun validatorReturningAfterAnotherRepositoryRestoreCannotRepopulateDataset() = runTest {
         val session = fixture()
         val token = repository.claimEditor(session.id, "owner").value()
         val entered = CompletableDeferred<Unit>()
@@ -634,14 +766,180 @@ class RoomGameRepositoryTest {
         release.complete(Unit)
         val outcome = oldWrite.await()
 
-        assertEquals(StorageFailureKind.REVISION_CONFLICT, (outcome as StorageOutcome.Failure).error.kind)
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (outcome as StorageOutcome.Failure).error.kind
+        )
         assertTrue(database.sudokuDao().sessions().isEmpty())
+    }
+
+    @Test
+    fun missingFormalResultProjectionTakesPriorityOverUnfinishedSession() = runTest {
+        val date = "2026-10-16"
+        val id = dev.sudoku.app.model.dailyFormalId(date, Variant.CLASSIC)
+        val session = fixture().copy(
+            id = id,
+            mode = GameMode.DAILY,
+            metadata = SessionMetadata.Daily(challengeDate = date, formalAttempt = true)
+        )
+        val token = repository.claimEditor(id, "owner").value()
+        val completed = session.copy(completion = Completion(session.startedAt, 0))
+        repository.writeSession(completed, 0, token).value()
+        repository.writeSession(session, 1, token).value()
+        database.summaryDao().deleteResult(id)
+        val reads = RoomReadRepository(database, validator)
+
+        val snapshot = reads.readDaily(date).value()
+
+        assertEquals(DailyStatus.PENDING, snapshot.statuses.getValue(Variant.CLASSIC))
+        assertTrue(database.sudokuDao().result(id) != null)
+    }
+
+    @Test
+    fun maintenanceQuarantinesAnEmptyCanonicalIdentityAndCompletesCoverage() = runTest {
+        val entity = SessionEntity(
+            id = "",
+            revision = 1,
+            mode = "FREE",
+            variant = "classic",
+            challengeDate = null,
+            payload = "broken"
+        )
+        database.sudokuDao().putSession(entity)
+        val reads = RoomReadRepository(database, validator)
+
+        reads.backfill().value()
+
+        assertEquals(1, repository.countQuarantined().value())
+        assertTrue(database.sudokuDao().sessions().isEmpty())
+        assertTrue(!reads.readBootstrap().value().home.pending)
+    }
+
+    @Test
+    fun maintenanceRepairsCanonicalIndexFieldsFromAValidatedSession() = runTest {
+        val session = fixture()
+        val token = repository.claimEditor(session.id, "owner").value()
+        repository.writeSession(session, 0, token).value()
+        val original = requireNotNull(database.sudokuDao().session(session.id))
+        database.sudokuDao().putSession(original.copy(mode = "LEARNING", variant = "diagonal"))
+        database.summaryDao().deleteSession(session.id)
+        val reads = RoomReadRepository(database, validator)
+
+        reads.backfill().value()
+
+        assertEquals(original, database.sudokuDao().session(session.id))
+        assertEquals(session.id, reads.readPage().value().items.single().summary?.id)
+        assertTrue(!reads.readBootstrap().value().home.pending)
+    }
+
+    @Test
+    fun staleDetailValidationCannotDeleteAReplacementAtTheSameRevision() = runTest {
+        val session = fixture()
+        val token = repository.claimEditor(session.id, "owner").value()
+        repository.writeSession(session, 0, token).value()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val rejecting = object : MathematicalValidator by validator {
+            override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> {
+                entered.complete(Unit)
+                release.await()
+                return EngineOutcome.Completed(Validation.Invalid(listOf("Rejected old snapshot")))
+            }
+        }
+        val reads = RoomReadRepository(database, rejecting)
+        val reading = async { reads.readSession(session.id) }
+        entered.await()
+        val previous = requireNotNull(database.sudokuDao().session(session.id))
+        val replacement = previous.copy(
+            payload = previous.payload.replace(session.startedAt, "2026-10-17T00:00:00.000Z")
+        )
+        database.sudokuDao().putSession(replacement)
+
+        release.complete(Unit)
+        val outcome = reading.await()
+
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (outcome as StorageOutcome.Failure).error.kind
+        )
+        assertEquals(replacement, database.sudokuDao().session(session.id))
+        assertEquals(0, repository.countQuarantined().value())
+    }
+
+    @Test
+    fun exportExcludesARecordWhosePayloadUsesAnotherIdentity() = runTest {
+        val session = fixture()
+        val token = repository.claimEditor(session.id, "owner").value()
+        repository.writeSession(session, 0, token).value()
+        val original = requireNotNull(database.sudokuDao().session(session.id))
+        database.sudokuDao().putSession(original.copy(id = "foreign-id"))
+
+        val exported = repository.exportBackup(session.startedAt).value()
+
+        assertEquals(listOf(session.id), exported.backup.sessions.map { it.session.id })
+        assertEquals(1, exported.excluded)
+        assertEquals(2, database.sudokuDao().sessions().size)
+    }
+
+    @Test
+    fun maintenanceCaptureRejectsARowFromAnotherDataset() = runTest {
+        val startEpoch = repository.readDatasetEpoch().value()
+        repository.clearAll(startEpoch).value()
+        val entity = SessionEntity(
+            id = "replacement",
+            revision = 1,
+            mode = "FREE",
+            variant = "classic",
+            challengeDate = null,
+            payload = "broken"
+        )
+        database.sudokuDao().putSession(entity)
+        val details = RecordDetails(database, validator)
+
+        val outcome = details.readSession(entity.id, expectedEpoch = startEpoch)
+
+        assertEquals(
+            StorageFailureKind.REVISION_CONFLICT,
+            (outcome as StorageOutcome.Failure).error.kind
+        )
+        assertEquals(entity, database.sudokuDao().session(entity.id))
+        assertEquals(0, repository.countQuarantined().value())
+    }
+
+    @Test
+    fun exhaustedProjectionGenerationRollsBackThePairedWrite() = runTest {
+        val session = fixture()
+        val token = repository.claimEditor(session.id, "owner").value()
+        database.summaryDao().initializeVersion()
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE summary_version SET generation=? WHERE id=1",
+            arrayOf(Long.MAX_VALUE)
+        )
+
+        val outcome = repository.writeSession(session, 0, token)
+
+        assertEquals(
+            StorageFailureKind.WRITE_FAILED,
+            (outcome as StorageOutcome.Failure).error.kind
+        )
+        assertEquals(null, database.sudokuDao().session(session.id))
+        assertEquals(null, database.summaryDao().session(session.id))
+        assertEquals(Long.MAX_VALUE, database.summaryDao().generation())
     }
 
     private fun fixture(): GameSession {
         val solution = List(81) { (it % 9 + it / 9 * 3 + it / 27) % 9 + 1 }
         val puzzle =
-            Puzzle(List(81) { 0 }, solution, PuzzleRules.Classic, Difficulty.EASY, "01".repeat(32), "sudoku-v11")
+            Puzzle(
+                List(81) {
+                    0
+                },
+                solution,
+                PuzzleRules.Classic,
+                Difficulty.EASY,
+                "01".repeat(32),
+                "sudoku-v11"
+            )
         return createSession(puzzle, SessionMetadata.Free, "attempt", "2026-10-16T01:02:03.004Z")
     }
 

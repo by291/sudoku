@@ -11,15 +11,20 @@ class PortableCodecTest {
         override suspend fun validatePuzzle(content: PuzzleContent) =
             EngineOutcome.Completed<Validation>(Validation.Valid)
 
-        override suspend fun validateAssessment(value: PuzzleAssessment?, variant: Variant, difficulty: Difficulty) =
-            EngineOutcome.Completed(value)
+        override suspend fun validateAssessment(
+            value: PuzzleAssessment?,
+            variant: Variant,
+            difficulty: Difficulty
+        ) = EngineOutcome.Completed(value)
     }
 
-    @Test fun `versioned identities validate without rewriting historical saves`() = runTest {
+    @Test
+    fun `versioned identities validate without rewriting historical saves`() = runTest {
         val codec = PortableCodec(validator)
         for (version in listOf("sudoku-v11", "sudoku-v12")) {
             val puzzle = puzzleFixture().copy(seed = "ab".repeat(32), puzzleVersion = version)
-            val session = createSession(puzzle, SessionMetadata.Free, "identity", "2026-10-16T01:02:03.004Z")
+            val session =
+                createSession(puzzle, SessionMetadata.Free, "identity", "2026-10-16T01:02:03.004Z")
 
             assertEquals(puzzle, codec.validateSession(session).puzzle)
             assertFailsWith<InvalidPortableData> {
@@ -27,16 +32,22 @@ class PortableCodecTest {
             }
             assertFailsWith<InvalidPortableData> {
                 codec.validateSession(
-                    session.copy(puzzle = puzzle.copy(puzzleVersion = version.replace("sudoku-", "sudoku-variants-")))
+                    session.copy(
+                        puzzle = puzzle.copy(
+                            puzzleVersion = version.replace("sudoku-", "sudoku-variants-")
+                        )
+                    )
                 )
             }
         }
     }
 
-    @Test fun `portable and local records preserve legacy surrogate code units and millisecond instants`() = runTest {
+    @Test
+    fun `legacy records preserve surrogate code units and millisecond instants`() = runTest {
         val codec = PortableCodec(validator)
         val puzzle = puzzleFixture().copy(seed = "legacy\uD800text", puzzleVersion = "old\uDC00")
-        val session = createSession(puzzle, SessionMetadata.Free, "legacy", "2026-10-16T01:02:03.004Z")
+        val session =
+            createSession(puzzle, SessionMetadata.Free, "legacy", "2026-10-16T01:02:03.004Z")
         val backup = LocalBackup(
             exportedAt = "2026-10-16T01:02:03.000Z",
             sessions = listOf(
@@ -70,9 +81,16 @@ class PortableCodecTest {
         assertTrue(recordText.contains("\"assessment\":null"))
     }
 
-    @Test fun `local records preserve histories above portable transfer limits`() = runTest {
+    @Test
+    fun `local records preserve histories above portable transfer limits`() = runTest {
         val codec = PortableCodec(validator)
-        val initial = createSession(puzzleFixture(), SessionMetadata.Free, "long-game", "2026-10-16T01:02:03.004Z")
+        val initial =
+            createSession(
+                puzzleFixture(),
+                SessionMetadata.Free,
+                "long-game",
+                "2026-10-16T01:02:03.004Z"
+            )
         val empty = BoardLayers(initial.entries, initial.notes)
         val noted = empty.copy(notes = empty.notes.toMutableList().also { it[0] = 1 })
         val history = List(BackupLimits.HISTORY_PER_SESSION + 1) { index ->
@@ -94,9 +112,11 @@ class PortableCodecTest {
         assertFailsWith<InvalidPortableData> { codec.decodeBackup(codec.encodeBackup(backup)) }
     }
 
-    @Test fun `history chains must connect to the current board`() = runTest {
+    @Test
+    fun `history chains must connect to the current board`() = runTest {
         val codec = PortableCodec(validator)
-        val session = createSession(puzzleFixture(), SessionMetadata.Free, "bad", "2026-10-16T01:02:03.004Z")
+        val session =
+            createSession(puzzleFixture(), SessionMetadata.Free, "bad", "2026-10-16T01:02:03.004Z")
         val empty = BoardLayers(session.entries, session.notes)
         val entered = empty.copy(entries = empty.entries.toMutableList().also { it[0] = 1 })
         val disconnected = session.copy(undoStack = listOf(HistoryMove(empty, entered)))
@@ -104,28 +124,43 @@ class PortableCodecTest {
         assertFailsWith<InvalidPortableData> { codec.validateSession(disconnected) }
     }
 
-    @Test fun `typed invalid input is conclusive corruption at the portable boundary`() = runTest {
+    @Test
+    fun `typed invalid input is conclusive corruption at the portable boundary`() = runTest {
         val invalid = object : MathematicalValidator by validator {
             override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> =
                 EngineOutcome.InvalidInput("Invalid region cell")
         }
-        val session = createSession(puzzleFixture(), SessionMetadata.Free, "invalid", "2026-10-16T01:02:03.004Z")
+        val session =
+            createSession(
+                puzzleFixture(),
+                SessionMetadata.Free,
+                "invalid",
+                "2026-10-16T01:02:03.004Z"
+            )
 
         assertFailsWith<InvalidPortableData> { PortableCodec(invalid).validateSession(session) }
     }
 
-    @Test fun `incomplete validator preserves data as unavailable`() = runTest {
+    @Test
+    fun `incomplete validator preserves data as unavailable`() = runTest {
         val incomplete = object : MathematicalValidator by validator {
             override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> =
                 EngineOutcome.Incomplete
         }
         val codec = PortableCodec(incomplete)
-        val session = createSession(puzzleFixture(), SessionMetadata.Free, "retry", "2026-10-16T01:02:03.004Z")
+        val session =
+            createSession(
+                puzzleFixture(),
+                SessionMetadata.Free,
+                "retry",
+                "2026-10-16T01:02:03.004Z"
+            )
 
         assertFailsWith<SnapshotValidationUnavailable> { codec.validateSession(session) }
     }
 
-    @Test fun `optional malformed assessment does not reject a valid game`() = runTest {
+    @Test
+    fun `optional malformed assessment does not reject a valid game`() = runTest {
         val codec = PortableCodec(validator)
         val session = createSession(
             puzzleFixture(),
@@ -155,7 +190,8 @@ class PortableCodecTest {
         assertTrue(decoded.sessions.single().session.assessment is PuzzleAssessment.Unavailable)
     }
 
-    @Test fun `missing portable settings flags are rejected instead of defaulting`() = runTest {
+    @Test
+    fun `missing portable settings flags are rejected instead of defaulting`() = runTest {
         val codec = PortableCodec(validator)
         val text = """
             {
@@ -171,17 +207,27 @@ class PortableCodecTest {
         assertFailsWith<InvalidPortableData> { codec.decodeBackup(text) }
     }
 
-    @Test fun `throwing validator is unavailable rather than corrupt data`() = runTest {
+    @Test
+    fun `throwing validator is unavailable rather than corrupt data`() = runTest {
         val throwing = object : MathematicalValidator by validator {
             override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> =
                 throw IllegalStateException("native unavailable")
         }
-        val session = createSession(puzzleFixture(), SessionMetadata.Free, "retry", "2026-10-16T01:02:03.004Z")
+        val session =
+            createSession(
+                puzzleFixture(),
+                SessionMetadata.Free,
+                "retry",
+                "2026-10-16T01:02:03.004Z"
+            )
 
-        assertFailsWith<SnapshotValidationUnavailable> { PortableCodec(throwing).validateSession(session) }
+        assertFailsWith<SnapshotValidationUnavailable> {
+            PortableCodec(throwing).validateSession(session)
+        }
     }
 
-    @Test fun `codec preserves all nineteen supported rule and difficulty identities`() = runTest {
+    @Test
+    fun `codec preserves all nineteen supported rule and difficulty identities`() = runTest {
         val codec = PortableCodec(validator)
         val rules = listOf(
             PuzzleRules.Classic,
@@ -223,9 +269,21 @@ class PortableCodecTest {
                 val puzzle = puzzleFixture().copy(
                     rules = rule,
                     difficulty = difficulty,
-                    puzzleVersion = if (rule == PuzzleRules.Classic) "sudoku-v11" else "sudoku-variants-v11"
+                    puzzleVersion = if (rule ==
+                        PuzzleRules.Classic
+                    ) {
+                        "sudoku-v11"
+                    } else {
+                        "sudoku-variants-v11"
+                    }
                 )
-                val session = createSession(puzzle, SessionMetadata.Free, "matrix", "2026-10-16T01:02:03.004Z")
+                val session =
+                    createSession(
+                        puzzle,
+                        SessionMetadata.Free,
+                        "matrix",
+                        "2026-10-16T01:02:03.004Z"
+                    )
                 val backup = LocalBackup(
                     exportedAt = "2026-10-16T01:02:03.000Z",
                     sessions = listOf(
@@ -247,7 +305,8 @@ class PortableCodecTest {
         }
     }
 
-    @Test fun `legacy classic records normalize without changing historical identity`() = runTest {
+    @Test
+    fun `legacy classic records normalize without changing historical identity`() = runTest {
         val codec = PortableCodec(validator)
         val session = createSession(
             puzzleFixture().copy(
@@ -285,7 +344,8 @@ class PortableCodecTest {
         assertEquals("old-seed", decoded.session.puzzle.seed)
     }
 
-    @Test fun `validation owns snapshots before suspending native computation`() = runTest {
+    @Test
+    fun `validation owns snapshots before suspending native computation`() = runTest {
         val mutableEntries = MutableList(81) { 0 }
         val mutating = object : MathematicalValidator by validator {
             override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> {

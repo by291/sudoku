@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Reads build-validated bundled content; runtime decoding still rejects malformed asset structure. */
+/** Loads selected bundled lessons and validates their structure before caching. */
 class AssetLearningContentRepository(private val context: Context) : LearningContentRepository {
     private val loading = Mutex()
     private val cached = linkedMapOf<String, LessonCatalogue>()
@@ -22,21 +22,25 @@ class AssetLearningContentRepository(private val context: Context) : LearningCon
                 return@withLock EngineOutcome.Failed("Unknown course identity")
             }
 
+            // Reinsert a hit at the end so eviction removes the least recently used asset.
             cached.remove(id)?.let {
                 cached[id] = it
                 return@withLock EngineOutcome.Completed(it)
             }
+
             try {
                 val catalogue = withContext(Dispatchers.IO) {
                     context.assets.open("lessons/$id.json").bufferedReader(Charsets.UTF_8).use {
                         LessonCatalogue.decodeLesson(it.readText())
                     }
                 }
+
                 require(catalogue.lesson(id) != null) { "Lesson asset identity mismatch" }
                 cached[id] = catalogue
                 while (cached.size > MAX_CACHED_LESSONS) {
                     cached.remove(cached.keys.first())
                 }
+
                 EngineOutcome.Completed(catalogue)
             } catch (error: CancellationException) {
                 throw error

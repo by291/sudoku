@@ -23,7 +23,11 @@ data class GameSummary(
 /** A missing summary means an existing legacy record needs validation, never that it is absent. */
 data class SummaryItem(val id: String, val summary: GameSummary?)
 
-data class HomePresence(val hasSaves: Boolean, val pending: Boolean, val singleSaveId: String? = null)
+data class HomePresence(
+    val hasSaves: Boolean,
+    val pending: Boolean,
+    val singleSaveId: String? = null
+)
 
 data class BootstrapSnapshot(val epoch: Long, val settings: Settings, val home: HomePresence)
 
@@ -31,14 +35,26 @@ data class BootstrapSnapshot(val epoch: Long, val settings: Settings, val home: 
 sealed interface SummaryQuery {
     val variant: Variant?
 
-    data class Saves(override val variant: Variant? = null, val unfinishedOnly: Boolean = false) : SummaryQuery
+    data class Saves(override val variant: Variant? = null, val unfinishedOnly: Boolean = false) :
+        SummaryQuery
 
     data class History(override val variant: Variant? = null) : SummaryQuery
 }
 
-data class SummaryCursor(val epoch: Long, val generation: Long, val query: SummaryQuery, val time: Long, val id: String)
+data class SummaryCursor(
+    val epoch: Long,
+    val generation: Long,
+    val query: SummaryQuery,
+    val time: Long,
+    val id: String
+)
 
-data class SummaryPage(val epoch: Long, val items: List<SummaryItem>, val next: SummaryCursor?, val pending: Boolean)
+data class SummaryPage(
+    val epoch: Long,
+    val items: List<SummaryItem>,
+    val next: SummaryCursor?,
+    val pending: Boolean
+)
 
 data class OverviewSnapshot(val epoch: Long, val summary: RecordSummary, val pending: Boolean)
 
@@ -51,25 +67,35 @@ interface GameReadRepository {
     val bootstrap: StateFlow<BootstrapSnapshot?>
     val changes: Flow<Unit>
 
+    /** Reads initial settings and compact save presence without opening boards. */
     suspend fun readBootstrap(): StorageOutcome<BootstrapSnapshot>
 
+    /** Reads one bounded page and rejects stale or incompatible cursors. */
     suspend fun readPage(
         query: SummaryQuery = SummaryQuery.Saves(),
         cursor: SummaryCursor? = null
     ): StorageOutcome<SummaryPage>
 
+    /** Reads compact statistics with explicit pending coverage. */
     suspend fun readOverview(variant: Variant, today: String): StorageOutcome<OverviewSnapshot>
 
+    /** Reads the status of each formal attempt for the challenge date. */
     suspend fun readDaily(date: String): StorageOutcome<DailySnapshot>
 
+    /** Validates the selected saved session before returning it. */
     suspend fun readSession(id: String): StorageOutcome<SessionRecord?>
 
+    /** Validates the selected immutable completion before returning it. */
     suspend fun readResult(id: String): StorageOutcome<ResultRecord?>
 
+    /** Reads compact facts for an active slot, including pending records. */
     suspend fun readSlotSummary(mode: GameMode, variant: Variant): StorageOutcome<SummaryItem?>
 
+    /** Validates the canonical record currently occupying the requested slot. */
     suspend fun readSlot(mode: GameMode, variant: Variant): StorageOutcome<SessionRecord?>
 
-    /** Validates pending rows one at a time; cancellation and inconclusive failures preserve them. */
+    /**
+     * Validates pending rows one at a time; cancellation and inconclusive failures preserve them.
+     */
     suspend fun backfill(): StorageOutcome<Unit>
 }

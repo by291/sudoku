@@ -7,7 +7,8 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
 class BackupInteroperabilityTest {
-    @Test fun `actual Web export round trips all portable facts through Android codec`() = runTest {
+    @Test
+    fun `actual Web export round trips all portable facts through Android codec`() = runTest {
         // This validates portable facts; actual native mathematical validation is a separate gate.
         val validator = object : MathematicalValidator {
             override suspend fun validatePuzzle(content: PuzzleContent): EngineOutcome<Validation> =
@@ -23,7 +24,13 @@ class BackupInteroperabilityTest {
         val codec = PortableCodec(validator)
 
         val decoded = codec.decodeBackup(source)
-        val exported = codec.encodeBackup(decoded.copy(sessions = decoded.sessions.map { it.copy(revision = 1) }))
+        val exported = codec.encodeBackup(
+            decoded.copy(
+                sessions = decoded.sessions.map {
+                    it.copy(revision = 1)
+                }
+            )
+        )
         val roundTrip = codec.decodeBackup(exported)
 
         assertEquals(19, decoded.sessions.size)
@@ -54,7 +61,14 @@ class BackupInteroperabilityTest {
         )
         assertEquals("2026-10-16T01:02:03.004Z", decoded.lessons.single().completedAt)
         assertEquals(5, decoded.settings.lessonStages?.get("killer-combined"))
-        assertEquals(decoded.copy(sessions = decoded.sessions.map { it.copy(revision = 1) }), roundTrip)
+        assertEquals(
+            decoded.copy(
+                sessions = decoded.sessions.map {
+                    it.copy(revision = 1)
+                }
+            ),
+            roundTrip
+        )
         File("build/interop").mkdirs()
         File("build/interop/android-backup-v1.json").writeText(exported)
     }

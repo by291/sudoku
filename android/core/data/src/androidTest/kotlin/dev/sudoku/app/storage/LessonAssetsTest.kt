@@ -8,7 +8,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class LessonAssetsTest {
-    @Test fun generatedDirectoryMatchesEveryIndependentlyLoadableLesson() = runTest {
+    @Test
+    fun generatedDirectoryMatchesEveryIndependentlyLoadableLesson() = runTest {
         val repository = AssetLearningContentRepository(ApplicationProvider.getApplicationContext())
         assertEquals(32, repository.directory.size)
         assertEquals(32, repository.directory.map { it.id }.toSet().size)

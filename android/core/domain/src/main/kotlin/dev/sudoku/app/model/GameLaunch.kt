@@ -2,7 +2,9 @@ package dev.sudoku.app.model
 
 import kotlinx.serialization.Serializable
 
-/** Navigation describes player intent; persisted puzzles and generated handles never enter a route. */
+/**
+ * Navigation describes player intent; persisted puzzles and generated handles never enter a route.
+ */
 @Serializable
 sealed interface GameLaunch {
     @Serializable
@@ -15,5 +17,6 @@ sealed interface GameLaunch {
     data class Daily(val variant: Variant, val date: String) : GameLaunch
 
     @Serializable
-    data class Practice(val lessonId: String, val variant: Variant, val difficulty: Difficulty) : GameLaunch
+    data class Practice(val lessonId: String, val variant: Variant, val difficulty: Difficulty) :
+        GameLaunch
 }

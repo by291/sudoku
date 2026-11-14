@@ -19,12 +19,19 @@ import org.junit.Rule
 import org.junit.Test
 
 class SummaryMigrationTest {
-    @get:Rule val helper = MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), SudokuDatabase::class.java)
+    @get:Rule val helper =
+        MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            SudokuDatabase::class.java
+        )
 
-    @Test fun completeVersionTwoCoverageBecomesPendingWithoutDecodingCanonicalRows() = runTest {
+    @Test
+    fun completeVersionTwoCoverageBecomesPendingWithoutDecodingCanonicalRows() = runTest {
         val name = "summary-versioned-coverage"
         helper.createDatabase(name, 2).use {
-            it.execSQL("INSERT INTO summary_version(id,generation,sessionsComplete,resultsComplete) VALUES(1,4,1,1)")
+            it.execSQL(
+                "INSERT INTO summary_version(id,generation,sessionsComplete,resultsComplete) VALUES(1,4,1,1)"
+            )
             for (index in 0 until 35) {
                 val id = "legacy-$index"
                 it.execSQL(
@@ -64,14 +71,21 @@ class SummaryMigrationTest {
             assertTrue(bootstrap.home.pending)
             assertEquals(35, (page.items + next.items).map { it.id }.toSet().size)
             assertTrue((page.items + next.items).all { it.summary == null })
-            assertEquals("unread canonical payload", database.sudokuDao().session("legacy-0")?.payload)
-            assertEquals(CURRENT_PROJECTION_VERSION, database.summaryDao().coverage()?.projectionVersion)
+            assertEquals(
+                "unread canonical payload",
+                database.sudokuDao().session("legacy-0")?.payload
+            )
+            assertEquals(
+                CURRENT_PROJECTION_VERSION,
+                database.summaryDao().coverage()?.projectionVersion
+            )
         } finally {
             database.close()
         }
     }
 
-    @Test fun schemaUpgradePreservesPayloadWithoutDecodingItAtStartup() = runTest {
+    @Test
+    fun schemaUpgradePreservesPayloadWithoutDecodingItAtStartup() = runTest {
         val name = "summary-migration"
         helper.createDatabase(name, 1).use {
             it.execSQL(

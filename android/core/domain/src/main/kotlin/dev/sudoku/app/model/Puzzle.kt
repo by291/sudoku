@@ -30,7 +30,13 @@ enum class Variant {
     ARROW;
 
     val wireName: String get() = name.lowercase()
-    val difficulties: List<Difficulty> get() = if (this == CLASSIC) Difficulty.entries else Difficulty.entries.take(3)
+    val difficulties: List<Difficulty> get() = if (this ==
+        CLASSIC
+    ) {
+        Difficulty.entries
+    } else {
+        Difficulty.entries.take(3)
+    }
 }
 
 @Serializable
@@ -75,9 +81,11 @@ sealed interface PuzzleRules {
     data class Arrow(val arrows: List<ArrowClue>) : PuzzleRules
 }
 
-@Serializable data class Cage(val cells: List<Int>, val sum: Int)
+@Serializable
+data class Cage(val cells: List<Int>, val sum: Int)
 
-@Serializable data class ArrowClue(val circle: Int, val shaft: List<Int>)
+@Serializable
+data class ArrowClue(val circle: Int, val shaft: List<Int>)
 
 val PuzzleRules.variant: Variant get() = when (this) {
     PuzzleRules.Classic -> Variant.CLASSIC

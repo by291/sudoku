@@ -35,18 +35,22 @@ val SessionMetadata.mode: GameMode get() = when (this) {
     is SessionMetadata.Daily -> GameMode.DAILY
 }
 
-@Serializable data class BoardLayers(val entries: List<Int>, val notes: List<Int>)
+@Serializable
+data class BoardLayers(val entries: List<Int>, val notes: List<Int>)
 
-@Serializable data class HistoryMove(val before: BoardLayers, val after: BoardLayers)
+@Serializable
+data class HistoryMove(val before: BoardLayers, val after: BoardLayers)
 
-@Serializable data class Assistance(
+@Serializable
+data class Assistance(
     val hintCount: Long = 0,
     val checkCount: Long = 0,
     val candidateCount: Long = 0,
     val assisted: Boolean = false
 )
 
-@Serializable data class Completion(val completedAt: String, val elapsedMs: Long)
+@Serializable
+data class Completion(val completedAt: String, val elapsedMs: Long)
 
 @Serializable
 data class GameSession(
@@ -77,6 +81,11 @@ sealed interface BoardEdit {
 
 enum class SessionFactAction { UNDO, REDO, HINT_SHOWN, CHECK }
 
-data class EditResult(val entries: List<Int>, val notes: List<Int>, val changed: Boolean, val boardComplete: Boolean)
+data class EditResult(
+    val entries: List<Int>,
+    val notes: List<Int>,
+    val changed: Boolean,
+    val boardComplete: Boolean
+)
 
 data class SessionActionResult(val session: GameSession, val changed: Boolean)

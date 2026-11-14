@@ -4,6 +4,7 @@ import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.sudoku.app.model.BOARD_SIZE
 import dev.sudoku.app.model.Completion
 import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.GameMode
@@ -12,6 +13,7 @@ import dev.sudoku.app.model.GameSummary
 import dev.sudoku.app.model.SessionMetadata
 import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.eligibleChallengeDate
+import dev.sudoku.app.model.isChallengeDate
 import dev.sudoku.app.model.variant
 import java.time.Instant
 
@@ -36,8 +38,20 @@ data class SummaryFields(
     tableName = "session_summaries",
     indices = [
         Index(
-            value = ["variant", "startedAt", "id"]
-        ), Index(value = ["startedAt", "id"]), Index(value = ["completedAt", "startedAt", "id"])
+            value = [
+                "variant",
+                "startedAt",
+                "id"
+            ]
+        ),
+        Index(value = ["startedAt", "id"]),
+        Index(
+            value = [
+                "completedAt",
+                "startedAt",
+                "id"
+            ]
+        )
     ]
 )
 data class SessionSummaryEntity(
@@ -50,11 +64,37 @@ data class SessionSummaryEntity(
 @Entity(
     tableName = "result_summaries",
     indices = [
-        Index(value = ["variant", "completedAt", "id"]),
-        Index(value = ["variant", "mode", "challengeDate", "id"]),
+        Index(
+            value = [
+                "variant",
+                "completedAt",
+                "id"
+            ]
+        ),
+        Index(
+            value = [
+                "variant",
+                "mode",
+                "challengeDate",
+                "id"
+            ]
+        ),
         Index(value = ["completedAt", "id"]),
-        Index(value = ["variant", "mode", "difficulty", "assisted"]),
-        Index(value = ["variant", "formalAttempt", "eligibleDate"])
+        Index(
+            value = [
+                "variant",
+                "mode",
+                "difficulty",
+                "assisted"
+            ]
+        ),
+        Index(
+            value = [
+                "variant",
+                "formalAttempt",
+                "eligibleDate"
+            ]
+        )
     ]
 )
 data class ResultSummaryEntity(
@@ -70,37 +110,62 @@ data class FreeBestRow(val difficulty: String, val assisted: Boolean, val best: 
 internal fun GameSession.summaryFields(): SummaryFields {
     val daily = metadata as? SessionMetadata.Daily
     val completed = completion?.completedAt?.let(Instant::parse)
+    val givens = puzzle.givens
+    val filledCells = givens.indices.count { cell -> givens[cell] == 0 && entries[cell] != 0 }
+
     return SummaryFields(
-        mode.name, puzzle.rules.variant.wireName, puzzle.difficulty.name,
-        Instant.parse(startedAt).toEpochMilli(), elapsedMs, completed?.toEpochMilli(), assistance.assisted,
-        daily?.challengeDate, daily?.formalAttempt, (metadata as? SessionMetadata.Learning)?.lessonId,
-        puzzle.givens.indices.count { puzzle.givens[it] == 0 && entries[it] != 0 },
-        puzzle.givens.count { it == 0 },
-        daily?.let { eligibleChallengeDate(it, completed) }
+        mode = mode.name,
+        variant = puzzle.rules.variant.wireName,
+        difficulty = puzzle.difficulty.name,
+        startedAt = Instant.parse(startedAt).toEpochMilli(),
+        elapsedMs = elapsedMs,
+        completedAt = completed?.toEpochMilli(),
+        assisted = assistance.assisted,
+        challengeDate = daily?.challengeDate,
+        formalAttempt = daily?.formalAttempt,
+        lessonId = (metadata as? SessionMetadata.Learning)?.lessonId,
+        filled = filledCells,
+        editable = givens.count { it == 0 },
+        eligibleDate = daily?.let { eligibleChallengeDate(it, completed) }
     )
 }
 
-internal fun SummaryRow.domain(): GameSummary? = facts?.let {
-    require(it.hasValidCalendar()) { "Invalid daily projection eligibility" }
+internal fun SummaryRow.domain(): GameSummary? {
+    val facts = facts ?: return null
+    require(facts.hasValidCalendar()) { "Invalid daily projection eligibility" }
     require(
-        id.isNotBlank() && revision >= 0 && it.elapsedMs >= 0 && it.editable in 0..81 && it.filled in 0..it.editable
+        id.isNotBlank() && revision >= 0 && facts.elapsedMs >= 0 &&
+            facts.editable in 0..BOARD_SIZE && facts.filled in 0..facts.editable
     )
-    val metadata = when (GameMode.valueOf(it.mode)) {
+    val metadata = when (GameMode.valueOf(facts.mode)) {
         GameMode.FREE -> SessionMetadata.Free
         GameMode.DAILY -> {
-            val date = requireNotNull(it.challengeDate)
-            require(dev.sudoku.app.model.isChallengeDate(date))
-            SessionMetadata.Daily(date, requireNotNull(it.formalAttempt))
+            val date = requireNotNull(facts.challengeDate)
+            require(isChallengeDate(date))
+            SessionMetadata.Daily(date, formalAttempt = requireNotNull(facts.formalAttempt))
         }
-        GameMode.LEARNING -> SessionMetadata.Learning(requireNotNull(it.lessonId))
+        GameMode.LEARNING -> SessionMetadata.Learning(requireNotNull(facts.lessonId))
     }
-    val variant = Variant.entries.single { variant -> variant.wireName == it.variant }
-    val difficulty = Difficulty.valueOf(it.difficulty)
+    val variant = Variant.entries.single { candidate -> candidate.wireName == facts.variant }
+    val difficulty = Difficulty.valueOf(facts.difficulty)
     require(difficulty in variant.difficulties)
-    GameSummary(
-        id, revision, variant, difficulty, metadata, Instant.ofEpochMilli(it.startedAt).toString(),
-        it.elapsedMs, it.completedAt?.let { at -> Completion(Instant.ofEpochMilli(at).toString(), it.elapsedMs) },
-        it.assisted, it.filled, it.editable
+
+    val completion = facts.completedAt?.let { instant ->
+        Completion(Instant.ofEpochMilli(instant).toString(), facts.elapsedMs)
+    }
+
+    return GameSummary(
+        id = id,
+        revision = revision,
+        variant = variant,
+        difficulty = difficulty,
+        metadata = metadata,
+        startedAt = Instant.ofEpochMilli(facts.startedAt).toString(),
+        elapsedMs = facts.elapsedMs,
+        completion = completion,
+        assisted = facts.assisted,
+        filled = facts.filled,
+        editable = facts.editable
     )
 }
 
@@ -111,7 +176,11 @@ internal fun SummaryFields.hasValidCalendar(): Boolean {
     }
 
     // Lightweight SQL selection has already checked daily field presence and calendar-date shape.
-    val metadata = SessionMetadata.Daily(requireNotNull(challengeDate), requireNotNull(formalAttempt))
-    val expectedEligibleDate = eligibleChallengeDate(metadata, completedAt?.let(Instant::ofEpochMilli))
+    val metadata = SessionMetadata.Daily(
+        requireNotNull(challengeDate),
+        requireNotNull(formalAttempt)
+    )
+    val expectedEligibleDate =
+        eligibleChallengeDate(metadata, completedAt?.let(Instant::ofEpochMilli))
     return eligibleDate == expectedEligibleDate
 }

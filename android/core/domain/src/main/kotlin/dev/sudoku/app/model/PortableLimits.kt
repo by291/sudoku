@@ -17,45 +17,46 @@ internal fun checkResources(value: JsonElement) {
     var nodes = 0
 
     fun visit(item: JsonElement, depth: Int) {
+        nodes++
         requireData(
-            ++nodes <= BackupLimits.NODES && depth <= BackupLimits.DEPTH,
+            nodes <= BackupLimits.NODES && depth <= BackupLimits.DEPTH,
             "Backup exceeds traversal limits"
         )
+
         when (item) {
             is JsonArray -> item.forEach { visit(it, depth + 1) }
             is JsonObject -> item.values.forEach { visit(it, depth + 1) }
             else -> Unit
         }
     }
+
     visit(value, 0)
 }
 
+/** Protects the recursive JSON decoder before constructing a tree. */
 internal fun preflightDepth(text: String) {
-    var inString = false
-    var escaped = false
+    var isInString = false
+    var isEscaped = false
     var depth = 0
-    text.forEach { character ->
-        if (inString) {
-            if (escaped) {
-                escaped = false
-            } else if (character == '\\') {
-                escaped = true
-            } else if (character == '"') {
-                inString = false
+
+    for (character in text) {
+        if (isInString) {
+            when {
+                isEscaped -> isEscaped = false
+                character == '\\' -> isEscaped = true
+                character == '"' -> isInString = false
             }
-        } else {
-            when (character) {
-                '"' -> inString = true
-                '{',
-                '[' -> {
-                    depth++
-                    requireData(
-                        depth <= BackupLimits.DEPTH + 1,
-                        "Backup exceeds nesting limit"
-                    )
-                }
-                '}', ']' -> depth--
+            continue
+        }
+
+        when (character) {
+            '"' -> isInString = true
+            '{', '[' -> {
+                depth++
+                // The parser tree counts the root at depth zero.
+                requireData(depth <= BackupLimits.DEPTH + 1, "Backup exceeds nesting limit")
             }
+            '}', ']' -> depth--
         }
     }
 }

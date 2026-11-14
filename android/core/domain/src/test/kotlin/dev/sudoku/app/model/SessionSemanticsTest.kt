@@ -7,8 +7,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SessionSemanticsTest {
-    @Test fun `undo restores layers but never reverses assistance`() {
-        val session = createSession(puzzleFixture(), SessionMetadata.Free, "attempt", "2026-10-16T01:02:03.004Z")
+    @Test
+    fun `undo restores layers but never reverses assistance`() {
+        val session =
+            createSession(
+                puzzleFixture(),
+                SessionMetadata.Free,
+                "attempt",
+                "2026-10-16T01:02:03.004Z"
+            )
         val entries = session.entries.toMutableList().also { it[0] = 5 }
         val edited = commitBoardEdit(
             session,
@@ -25,7 +32,37 @@ class SessionSemanticsTest {
         assertEquals(5, applySessionAction(undone, SessionFactAction.REDO).session.entries[0])
     }
 
-    @Test fun `daily identity uses Beijing date and classic historical spelling`() {
+    @Test
+    fun `assistance actions retain portable counters at their upper bound`() {
+        val session = createSession(
+            puzzle = puzzleFixture(),
+            metadata = SessionMetadata.Free,
+            id = "attempt",
+            startedAt = "2026-10-16T01:02:03.004Z"
+        ).copy(
+            assistance = Assistance(
+                hintCount = MAX_SAFE_INTEGER,
+                checkCount = MAX_SAFE_INTEGER,
+                candidateCount = MAX_SAFE_INTEGER,
+                assisted = true
+            )
+        )
+        val edit = EditResult(
+            entries = session.entries,
+            notes = session.notes,
+            changed = false,
+            boardComplete = false
+        )
+
+        val hint = applySessionAction(session, SessionFactAction.HINT_SHOWN).session
+        val checked = applySessionAction(hint, SessionFactAction.CHECK).session
+        val generated = commitBoardEdit(checked, edit, BoardEdit.GenerateNotes).session
+
+        assertEquals(session.assistance, generated.assistance)
+    }
+
+    @Test
+    fun `daily identity uses Beijing date and classic historical spelling`() {
         assertEquals("2026-10-17", challengeDate(Instant.parse("2026-10-16T16:00:00Z")))
         assertEquals("daily:2026-10-16:formal", dailyFormalId("2026-10-16", Variant.CLASSIC))
         assertEquals("daily:killer:2026-10-16:formal", dailyFormalId("2026-10-16", Variant.KILLER))
@@ -33,7 +70,8 @@ class SessionSemanticsTest {
         assertFalse(Difficulty.EXPERT in Variant.ARROW.difficulties)
     }
 
-    @Test fun `monotonic running intervals settle once and restoration remains paused`() {
+    @Test
+    fun `monotonic running intervals settle once and restoration remains paused`() {
         val clock = SessionClock(400)
         clock.resume(1000)
         assertEquals(650, clock.elapsedAt(1250))

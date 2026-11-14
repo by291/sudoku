@@ -16,34 +16,43 @@ internal const val CURRENT_PROJECTION_VERSION = 3
 private const val VALID_SHARED_FACTS =
     "length(trim(p.id)) BETWEEN 1 AND 200 AND p.elapsedMs BETWEEN 0 AND 9007199254740991 " +
         "AND p.startedAt BETWEEN -8640000000000000 AND 8640000000000000 " +
-        "AND (p.completedAt IS NULL OR p.completedAt BETWEEN -8640000000000000 AND 8640000000000000) " +
-        "AND p.assisted IN (0,1) AND p.editable BETWEEN 0 AND 81 AND p.filled BETWEEN 0 AND p.editable " +
+        "AND (p.completedAt IS NULL OR p.completedAt BETWEEN -8640000000000000 AND " +
+        "8640000000000000) " +
+        "AND p.assisted IN (0,1) AND p.editable BETWEEN 0 AND 81 AND p.filled BETWEEN " +
+        "0 AND p.editable " +
         "AND p.variant IN ('classic','diagonal','jigsaw','killer','thermo','arrow') " +
-        "AND p.difficulty IN ('EASY','MEDIUM','HARD','EXPERT') AND (p.variant='classic' OR p.difficulty!='EXPERT')"
+        "AND p.difficulty IN ('EASY','MEDIUM','HARD','EXPERT') AND " +
+        "(p.variant='classic' OR p.difficulty!='EXPERT')"
 
 private const val VALID_MODE_FACTS =
     "((p.mode='FREE' AND p.challengeDate IS NULL AND p.formalAttempt IS NULL " +
         "AND p.lessonId IS NULL AND p.eligibleDate IS NULL) " +
         "OR (p.mode='LEARNING' AND p.challengeDate IS NULL AND p.formalAttempt IS NULL " +
         "AND length(trim(p.lessonId)) BETWEEN 1 AND 200 AND p.eligibleDate IS NULL) " +
-        "OR (p.mode='DAILY' AND length(p.challengeDate)=10 AND date(p.challengeDate,'+0 days')=p.challengeDate " +
+        "OR (p.mode='DAILY' AND length(p.challengeDate)=10 AND " +
+        "date(p.challengeDate,'+0 days')=p.challengeDate " +
         "AND p.formalAttempt IN (0,1) AND p.lessonId IS NULL " +
-        "AND p.formalAttempt=(p.id=CASE WHEN p.variant='classic' THEN 'daily:' || p.challengeDate || ':formal' " +
+        "AND p.formalAttempt=(p.id=CASE WHEN p.variant='classic' THEN 'daily:' || " +
+        "p.challengeDate || ':formal' " +
         "ELSE 'daily:' || p.variant || ':' || p.challengeDate || ':formal' END) " +
         "AND (p.eligibleDate IS NULL OR (p.formalAttempt=1 AND p.completedAt IS NOT NULL " +
         "AND p.eligibleDate=p.challengeDate))))"
 
 internal const val CURRENT_SESSION =
-    "p.version=" + CURRENT_PROJECTION_VERSION + " AND p.revision BETWEEN 0 AND 9007199254740991 AND " +
+    "p.version=" + CURRENT_PROJECTION_VERSION + " AND p.revision BETWEEN 0 AND " +
+        "9007199254740991 AND " +
         VALID_SHARED_FACTS + " AND " + VALID_MODE_FACTS +
-        " AND EXISTS(SELECT 1 FROM sessions source WHERE source.id=p.id AND source.revision=p.revision " +
-        "AND source.mode=p.mode AND source.variant=p.variant AND source.challengeDate IS p.challengeDate)"
+        " AND EXISTS(SELECT 1 FROM sessions source WHERE source.id=p.id AND " +
+        "source.revision=p.revision " +
+        "AND source.mode=p.mode AND source.variant=p.variant AND source.challengeDate " +
+        "IS p.challengeDate)"
 
 internal const val CURRENT_RESULT =
     "p.version=" + CURRENT_PROJECTION_VERSION + " AND p.completedAt IS NOT NULL AND " +
         VALID_SHARED_FACTS + " AND " + VALID_MODE_FACTS +
         " AND EXISTS(SELECT 1 FROM results source WHERE source.id=p.id " +
-        "AND source.mode=p.mode AND source.variant=p.variant AND source.challengeDate IS p.challengeDate)"
+        "AND source.mode=p.mode AND source.variant=p.variant AND source.challengeDate " +
+        "IS p.challengeDate)"
 
 @Entity(tableName = "summary_version")
 data class SummaryVersionEntity(
@@ -56,45 +65,51 @@ data class SummaryVersionEntity(
 
 @Dao
 interface SummaryDao : SummaryCoverageDao {
-    @Transaction suspend fun putSession(row: SessionSummaryEntity) {
+    @Transaction
+    suspend fun putSession(row: SessionSummaryEntity) {
         insertSession(row)
         changed()
         if (session(row.id) == null) {
-            sessionCoverage(false)
+            sessionCoverage(complete = false)
         }
     }
 
-    @Transaction suspend fun putResult(row: ResultSummaryEntity) {
+    @Transaction
+    suspend fun putResult(row: ResultSummaryEntity) {
         if (insertResult(row) != -1L) {
             changed()
             if (result(row.id) == null) {
-                resultCoverage(false)
+                resultCoverage(complete = false)
             }
         }
     }
 
-    @Transaction suspend fun deleteSession(id: String) {
+    @Transaction
+    suspend fun deleteSession(id: String) {
         removeSession(id)
         changed()
-        sessionCoverage(false)
+        sessionCoverage(complete = false)
     }
 
-    @Transaction suspend fun deleteResult(id: String) {
+    @Transaction
+    suspend fun deleteResult(id: String) {
         removeResult(id)
         changed()
-        resultCoverage(false)
+        resultCoverage(complete = false)
     }
 
-    @Transaction suspend fun clearSessions() {
+    @Transaction
+    suspend fun clearSessions() {
         removeSessions()
         changed()
-        sessionCoverage(false)
+        sessionCoverage(complete = false)
     }
 
-    @Transaction suspend fun clearResults() {
+    @Transaction
+    suspend fun clearResults() {
         removeResults()
         changed()
-        resultCoverage(false)
+        resultCoverage(complete = false)
     }
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -115,10 +130,16 @@ interface SummaryDao : SummaryCoverageDao {
     @Query("DELETE FROM result_summaries")
     suspend fun removeResults()
 
-    @Query("SELECT EXISTS(SELECT 1 FROM session_summaries p WHERE " + CURRENT_SESSION + " AND p.completedAt IS NULL)")
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM session_summaries p WHERE " + CURRENT_SESSION +
+            " AND p.completedAt IS NULL)"
+    )
     suspend fun hasUnfinished(): Boolean
 
-    @Query("SELECT p.id FROM session_summaries p WHERE " + CURRENT_SESSION + " AND p.completedAt IS NULL LIMIT 2")
+    @Query(
+        "SELECT p.id FROM session_summaries p WHERE " + CURRENT_SESSION +
+            " AND p.completedAt IS NULL LIMIT 2"
+    )
     suspend fun unfinishedIds(): List<String>
 
     @Query(
@@ -136,7 +157,8 @@ interface SummaryDao : SummaryCoverageDao {
             "p.completedAt, p.assisted, p.challengeDate, p.formalAttempt, p.lessonId, p.filled, " +
             "p.editable, p.eligibleDate FROM session_summaries p WHERE " + CURRENT_SESSION +
             " AND (p.startedAt,p.id)<(:afterTime,:afterId) AND EXISTS(SELECT 1 FROM sessions s " +
-            "WHERE s.id=p.id AND s.revision=p.revision) ORDER BY p.startedAt DESC,p.id DESC LIMIT " +
+            "WHERE s.id=p.id AND s.revision=p.revision) ORDER BY p.startedAt " +
+            "DESC,p.id DESC LIMIT " +
             ":limit"
     )
     suspend fun sessions(afterTime: Long, afterId: String, limit: Int): List<SummaryRow>
@@ -159,7 +181,12 @@ interface SummaryDao : SummaryCoverageDao {
             "EXISTS(SELECT 1 FROM sessions s WHERE s.id=p.id AND s.revision=p.revision) ORDER BY " +
             "p.startedAt DESC,p.id DESC LIMIT :limit"
     )
-    suspend fun sessionsByVariant(variant: String, afterTime: Long, afterId: String, limit: Int): List<SummaryRow>
+    suspend fun sessionsByVariant(
+        variant: String,
+        afterTime: Long,
+        afterId: String,
+        limit: Int
+    ): List<SummaryRow>
 
     @Query(
         "SELECT p.id, p.revision, p.mode, p.variant, p.difficulty, p.startedAt, p.elapsedMs, " +
@@ -189,7 +216,8 @@ interface SummaryDao : SummaryCoverageDao {
     @Query(
         "SELECT p.id, 0 AS revision, p.mode, p.variant, p.difficulty, p.startedAt, " +
             "p.elapsedMs, p.completedAt, p.assisted, p.challengeDate, p.formalAttempt, " +
-            "p.lessonId, p.filled, p.editable, p.eligibleDate FROM result_summaries p WHERE " + CURRENT_RESULT +
+            "p.lessonId, p.filled, p.editable, p.eligibleDate FROM result_summaries p WHERE " +
+            CURRENT_RESULT +
             " AND (p.completedAt,p.id)<(:afterTime,:afterId) ORDER BY p.completedAt DESC,p.id " +
             "DESC LIMIT :limit"
     )
@@ -198,11 +226,17 @@ interface SummaryDao : SummaryCoverageDao {
     @Query(
         "SELECT p.id, 0 AS revision, p.mode, p.variant, p.difficulty, p.startedAt, " +
             "p.elapsedMs, p.completedAt, p.assisted, p.challengeDate, p.formalAttempt, " +
-            "p.lessonId, p.filled, p.editable, p.eligibleDate FROM result_summaries p WHERE " + CURRENT_RESULT +
+            "p.lessonId, p.filled, p.editable, p.eligibleDate FROM result_summaries p WHERE " +
+            CURRENT_RESULT +
             " AND p.variant=:variant AND (p.completedAt,p.id)<(:afterTime,:afterId) ORDER BY " +
             "p.completedAt DESC,p.id DESC LIMIT :limit"
     )
-    suspend fun resultsByVariant(variant: String, afterTime: Long, afterId: String, limit: Int): List<SummaryRow>
+    suspend fun resultsByVariant(
+        variant: String,
+        afterTime: Long,
+        afterId: String,
+        limit: Int
+    ): List<SummaryRow>
 
     @Query("SELECT p.* FROM session_summaries p WHERE p.id=:id AND " + CURRENT_SESSION)
     suspend fun selectSession(id: String): SessionSummaryEntity?
@@ -210,21 +244,25 @@ interface SummaryDao : SummaryCoverageDao {
     @Query("SELECT p.* FROM result_summaries p WHERE p.id=:id AND " + CURRENT_RESULT)
     suspend fun selectResult(id: String): ResultSummaryEntity?
 
-    @Transaction suspend fun session(id: String): SessionSummaryEntity? {
+    @Transaction
+    suspend fun session(id: String): SessionSummaryEntity? {
         val row = selectSession(id) ?: return null
         if (!row.facts.hasValidCalendar()) {
             deleteSession(id)
             return null
         }
+
         return row
     }
 
-    @Transaction suspend fun result(id: String): ResultSummaryEntity? {
+    @Transaction
+    suspend fun result(id: String): ResultSummaryEntity? {
         val row = selectResult(id) ?: return null
         if (!row.facts.hasValidCalendar()) {
             deleteResult(id)
             return null
         }
+
         return row
     }
 
@@ -246,23 +284,34 @@ interface SummaryDao : SummaryCoverageDao {
         "SELECT p.id, 0 AS revision, p.mode, p.variant, p.difficulty, p.startedAt, p.elapsedMs, " +
             "p.completedAt, p.assisted, p.challengeDate, p.formalAttempt, p.lessonId, p.filled, " +
             "p.editable, p.eligibleDate FROM result_summaries p WHERE " + CURRENT_RESULT +
-            " AND p.variant=:variant AND p.mode='DAILY' AND (p.challengeDate,p.id)<(:afterDate,:afterId) " +
+            " AND p.variant=:variant AND p.mode='DAILY' AND " +
+            "(p.challengeDate,p.id)<(:afterDate,:afterId) " +
             "ORDER BY p.challengeDate DESC,p.id DESC LIMIT :limit"
     )
-    suspend fun dailyResults(variant: String, afterDate: String, afterId: String, limit: Int): List<SummaryRow>
+    suspend fun dailyResults(
+        variant: String,
+        afterDate: String,
+        afterId: String,
+        limit: Int
+    ): List<SummaryRow>
 
     @Query(
-        "SELECT s.id FROM sessions s LEFT JOIN session_summaries p ON p.id=s.id AND " + CURRENT_SESSION +
-            " WHERE p.id IS NULL AND s.id>:after ORDER BY s.id LIMIT 1"
+        "SELECT s.id FROM sessions s LEFT JOIN session_summaries p ON p.id=s.id AND " +
+            CURRENT_SESSION +
+            " WHERE p.id IS NULL AND (:after IS NULL OR s.id>:after) ORDER BY s.id LIMIT 1"
     )
-    suspend fun nextSession(after: String): String?
+    suspend fun nextSession(after: String?): String?
 
     @Query(
-        "SELECT s.id FROM results s LEFT JOIN result_summaries p ON p.id=s.id AND " + CURRENT_RESULT +
-            " WHERE p.id IS NULL AND s.id>:after ORDER BY s.id LIMIT 1"
+        "SELECT s.id FROM results s " +
+            "LEFT JOIN result_summaries p ON p.id=s.id AND " + CURRENT_RESULT +
+            " WHERE p.id IS NULL AND (:after IS NULL OR s.id>:after) ORDER BY s.id LIMIT 1"
     )
-    suspend fun nextResult(after: String): String?
+    suspend fun nextResult(after: String?): String?
 
-    @Query("SELECT id FROM sessions WHERE mode=:mode AND (:mode!='FREE' OR variant=:variant) LIMIT 2")
+    @Query(
+        "SELECT id FROM sessions " +
+            "WHERE mode=:mode AND (:mode!='FREE' OR variant=:variant) LIMIT 2"
+    )
     suspend fun slotIds(mode: String, variant: String): List<String>
 }
