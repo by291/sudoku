@@ -9,17 +9,19 @@ const localTools = resolve(root, '.tools/wasm-bindgen')
 const executable = process.platform === 'win32' ? 'wasm-bindgen.exe' : 'wasm-bindgen'
 const bindgen = process.env.WASM_BINDGEN ?? resolve(localTools, 'bin', executable)
 
-function run(command, args, capture = false) {
+function run(command, args, { captureOutput = false } = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
     encoding: 'utf8',
-    stdio: capture ? 'pipe' : 'inherit',
+    stdio: captureOutput ? 'pipe' : 'inherit',
   })
+
   if (result.error || result.status !== 0) {
     throw new Error(
       result.error?.message ?? `${command} failed (${result.status}): ${result.stderr ?? ''}`,
     )
   }
+
   return result.stdout?.trim()
 }
 
@@ -35,16 +37,19 @@ const metadata = JSON.parse(
       '--filter-platform',
       'wasm32-unknown-unknown',
     ],
-    true,
+    { captureOutput: true },
   ),
 )
 const bindingPackages = metadata.packages.filter((entry) => entry.name === 'wasm-bindgen')
 if (bindingPackages.length !== 1) {
   throw new Error('Expected exactly one resolved wasm-bindgen version')
 }
+
 const version = bindingPackages[0].version
 const expectedVersion = `wasm-bindgen ${version}`
-const installedVersion = existsSync(bindgen) ? run(bindgen, ['--version'], true) : undefined
+const installedVersion = existsSync(bindgen)
+  ? run(bindgen, ['--version'], { captureOutput: true })
+  : undefined
 
 if (installedVersion !== expectedVersion) {
   if (process.env.WASM_BINDGEN) {
@@ -62,7 +67,8 @@ if (installedVersion !== expectedVersion) {
     localTools,
   ])
 }
-if (run(bindgen, ['--version'], true) !== expectedVersion) {
+
+if (run(bindgen, ['--version'], { captureOutput: true }) !== expectedVersion) {
   throw new Error(`The binding crate and wasm-bindgen CLI must both be ${version}`)
 }
 
@@ -75,6 +81,7 @@ run('cargo', [
   '--release',
   '--locked',
 ])
+
 const output = resolve(root, 'sudoku/wasm/pkg')
 mkdirSync(output, { recursive: true })
 run(bindgen, [
@@ -101,6 +108,7 @@ if (
 ) {
   throw new Error('The generated binding factory requires self-contained wasm-bindgen web glue')
 }
+
 const transformed = ts.transpileModule(glue, {
   fileName: 'sudoku_wasm.js',
   compilerOptions: {
@@ -121,6 +129,7 @@ if (
     }),
   )
 }
+
 writeFileSync(
   resolve(output, 'factory.js'),
   `// Generated from pinned wasm-bindgen glue by TypeScript. Do not edit.\nexport function createBindings() {\nconst exports = {};\n${transformed.outputText}\nreturn exports;\n}\n`,
