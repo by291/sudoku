@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::rules::types::PreparedRules;
-use crate::types::{BOARD_SIZE, Bounded, CandidateMask, CoreResult, EngineError};
+use crate::types::{BOARD_SIZE, Bounded, CandidateMask, CoreResult, EngineError, UNIT_SIZE};
 
 pub const MAX_CATALOGUE_CELLS: usize = 4;
 pub const MAX_TUPLES_PER_CONSTRAINT: usize = 512;
@@ -43,7 +43,7 @@ pub struct SupportSnapshot {
 }
 
 // Arrow permits a circle plus nine shaft cells; other local constraints use at most nine cells.
-pub(crate) const MAX_CONSTRAINT_CELLS: usize = 10;
+pub(crate) const MAX_CONSTRAINT_CELLS: usize = UNIT_SIZE + 1;
 
 /// Query-local masks borrow their geometry from the immutable constraint owner.
 #[derive(Clone, Copy)]
@@ -53,20 +53,23 @@ pub(crate) struct SupportMasks {
 }
 
 impl SupportMasks {
+    /// Borrow only the masks belonging to positions in this constraint.
     pub fn as_slice(&self) -> &[u16] {
         &self.bits[..self.len]
     }
 
+    /// Pair the masks with the cells of the same constraint in an owned snapshot.
     pub fn into_snapshot(self, cells: &[usize]) -> SupportSnapshot {
         debug_assert_eq!(cells.len(), self.len);
+        let masks = self.as_slice();
+        let supports = masks
+            .iter()
+            .map(|&bits| CandidateMask::from_computed_bits(bits))
+            .collect();
+
         SupportSnapshot {
             cells: cells.to_vec(),
-            supports: self
-                .as_slice()
-                .iter()
-                .copied()
-                .map(CandidateMask::from_computed_bits)
-                .collect(),
+            supports,
         }
     }
 }
@@ -77,7 +80,7 @@ pub type SupportResult = Bounded<SupportSnapshot>;
 pub type CandidateResult = Bounded<[CandidateMask; BOARD_SIZE]>;
 
 // Each block indexes up to 64 complete tuples by position and digit.
-pub(crate) type CageTupleBlock = [[u64; 9]; MAX_CATALOGUE_CELLS];
+pub(crate) type CageTupleBlock = [[u64; UNIT_SIZE]; MAX_CATALOGUE_CELLS];
 
 pub(crate) struct CageCatalogue {
     pub arity: usize,
@@ -111,31 +114,34 @@ pub enum LiveComputationCost {
 }
 
 impl PreparedComputation {
+    /// Classify the layout for the host's live-computation dispatch policy.
     pub fn live_computation_cost(&self) -> LiveComputationCost {
         use crate::rules::types::RuleConstraint;
         const MAX_IMMEDIATE_CAGE_CELLS: usize = 4;
 
         // Exhaustive dispatch makes a new primitive choose its live-computation policy.
-        let heavy = self
-            .rules
-            .context()
+        let context = self.rules.context();
+        let is_heavy = context
             .constraints
             .iter()
             .any(|constraint| match constraint {
                 RuleConstraint::Cage { cells, .. } => cells.len() > MAX_IMMEDIATE_CAGE_CELLS,
                 RuleConstraint::Thermo { .. } | RuleConstraint::Arrow { .. } => false,
             });
-        if heavy {
+
+        if is_heavy {
             LiveComputationCost::HeavyEnumeration
         } else {
             LiveComputationCost::Small
         }
     }
 
+    /// Borrow the prepared rules that own the support catalogue's geometry.
     pub fn rules(&self) -> &PreparedRules {
         &self.rules
     }
 
+    /// Borrow the immutable support catalogue for this prepared layout.
     pub fn support(&self) -> &PreparedConstraintSupport {
         &self.support
     }

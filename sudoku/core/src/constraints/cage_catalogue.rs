@@ -5,6 +5,8 @@ use super::types::{
 use crate::control::ExecutionControl;
 use crate::types::{Bounded, UNIT_SIZE};
 
+const TUPLES_PER_INDEX_BLOCK: usize = u64::BITS as usize;
+
 pub(super) enum CatalogueResult {
     Complete(CageCatalogue),
     Fallback,
@@ -99,12 +101,35 @@ impl CatalogueBuilder<'_> {
     }
 }
 
+pub(super) struct CatalogueRequest {
+    pub arity: usize,
+    pub target: u16,
+    pub capacity: usize,
+}
+
+fn index_block(tuples: &[[u16; MAX_CATALOGUE_CELLS]], arity: usize) -> CageTupleBlock {
+    let mut block = [[0; UNIT_SIZE]; MAX_CATALOGUE_CELLS];
+    for (tuple_index, tuple) in tuples.iter().enumerate() {
+        for position in 0..arity {
+            let digit_index = tuple[position].trailing_zeros() as usize;
+            block[position][digit_index] |= 1_u64 << tuple_index;
+        }
+    }
+
+    block
+}
+
+/// Enumerate complete cage tuples and index them when the catalogue is large enough.
 pub(super) fn compile(
-    arity: usize,
-    target: u16,
-    capacity: usize,
+    request: CatalogueRequest,
     control: &mut ExecutionControl,
 ) -> CatalogueResult {
+    let CatalogueRequest {
+        arity,
+        target,
+        capacity,
+    } = request;
+
     let mut builder = CatalogueBuilder {
         arity,
         target: i32::from(target),
@@ -126,23 +151,19 @@ pub(super) fn compile(
     if builder.overflow {
         return CatalogueResult::Fallback;
     }
-    let mut index: Vec<CageTupleBlock> = vec![];
+    let mut index = Vec::new();
+
     // Tiny catalogues retain the direct scan; indexing them costs more than filtering them.
-    if builder.tuples.len() >= 64 {
-        for tuples in builder.tuples.chunks(64) {
+    if builder.tuples.len() >= TUPLES_PER_INDEX_BLOCK {
+        for tuples in builder.tuples.chunks(TUPLES_PER_INDEX_BLOCK) {
             if !builder.control.check() {
                 return CatalogueResult::Incomplete;
             }
-            let mut block = [[0; UNIT_SIZE]; MAX_CATALOGUE_CELLS];
-            for (tuple_index, tuple) in tuples.iter().enumerate() {
-                for position in 0..arity {
-                    block[position][tuple[position].trailing_zeros() as usize] |=
-                        1_u64 << tuple_index;
-                }
-            }
-            index.push(block);
+
+            index.push(index_block(tuples, arity));
         }
     }
+
     CatalogueResult::Complete(CageCatalogue {
         arity,
         tuples: builder.tuples,
@@ -150,31 +171,35 @@ pub(super) fn compile(
     })
 }
 
+/// Collect supported digits from the complete tuples compatible with the supplied domains.
 pub(super) fn filter(
-    arity: usize,
     domains: &[u16],
     catalogue: &CageCatalogue,
     control: &mut ExecutionControl,
 ) -> SupportMasksResult {
     let mut supports = SupportMasks {
         bits: [0; MAX_CONSTRAINT_CELLS],
-        len: arity,
+        len: catalogue.arity,
     };
+
     if !catalogue.index.is_empty() {
         return filter_index(domains, catalogue, control);
     }
+
     for tuple in &catalogue.tuples {
         if !control.check() {
             return Bounded::Cancelled;
         }
-        let mut compatible = true;
+
+        let mut is_compatible = true;
         for index in 0..catalogue.arity {
             if tuple[index] & domains[index] == 0 {
-                compatible = false;
+                is_compatible = false;
                 break;
             }
         }
-        if compatible {
+
+        if is_compatible {
             for (support, &bits) in supports.bits.iter_mut().zip(&tuple[..catalogue.arity]) {
                 *support |= bits;
             }
@@ -182,6 +207,49 @@ pub(super) fn filter(
     }
 
     Bounded::Complete(supports)
+}
+
+fn compatible_tuples(block: &CageTupleBlock, domains: &[u16]) -> u64 {
+    let mut compatible = u64::MAX;
+
+    // Union the tuples allowed at each position, then intersect across all positions.
+    for (position, &domain) in domains.iter().enumerate() {
+        let mut permitted = 0;
+        let mut remaining = domain;
+        while remaining != 0 {
+            let digit = remaining.trailing_zeros() as usize;
+            remaining &= remaining - 1;
+            permitted |= block[position][digit];
+        }
+
+        compatible &= permitted;
+        if compatible == 0 {
+            break;
+        }
+    }
+
+    compatible
+}
+
+fn collect_indexed_support(
+    supports: &mut SupportMasks,
+    domains: &[u16],
+    witness: (&CageTupleBlock, u64),
+) {
+    let (block, compatible) = witness;
+
+    // Each surviving bit witnesses one complete assignment across every position.
+    for (position, &domain) in domains.iter().enumerate() {
+        let mut remaining = domain & !supports.bits[position];
+        while remaining != 0 {
+            let digit = remaining.trailing_zeros() as usize;
+            let bit = 1 << digit;
+            remaining &= remaining - 1;
+            if block[position][digit] & compatible != 0 {
+                supports.bits[position] |= bit;
+            }
+        }
+    }
 }
 
 fn filter_index(
@@ -193,38 +261,17 @@ fn filter_index(
         bits: [0; MAX_CONSTRAINT_CELLS],
         len: catalogue.arity,
     };
+
     for block in &catalogue.index {
         if !control.check() {
             return Bounded::Cancelled;
         }
-        let mut compatible = u64::MAX;
-        for (position, &domain) in domains.iter().enumerate() {
-            let mut permitted = 0;
-            let mut remaining = domain;
-            while remaining != 0 {
-                let digit = remaining.trailing_zeros() as usize;
-                remaining &= remaining - 1;
-                permitted |= block[position][digit];
-            }
-            compatible &= permitted;
-            if compatible == 0 {
-                break;
-            }
-        }
-        if compatible == 0 {
-            continue;
-        }
-        for (position, &domain) in domains.iter().enumerate() {
-            let mut remaining = domain & !supports.bits[position];
-            while remaining != 0 {
-                let digit = remaining.trailing_zeros() as usize;
-                let bit = 1 << digit;
-                remaining &= remaining - 1;
-                if block[position][digit] & compatible != 0 {
-                    supports.bits[position] |= bit;
-                }
-            }
+
+        let compatible = compatible_tuples(block, domains);
+        if compatible != 0 {
+            collect_indexed_support(&mut supports, domains, (block, compatible));
         }
     }
+
     Bounded::Complete(supports)
 }

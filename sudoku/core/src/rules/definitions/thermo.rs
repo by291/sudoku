@@ -4,6 +4,7 @@ use super::super::{
 };
 use crate::types::{CoreResult, EngineError, UNIT_SIZE};
 
+/// Validate thermometer paths in bulb-to-tip order.
 pub(super) fn validate(paths: &[Vec<usize>]) -> CoreResult<()> {
     if paths.is_empty() {
         return Err(EngineError::invalid("Thermo requires paths"));
@@ -20,17 +21,18 @@ pub(super) fn validate(paths: &[Vec<usize>]) -> CoreResult<()> {
     Ok(())
 }
 
+/// Add increasing thermometer paths to the Classic full units.
 pub(super) fn compile(paths: &[Vec<usize>]) -> CompiledVariantRules {
     let units = classic_units();
-    let constraints = paths
-        .iter()
-        .enumerate()
+    let indexed_paths = paths.iter().enumerate();
+    let constraints = indexed_paths
         .map(|(index, cells)| RuleConstraint::Thermo {
             id: format!("thermo:{index}"),
             index,
             cells: cells.clone(),
         })
         .collect();
+
     let duplicate_groups = units.iter().map(|unit| unit.cells.clone()).collect();
 
     CompiledVariantRules {

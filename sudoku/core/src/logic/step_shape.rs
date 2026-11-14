@@ -7,9 +7,10 @@ use super::types::{
 };
 use crate::rules::context::validate_rules;
 use crate::rules::types::{Arrow, PuzzleRules, Unit, UnitKind};
-use crate::types::BOARD_SIZE;
+use crate::types::{BOARD_SIZE, UNIT_SIZE};
 
 pub(crate) const STEP_COUNT_LIMIT: usize = 500;
+const DIAGONAL_UNIT_COUNT: usize = 2;
 
 fn unique<T: Ord>(values: &[T]) -> bool {
     values.iter().collect::<BTreeSet<_>>().len() == values.len()
@@ -30,12 +31,12 @@ fn digit_list(digits: &[u8]) -> bool {
 }
 
 fn valid_unit(unit: &Unit) -> bool {
-    unit.index
-        < if unit.kind == UnitKind::Diagonal {
-            2
-        } else {
-            9
-        }
+    let unit_count = if unit.kind == UnitKind::Diagonal {
+        DIAGONAL_UNIT_COUNT
+    } else {
+        UNIT_SIZE
+    };
+    unit.index < unit_count
 }
 
 fn valid_rule_evidence(evidence: &RuleEvidence) -> bool {
@@ -61,9 +62,14 @@ fn valid_rule_evidence(evidence: &RuleEvidence) -> bool {
         }
         RuleEvidenceKind::Cage { sum, domains } => {
             let count = evidence.cells.len();
-            count <= 9
-                && usize::from(*sum) >= count * (count + 1) / 2
-                && usize::from(*sum) <= count * (19 - count) / 2
+            if count > UNIT_SIZE {
+                return false;
+            }
+
+            // A distinct cage reaches its extremes using the lowest or highest digits.
+            let minimum: usize = (1..=count).sum();
+            let maximum: usize = (1..=UNIT_SIZE).rev().take(count).sum();
+            (minimum..=maximum).contains(&usize::from(*sum))
                 && valid_rule_domains(evidence, domains)
         }
         RuleEvidenceKind::Arrow {
@@ -107,7 +113,7 @@ fn matches_rule_kind(technique: Technique, kind: &RuleEvidenceKind) -> bool {
 }
 
 pub(crate) fn valid_step_shape(step: &LogicalStep) -> bool {
-    let action_valid = match &step.action {
+    let is_action_valid = match &step.action {
         LogicalAction::Placement { cell, digit } => *cell < BOARD_SIZE && (1..=9).contains(digit),
         LogicalAction::Elimination { removals } => {
             !removals.is_empty()
@@ -117,7 +123,7 @@ pub(crate) fn valid_step_shape(step: &LogicalStep) -> bool {
                     .all(|removal| removal.cell < BOARD_SIZE && (1..=9).contains(&removal.digit))
         }
     };
-    if !action_valid {
+    if !is_action_valid {
         return false;
     }
 

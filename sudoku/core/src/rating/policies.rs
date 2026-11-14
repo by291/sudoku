@@ -2,19 +2,30 @@ use crate::logic::techniques::{ALL_CLASSIC_TECHNIQUES, BASIC_TECHNIQUES, Techniq
 use crate::rules::types::SudokuVariant;
 use crate::types::Difficulty;
 
+// Non-Classic variants support the first three tiers through Hard.
+const VARIANT_DIFFICULTY_COUNT: usize = 3;
+
+struct PolicyCatalogue {
+    techniques: &'static [Technique],
+    easy_len: usize,
+    medium_len: usize,
+}
+
+/// List the grades that can be requested for this variant, in ascending order.
 pub fn supported_difficulties(variant: SudokuVariant) -> &'static [Difficulty] {
     if variant == SudokuVariant::Classic {
         &Difficulty::ALL
     } else {
-        &Difficulty::ALL[..3]
+        &Difficulty::ALL[..VARIANT_DIFFICULTY_COUNT]
     }
 }
 
+/// Report whether a difficulty can be requested for this variant.
 pub fn supports_difficulty(variant: SudokuVariant, difficulty: Difficulty) -> bool {
     supported_difficulties(variant).contains(&difficulty)
 }
 
-/// Fixed catalogues are borrowed internally; the public wrapper retains native source compatibility.
+/// Borrow a policy prefix without allocating an owned copy.
 pub(crate) fn policy_slice(variant: SudokuVariant, difficulty: Difficulty) -> &'static [Technique] {
     use Technique::*;
     const KILLER: &[Technique] = &[
@@ -45,18 +56,36 @@ pub(crate) fn policy_slice(variant: SudokuVariant, difficulty: Difficulty) -> &'
         HiddenPair,
     ];
 
-    let (catalogue, easy, medium): (&[Technique], usize, usize) = match variant {
+    // The two lengths mark where each tier ends in its cumulative technique order.
+    let catalogue = match variant {
         SudokuVariant::Classic | SudokuVariant::Diagonal | SudokuVariant::Jigsaw => {
-            (&ALL_CLASSIC_TECHNIQUES, 2, 3)
+            PolicyCatalogue {
+                techniques: &ALL_CLASSIC_TECHNIQUES,
+                easy_len: 2,
+                medium_len: 3,
+            }
         }
-        SudokuVariant::Killer => (KILLER, 4, 6),
-        SudokuVariant::Thermo => (THERMO, 3, 4),
-        SudokuVariant::Arrow => (ARROW, 3, 5),
+        SudokuVariant::Killer => PolicyCatalogue {
+            techniques: KILLER,
+            easy_len: 4,
+            medium_len: 6,
+        },
+        SudokuVariant::Thermo => PolicyCatalogue {
+            techniques: THERMO,
+            easy_len: 3,
+            medium_len: 4,
+        },
+        SudokuVariant::Arrow => PolicyCatalogue {
+            techniques: ARROW,
+            easy_len: 3,
+            medium_len: 5,
+        },
     };
+
     let length = match difficulty {
-        Difficulty::Easy => easy,
-        Difficulty::Medium => medium,
-        Difficulty::Expert if variant == SudokuVariant::Classic => catalogue.len(),
+        Difficulty::Easy => catalogue.easy_len,
+        Difficulty::Medium => catalogue.medium_len,
+        Difficulty::Expert if variant == SudokuVariant::Classic => catalogue.techniques.len(),
         Difficulty::Hard | Difficulty::Expert => {
             if matches!(
                 variant,
@@ -64,18 +93,20 @@ pub(crate) fn policy_slice(variant: SudokuVariant, difficulty: Difficulty) -> &'
             ) {
                 BASIC_TECHNIQUES.len()
             } else {
-                catalogue.len()
+                catalogue.techniques.len()
             }
         }
     };
 
-    &catalogue[..length]
+    &catalogue.techniques[..length]
 }
 
+/// Return the owned technique policy; query supported grades separately before rating.
 pub fn policy(variant: SudokuVariant, difficulty: Difficulty) -> Vec<Technique> {
     policy_slice(variant, difficulty).to_vec()
 }
 
+/// Return the lowest policy tier to which this technique belongs.
 pub fn technique_tier(technique: Technique) -> Difficulty {
     match technique {
         Technique::NakedSingle

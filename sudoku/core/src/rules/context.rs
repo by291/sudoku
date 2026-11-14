@@ -5,6 +5,11 @@ use super::types::{PreparedRules, PuzzleRules, RuleMetadata};
 use crate::control::ExecutionControl;
 use crate::types::{BOARD_SIZE, Bounded, CoreResult, EngineError};
 
+const PEER_WORD_BITS: usize = u64::BITS as usize;
+const PEER_WORD_COUNT: usize = BOARD_SIZE.div_ceil(PEER_WORD_BITS);
+
+type PeerBits = [u64; PEER_WORD_COUNT];
+
 fn checkpoint(control: &mut Option<&mut ExecutionControl>) -> bool {
     match control {
         Some(control) => control.check(),
@@ -30,32 +35,39 @@ fn memberships<'a>(
     Some(result)
 }
 
+fn add_group_peers(group: &[usize], peers_by_cell: &mut [PeerBits; BOARD_SIZE]) {
+    for &cell in group {
+        for &peer in group {
+            if cell != peer {
+                peers_by_cell[cell][peer / PEER_WORD_BITS] |= 1_u64 << (peer % PEER_WORD_BITS);
+            }
+        }
+    }
+}
+
 fn relationships<'a>(
     groups: impl IntoIterator<Item = &'a [usize]>,
     control: &mut Option<&mut ExecutionControl>,
 ) -> Option<Vec<Vec<usize>>> {
-    // Two machine words cover the finite board without tree nodes or target-dependent u128 shifts.
-    let mut result = [[0_u64; 2]; BOARD_SIZE];
+    // Fixed-width words avoid tree nodes and wide shifts while deduplicating peers.
+    let mut peers_by_cell = [[0_u64; PEER_WORD_COUNT]; BOARD_SIZE];
 
     for cells in groups {
         if !checkpoint(control) {
             return None;
         }
-        for &cell in cells {
-            for &peer in cells {
-                if cell != peer {
-                    result[cell][peer / 64] |= 1_u64 << (peer % 64);
-                }
-            }
-        }
+
+        add_group_peers(cells, &mut peers_by_cell);
     }
 
     Some(
-        result
+        peers_by_cell
             .into_iter()
             .map(|peers| {
                 (0..BOARD_SIZE)
-                    .filter(|&cell| peers[cell / 64] & (1_u64 << (cell % 64)) != 0)
+                    .filter(|&cell| {
+                        peers[cell / PEER_WORD_BITS] & (1_u64 << (cell % PEER_WORD_BITS)) != 0
+                    })
                     .collect()
             })
             .collect(),
@@ -122,7 +134,7 @@ pub(super) fn classic_prepared_rules() -> CoreResult<PreparedRules> {
         .clone()
 }
 
-/// Validate and own an immutable layout. Native callers may choose this unbounded convenience API.
+/// Validate and own an immutable layout without a cancellation checkpoint.
 pub fn compile_rules(rules: &PuzzleRules) -> CoreResult<PreparedRules> {
     definitions::validate(rules)?;
 

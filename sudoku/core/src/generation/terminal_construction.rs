@@ -4,6 +4,10 @@ use crate::random::SeededRandom;
 use crate::rules::types::{PreparedRules, PuzzleRules};
 use crate::types::{ALL_DIGITS_MASK, BOARD_SIZE, Board, UNIT_SIZE};
 
+const MIN_DIGIT: u8 = 1;
+const MAX_DIGIT: u8 = UNIT_SIZE as u8;
+const MIN_COMPLETE_UNITS: usize = UNIT_SIZE * 3;
+
 // The regional attempt cap is 6,561 visits; exhausting it retires the layout.
 const REGIONAL_TERMINAL_NODE_LIMIT: u64 = (BOARD_SIZE * BOARD_SIZE) as u64;
 
@@ -12,6 +16,11 @@ pub enum TerminalConstructionResult {
     Incomplete,
     AttemptExhausted,
     Failed { reason: String },
+}
+
+struct RegionalPositionSearch {
+    digit_bit: u16,
+    assignment_limit: usize,
 }
 
 struct Construction<'a> {
@@ -31,6 +40,7 @@ impl Construction<'_> {
     fn assign(&mut self, cell: usize, digit: u8) {
         let previous = self.board[cell];
         self.board[cell] = digit;
+
         // Each candidate is distinct in every unit, so undo removes only this cell's own bit.
         for &index in &self.rules.context().cell_units[cell] {
             if previous != 0 {
@@ -55,6 +65,77 @@ impl Construction<'_> {
         })
     }
 
+    fn collect_regional_positions(
+        candidates: &[u16; BOARD_SIZE],
+        cells: &[usize],
+        search: RegionalPositionSearch,
+    ) -> ([usize; UNIT_SIZE], usize) {
+        let mut positions = [0; UNIT_SIZE];
+        let mut count = 0;
+        for &cell in cells {
+            if candidates[cell] & search.digit_bit == 0 {
+                continue;
+            }
+
+            positions[count] = cell;
+            count += 1;
+
+            // An equal or larger branch cannot win, so stop as soon as it reaches the limit.
+            if count >= search.assignment_limit {
+                break;
+            }
+        }
+
+        (positions, count)
+    }
+
+    fn write_digit_assignments(
+        assignments: &mut [(usize, u8); UNIT_SIZE],
+        positions: &[usize],
+        digit: u8,
+    ) {
+        for (assignment, &cell) in assignments.iter_mut().zip(positions) {
+            *assignment = (cell, digit);
+        }
+    }
+
+    fn choose_regional_branch(
+        &self,
+        candidates: &[u16; BOARD_SIZE],
+        assignments: &mut [(usize, u8); UNIT_SIZE],
+        mut assignment_count: usize,
+    ) -> Option<usize> {
+        // A missing digit in a region can have fewer positions than the best cell has digits.
+        for (index, unit) in self.rules.context().units.iter().enumerate() {
+            for digit in MIN_DIGIT..=MAX_DIGIT {
+                let digit_bit = 1 << (digit - 1);
+                if self.unit_masks[index] & digit_bit != 0 {
+                    continue;
+                }
+
+                let search = RegionalPositionSearch {
+                    digit_bit,
+                    assignment_limit: assignment_count,
+                };
+                let (positions, position_count) =
+                    Self::collect_regional_positions(candidates, &unit.cells, search);
+                if position_count == 0 {
+                    return None;
+                }
+
+                // Keeping the earlier branch on ties preserves the seeded traversal.
+                if position_count >= assignment_count {
+                    continue;
+                }
+
+                assignment_count = position_count;
+                Self::write_digit_assignments(assignments, &positions[..position_count], digit);
+            }
+        }
+
+        Some(assignment_count)
+    }
+
     fn visit(&mut self) -> bool {
         if self.node_limit.is_some_and(|limit| self.nodes >= limit) {
             self.attempt_exhausted = true;
@@ -64,6 +145,7 @@ impl Construction<'_> {
             self.exhausted = true;
             return false;
         }
+
         self.nodes += 1;
 
         let candidates = self.candidates();
@@ -87,47 +169,23 @@ impl Construction<'_> {
         let Some(target) = target else {
             return is_complete(&Board::from_computed_values(self.board), self.rules);
         };
+
         let mut assignments = [(0, 0); UNIT_SIZE];
         let mut assignment_count = 0;
-        for digit in 1..=9 {
+        for digit in MIN_DIGIT..=MAX_DIGIT {
             if candidates[target] & (1 << (digit - 1)) != 0 {
                 assignments[assignment_count] = (target, digit);
                 assignment_count += 1;
             }
         }
+
         if self.regional {
-            // Regional units can offer fewer positions for a missing digit than the cell MRV choice.
-            for (index, unit) in self.rules.context().units.iter().enumerate() {
-                for digit in 1..=9 {
-                    let bit = 1 << (digit - 1);
-                    if self.unit_masks[index] & bit != 0 {
-                        continue;
-                    }
-                    let mut positions = [0; UNIT_SIZE];
-                    let mut position_count = 0;
-                    for &cell in &unit.cells {
-                        if candidates[cell] & bit != 0 {
-                            positions[position_count] = cell;
-                            position_count += 1;
-                            // Equal/larger branches cannot win; skipping their tail preserves tie/draw order.
-                            if position_count >= assignment_count {
-                                break;
-                            }
-                        }
-                    }
-                    if position_count == 0 {
-                        return false;
-                    }
-                    if position_count < assignment_count {
-                        assignment_count = position_count;
-                        for (assignment, &cell) in
-                            assignments.iter_mut().zip(&positions[..position_count])
-                        {
-                            *assignment = (cell, digit);
-                        }
-                    }
-                }
-            }
+            let Some(regional_count) =
+                self.choose_regional_branch(&candidates, &mut assignments, assignment_count)
+            else {
+                return false;
+            };
+            assignment_count = regional_count;
         }
 
         // Ascending MRV ties and one descending Fisher-Yates shuffle per branch are seed identity.
@@ -137,16 +195,20 @@ impl Construction<'_> {
             if self.visit() {
                 return true;
             }
+
+            // Restore the current branch even when a descendant stops at a work limit.
             self.assign(cell, 0);
             if self.exhausted || self.attempt_exhausted {
                 return false;
             }
         }
+
         false
     }
 }
 
-/// Own all mutable search state and publish only a complete terminal. Local limits permit a new layout.
+/// Own all mutable search state and publish only a complete terminal. Local limits permit a new
+/// layout.
 pub fn construct_unit_terminal(
     rules: &PreparedRules,
     random: &mut SeededRandom,
@@ -157,7 +219,7 @@ pub fn construct_unit_terminal(
         rules.rules(),
         PuzzleRules::Classic | PuzzleRules::Diagonal | PuzzleRules::Jigsaw { .. }
     ) || !rules.context().constraints.is_empty()
-        || rules.context().units.len() < UNIT_SIZE * 3
+        || rules.context().units.len() < MIN_COMPLETE_UNITS
         || rules
             .context()
             .units
@@ -187,9 +249,11 @@ pub fn construct_unit_terminal(
         exhausted: false,
         attempt_exhausted: false,
     };
+
     if regional {
-        // Fixing a full unit removes digit-label symmetry without excluding regional solution families.
-        let mut digits = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+        // Fixing a full unit removes digit-label symmetry without excluding regional solution
+        // families.
+        let mut digits = std::array::from_fn::<_, UNIT_SIZE, _>(|index| index as u8 + MIN_DIGIT);
         state.random.shuffle(&mut digits);
         for (&cell, digit) in rules.context().units[0].cells.iter().zip(digits) {
             if !state.control.check() {
@@ -198,6 +262,7 @@ pub fn construct_unit_terminal(
             state.assign(cell, digit);
         }
     }
+
     if state.visit() {
         return TerminalConstructionResult::Ready {
             solution: Board::from_computed_values(state.board),

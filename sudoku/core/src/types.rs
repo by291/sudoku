@@ -19,6 +19,7 @@ pub enum EngineError {
 }
 
 impl EngineError {
+    /// Create an invalid-input error carrying a single diagnostic.
     pub fn invalid(message: impl Into<String>) -> Self {
         Self::InvalidInput(vec![message.into()])
     }
@@ -58,7 +59,7 @@ pub struct Board([u8; BOARD_SIZE]);
 impl Board {
     pub const EMPTY: Self = Self([0; BOARD_SIZE]);
 
-    // Computed boards contain only existing validated values or digits selected from nine-bit domains.
+    /// Build an internal board from validated values or digits selected from candidate domains.
     pub(crate) fn from_computed_values(values: [u8; BOARD_SIZE]) -> Self {
         assert!(
             values.iter().all(|&value| usize::from(value) <= UNIT_SIZE),
@@ -67,6 +68,7 @@ impl Board {
         Self(values)
     }
 
+    /// Borrow the row-major board values, where zero denotes an empty cell.
     pub fn values(&self) -> &[u8; BOARD_SIZE] {
         &self.0
     }
@@ -79,6 +81,7 @@ impl TryFrom<&[u8]> for Board {
         let cells: [u8; BOARD_SIZE] = values
             .try_into()
             .map_err(|_| EngineError::InvalidBoardLength(values.len()))?;
+
         if let Some(digit) = cells.iter().find(|digit| **digit > UNIT_SIZE as u8) {
             return Err(EngineError::InvalidDigit(*digit));
         }
@@ -91,6 +94,7 @@ impl TryFrom<&[u8]> for Board {
 pub struct Digit(u8);
 
 impl Digit {
+    /// Return the validated digit in the inclusive range 1 through 9.
     pub fn value(self) -> u8 {
         self.0
     }
@@ -112,6 +116,7 @@ impl TryFrom<u8> for Digit {
 pub struct CellIndex(usize);
 
 impl CellIndex {
+    /// Return the zero-based position in row-major board order.
     pub fn value(self) -> usize {
         self.0
     }
@@ -133,7 +138,7 @@ impl TryFrom<usize> for CellIndex {
 pub struct CandidateMask(u16);
 
 impl CandidateMask {
-    // Internal unions/intersections preserve nine-bit validity; external bits must use TryFrom.
+    /// Build a mask from internal operations that preserve its nine-bit invariant.
     pub(crate) fn from_computed_bits(bits: u16) -> Self {
         debug_assert_eq!(bits & !ALL_DIGITS_MASK, 0);
         Self(bits)
@@ -142,10 +147,12 @@ impl CandidateMask {
     pub const EMPTY: Self = Self(0);
     pub const ALL: Self = Self(ALL_DIGITS_MASK);
 
+    /// Test whether the digit remains in the candidate domain.
     pub fn contains(self, digit: Digit) -> bool {
         self.0 & (1 << (digit.0 - 1)) != 0
     }
 
+    /// Count the digits present in the candidate domain.
     pub fn count(self) -> u32 {
         self.0.count_ones()
     }
@@ -168,6 +175,7 @@ impl CandidateMask {
         })
     }
 
+    /// Return the nine-bit representation used by candidate computations.
     pub fn bits(self) -> u16 {
         self.0
     }
@@ -194,6 +202,7 @@ pub enum Difficulty {
 }
 
 impl Difficulty {
+    /// Return the zero-based position in the ascending difficulty order.
     pub fn rank(self) -> u8 {
         match self {
             Self::Easy => 0,
@@ -203,8 +212,15 @@ impl Difficulty {
         }
     }
 
-    pub const ALL: [Self; 4] = [Self::Easy, Self::Medium, Self::Hard, Self::Expert];
+    pub const ALL: [Self; 4] = [
+        // Array order matches the public rank and rating policy prefix order.
+        Self::Easy,
+        Self::Medium,
+        Self::Hard,
+        Self::Expert,
+    ];
 
+    /// Return the canonical difficulty label used across engine boundaries.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Easy => "easy",

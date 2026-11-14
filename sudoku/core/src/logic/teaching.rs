@@ -1,6 +1,6 @@
 //! Validate authored candidate-relative deductions independently of live detector ordering.
 use super::step_shape::valid_step_shape;
-use super::step_validation::{ValidationMode, invalid, validate_step_and_apply};
+use super::step_validation::{StepReplay, ValidationMode, invalid, validate_step_and_apply};
 use super::types::{LogicalStep, LogicalWorkspace};
 use crate::control::ExecutionControl;
 use crate::rules::context::compile_rules;
@@ -33,24 +33,29 @@ pub fn validate_teaching_step_with_control(
     step: &LogicalStep,
     control: &mut ExecutionControl,
 ) -> CoreResult<()> {
-    if !valid_step_shape(step)
-        || board
-            .values()
-            .iter()
-            .zip(candidates)
-            .any(|(&value, mask)| value != 0 && mask != CandidateMask::EMPTY)
-    {
+    if !valid_step_shape(step) {
         return Err(invalid());
     }
+
+    let board_values = board.values();
+    let has_candidates_on_filled_cells = board_values
+        .iter()
+        .zip(candidates)
+        .any(|(&value, mask)| value != 0 && mask != CandidateMask::EMPTY);
+    if has_candidates_on_filled_cells {
+        return Err(invalid());
+    }
+
     let context = compile_rules(rules)?;
     let workspace = LogicalWorkspace::from_authored_candidates(board, candidates, &context)?;
     let mut state = Some(workspace);
+
     let mut step = step.clone();
-    validate_step_and_apply(
-        &mut step,
-        &context,
-        &mut state,
+    validate_step_and_apply(StepReplay {
+        step: &mut step,
+        context: &context,
+        state: &mut state,
         control,
-        ValidationMode::Teaching,
-    )
+        mode: ValidationMode::Teaching,
+    })
 }

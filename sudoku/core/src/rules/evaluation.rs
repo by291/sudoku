@@ -12,27 +12,26 @@ pub(crate) fn directly_contradictory_rules(board: &Board, rules: &PuzzleRules) -
 
     if matches!(rules, PuzzleRules::Classic) {
         let prepared = classic_prepared_rules()?;
-        return Ok(prepared
-            .context()
-            .units
-            .iter()
-            .any(|unit| has_duplicate(board, &unit.cells)));
+        let units = &prepared.context().units;
+        return Ok(units.iter().any(|unit| has_duplicate(board, &unit.cells)));
     }
 
     let compiled = definitions::compile(rules);
-    if compiled
+    let has_duplicate_entry = compiled
         .duplicate_groups
         .iter()
-        .any(|cells| has_duplicate(board, cells))
-    {
-        return Ok(true);
-    }
+        .any(|cells| has_duplicate(board, cells));
 
-    Ok(!board.values().contains(&0)
-        && compiled
-            .constraints
-            .iter()
-            .any(|constraint| !satisfies_constraint(board, constraint)))
+    // Partial arithmetic feasibility belongs to the support checks.
+    let is_filled = !board.values().contains(&0);
+    let has_direct_contradiction = has_duplicate_entry
+        || (is_filled
+            && compiled
+                .constraints
+                .iter()
+                .any(|constraint| !satisfies_constraint(board, constraint)));
+
+    Ok(has_direct_contradiction)
 }
 
 fn has_duplicate(board: &Board, cells: &[usize]) -> bool {
@@ -59,7 +58,8 @@ fn has_duplicate(board: &Board, cells: &[usize]) -> bool {
 /// An unfilled clue is not satisfied; partial feasibility belongs to constraint support.
 pub(crate) fn satisfies_constraint(board: &Board, constraint: &RuleConstraint) -> bool {
     let values = board.values();
-    if constraint.cells().iter().any(|&cell| values[cell] == 0) {
+    let cells = constraint.cells();
+    if cells.iter().any(|&cell| values[cell] == 0) {
         return false;
     }
 

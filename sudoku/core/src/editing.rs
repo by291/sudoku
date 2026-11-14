@@ -1,4 +1,5 @@
-//! Pure board-layer edits; session history, assistance, clocks and completion records belong to callers.
+//! Pure board-layer edits. Callers own session history, assistance, clocks and completion records.
+
 use crate::board::is_complete;
 use crate::constraints::candidates::evaluate_candidates;
 use crate::control::ExecutionControl;
@@ -33,6 +34,19 @@ pub enum EditOutcome {
     Incomplete,
 }
 
+struct EditContext<'edit> {
+    givens: &'edit Board,
+    before: &'edit BoardLayers,
+    rules: &'edit PreparedRules,
+}
+
+impl EditContext<'_> {
+    fn unchanged(&self) -> EditOutcome {
+        complete_edit(self, self.before.clone())
+    }
+}
+
+/// Merge player entries with givens, which take precedence wherever they are present.
 pub fn merged_board(givens: &Board, layers: &BoardLayers) -> Board {
     Board::from_computed_values(std::array::from_fn(|cell| {
         if givens.values()[cell] == 0 {
@@ -43,14 +57,10 @@ pub fn merged_board(givens: &Board, layers: &BoardLayers) -> Board {
     }))
 }
 
-fn complete(
-    givens: &Board,
-    before: &BoardLayers,
-    layers: BoardLayers,
-    rules: &PreparedRules,
-) -> EditOutcome {
-    let changed = *before != layers;
-    let board_complete = is_complete(&merged_board(givens, &layers), rules);
+fn complete_edit(context: &EditContext<'_>, layers: BoardLayers) -> EditOutcome {
+    let changed = *context.before != layers;
+    let board_complete = is_complete(&merged_board(context.givens, &layers), context.rules);
+
     EditOutcome::Complete(Box::new(EditResult {
         layers,
         changed,
@@ -66,15 +76,22 @@ pub fn edit_board(
     rules: &PreparedRules,
     control: &mut ExecutionControl,
 ) -> CoreResult<EditOutcome> {
+    let context = EditContext {
+        givens,
+        before,
+        rules,
+    };
     let cell = match edit {
         BoardEdit::Enter { cell, .. }
         | BoardEdit::Erase { cell }
         | BoardEdit::ToggleNote { cell, .. } => Some(cell.value()),
         BoardEdit::GenerateNotes => None,
     };
+
     if cell.is_some_and(|cell| givens.values()[cell] != 0) {
-        return Ok(complete(givens, before, before.clone(), rules));
+        return Ok(context.unchanged());
     }
+
     let mut entries = *before.entries.values();
     let mut notes = before.notes;
 
@@ -82,10 +99,13 @@ pub fn edit_board(
         BoardEdit::Enter { cell, digit } => {
             let cell = cell.value();
             if entries[cell] == digit.value() {
-                return Ok(complete(givens, before, before.clone(), rules));
+                return Ok(context.unchanged());
             }
+
             entries[cell] = digit.value();
             notes[cell] = CandidateMask::EMPTY;
+
+            // Only duplicate peers exclude this digit directly. GenerateNotes handles support.
             let bit = 1 << (digit.value() - 1);
             for &peer in &rules.context().duplicate_peers[cell] {
                 notes[peer] = CandidateMask::from_computed_bits(notes[peer].bits() & !bit);
@@ -98,8 +118,9 @@ pub fn edit_board(
         BoardEdit::ToggleNote { cell, digit } => {
             let cell = cell.value();
             if entries[cell] != 0 {
-                return Ok(complete(givens, before, before.clone(), rules));
+                return Ok(context.unchanged());
             }
+
             notes[cell] =
                 CandidateMask::from_computed_bits(notes[cell].bits() ^ (1 << (digit.value() - 1)));
         }
@@ -109,12 +130,14 @@ pub fn edit_board(
             else {
                 return Ok(EditOutcome::Incomplete);
             };
+
             notes = candidates;
         }
     }
+
     let after = BoardLayers {
         entries: Board::from_computed_values(entries),
         notes,
     };
-    Ok(complete(givens, before, after, rules))
+    Ok(complete_edit(&context, after))
 }

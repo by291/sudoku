@@ -1,5 +1,4 @@
 use super::types::{AssessmentInput, AssessmentLimits, RATING_VERSION};
-use crate::rules::context::validate_rules;
 use crate::rules::types::PuzzleRules;
 use crate::types::Board;
 use crate::types::{CoreResult, EngineError};
@@ -19,10 +18,12 @@ impl AssessmentLimits {
         if self.max_steps > MAX_ASSESSMENT_STEPS {
             return Err(EngineError::invalid("Invalid assessment step limit"));
         }
+
         Ok(())
     }
 }
 
+/// Snapshot a board and rules in an owned input stamped with the current rating version.
 pub fn create_assessment_input(
     board: &Board,
     rules: &PuzzleRules,
@@ -36,12 +37,13 @@ pub fn create_assessment_input(
     }
 }
 
-pub(crate) fn validate_input(input: &AssessmentInput) -> CoreResult<()> {
+/// Reject unsupported envelopes before validating their rules and limits.
+pub(crate) fn validate_rating_version(input: &AssessmentInput) -> CoreResult<()> {
     if input.rating_version != RATING_VERSION {
         return Err(EngineError::invalid(
             "Invalid assessment envelope or rating version",
         ));
     }
-    validate_rules(&input.rules)?;
-    input.limits.validate()
+
+    Ok(())
 }

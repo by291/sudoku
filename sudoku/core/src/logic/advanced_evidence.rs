@@ -9,13 +9,27 @@ use super::types::{
     LogicalStep, LogicalWorkspace, Removal,
 };
 use crate::rules::types::{PuzzleRules, SudokuUnit, Unit, UnitKind};
-use crate::types::BOARD_SIZE;
+use crate::types::{BOARD_SIZE, UNIT_SIZE};
+
+const TRIPLE_SIZE: usize = 3;
+const CLASSIC_UNIT_COUNT: usize = UNIT_SIZE * 3;
+
+struct Proof<'a> {
+    state: &'a LogicalWorkspace,
+    technique: Technique,
+    evidence: &'a AdvancedEvidence,
+    removals: &'a [Removal],
+}
+
+struct SubsetProof<'a> {
+    proof: Proof<'a>,
+    unit: Unit,
+    is_hidden: bool,
+}
 
 fn unit_for(state: &LogicalWorkspace, unit: Unit) -> Option<&SudokuUnit> {
-    state
-        .rules
-        .context()
-        .units
+    let units = &state.rules.context().units;
+    units
         .iter()
         .find(|candidate| candidate.kind == unit.kind && candidate.index == unit.index)
 }
@@ -33,6 +47,19 @@ fn valid_cells(cells: &[usize]) -> bool {
         && cells.iter().collect::<BTreeSet<_>>().len() == cells.len()
 }
 
+fn has_unique_units(units: &[&SudokuUnit]) -> bool {
+    let indices: BTreeSet<_> = units.iter().map(|unit| unit.index).collect();
+    indices.len() == units.len()
+}
+
+fn has_unique_removals(removals: &[Removal]) -> bool {
+    let pairs: BTreeSet<_> = removals
+        .iter()
+        .map(|removal| (removal.cell, removal.digit))
+        .collect();
+    pairs.len() == removals.len()
+}
+
 /// Check the supplied proof directly; a detector rerun or stored solution is never a proof.
 pub fn validate_advanced_step(state: &LogicalWorkspace, step: &LogicalStep) -> bool {
     let Evidence::Advanced(evidence) = &step.evidence else {
@@ -41,16 +68,22 @@ pub fn validate_advanced_step(state: &LogicalWorkspace, step: &LogicalStep) -> b
     let LogicalAction::Elimination { removals } = &step.action else {
         return false;
     };
+
     if !step.technique.is_advanced()
         || !matches!(state.rules.rules(), PuzzleRules::Classic)
         || !valid_cells(&evidence.cells)
         || evidence.digits.is_empty()
-        || evidence.digits.len() > 9
-        || evidence.digits.iter().any(|digit| !(1..=9).contains(digit))
+        || evidence.digits.len() > UNIT_SIZE
+        || evidence
+            .digits
+            .iter()
+            .any(|digit| !(1..=UNIT_SIZE as u8).contains(digit))
         || evidence.digits.iter().collect::<BTreeSet<_>>().len() != evidence.digits.len()
     {
         return false;
     }
+
+    // Bind the supplied witness to the replay state before using its candidate domains.
     if evidence.domains.len() != BOARD_SIZE
         || !evidence.domains.iter().enumerate().all(|(index, domain)| {
             domain.cell == index
@@ -64,17 +97,13 @@ pub fn validate_advanced_step(state: &LogicalWorkspace, step: &LogicalStep) -> b
     {
         return false;
     }
+
     if removals.is_empty()
-        || removals.len() > BOARD_SIZE * 9
-        || removals
-            .iter()
-            .map(|removal| (removal.cell, removal.digit))
-            .collect::<BTreeSet<_>>()
-            .len()
-            != removals.len()
+        || removals.len() > BOARD_SIZE * UNIT_SIZE
+        || !has_unique_removals(removals)
         || !removals.iter().all(|removal| {
             removal.cell < BOARD_SIZE
-                && (1..=9).contains(&removal.digit)
+                && (1..=UNIT_SIZE as u8).contains(&removal.digit)
                 && state.board.values()[removal.cell] == 0
                 && state.candidates[removal.cell].bits() & mask_of(removal.digit) != 0
         })
@@ -82,90 +111,89 @@ pub fn validate_advanced_step(state: &LogicalWorkspace, step: &LogicalStep) -> b
         return false;
     }
 
+    let proof = Proof {
+        state,
+        technique: step.technique,
+        evidence,
+        removals,
+    };
     match &evidence.kind {
-        AdvancedEvidenceKind::Subset { unit, hidden } => {
-            validate_subset(state, step.technique, evidence, removals, *unit, *hidden)
-        }
-        AdvancedEvidenceKind::Fish { bases, covers } => {
-            validate_fish(state, step.technique, evidence, removals, bases, covers)
-        }
-        AdvancedEvidenceKind::Wing { pivot, wings } => {
-            validate_wing(state, step.technique, evidence, removals, *pivot, *wings)
-        }
+        AdvancedEvidenceKind::Subset { unit, hidden } => validate_subset(SubsetProof {
+            proof,
+            unit: *unit,
+            is_hidden: *hidden,
+        }),
+        AdvancedEvidenceKind::Fish { bases, covers } => validate_fish(proof, bases, covers),
+        AdvancedEvidenceKind::Wing { pivot, wings } => validate_wing(proof, *pivot, *wings),
         AdvancedEvidenceKind::Coloring {
             mode,
             colors,
             links,
-        } => validate_coloring(
-            state,
-            step.technique,
-            evidence,
-            removals,
-            *mode,
+        } => validate_coloring(ColoringProof {
+            proof,
+            mode: *mode,
             colors,
             links,
-        ),
+        }),
     }
 }
 
-fn validate_subset(
-    state: &LogicalWorkspace,
-    technique: Technique,
-    evidence: &AdvancedEvidence,
-    removals: &[Removal],
-    unit: Unit,
-    hidden: bool,
-) -> bool {
+fn validate_subset(subset: SubsetProof<'_>) -> bool {
+    let Proof {
+        state,
+        technique,
+        evidence,
+        removals,
+    } = subset.proof;
+    let unit = subset.unit;
+    let expected_technique = if subset.is_hidden {
+        Technique::HiddenTriple
+    } else {
+        Technique::NakedTriple
+    };
+
     let Some(unit) = unit_for(state, unit) else {
         return false;
     };
-    if evidence.cells.len() != 3
-        || evidence.digits.len() != 3
+    if evidence.cells.len() != TRIPLE_SIZE
+        || evidence.digits.len() != TRIPLE_SIZE
         || !evidence
             .cells
             .iter()
             .all(|&cell| unit.cells.contains(&cell) && state.board.values()[cell] == 0)
-        || technique
-            != if hidden {
-                Technique::HiddenTriple
-            } else {
-                Technique::NakedTriple
-            }
+        || technique != expected_technique
     {
         return false;
     }
-    if hidden {
+
+    // A hidden subset excludes other digits from its cells. A naked subset excludes its
+    // digits from the rest of the unit.
+    if subset.is_hidden {
         let positions: Vec<Vec<usize>> = evidence
             .digits
             .iter()
             .map(|&digit| candidate_positions(state, &unit.cells, digit))
             .collect();
-        let cells: Vec<usize> = positions
-            .iter()
-            .flatten()
-            .copied()
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
+        let digit_cells = positions.iter().flatten();
+        let distinct_cells: BTreeSet<_> = digit_cells.copied().collect();
+        let cells: Vec<_> = distinct_cells.into_iter().collect();
+
         return positions.iter().all(|cells| cells.len() >= 2)
             && equal_set(&cells, &evidence.cells)
             && removals.iter().all(|removal| {
                 evidence.cells.contains(&removal.cell) && !evidence.digits.contains(&removal.digit)
             });
     }
+
+    let candidate_union = evidence
+        .cells
+        .iter()
+        .fold(0, |bits, &cell| bits | state.candidates[cell].bits());
     evidence
         .cells
         .iter()
         .all(|&cell| state.candidates[cell].bits().count_ones() >= 2)
-        && equal_set(
-            &digits_in(
-                evidence
-                    .cells
-                    .iter()
-                    .fold(0, |bits, &cell| bits | state.candidates[cell].bits()),
-            ),
-            &evidence.digits,
-        )
+        && equal_set(&digits_in(candidate_union), &evidence.digits)
         && removals.iter().all(|removal| {
             unit.cells.contains(&removal.cell)
                 && !evidence.cells.contains(&removal.cell)
@@ -173,14 +201,14 @@ fn validate_subset(
         })
 }
 
-fn validate_fish(
-    state: &LogicalWorkspace,
-    technique: Technique,
-    evidence: &AdvancedEvidence,
-    removals: &[Removal],
-    base_ids: &[Unit],
-    cover_ids: &[Unit],
-) -> bool {
+fn validate_fish(proof: Proof<'_>, base_ids: &[Unit], cover_ids: &[Unit]) -> bool {
+    let Proof {
+        state,
+        technique,
+        evidence,
+        removals,
+    } = proof;
+
     let size = match technique {
         Technique::XWing => 2,
         Technique::Swordfish => 3,
@@ -213,18 +241,8 @@ fn validate_fish(
     if !matches!(kind, UnitKind::Row | UnitKind::Column)
         || bases.iter().any(|unit| unit.kind != kind)
         || covers.iter().any(|unit| unit.kind != other_kind)
-        || bases
-            .iter()
-            .map(|unit| unit.index)
-            .collect::<BTreeSet<_>>()
-            .len()
-            != size
-        || covers
-            .iter()
-            .map(|unit| unit.index)
-            .collect::<BTreeSet<_>>()
-            .len()
-            != size
+        || !has_unique_units(&bases)
+        || !has_unique_units(&covers)
     {
         return false;
     }
@@ -234,7 +252,10 @@ fn validate_fish(
         .iter()
         .map(|unit| candidate_positions(state, &unit.cells, digit))
         .collect();
-    let cells: Vec<usize> = positions.iter().flatten().copied().collect();
+    let candidate_cells = positions.iter().flatten();
+    let cells: Vec<usize> = candidate_cells.copied().collect();
+
+    // The selected bases fill every cover for this digit, excluding other positions there.
     positions
         .iter()
         .all(|cells| (2..=size).contains(&cells.len()))
@@ -252,14 +273,14 @@ fn validate_fish(
         })
 }
 
-fn validate_wing(
-    state: &LogicalWorkspace,
-    technique: Technique,
-    evidence: &AdvancedEvidence,
-    removals: &[Removal],
-    pivot: usize,
-    wings: [usize; 2],
-) -> bool {
+fn validate_wing(proof: Proof<'_>, pivot: usize, wings: [usize; 2]) -> bool {
+    let Proof {
+        state,
+        technique,
+        evidence,
+        removals,
+    } = proof;
+
     let [first, second] = wings;
     if pivot >= BOARD_SIZE || first >= BOARD_SIZE || second >= BOARD_SIZE {
         return false;
@@ -271,8 +292,12 @@ fn validate_wing(
         state.candidates[second].bits(),
     ];
     let shared = digits_in(masks[1] & masks[2] & !masks[0]);
-    technique == Technique::XYWing
-        && equal_set(&evidence.cells, &[pivot, first, second])
+    let wing_cells = [
+        // The pivot belongs to the witness even though only the wings see the targets.
+        pivot, first, second,
+    ];
+    let is_witness_valid = technique == Technique::XYWing
+        && equal_set(&evidence.cells, &wing_cells)
         && evidence
             .cells
             .iter()
@@ -284,33 +309,51 @@ fn validate_wing(
         && equal_set(&evidence.digits, &digits_in(masks[0] | masks[1] | masks[2]))
         && (masks[0] & masks[1]).count_ones() == 1
         && (masks[0] & masks[2]).count_ones() == 1
-        && (masks[0] & masks[1]) != (masks[0] & masks[2])
-        && removals.iter().all(|removal| {
-            removal.digit == shared[0]
-                && !evidence.cells.contains(&removal.cell)
-                && are_classic_peers(first, removal.cell)
-                && are_classic_peers(second, removal.cell)
-        })
+        && (masks[0] & masks[1]) != (masks[0] & masks[2]);
+    if !is_witness_valid {
+        return false;
+    }
+
+    // Either pivot value forces the shared digit in one wing, so a target must see both.
+    removals.iter().all(|removal| {
+        removal.digit == shared[0]
+            && !evidence.cells.contains(&removal.cell)
+            && are_classic_peers(first, removal.cell)
+            && are_classic_peers(second, removal.cell)
+    })
 }
 
-fn validate_coloring(
-    state: &LogicalWorkspace,
-    technique: Technique,
-    evidence: &AdvancedEvidence,
-    removals: &[Removal],
+struct ColoringProof<'a> {
+    proof: Proof<'a>,
     mode: ColoringMode,
-    colors: &[Vec<usize>; 2],
-    links: &[ColoringLink],
-) -> bool {
+    colors: &'a [Vec<usize>; 2],
+    links: &'a [ColoringLink],
+}
+
+fn validate_coloring(coloring: ColoringProof<'_>) -> bool {
+    let Proof {
+        state,
+        technique,
+        evidence,
+        removals,
+    } = coloring.proof;
+    let ColoringProof {
+        mode,
+        colors,
+        links,
+        ..
+    } = coloring;
+
     let [first, second] = colors;
-    let cells: Vec<usize> = first.iter().chain(second).copied().collect();
+    let colored_cells = first.iter().chain(second);
+    let cells: Vec<_> = colored_cells.copied().collect();
     if technique != Technique::SimpleColoring
         || evidence.digits.len() != 1
         || !valid_cells(first)
         || !valid_cells(second)
         || !equal_set(&cells, &evidence.cells)
         || links.is_empty()
-        || links.len() > 27
+        || links.len() > CLASSIC_UNIT_COUNT
     {
         return false;
     }
@@ -323,6 +366,8 @@ fn validate_coloring(
     {
         return false;
     }
+
+    // Each link must be an actual either-or choice between two opposite colors.
     for link in links {
         let Some(unit) = unit_for(state, link.unit) else {
             return false;
@@ -355,11 +400,15 @@ fn validate_coloring(
     let conflicts = [has_peer_collision(first), has_peer_collision(second)];
     match mode {
         ColoringMode::Wrap => {
+            // A collision rules out its color only when the other color remains possible.
+            let invalid_color = match conflicts[0] {
+                true => first,
+                false => second,
+            };
             conflicts[0] != conflicts[1]
-                && removals.iter().all(|removal| {
-                    removal.digit == digit
-                        && colors[if conflicts[0] { 0 } else { 1 }].contains(&removal.cell)
-                })
+                && removals
+                    .iter()
+                    .all(|removal| removal.digit == digit && invalid_color.contains(&removal.cell))
         }
         ColoringMode::Trap => {
             !conflicts.iter().any(|&conflict| conflict)

@@ -67,7 +67,8 @@ impl LogicalWorkspace {
 }
 
 /// Apply an engine-produced or independently proved step for this exact workspace state.
-/// This checks action shape/applicability, not mathematical evidence. Premises survive until placement.
+/// This checks action shape and applicability, not mathematical evidence.
+/// Premises survive until placement.
 ///
 /// # Errors
 /// Returns an error without mutation if any action cell, digit or domain is inapplicable.
@@ -78,7 +79,8 @@ pub fn apply_step(state: &mut LogicalWorkspace, step: &LogicalStep) -> CoreResul
             && state.board.values()[cell] == 0
             && state.candidates[cell].bits() & mask_of(digit) != 0
     };
-    let valid = match &step.action {
+
+    let is_applicable = match &step.action {
         LogicalAction::Placement { cell, digit } => applicable(*cell, *digit),
         LogicalAction::Elimination { removals } => {
             !removals.is_empty()
@@ -87,7 +89,7 @@ pub fn apply_step(state: &mut LogicalWorkspace, step: &LogicalStep) -> CoreResul
                     .all(|removal| applicable(removal.cell, removal.digit))
         }
     };
-    if !valid {
+    if !is_applicable {
         return Err(EngineError::invalid(
             "Logical action is not applicable to this workspace",
         ));
@@ -100,7 +102,9 @@ pub fn apply_step(state: &mut LogicalWorkspace, step: &LogicalStep) -> CoreResul
 
 /// The detector or proof validator has already established this step for the current state.
 pub(crate) fn apply_established_step(state: &mut LogicalWorkspace, step: &LogicalStep) {
+    // The position index belongs to the candidate domains before this action.
     state.positions.take();
+
     match &step.action {
         LogicalAction::Elimination { removals } => {
             for removal in removals {
@@ -108,6 +112,7 @@ pub(crate) fn apply_established_step(state: &mut LogicalWorkspace, step: &Logica
                     state.candidates[removal.cell].bits() & !mask_of(removal.digit),
                 );
             }
+
             if let Evidence::Rule(evidence) = &step.evidence {
                 state.premises.push(evidence.clone());
             }
@@ -117,6 +122,7 @@ pub(crate) fn apply_established_step(state: &mut LogicalWorkspace, step: &Logica
             values[*cell] = *digit;
             state.board = Board::from_computed_values(values);
             state.candidates[*cell] = CandidateMask::EMPTY;
+
             // Only full units propagate here; cage and path effects need their own explained steps.
             for &index in &state.rules.context().cell_units[*cell] {
                 for &peer in &state.rules.context().units[index].cells {
@@ -125,6 +131,8 @@ pub(crate) fn apply_established_step(state: &mut LogicalWorkspace, step: &Logica
                     );
                 }
             }
+
+            // The explanation chain ends once its premises produce a placement.
             state.premises.clear();
         }
     }

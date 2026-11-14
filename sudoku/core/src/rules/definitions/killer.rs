@@ -4,6 +4,7 @@ use super::super::{
 };
 use crate::types::{CoreResult, EngineError, UNIT_SIZE};
 
+/// Validate connected cage coverage and each total's distinct-digit bounds.
 pub(super) fn validate(cages: &[Cage]) -> CoreResult<()> {
     if cages.is_empty() {
         return Err(EngineError::invalid("Killer requires cages"));
@@ -15,10 +16,13 @@ pub(super) fn validate(cages: &[Cage]) -> CoreResult<()> {
                 "Cages must contain connected distinct cells",
             ));
         }
+
+        // The smallest and largest sums use the lowest and highest distinct digits.
         let count = cage.cells.len();
-        if usize::from(cage.sum) < count * (count + 1) / 2
-            || usize::from(cage.sum) > count * (19 - count) / 2
-        {
+        let minimum = count * (count + 1) / 2;
+        let maximum = count * (2 * UNIT_SIZE + 1 - count) / 2;
+        let sum = usize::from(cage.sum);
+        if sum < minimum || sum > maximum {
             return Err(EngineError::invalid(
                 "Cage total is outside distinct digit bounds",
             ));
@@ -32,11 +36,11 @@ pub(super) fn validate(cages: &[Cage]) -> CoreResult<()> {
     Ok(())
 }
 
+/// Add cage sums and duplicate exclusions to the Classic full units.
 pub(super) fn compile(cages: &[Cage]) -> CompiledVariantRules {
     let units = classic_units();
-    let constraints = cages
-        .iter()
-        .enumerate()
+    let indexed_cages = cages.iter().enumerate();
+    let constraints = indexed_cages
         .map(|(index, cage)| RuleConstraint::Cage {
             id: format!("cage:{index}"),
             index,
@@ -44,12 +48,11 @@ pub(super) fn compile(cages: &[Cage]) -> CompiledVariantRules {
             sum: cage.sum,
         })
         .collect();
+
     // Cages exclude duplicates without becoming complete nine-digit units.
-    let duplicate_groups = units
-        .iter()
-        .map(|unit| unit.cells.clone())
-        .chain(cages.iter().map(|cage| cage.cells.clone()))
-        .collect();
+    let unit_cells = units.iter().map(|unit| unit.cells.clone());
+    let cage_cells = cages.iter().map(|cage| cage.cells.clone());
+    let duplicate_groups = unit_cells.chain(cage_cells).collect();
 
     CompiledVariantRules {
         units,

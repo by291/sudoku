@@ -1,4 +1,5 @@
-//! Own bounded clue exploration only; boards, logical domains and geometry stay with layout evaluators.
+//! Own bounded clue exploration only; boards, logical domains and geometry stay with layout
+//! evaluators.
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -16,6 +17,13 @@ pub const MAX_SEEN_MASKS: usize = 4096;
 pub const MAX_PROPOSALS: usize = 32;
 pub const STAGNATION_LIMIT: usize = 8;
 const INITIAL_SWEEP_PROPOSALS: usize = 24;
+const STALLED_PROPOSAL_CYCLE: usize = 3;
+const STALLED_EXCHANGE_SLOT: usize = STALLED_PROPOSAL_CYCLE - 1;
+
+enum ClueEdit {
+    Remove,
+    Restore,
+}
 
 /// Bit N retains cell N. This 81-bit internal value never crosses a JS/WASM DTO boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -24,30 +32,30 @@ pub struct GivenMask(u128);
 impl GivenMask {
     pub const FULL: Self = Self((1_u128 << BOARD_SIZE) - 1);
 
+    /// Return the raw cell bits in board order.
     pub fn bits(self) -> u128 {
         self.0
     }
 
+    /// Count the cells kept as givens.
     pub fn clue_count(self) -> u32 {
         self.0.count_ones()
     }
 
+    /// Retain one bit for each nonempty cell in the board.
     pub fn from_board(board: &Board) -> Self {
-        Self(
-            board
-                .values()
-                .iter()
-                .enumerate()
-                .fold(0, |mask, (cell, &digit)| {
-                    if digit == 0 {
-                        mask
-                    } else {
-                        mask | (1_u128 << cell)
-                    }
-                }),
-        )
+        let cells = board.values();
+        let mut mask = 0;
+        for (cell, &digit) in cells.iter().enumerate() {
+            if digit != 0 {
+                mask |= 1_u128 << cell;
+            }
+        }
+
+        Self(mask)
     }
 
+    /// Copy the retained clues from a filled terminal into an owned board.
     pub fn materialize(self, terminal: &Board) -> CoreResult<Board> {
         if terminal.values().contains(&0) {
             return Err(EngineError::invalid("Candidate terminal must be complete"));
@@ -66,9 +74,12 @@ impl GivenMask {
         self.0 & (1_u128 << cell) != 0
     }
 
-    fn edit(self, cell: usize, restore: bool) -> Self {
+    fn edit(self, cell: usize, edit: ClueEdit) -> Self {
         let bit = 1_u128 << cell;
-        Self(if restore { self.0 | bit } else { self.0 & !bit })
+        match edit {
+            ClueEdit::Remove => Self(self.0 & !bit),
+            ClueEdit::Restore => Self(self.0 | bit),
+        }
     }
 }
 
@@ -162,18 +173,11 @@ impl EditOrder {
             Self::Prepared(prepared) => return prepared,
         };
 
+        let (present, missing) = cells.iter().copied().partition(|&cell| mask.contains(cell));
         *self = Self::Prepared(PreparedEditOrder {
             cells,
-            present: cells
-                .iter()
-                .copied()
-                .filter(|&cell| mask.contains(cell))
-                .collect(),
-            missing: cells
-                .iter()
-                .copied()
-                .filter(|&cell| !mask.contains(cell))
-                .collect(),
+            present,
+            missing,
         });
         let Self::Prepared(prepared) = self else {
             unreachable!("Edit order was prepared above");
@@ -190,6 +194,11 @@ impl EditOrder {
     }
 }
 
+enum CheckpointClass {
+    Solved,
+    Stalled,
+}
+
 struct FrontierEntry {
     checkpoint: CandidateCheckpoint,
     cursor: usize,
@@ -197,7 +206,8 @@ struct FrontierEntry {
     sweep_cursor: usize,
 }
 
-// Pool, pending parent and continued sweep refer to the same small owner. Entries contain no back-references.
+// Pool, pending parent and continued sweep refer to the same small owner. Entries contain no
+// back-references.
 type Entry = Rc<RefCell<FrontierEntry>>;
 
 struct PendingProposal {
@@ -231,16 +241,18 @@ fn compare(
                 difficulty: second, ..
             },
         ) => {
-            return target
-                .rank()
-                .abs_diff(first.rank())
-                .cmp(&target.rank().abs_diff(second.rank()))
-                .then_with(|| {
-                    left.feedback
-                        .remaining_cells
-                        .cmp(&right.feedback.remaining_cells)
-                })
-                // Completed traces measure workload; fewer clues win before total deductions.
+            let target_rank = target.rank();
+            let left_distance = target_rank.abs_diff(first.rank());
+            let right_distance = target_rank.abs_diff(second.rank());
+            let by_distance = left_distance.cmp(&right_distance);
+            let by_distance_and_remaining = by_distance.then_with(|| {
+                left.feedback
+                    .remaining_cells
+                    .cmp(&right.feedback.remaining_cells)
+            });
+
+            // Completed traces measure workload; fewer clues win before total deductions.
+            return by_distance_and_remaining
                 .then_with(|| left.mask.clue_count().cmp(&right.mask.clue_count()))
                 .then_with(|| right.feedback.deductions.cmp(&left.feedback.deductions));
         }
@@ -261,13 +273,51 @@ fn compare(
         .then_with(|| left.mask.clue_count().cmp(&right.mask.clue_count()))
 }
 
+struct ClueExchange<'a> {
+    cursor: usize,
+    present: &'a [usize],
+    missing: &'a [usize],
+    status: CheckpointStatus,
+}
+
+fn exchange_clues(
+    exchange: ClueExchange<'_>,
+    mut edit: impl FnMut(usize, ClueEdit) -> Option<()>,
+) -> Option<()> {
+    let cursor = exchange.cursor;
+    let missing = exchange.missing;
+    let present = exchange.present;
+    let restores = if cursor.is_multiple_of(2) && missing.len() > 1 {
+        2_usize
+    } else {
+        1
+    };
+    for index in 0..restores {
+        let cell = missing[(cursor + index) % missing.len()];
+        edit(cell, ClueEdit::Restore)?;
+    }
+
+    let removals = if exchange.status.solved() {
+        present.len().min(restores + 1)
+    } else {
+        1.max(restores - 1)
+    };
+    for index in 0..removals {
+        let cell = present[(cursor + index) % present.len()];
+        edit(cell, ClueEdit::Remove)?;
+    }
+
+    Some(())
+}
+
 impl FrontierEntry {
     fn neighboring_proposal(
         &mut self,
         random: &mut SeededRandom,
         control: &mut ExecutionControl,
     ) -> Option<CandidateProposal> {
-        // Partition only after choosing the inherited/shuffled order; inheritance consumes no draws.
+        // Partition only after choosing the inherited/shuffled order; inheritance consumes no
+        // draws.
         let prepared = self.edit_order.prepare(self.checkpoint.mask, random);
         let order = &prepared.cells;
         let present = &prepared.present;
@@ -275,13 +325,13 @@ impl FrontierEntry {
 
         let mut intermediate_masks = vec![];
         let mut mask = self.checkpoint.mask;
-        let mut edit = |cell, restore| {
+        let mut edit = |cell, action| {
             if !control.check() {
-                return false;
+                return None;
             }
             intermediate_masks.push(mask);
-            mask = mask.edit(cell, restore);
-            true
+            mask = mask.edit(cell, action);
+            Some(())
         };
 
         let mut sweep_cell = None;
@@ -298,47 +348,32 @@ impl FrontierEntry {
             }
         }
 
-        let kind;
-        if let Some(cell) = sweep_cell {
-            kind = ProposalKind::Remove;
-            if !edit(cell, false) {
-                return None;
-            }
-        } else if !missing.is_empty()
-            && ((!self.checkpoint.status.solved() && self.cursor % 3 != 2) || present.is_empty())
-        {
-            kind = ProposalKind::Restore;
-            if !edit(missing[self.cursor % missing.len()], true) {
-                return None;
-            }
+        let is_solved = self.checkpoint.status.solved();
+        let is_restore_slot = self.cursor % STALLED_PROPOSAL_CYCLE != STALLED_EXCHANGE_SLOT;
+        let can_restore =
+            !missing.is_empty() && ((!is_solved && is_restore_slot) || present.is_empty());
+        let kind = if let Some(cell) = sweep_cell {
+            edit(cell, ClueEdit::Remove)?;
+            ProposalKind::Remove
+        } else if can_restore {
+            let cell = missing[self.cursor % missing.len()];
+            edit(cell, ClueEdit::Restore)?;
+            ProposalKind::Restore
         } else if !missing.is_empty() && !present.is_empty() {
-            kind = ProposalKind::Exchange;
-            let restores = if self.cursor.is_multiple_of(2) && missing.len() > 1 {
-                2_usize
-            } else {
-                1
+            let exchange = ClueExchange {
+                cursor: self.cursor,
+                present,
+                missing,
+                status: self.checkpoint.status,
             };
-            for index in 0..restores {
-                if !edit(missing[(self.cursor + index) % missing.len()], true) {
-                    return None;
-                }
-            }
-
-            let removals = if self.checkpoint.status.solved() {
-                present.len().min(restores + 1)
-            } else {
-                1.max(restores - 1)
-            };
-            for index in 0..removals {
-                if !edit(present[(self.cursor + index) % present.len()], false) {
-                    return None;
-                }
-            }
+            exchange_clues(exchange, edit)?;
+            ProposalKind::Exchange
         } else {
             return None;
-        }
+        };
 
-        // These are executed edit masks, not logical proofs; the evaluator decides which masks to screen.
+        // These are executed edit masks, not logical proofs; the evaluator decides which masks to
+        // screen.
         Some(CandidateProposal {
             kind,
             mask,
@@ -348,6 +383,7 @@ impl FrontierEntry {
 }
 
 impl CandidateFrontier {
+    /// Start an empty frontier scoped to one completed terminal and target tier.
     pub fn new(layout_id: u32, terminal: &Board, target: Difficulty) -> CoreResult<Self> {
         GivenMask::FULL.materialize(terminal)?;
         Ok(Self {
@@ -362,6 +398,10 @@ impl CandidateFrontier {
         })
     }
 
+    /// Retain a checkpoint for this layout and report whether it improved the search.
+    ///
+    /// A matching pending removal can pass its parent's remaining sweep to the child.
+    /// Duplicate or closed checkpoints leave the frontier unchanged.
     pub fn retain(&mut self, checkpoint: CandidateCheckpoint) -> CoreResult<bool> {
         if checkpoint.layout_id != self.layout_id {
             return Err(EngineError::invalid(
@@ -369,7 +409,8 @@ impl CandidateFrontier {
             ));
         }
 
-        if self.seen.len() >= MAX_SEEN_MASKS
+        // The proposal is marked seen when scheduled, before its evaluation can retain it.
+        let cannot_retain = self.seen.len() >= MAX_SEEN_MASKS
             || (self.seen.contains(&checkpoint.mask)
                 && !self
                     .pending
@@ -378,12 +419,14 @@ impl CandidateFrontier {
             || self
                 .entries
                 .iter()
-                .any(|entry| entry.borrow().checkpoint.mask == checkpoint.mask)
-        {
-            return Ok(false);
+                .any(|entry| entry.borrow().checkpoint.mask == checkpoint.mask);
+        if cannot_retain {
+            let improved = false;
+            return Ok(improved);
         }
 
-        // Removal children inherit the remaining sweep; restoring/exchanging clues starts another order.
+        // Removal children inherit the remaining sweep; restoring/exchanging clues starts another
+        // order.
         let inherited = self.pending.take().and_then(|pending| {
             if pending.mask == checkpoint.mask && pending.kind == ProposalKind::Remove {
                 Some(pending.parent)
@@ -392,9 +435,11 @@ impl CandidateFrontier {
             }
         });
         self.seen.insert(checkpoint.mask);
+
         // Novelty survives eviction; closed entries must not crowd out viable children.
         self.entries
             .retain(|entry| entry.borrow().cursor < MAX_PROPOSALS);
+
         let previous_best = self
             .entries
             .iter()
@@ -430,17 +475,22 @@ impl CandidateFrontier {
         // Insertion temporarily owns nine entries before the retained pool returns to eight.
         let mut solved = [0; MAX_CHECKPOINTS + 1];
         let mut stalled = [0; MAX_CHECKPOINTS + 1];
-        let solved_count = self.rank_indices(true, &mut solved);
-        let stalled_count = self.rank_indices(false, &mut stalled);
+        let solved_count = self.rank_indices(CheckpointClass::Solved, &mut solved);
+        let stalled_count = self.rank_indices(CheckpointClass::Stalled, &mut stalled);
+
+        // Each class can use any part of the other class's reservation left empty.
+
         let reserved = MAX_CHECKPOINTS / 2;
         let solved_capacity = reserved.max(MAX_CHECKPOINTS.saturating_sub(stalled_count));
         let stalled_capacity = reserved.max(MAX_CHECKPOINTS.saturating_sub(solved_count));
         let solved_count = solved_count.min(solved_capacity);
         let stalled_count = stalled_count.min(stalled_capacity);
+
         let mut retained: [Option<Entry>; MAX_CHECKPOINTS] = std::array::from_fn(|_| None);
         for (slot, &index) in retained.iter_mut().zip(&solved[..solved_count]) {
             *slot = Some(self.entries[index].clone());
         }
+
         // A temporary tier drop must not cut a solved removal lineage's ordinary sweep short.
         if let Some(sweep) = &self.sweep_entry
             && solved_count != 0
@@ -457,15 +507,21 @@ impl CandidateFrontier {
         {
             *slot = Some(self.entries[index].clone());
         }
+
         self.entries.clear();
         self.entries.extend(retained.into_iter().flatten());
         Ok(improved || continuing_sweep)
     }
 
-    fn rank_indices(&self, solved: bool, ranked: &mut [usize; MAX_CHECKPOINTS + 1]) -> usize {
+    fn rank_indices(
+        &self,
+        class: CheckpointClass,
+        ranked: &mut [usize; MAX_CHECKPOINTS + 1],
+    ) -> usize {
+        let is_solved = matches!(class, CheckpointClass::Solved);
         let mut count = 0;
         for (index, entry) in self.entries.iter().enumerate() {
-            if entry.borrow().checkpoint.status.solved() != solved {
+            if entry.borrow().checkpoint.status.solved() != is_solved {
                 continue;
             }
             let mut position = count;
@@ -486,6 +542,10 @@ impl CandidateFrontier {
         count
     }
 
+    /// Schedule and remember the next novel proposal for evaluation.
+    ///
+    /// Returns `None` when the frontier is exhausted or cancellation stops selection.
+    /// The caller uses the same frontier to retain the resulting checkpoint.
     pub fn next(
         &mut self,
         random: &mut SeededRandom,
@@ -524,6 +584,7 @@ impl CandidateFrontier {
                     self.target,
                 ) == Ordering::Equal
             });
+
             if self.sweep_entry.as_ref().is_some_and(|sweep| {
                 !eligible.clone().any(|entry| Rc::ptr_eq(entry, sweep))
                     || sweep.borrow().sweep_cursor >= BOARD_SIZE
@@ -548,12 +609,14 @@ impl CandidateFrontier {
                 entry.cursor += 1;
                 proposal
             };
+
             let Some(proposal) = proposal else {
                 if control.is_cancelled() {
                     return None;
                 }
                 continue;
             };
+
             if self.seen.contains(&proposal.mask) {
                 if control.is_cancelled() {
                     return None;
@@ -572,6 +635,7 @@ impl CandidateFrontier {
         None
     }
 
+    /// Update the stagnation counter after evaluating a scheduled proposal.
     pub fn record_evaluation(&mut self, improved: bool) {
         self.non_improving = if improved {
             0
@@ -580,18 +644,22 @@ impl CandidateFrontier {
         };
     }
 
+    /// Count the distinct masks recorded for this layout, including evicted checkpoints.
     pub fn seen_count(&self) -> usize {
         self.seen.len()
     }
 
+    /// Count the currently retained checkpoints.
     pub fn checkpoint_count(&self) -> usize {
         self.entries.len()
     }
 
+    /// Check whether the consecutive non-improving evaluations have reached the local limit.
     pub fn stagnant(&self) -> bool {
         self.non_improving >= STAGNATION_LIMIT
     }
 
+    /// Check whether this layout can schedule more proposals under its local bounds.
     pub fn exhausted(&self) -> bool {
         self.seen.len() >= MAX_SEEN_MASKS
             || self

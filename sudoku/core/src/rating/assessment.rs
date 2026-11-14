@@ -1,6 +1,6 @@
 use std::cell::OnceCell;
 
-use super::input::validate_input;
+use super::input::validate_rating_version;
 use super::policies::{policy_slice, supported_difficulties, supports_difficulty};
 use super::types::{
     AssessmentFailure, AssessmentIssue, AssessmentResult, AssessmentStage, DifficultyAssessment,
@@ -14,7 +14,7 @@ use crate::constraints::computation::prepare_computation;
 use crate::constraints::conflicts::evaluate_prepared_conflicts;
 use crate::constraints::types::{ConflictStatus, PreparedComputation};
 use crate::control::ExecutionControl;
-use crate::logic::solver::analyze_workspace_owned;
+use crate::logic::solver::{LogicContinuation, analyze_workspace_owned};
 use crate::logic::techniques::{Technique, execution_order};
 use crate::logic::types::{LogicStatus, LogicalStep};
 use crate::logic::workspace::create_prepared_workspace;
@@ -51,16 +51,18 @@ pub fn prepare_assessment_with_computation(
     })
 }
 
+/// Rate the board with the configured step limit and without a host cancellation probe.
 pub fn assess_puzzle(input: &AssessmentInput) -> AssessmentResult {
     assess_puzzle_with_control(input, &mut ExecutionControl::new())
 }
 
+/// Rate the board while sharing the caller's cancellation signal across all policies.
 pub fn assess_puzzle_with_control(
     input: &AssessmentInput,
     control: &mut ExecutionControl,
 ) -> AssessmentResult {
-    let prepared =
-        validate_input(input).and_then(|()| prepare_assessment(&input.rules, input.limits));
+    let prepared = validate_rating_version(input)
+        .and_then(|()| prepare_assessment(&input.rules, input.limits));
 
     match prepared {
         Ok(owner) => owner.assess(&input.board, control),
@@ -82,6 +84,32 @@ enum PolicyScreen {
         difficulty: Option<Difficulty>,
     },
     Invalid(Vec<AssessmentIssue>),
+}
+
+pub(crate) struct WitnessedTarget<'layout> {
+    pub board: &'layout Board,
+    pub difficulty: Difficulty,
+    pub completion: &'layout KnownCompletion,
+}
+
+struct PolicyEvaluation<'request> {
+    board: &'request Board,
+    control: &'request mut ExecutionControl,
+    target: Option<Difficulty>,
+    completion: Option<&'request KnownCompletion>,
+}
+
+struct PolicyScreenRequest<'request, Policies> {
+    evaluation: PolicyEvaluation<'request>,
+    limits: AssessmentLimits,
+    computation: &'request PreparedComputation,
+    policies: Policies,
+}
+
+enum BoardValidation {
+    Valid,
+    Invalid(Vec<AssessmentIssue>),
+    Cancelled,
 }
 
 fn message(value: impl Into<String>) -> Vec<AssessmentIssue> {
@@ -111,18 +139,16 @@ impl PreparedAssessment {
             .ok_or_else(|| EngineError::invalid("Assessment preparation was not retained"))
     }
 
-    fn evaluate(
-        &self,
-        board: &Board,
-        control: &mut ExecutionControl,
-        target: Option<Difficulty>,
-        completion: Option<&KnownCompletion>,
-    ) -> PolicyScreen {
-        if target.is_some_and(|target| !supports_difficulty(self.rules.variant(), target)) {
+    fn evaluate(&self, evaluation: PolicyEvaluation<'_>) -> PolicyScreen {
+        let variant = self.rules.variant();
+        if evaluation
+            .target
+            .is_some_and(|target| !supports_difficulty(variant, target))
+        {
             return PolicyScreen::Invalid(message("Unsupported assessment target"));
         }
 
-        let computation = match self.prepared(control) {
+        let computation = match self.prepared(evaluation.control) {
             Ok(Bounded::Complete(computation)) => computation,
             Ok(Bounded::Cancelled) => {
                 return PolicyScreen::Exhausted {
@@ -134,24 +160,29 @@ impl PreparedAssessment {
             Err(error) => return PolicyScreen::Invalid(message(error.to_string())),
         };
 
-        let policies = supported_difficulties(self.rules.variant())
+        let policies = supported_difficulties(variant)
             .iter()
-            .map(|&difficulty| (difficulty, policy_slice(self.rules.variant(), difficulty)));
-        screen_policies(
-            board,
-            self.limits,
+            .map(|&difficulty| (difficulty, policy_slice(variant, difficulty)));
+
+        screen_policies(PolicyScreenRequest {
+            evaluation,
+            limits: self.limits,
             computation,
-            control,
-            target,
             policies,
-            completion,
-        )
+        })
     }
 
-    /// Share the caller cancellation signal across policies and boards.
+    /// Find the first solving policy and return its owned trial for later workload accounting.
     pub fn screen(&self, board: &Board, control: &mut ExecutionControl) -> TrialAssessmentResult {
         let variant = self.rules.variant();
-        match self.evaluate(board, control, None, None) {
+        let evaluation = PolicyEvaluation {
+            board,
+            control,
+            target: None,
+            completion: None,
+        };
+
+        match self.evaluate(evaluation) {
             PolicyScreen::Rated { trial, .. } => TrialAssessmentResult::Rated(trial),
             PolicyScreen::Stalled(_) => {
                 TrialAssessmentResult::Unrated(AssessmentFailure::Ungraded { variant })
@@ -169,6 +200,7 @@ impl PreparedAssessment {
         }
     }
 
+    /// Rate a board and summarize its successful trace without solving it again.
     pub fn assess(&self, board: &Board, control: &mut ExecutionControl) -> AssessmentResult {
         match self.screen(board, control) {
             TrialAssessmentResult::Unrated(failure) => AssessmentResult::Unrated(failure),
@@ -181,37 +213,42 @@ impl PreparedAssessment {
         }
     }
 
+    /// Screen through the target policy and return a lower grade, matching grade or stall.
     pub fn screen_target(
         &self,
         board: &Board,
         target: Difficulty,
         control: &mut ExecutionControl,
     ) -> TargetScreenResult {
-        self.screen_target_inner(board, target, control, None)
+        self.screen_target_inner(PolicyEvaluation {
+            board,
+            control,
+            target: Some(target),
+            completion: None,
+        })
     }
 
     /// A validated completion avoids re-enumerating partial-clue feasibility for its own givens.
     /// Layout identity and every given are checked again; this does not establish uniqueness.
     pub(crate) fn screen_target_with_completion(
         &self,
-        board: &Board,
-        target: Difficulty,
+        target: WitnessedTarget<'_>,
         control: &mut ExecutionControl,
-        completion: &KnownCompletion,
     ) -> TargetScreenResult {
-        self.screen_target_inner(board, target, control, Some(completion))
+        self.screen_target_inner(PolicyEvaluation {
+            board: target.board,
+            control,
+            target: Some(target.difficulty),
+            completion: Some(target.completion),
+        })
     }
 
-    fn screen_target_inner(
-        &self,
-        board: &Board,
-        target: Difficulty,
-        control: &mut ExecutionControl,
-        completion: Option<&KnownCompletion>,
-    ) -> TargetScreenResult {
-        match self.evaluate(board, control, Some(target), completion) {
+    fn screen_target_inner(&self, evaluation: PolicyEvaluation<'_>) -> TargetScreenResult {
+        let target = evaluation.target;
+
+        match self.evaluate(evaluation) {
             PolicyScreen::Rated { trial, feedback } => {
-                if trial.difficulty() == target {
+                if Some(trial.difficulty()) == target {
                     TargetScreenResult::MatchingTarget { trial, feedback }
                 } else {
                     TargetScreenResult::BelowTarget { trial, feedback }
@@ -247,38 +284,61 @@ fn extends_prefix(
     previous.all(|technique| order.next() == Some(technique))
 }
 
-fn screen_policies<'policy>(
-    board: &Board,
-    limits: AssessmentLimits,
+fn validate_board_for_screening(
+    evaluation: &mut PolicyEvaluation<'_>,
     computation: &PreparedComputation,
-    control: &mut ExecutionControl,
-    target: Option<Difficulty>,
-    policies: impl IntoIterator<Item = (Difficulty, &'policy [Technique])>,
-    completion: Option<&KnownCompletion>,
-) -> PolicyScreen {
-    if let Some(completion) = completion {
-        if !completion.covers(board, computation.rules()) {
-            return PolicyScreen::Invalid(message("Board does not belong to the known completion"));
+) -> BoardValidation {
+    let is_incomplete = if let Some(completion) = evaluation.completion {
+        // Only a witness for this layout and these givens can replace support checks.
+        if !completion.covers(evaluation.board, computation.rules()) {
+            return BoardValidation::Invalid(message(
+                "Board does not belong to the known completion",
+            ));
         }
-        if !control.check() {
-            return PolicyScreen::Exhausted {
-                cause: ExhaustionCause::Cancelled,
-                stage: AssessmentStage::Validation,
-                difficulty: None,
-            };
-        }
+
+        !evaluation.control.check()
     } else {
-        let conflicts = evaluate_prepared_conflicts(board, computation, control);
+        let conflicts =
+            evaluate_prepared_conflicts(evaluation.board, computation, evaluation.control);
+
+        // Proven violations remain valid even if later support checks were cancelled.
         if !conflicts.violations.is_empty() {
-            return PolicyScreen::Invalid(
-                conflicts
-                    .violations
-                    .into_iter()
-                    .map(AssessmentIssue::Violation)
-                    .collect(),
-            );
+            let issues = conflicts
+                .violations
+                .into_iter()
+                .map(AssessmentIssue::Violation);
+            return BoardValidation::Invalid(issues.collect());
         }
-        if conflicts.status == ConflictStatus::Incomplete {
+
+        conflicts.status == ConflictStatus::Incomplete
+    };
+
+    if is_incomplete {
+        return BoardValidation::Cancelled;
+    }
+
+    BoardValidation::Valid
+}
+
+fn count_empty_cells(board: &Board) -> usize {
+    let digits = board.values().iter().filter(|&&digit| digit == 0);
+    digits.count()
+}
+
+fn screen_policies<'policy>(
+    request: PolicyScreenRequest<'_, impl IntoIterator<Item = (Difficulty, &'policy [Technique])>>,
+) -> PolicyScreen {
+    let PolicyScreenRequest {
+        mut evaluation,
+        limits,
+        computation,
+        policies,
+    } = request;
+
+    match validate_board_for_screening(&mut evaluation, computation) {
+        BoardValidation::Valid => {}
+        BoardValidation::Invalid(issues) => return PolicyScreen::Invalid(issues),
+        BoardValidation::Cancelled => {
             return PolicyScreen::Exhausted {
                 cause: ExhaustionCause::Cancelled,
                 stage: AssessmentStage::Validation,
@@ -287,18 +347,23 @@ fn screen_policies<'policy>(
         }
     }
 
+    let PolicyEvaluation {
+        board,
+        control,
+        target,
+        ..
+    } = evaluation;
+    let variant = computation.rules().rules().variant();
     let mut workspace = create_prepared_workspace(board, computation);
     let mut previous_allowed: &[Technique] = &[];
     let mut previous_steps: Vec<LogicalStep> = vec![];
     let mut feedback = TargetFeedback {
-        remaining_cells: board.values().iter().filter(|&&digit| digit == 0).count(),
+        remaining_cells: count_empty_cells(board),
         deductions: 0,
     };
 
     for (difficulty, allowed) in policies {
-        let variant = computation.rules().rules().variant();
-
-        // Only an unchanged priority prefix can resume domains; changed priorities need a fresh board.
+        // A priority change can alter earlier deductions, so restart unless the prefix is intact.
         if !extends_prefix(
             execution_order(variant, previous_allowed),
             execution_order(variant, allowed),
@@ -307,13 +372,14 @@ fn screen_policies<'policy>(
             previous_steps.clear();
         }
 
-        let result = analyze_workspace_owned(
-            &mut workspace,
+        // Retained steps count toward the next policy's step limit.
+        let result = analyze_workspace_owned(LogicContinuation {
+            state: &mut workspace,
             allowed,
-            limits.max_steps,
+            max_steps: limits.max_steps,
             control,
-            previous_steps,
-        );
+            steps: previous_steps,
+        });
 
         match result.status {
             LogicStatus::Cancelled | LogicStatus::StepLimit => {
@@ -331,12 +397,7 @@ fn screen_policies<'policy>(
         }
 
         feedback = TargetFeedback {
-            remaining_cells: result
-                .board
-                .values()
-                .iter()
-                .filter(|&&digit| digit == 0)
-                .count(),
+            remaining_cells: count_empty_cells(&result.board),
             deductions: result.steps.len(),
         };
 
@@ -351,6 +412,7 @@ fn screen_policies<'policy>(
                 feedback,
             };
         }
+
         if Some(difficulty) == target {
             break;
         }
@@ -382,9 +444,8 @@ mod tests {
         let input = &row["input"];
         let values: Vec<u8> = serde_json::from_value(input["board"].clone()).unwrap();
         let board = Board::try_from(values.as_slice()).unwrap();
-        let cages = input["rules"]["cages"]
-            .as_array()
-            .unwrap()
+        let cage_rows = input["rules"]["cages"].as_array().unwrap();
+        let cages = cage_rows
             .iter()
             .map(|cage| Cage {
                 cells: serde_json::from_value(cage["cells"].clone()).unwrap(),
@@ -410,17 +471,20 @@ mod tests {
             (Difficulty::Medium, changed.clone()),
         ];
 
-        let PolicyScreen::Rated { trial, .. } = screen_policies(
-            &board,
-            AssessmentLimits::default(),
-            &computation,
-            &mut ExecutionControl::new(),
-            None,
-            policies
-                .iter()
-                .map(|(difficulty, allowed)| (*difficulty, allowed.as_slice())),
-            None,
-        ) else {
+        let allowed_policies = policies
+            .iter()
+            .map(|(difficulty, allowed)| (*difficulty, allowed.as_slice()));
+        let PolicyScreen::Rated { trial, .. } = screen_policies(PolicyScreenRequest {
+            evaluation: PolicyEvaluation {
+                board: &board,
+                control: &mut ExecutionControl::new(),
+                target: None,
+                completion: None,
+            },
+            limits: AssessmentLimits::default(),
+            computation: &computation,
+            policies: allowed_policies,
+        }) else {
             panic!("Expected changed-priority rating");
         };
         let fresh = analyze_logic(

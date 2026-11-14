@@ -3,10 +3,10 @@ use std::collections::BTreeSet;
 use super::policies::{policy, technique_tier};
 use super::types::{ReasoningWorkload, TechniqueCounts};
 use crate::logic::pattern_facts::mask_of;
-use crate::logic::types::{Evidence, LogicalAction, LogicalStep};
+use crate::logic::types::{Evidence, LogicalAction, LogicalStep, LogicalWorkspace, Removal};
 use crate::logic::workspace::{apply_established_step, create_workspace};
 use crate::rules::types::{PreparedRules, UnitKind};
-use crate::types::{BOARD_SIZE, Board, CoreResult, Difficulty, EngineError};
+use crate::types::{BOARD_SIZE, Board, CoreResult, Difficulty, EngineError, UNIT_SIZE};
 
 fn has_variant_evidence(step: &LogicalStep) -> bool {
     match &step.evidence {
@@ -29,7 +29,33 @@ fn has_variant_evidence(step: &LogicalStep) -> bool {
     }
 }
 
-/// Replay effective actions; proving their soundness remains the detector's separate responsibility.
+fn is_available_candidate(state: &LogicalWorkspace, cell: usize, digit: u8) -> bool {
+    cell < BOARD_SIZE
+        && (1..=UNIT_SIZE as u8).contains(&digit)
+        && state.board.values()[cell] == 0
+        && (state.candidates[cell].bits() & mask_of(digit)) != 0
+}
+
+fn count_effective_removals(state: &LogicalWorkspace, removals: &[Removal]) -> CoreResult<u64> {
+    if removals.is_empty() {
+        return Err(EngineError::invalid("Trace contains an empty elimination"));
+    }
+
+    let mut removed = BTreeSet::new();
+    for removal in removals {
+        if !is_available_candidate(state, removal.cell, removal.digit)
+            || !removed.insert((removal.cell, removal.digit))
+        {
+            return Err(EngineError::invalid(
+                "Trace contains a duplicate or ineffective removal",
+            ));
+        }
+    }
+
+    Ok(removed.len() as u64)
+}
+
+/// Replay effective actions. The detector remains responsible for proving their soundness.
 pub fn summarize_trace(
     board: &Board,
     rules: &PreparedRules,
@@ -48,6 +74,7 @@ pub fn summarize_trace(
         variant_steps: 0,
     };
     let mut highest_order = None;
+
     for step in steps {
         let Some(index) = order
             .iter()
@@ -55,41 +82,26 @@ pub fn summarize_trace(
         else {
             return Err(EngineError::invalid("Trace uses an inapplicable technique"));
         };
+
         match &step.action {
             LogicalAction::Placement { cell, digit } => {
-                if *cell >= BOARD_SIZE
-                    || !(1..=9).contains(digit)
-                    || state.board.values()[*cell] != 0
-                    || state.candidates[*cell].bits() & mask_of(*digit) == 0
-                {
+                if !is_available_candidate(&state, *cell, *digit) {
                     return Err(EngineError::invalid(
                         "Trace placement does not change a supported empty cell",
                     ));
                 }
+
                 result.placements += 1;
             }
             LogicalAction::Elimination { removals } => {
-                if removals.is_empty() {
-                    return Err(EngineError::invalid("Trace contains an empty elimination"));
-                }
-                let mut removed = BTreeSet::new();
-                for removal in removals {
-                    if removal.cell >= BOARD_SIZE
-                        || !(1..=9).contains(&removal.digit)
-                        || state.board.values()[removal.cell] != 0
-                        || !removed.insert((removal.cell, removal.digit))
-                        || state.candidates[removal.cell].bits() & mask_of(removal.digit) == 0
-                    {
-                        return Err(EngineError::invalid(
-                            "Trace contains a duplicate or ineffective removal",
-                        ));
-                    }
-                }
+                result.candidate_removals += count_effective_removals(&state, removals)?;
                 result.eliminations += 1;
-                result.candidate_removals += removed.len() as u64;
             }
         }
+
+        // Replay the established action so the next step is checked against the updated domains.
         apply_established_step(&mut state, step);
+
         result.technique_counts.increment(step.technique);
         if has_variant_evidence(step) {
             result.variant_steps += 1;
@@ -100,5 +112,6 @@ pub fn summarize_trace(
             result.highest_tier = Some(technique_tier(step.technique));
         }
     }
+
     Ok(result)
 }

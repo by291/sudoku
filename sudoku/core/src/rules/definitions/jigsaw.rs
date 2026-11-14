@@ -4,6 +4,7 @@ use super::super::{
 };
 use crate::types::{CoreResult, EngineError, UNIT_SIZE};
 
+/// Validate a partition of the board into connected nine-cell regions.
 pub(super) fn validate(regions: &[Vec<usize>]) -> CoreResult<()> {
     if regions.len() != UNIT_SIZE {
         return Err(EngineError::invalid("Jigsaw requires nine regions"));
@@ -26,13 +27,17 @@ pub(super) fn validate(regions: &[Vec<usize>]) -> CoreResult<()> {
     Ok(())
 }
 
+/// Replace the Classic boxes with the validated Jigsaw regions.
 pub(super) fn compile(regions: &[Vec<usize>]) -> CompiledVariantRules {
     let mut units = classic_units();
+
+    // Jigsaw regions replace the trailing Classic boxes and preserve row and column order.
     units.truncate(UNIT_SIZE * 2);
     units.extend(regions.iter().enumerate().map(|(index, cells)| SudokuUnit {
         kind: UnitKind::Region,
         index,
         cells: cells.clone(),
     }));
+
     compile_units(units)
 }

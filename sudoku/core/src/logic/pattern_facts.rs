@@ -1,4 +1,5 @@
 use super::types::LogicalWorkspace;
+use crate::types::{BOX_SIZE, UNIT_SIZE};
 
 pub(crate) fn mask_of(digit: u8) -> u16 {
     1 << (digit - 1)
@@ -30,10 +31,18 @@ pub(crate) fn candidate_position_iter<'a>(
 }
 
 pub(crate) fn are_classic_peers(first: usize, second: usize) -> bool {
-    first != second
-        && (first / 9 == second / 9
-            || first % 9 == second % 9
-            || (first / 27 == second / 27 && first % 9 / 3 == second % 9 / 3))
+    if first == second {
+        return false;
+    }
+
+    let first_row = first / UNIT_SIZE;
+    let first_column = first % UNIT_SIZE;
+    let second_row = second / UNIT_SIZE;
+    let second_column = second % UNIT_SIZE;
+    let is_same_box = (first_row / BOX_SIZE == second_row / BOX_SIZE)
+        && (first_column / BOX_SIZE == second_column / BOX_SIZE);
+
+    first_row == second_row || first_column == second_column || is_same_box
 }
 
 pub(crate) fn has_peer_collision(cells: &[usize]) -> bool {

@@ -5,17 +5,19 @@ use crate::types::{CoreResult, EngineError};
 
 pub const SEED_LENGTH: usize = 32;
 pub const ROOT_SEED_CONTEXT: &str = "sudoku 2026-10-16 root seed v1";
-const U32_RANGE: f64 = 4294967296.0;
+const U32_RANGE: f64 = 4_294_967_296.0;
 
 /// A binary seed has no text encoding; every value of the fixed-width byte array is valid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Seed([u8; SEED_LENGTH]);
 
 impl Seed {
+    /// Take ownership of a fixed-width binary seed.
     pub fn from_bytes(bytes: [u8; SEED_LENGTH]) -> Self {
         Self(bytes)
     }
 
+    /// Borrow the seed in its original byte order.
     pub fn as_bytes(&self) -> &[u8; SEED_LENGTH] {
         &self.0
     }
@@ -42,10 +44,12 @@ impl TryFrom<&[u8]> for Seed {
 pub struct SeededRandom(ChaCha8Rng);
 
 impl SeededRandom {
+    /// Initialize the deterministic stream at its first word.
     pub fn new(seed: &Seed) -> Self {
         Self(ChaCha8Rng::from_seed(*seed.as_bytes()))
     }
 
+    /// Consume one word from the stream.
     pub fn next_u32(&mut self) -> u32 {
         self.0.next_u32()
     }

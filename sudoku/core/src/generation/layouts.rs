@@ -1,15 +1,20 @@
 use super::classic::construct_classic_terminal;
 use super::terminal_construction::{TerminalConstructionResult, construct_unit_terminal};
 use super::types::{GenerationInput, LayoutConstructionResult};
-use super::variant::{SpatialSymmetry, transform_rules};
+use super::variant::{
+    DigitTransform, SPATIAL_SYMMETRY_COUNT, SpatialSymmetry, transform_layout_rules,
+};
 use super::variant_strategies::capabilities;
-use super::variants::{arrow, diagonal, jigsaw, killer, thermo};
+use super::variants::{GeometryInput, arrow, diagonal, jigsaw, killer, thermo};
 use crate::control::ExecutionControl;
 use crate::random::SeededRandom;
 use crate::rules::context::{prepare_rules, validate_rules};
 use crate::rules::types::{PuzzleRules, SudokuVariant};
-use crate::types::{Bounded, CoreResult};
+use crate::types::{Bounded, CoreResult, UNIT_SIZE};
 
+/// Build one fresh terminal and its variant rules using independent random streams.
+///
+/// `Incomplete` stops the request on cancellation. `AttemptExhausted` retires this layout.
 pub fn construct_generation_layout(
     input: &GenerationInput,
     terminal_random: &mut SeededRandom,
@@ -34,22 +39,27 @@ pub fn construct_generation_layout(
         );
     }
 
-    // Each v11 variant/tier has one geometry example. Its selection draw remains part of seed identity.
+    // Each v11 variant/tier has one geometry example. Its selection draw remains part of seed
+    // identity.
     geometry_random.next_f64();
-    let symmetry = SpatialSymmetry::from_draw((geometry_random.next_f64() * 8.0) as usize);
+    let symmetry = SpatialSymmetry::from_draw(
+        (geometry_random.next_f64() * f64::from(SPATIAL_SYMMETRY_COUNT)) as usize,
+    );
     let permissions = capabilities(input.variant);
     if permissions.allows_digit_map {
-        // Teaching-board digit relabeling does not affect these unit geometries, but consumes eight draws.
-        let mut digit_order = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+        // Teaching-board digit relabeling does not affect these unit geometries, but consumes eight
+        // draws.
+        let mut digit_order: [u8; UNIT_SIZE] = std::array::from_fn(|index| index as u8 + 1);
         geometry_random.shuffle(&mut digit_order);
     } else if permissions.allows_complement {
-        // Arithmetic teaching clues are rebuilt for the new terminal; preserve their complement draw.
+        // Arithmetic teaching clues are rebuilt for the new terminal; preserve their complement
+        // draw.
         geometry_random.next_f64();
     }
 
     let terminal_rules = match input.variant {
         SudokuVariant::Diagonal => PuzzleRules::Diagonal,
-        SudokuVariant::Jigsaw => transform_rules(
+        SudokuVariant::Jigsaw => transform_layout_rules(
             &PuzzleRules::Jigsaw {
                 regions: jigsaw::REGION_PRESET
                     .iter()
@@ -57,7 +67,7 @@ pub fn construct_generation_layout(
                     .collect(),
             },
             symmetry,
-            false,
+            DigitTransform::Preserve,
         )?,
         SudokuVariant::Classic
         | SudokuVariant::Killer
@@ -79,20 +89,20 @@ pub fn construct_generation_layout(
             return Ok(LayoutConstructionResult::Failed { reason });
         }
     };
+
     // Only region geometry is reused. Arithmetic and path clues must describe this fresh terminal.
+    let geometry = GeometryInput {
+        terminal: &terminal,
+        random: geometry_random,
+        control,
+    };
     let rules = match &terminal_rules {
         PuzzleRules::Diagonal => Some(diagonal::create_geometry()),
-        PuzzleRules::Jigsaw { regions } => {
-            jigsaw::create_geometry(regions, &terminal, geometry_random, control)
-        }
+        PuzzleRules::Jigsaw { regions } => jigsaw::create_geometry(regions, geometry),
         PuzzleRules::Classic => match input.variant {
             SudokuVariant::Killer => killer::create_geometry(&terminal, geometry_random, control),
-            SudokuVariant::Thermo => {
-                thermo::create_geometry(&[], &terminal, geometry_random, control)
-            }
-            SudokuVariant::Arrow => {
-                arrow::create_geometry(&[], &terminal, geometry_random, control)
-            }
+            SudokuVariant::Thermo => thermo::create_geometry(&[], geometry),
+            SudokuVariant::Arrow => arrow::create_geometry(&[], geometry),
             SudokuVariant::Classic | SudokuVariant::Diagonal | SudokuVariant::Jigsaw => None,
         },
         PuzzleRules::Killer { .. } | PuzzleRules::Thermo { .. } | PuzzleRules::Arrow { .. } => None,
@@ -104,6 +114,7 @@ pub fn construct_generation_layout(
             LayoutConstructionResult::AttemptExhausted
         });
     };
+
     if rules.variant() != input.variant || validate_rules(&rules).is_err() {
         return Ok(LayoutConstructionResult::AttemptExhausted);
     }
@@ -112,5 +123,6 @@ pub fn construct_generation_layout(
     {
         return Ok(LayoutConstructionResult::AttemptExhausted);
     }
+
     Ok(LayoutConstructionResult::Ready { terminal, rules })
 }

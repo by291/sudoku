@@ -1,8 +1,9 @@
-use super::search::search_generation;
+use super::search::{GenerationSearch, search_generation};
 use super::types::{GenerationInput, GenerationLimits, GenerationMetrics, GenerationResult};
 use crate::control::ExecutionControl;
 use crate::types::CoreResult;
 
+/// Generate a puzzle with the default execution control.
 pub fn generate_puzzle(
     input: &GenerationInput,
     limits: &GenerationLimits,
@@ -17,8 +18,16 @@ pub fn generate_puzzle_with_control(
     control: &mut ExecutionControl,
 ) -> CoreResult<GenerationResult> {
     limits.validate()?;
+
     let mut metrics = GenerationMetrics::default();
-    let outcome = search_generation(input, limits, &mut metrics, control)?;
+
+    let outcome = search_generation(GenerationSearch {
+        input,
+        limits,
+        metrics: &mut metrics,
+        control,
+    })?;
+
     Ok(GenerationResult { outcome, metrics })
 }
 
@@ -29,9 +38,17 @@ pub fn generate_puzzle_controlled(
     probe: std::sync::Arc<dyn crate::control::CancellationProbe>,
 ) -> CoreResult<crate::control::Controlled<GenerationResult>> {
     limits.validate()?;
+
     let mut metrics = GenerationMetrics::default();
     let mut control = ExecutionControl::with_cancellation(probe);
-    let result = search_generation(input, limits, &mut metrics, &mut control);
+
+    let result = search_generation(GenerationSearch {
+        input,
+        limits,
+        metrics: &mut metrics,
+        control: &mut control,
+    });
+
     // Settle cancellation before interpreting a stopped inner operation as exhaustion or failure.
     match control.finish(result) {
         crate::control::Controlled::Cancelled => Ok(crate::control::Controlled::Cancelled),

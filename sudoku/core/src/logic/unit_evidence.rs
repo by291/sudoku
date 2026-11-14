@@ -26,6 +26,7 @@ pub(crate) fn valid_authored_unit_action(state: &LogicalWorkspace, step: &Logica
     let equal_cells = |first: &[usize], second: &[usize]| {
         first.len() == second.len() && first.iter().all(|cell| second.contains(cell))
     };
+
     match (&step.action, step.technique) {
         (LogicalAction::Placement { cell, digit }, Technique::NakedSingle) => {
             cells == &[*cell]
@@ -59,7 +60,7 @@ pub(crate) fn valid_authored_unit_action(state: &LogicalWorkspace, step: &Logica
                 return false;
             }
             let pair = mask_of(digits[0]) | mask_of(digits[1]);
-            let pattern_valid = if step.technique == Technique::NakedPair {
+            let is_pattern_valid = if step.technique == Technique::NakedPair {
                 cells
                     .iter()
                     .all(|&cell| state.candidates[cell].bits() == pair)
@@ -68,7 +69,8 @@ pub(crate) fn valid_authored_unit_action(state: &LogicalWorkspace, step: &Logica
                     equal_cells(&candidate_positions(state, &unit.cells, digit), cells)
                 })
             };
-            pattern_valid
+
+            is_pattern_valid
                 && removals.iter().all(|removal| {
                     unit.cells.contains(&removal.cell)
                         && state.board.values()[removal.cell] == 0

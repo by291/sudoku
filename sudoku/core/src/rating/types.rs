@@ -6,6 +6,8 @@ use crate::logic::types::LogicalStep;
 use crate::rules::types::{PreparedRules, PuzzleRules, SudokuVariant};
 use crate::types::{Board, Difficulty};
 
+pub const RATING_VERSION: &str = "sudoku-rating-v2";
+
 #[derive(Clone, Copy, Debug)]
 pub struct AssessmentLimits {
     pub max_steps: u32,
@@ -19,8 +21,6 @@ pub struct AssessmentInput {
     pub limits: AssessmentLimits,
 }
 
-pub const RATING_VERSION: &str = "sudoku-rating-v2";
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TechniqueCounts(pub(crate) [u64; ALL_TECHNIQUES.len()]);
 
@@ -31,10 +31,12 @@ impl Default for TechniqueCounts {
 }
 
 impl TechniqueCounts {
+    /// Return the number of recorded deductions using this technique.
     pub fn count(&self, technique: Technique) -> u64 {
         self.0[technique as usize]
     }
 
+    /// Record one effective deduction during trace replay.
     pub(crate) fn increment(&mut self, technique: Technique) {
         self.0[technique as usize] += 1;
     }
@@ -104,7 +106,7 @@ pub enum AssessmentResult {
     Unrated(AssessmentFailure),
 }
 
-/// Completion consumes a successful trial's board and trace; no control or policy search is retained.
+/// Completion consumes the board and trace of a successful trial without retaining search state.
 pub struct RatedTrial {
     pub(crate) board: Board,
     pub(crate) rules: PreparedRules,
@@ -113,6 +115,7 @@ pub struct RatedTrial {
 }
 
 impl RatedTrial {
+    /// Return the difficulty of the first policy that solved the board.
     pub fn difficulty(&self) -> Difficulty {
         self.difficulty
     }

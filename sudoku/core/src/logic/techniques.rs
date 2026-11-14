@@ -82,6 +82,7 @@ pub enum TechniqueAction {
 }
 
 impl Technique {
+    /// Return the stable identifier used in serialized evidence.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::NakedSingle => "naked-single",
@@ -104,20 +105,24 @@ impl Technique {
         }
     }
 
+    /// Resolve an exact stable technique identifier.
     pub fn parse(value: &str) -> Option<Self> {
         ALL_TECHNIQUES
             .into_iter()
             .find(|technique| technique.as_str() == value)
     }
 
+    /// Report whether the technique belongs to the advanced catalogue.
     pub fn is_advanced(self) -> bool {
         ADVANCED_TECHNIQUES.contains(&self)
     }
 
+    /// Report whether the technique belongs to the Classic catalogue.
     pub fn is_classic(self) -> bool {
         ALL_CLASSIC_TECHNIQUES.contains(&self)
     }
 
+    /// Return the action kinds the technique can produce.
     pub fn action(self) -> TechniqueAction {
         match self {
             Self::NakedSingle | Self::HiddenSingle | Self::CageRemainder | Self::ArrowEquation => {
@@ -146,8 +151,8 @@ pub(crate) fn execution_order(
     variant: SudokuVariant,
     allowed: &[Technique],
 ) -> impl Iterator<Item = Technique> + Clone + '_ {
-    let classic = variant == SudokuVariant::Classic;
-    let order = if classic {
+    let is_classic = variant == SudokuVariant::Classic;
+    let order = if is_classic {
         &ALL_CLASSIC_TECHNIQUES[..]
     } else {
         allowed
@@ -156,5 +161,5 @@ pub(crate) fn execution_order(
     order
         .iter()
         .copied()
-        .filter(move |technique| !classic || allowed.contains(technique))
+        .filter(move |technique| !is_classic || allowed.contains(technique))
 }

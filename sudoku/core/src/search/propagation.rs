@@ -2,11 +2,13 @@ use std::collections::VecDeque;
 
 use super::types::SearchResult;
 use crate::board::{base_candidates, is_complete};
+use crate::constraints::support::SupportBoard;
 use crate::constraints::types::PreparedComputation;
 use crate::control::ExecutionControl;
 use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask, UNIT_SIZE};
 
-// JS Set semantics: pop removes membership immediately; reinsertion appends to the tail.
+// Popping releases membership so a later domain change can enqueue the same index at the tail.
+// The FIFO order preserves deterministic propagation between duplicate-free visits.
 struct OrderedQueue {
     pending: VecDeque<usize>,
     present: Vec<bool>,
@@ -22,7 +24,7 @@ impl OrderedQueue {
 
     fn clear(&mut self) {
         self.pending.clear();
-        self.present.fill(false);
+        self.present.fill(bool::default());
     }
 
     fn insert(&mut self, index: usize) {
@@ -117,8 +119,9 @@ impl SearchState<'_> {
         if bits == self.domains[cell].bits() {
             return true;
         }
+
         self.assign(cell, CandidateMask::from_computed_bits(bits));
-        // Cell visits intentionally allow duplicates; unit and clue visits use ordered deduplication.
+        // Cells can be revisited; unit and clue queues deduplicate without changing order.
         queues.cells.push(cell);
         for &index in &self.computation.rules.context().cell_units[cell] {
             queues.units.insert(index);
@@ -132,8 +135,10 @@ impl SearchState<'_> {
     fn propagate(&mut self, changed_cell: Option<usize>, queues: &mut Queues) -> bool {
         let computation = self.computation;
         let context = computation.rules.context();
-        // A contradiction can leave all three queues pending; siblings always start with empty membership.
+        // A contradiction may leave work pending. Clear the queues before reusing them for a
+        // sibling so it starts with only the work scheduled by its own branch.
         queues.clear();
+
         if let Some(cell) = changed_cell {
             queues.cells.push(cell);
             for &index in &context.cell_units[cell] {
@@ -185,6 +190,7 @@ impl SearchState<'_> {
         if !self.checkpoint() {
             return false;
         }
+
         let mask = self.domains[cell].bits();
         if mask == 0 {
             return false;
@@ -192,6 +198,7 @@ impl SearchState<'_> {
         if mask & (mask - 1) != 0 {
             return true;
         }
+
         for &peer in &self.computation.rules.context().duplicate_peers[cell] {
             if !self.reduce(peer, self.domains[peer].bits() & !mask, queues) {
                 return false;
@@ -205,6 +212,7 @@ impl SearchState<'_> {
         if !self.checkpoint() {
             return false;
         }
+
         let cells = &self.computation.rules.context().units[index].cells;
         let mut positions = [0_u16; UNIT_SIZE];
         for (position, &cell) in cells.iter().enumerate() {
@@ -212,6 +220,7 @@ impl SearchState<'_> {
                 positions[usize::from(digit.value() - 1)] |= 1 << position;
             }
         }
+
         for digit in 0..UNIT_SIZE {
             let locations = positions[digit];
             if locations == 0 {
@@ -220,12 +229,15 @@ impl SearchState<'_> {
             if locations & (locations - 1) != 0 {
                 continue;
             }
+
             let cell = cells[locations.trailing_zeros() as usize];
             let bit = 1 << digit;
             let removed = CandidateMask::from_computed_bits(self.domains[cell].bits() & !bit);
             if !self.reduce(cell, bit, queues) {
                 return false;
             }
+            // Later digits in this pass must see the new domain immediately. The queue
+            // will revisit this unit only after the current propagation returns.
             for excluded in removed.digits() {
                 positions[usize::from(excluded.value() - 1)] &= !locations;
             }
@@ -238,14 +250,22 @@ impl SearchState<'_> {
         if !self.checkpoint() {
             return false;
         }
-        let result =
-            self.computation
-                .support
-                .query_at(&self.unassigned, &self.domains, index, self.control);
+
+        // Exact search represents even filled cells by singleton domains. An empty board
+        // lets support queries use those domains directly for every position.
+        let board = SupportBoard {
+            board: &self.unassigned,
+            candidates: &self.domains,
+        };
+        let result = self
+            .computation
+            .support
+            .query_at(board, index, self.control);
         let Bounded::Complete(support) = result else {
             self.exhausted = true;
             return false;
         };
+
         for (&cell, mask) in self.computation.rules.context().constraints[index]
             .cells()
             .iter()
@@ -258,16 +278,8 @@ impl SearchState<'_> {
         true
     }
 
-    fn visit(&mut self, changed_cell: Option<usize>, queues: &mut Queues) {
-        if self.nodes_visited >= self.node_limit || !self.checkpoint() {
-            self.exhausted = true;
-            return;
-        }
-        self.nodes_visited += 1;
-        if !self.propagate(changed_cell, queues) {
-            return;
-        }
-
+    fn branch_cell(&self) -> Option<usize> {
+        // Keep the first cell at each domain size. Two is the smallest branchable domain.
         let mut target = None;
         let mut fewest = UNIT_SIZE as u32 + 1;
         for cell in 0..BOARD_SIZE {
@@ -280,16 +292,39 @@ impl SearchState<'_> {
                 }
             }
         }
-        let Some(target) = target else {
-            let values =
-                std::array::from_fn(|cell| (self.domains[cell].bits().trailing_zeros() + 1) as u8);
-            let completed = Board::from_computed_values(values);
-            if self.known != Some(&completed) && is_complete(&completed, &self.computation.rules) {
-                self.count = if self.count == 0 { 1 } else { 2 };
-                if self.solution.is_none() {
-                    self.solution = Some(completed);
-                }
-            }
+        target
+    }
+
+    fn record_completed_solution(&mut self) {
+        let values =
+            std::array::from_fn(|cell| (self.domains[cell].bits().trailing_zeros() + 1) as u8);
+        let completed = Board::from_computed_values(values);
+
+        // The known completion already contributes to the count. Other singleton boards
+        // still need the full rule check before they can establish another solution.
+        if self.known == Some(&completed) || !is_complete(&completed, &self.computation.rules) {
+            return;
+        }
+
+        self.count = (self.count + 1).min(2);
+        if self.solution.is_none() {
+            self.solution = Some(completed);
+        }
+    }
+
+    fn visit(&mut self, changed_cell: Option<usize>, queues: &mut Queues) {
+        if self.nodes_visited >= self.node_limit || !self.checkpoint() {
+            self.exhausted = true;
+            return;
+        }
+        self.nodes_visited += 1;
+
+        if !self.propagate(changed_cell, queues) {
+            return;
+        }
+
+        let Some(target) = self.branch_cell() else {
+            self.record_completed_solution();
             return;
         };
 
@@ -304,12 +339,14 @@ impl SearchState<'_> {
             if choices & bit == 0 {
                 continue;
             }
+
             let mark = self.trail.len();
             self.assign(target, CandidateMask::from_computed_bits(bit));
             {
                 let guard = TrailGuard { state: self, mark };
                 guard.state.visit(Some(target), queues);
             }
+
             if self.exhausted || self.count == 2 {
                 return;
             }
@@ -329,13 +366,24 @@ impl Drop for TrailGuard<'_, '_> {
     }
 }
 
-pub(super) fn count_propagation_solutions(
-    board: &Board,
-    computation: &PreparedComputation,
-    control: &mut ExecutionControl,
-    node_limit: u64,
-    known: Option<&Board>,
-) -> SearchResult {
+pub(super) struct PropagationSearch<'layout> {
+    pub board: &'layout Board,
+    pub computation: &'layout PreparedComputation,
+    pub control: &'layout mut ExecutionControl,
+    pub node_limit: u64,
+    pub known: Option<&'layout Board>,
+}
+
+/// Count solutions with fresh propagation state and an optional validated completion.
+pub(super) fn count_propagation_solutions(search: PropagationSearch<'_>) -> SearchResult {
+    let PropagationSearch {
+        board,
+        computation,
+        control,
+        node_limit,
+        known,
+    } = search;
+
     let base = base_candidates(board, &computation.rules);
     // Search uses singleton domains for givens; presentation candidates use zero for filled cells.
     let domains = std::array::from_fn(|cell| {
@@ -345,6 +393,7 @@ pub(super) fn count_propagation_solutions(
             CandidateMask::from_computed_bits(1 << (board.values()[cell] - 1))
         }
     });
+
     let mut state = SearchState {
         givens: board,
         known,
@@ -359,6 +408,7 @@ pub(super) fn count_propagation_solutions(
         count: u8::from(known.is_some()),
         solution: known.cloned(),
     };
+
     let mut queues = Queues::new(computation);
     {
         let guard = TrailGuard {
@@ -367,6 +417,7 @@ pub(super) fn count_propagation_solutions(
         };
         guard.state.visit(None, &mut queues);
     }
+
     if state.exhausted {
         SearchResult::Incomplete {
             nodes_visited: state.nodes_visited,

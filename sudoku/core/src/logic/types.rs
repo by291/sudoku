@@ -1,7 +1,7 @@
 use super::techniques::Technique;
 use crate::constraints::types::PreparedConstraintSupport;
 use crate::rules::types::{PreparedRules, Unit};
-use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask};
+use crate::types::{BOARD_SIZE, Board, Bounded, CandidateMask, UNIT_SIZE};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CandidateDomain {
@@ -126,7 +126,7 @@ pub(crate) struct CageMemo {
 /// Only immutable preparation may be shared between workspaces. Use checked construction and
 /// step application to preserve their coupled invariants; returned evidence owns its snapshots.
 pub struct LogicalWorkspace {
-    pub(crate) positions: std::cell::OnceCell<[u128; 9]>,
+    pub(crate) positions: std::cell::OnceCell<[u128; UNIT_SIZE]>,
     pub(crate) board: Board,
     pub(crate) candidates: [CandidateMask; BOARD_SIZE],
     pub(crate) rules: PreparedRules,
@@ -137,9 +137,9 @@ pub struct LogicalWorkspace {
 
 impl LogicalWorkspace {
     /// Candidate positions belong to this exact board/domain revision and never cross workspaces.
-    pub(crate) fn digit_positions(&self) -> &[u128; 9] {
+    pub(crate) fn digit_positions(&self) -> &[u128; UNIT_SIZE] {
         self.positions.get_or_init(|| {
-            let mut positions = [0; 9];
+            let mut positions = [0; UNIT_SIZE];
             for (cell, mask) in self.candidates.iter().enumerate() {
                 for digit in mask.digits() {
                     positions[usize::from(digit.value() - 1)] |= 1_u128 << cell;
@@ -159,10 +159,12 @@ impl LogicalWorkspace {
         &self.candidates
     }
 
+    /// Borrow the immutable layout shared by compatible workspaces.
     pub fn rules(&self) -> &PreparedRules {
         &self.rules
     }
 
+    /// Borrow rule evidence accumulated since the last placement.
     pub fn premises(&self) -> &[RuleEvidence] {
         &self.premises
     }

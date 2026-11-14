@@ -6,6 +6,7 @@ pub struct GenerationCapabilities {
     pub allows_complement: bool,
 }
 
+/// Report the digit transformations that preserve the variant rules.
 pub fn capabilities(variant: SudokuVariant) -> GenerationCapabilities {
     match variant {
         SudokuVariant::Classic | SudokuVariant::Diagonal | SudokuVariant::Jigsaw => {

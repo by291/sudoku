@@ -10,6 +10,7 @@ impl GenerationLimits {
         if self.max_steps > maximum.max_steps {
             return Err(EngineError::invalid("Invalid generation limit: maxSteps"));
         }
+
         Ok(())
     }
 }

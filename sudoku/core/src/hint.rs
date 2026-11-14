@@ -34,7 +34,8 @@ pub enum HintResult {
     Unavailable(HintUnavailable),
 }
 
-/// Return the first incorrect entry or an owned elimination-to-placement chain using one caller control.
+/// Return the first incorrect entry or an owned elimination-to-placement chain.
+/// The caller supplies cooperative cancellation for deduction detection.
 pub fn analyze_hint(
     board: &Board,
     solution: &Board,
@@ -42,11 +43,11 @@ pub fn analyze_hint(
     max_steps: u32,
     control: &mut ExecutionControl,
 ) -> HintResult {
-    if let Some(cell) = board
-        .values()
-        .iter()
-        .enumerate()
-        .position(|(cell, &value)| value != 0 && value != solution.values()[cell])
+    // The solution can identify an incorrect entry, but supplies no deduction evidence.
+    let values = board.values();
+    let mut entries = values.iter().enumerate();
+    if let Some(cell) =
+        entries.position(|(cell, &value)| value != 0 && value != solution.values()[cell])
     {
         return HintResult::ReviewEntry { cell };
     }
@@ -57,6 +58,7 @@ pub fn analyze_hint(
     let mut state = create_workspace(board, rules);
     let techniques = hint_techniques_slice(rules.rules().variant());
     let mut steps = vec![];
+
     for _ in 0..max_steps {
         let step = match find_step(&mut state, techniques, control) {
             Bounded::Cancelled => {
@@ -67,18 +69,20 @@ pub fn analyze_hint(
             }
             Bounded::Complete(Some(step)) => *step,
         };
-        let placement = if let LogicalAction::Placement { cell, digit } = step.action {
-            Some(Placement { cell, digit })
-        } else {
-            None
-        };
-        if placement.is_none() {
-            apply_established_step(&mut state, &step);
+
+        // The first placement finishes the hint. Only eliminations affect the next detection.
+        if let LogicalAction::Placement { cell, digit } = step.action {
+            steps.push(step);
+            return HintResult::Deduction {
+                steps,
+                placement: Placement { cell, digit },
+            };
         }
+
+        apply_established_step(&mut state, &step);
         steps.push(step);
-        if let Some(placement) = placement {
-            return HintResult::Deduction { steps, placement };
-        }
     }
+
+    // A partial elimination chain has no placement to offer.
     HintResult::Unavailable(HintUnavailable::Incomplete)
 }

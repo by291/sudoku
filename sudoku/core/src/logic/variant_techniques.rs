@@ -5,11 +5,11 @@ use super::types::{
     Removal, RuleEvidence, RuleEvidenceKind, StepOutcome,
 };
 use super::workspace::{all_digits, local_domains};
-use crate::constraints::support::raw_for_constraint;
+use crate::constraints::support::{RawSupportQuery, SupportBoard, raw_for_constraint};
 use crate::constraints::types::{MAX_CONSTRAINT_CELLS, SupportMasksResult};
 use crate::control::ExecutionControl;
 use crate::rules::types::RuleConstraint;
-use crate::types::{Bounded, CandidateMask};
+use crate::types::{Bounded, CandidateMask, UNIT_SIZE};
 
 pub(crate) fn matches_rule_technique(technique: Technique, constraint: &RuleConstraint) -> bool {
     match constraint {
@@ -31,9 +31,9 @@ fn combination_support(
     control: &mut ExecutionControl,
 ) -> SupportMasksResult {
     let constraint = &state.rules.context().constraints[index];
-    let cage = matches!(constraint, RuleConstraint::Cage { .. });
+    let is_cage = matches!(constraint, RuleConstraint::Cage { .. });
     let domains = std::array::from_fn(|position| {
-        if !cage || position >= constraint.cells().len() {
+        if !is_cage || position >= constraint.cells().len() {
             return CandidateMask::EMPTY;
         }
         let cell = constraint.cells()[position];
@@ -43,7 +43,8 @@ fn combination_support(
             CandidateMask::from_computed_bits(mask_of(state.board.values()[cell]))
         }
     });
-    if cage
+
+    if is_cage
         && let Some(previous) = &state.cage_memo[index]
         && previous.domains == domains
     {
@@ -51,37 +52,43 @@ fn combination_support(
         return Bounded::Complete(previous.supports);
     }
 
+    let board = SupportBoard {
+        board: &state.board,
+        candidates: &state.candidates,
+    };
     let result = if let Some(support) = &state.support {
-        support.query_at(&state.board, &state.candidates, index, control)
+        support.query_at(board, index, control)
     } else {
         raw_for_constraint(
-            &state.board,
-            &state.candidates,
-            &state.rules,
-            constraint,
+            RawSupportQuery {
+                board,
+                rules: &state.rules,
+                constraint,
+            },
             control,
         )
     };
-    if cage && let Bounded::Complete(support) = &result {
+
+    if is_cage && let Bounded::Complete(support) = &result {
         // Keep one owned complete snapshot per cage; an interrupted enumeration proves nothing.
         state.cage_memo[index] = Some(CageMemo {
             domains,
             supports: *support,
         });
     }
+
     result
 }
 
 pub(crate) fn clue_evidence(state: &LogicalWorkspace, constraint: &RuleConstraint) -> RuleEvidence {
     let cells = constraint.cells().to_vec();
     let domains = || {
-        cells
-            .iter()
-            .copied()
-            .zip(local_domains(state, &cells))
+        let indexed_domains = cells.iter().copied().zip(local_domains(state, &cells));
+        indexed_domains
             .map(|(cell, mask)| CandidateDomain { cell, mask })
             .collect()
     };
+
     let kind = match constraint {
         RuleConstraint::Cage { sum, .. } => RuleEvidenceKind::Cage {
             sum: *sum,
@@ -97,6 +104,7 @@ pub(crate) fn clue_evidence(state: &LogicalWorkspace, constraint: &RuleConstrain
             domains: domains(),
         },
     };
+
     RuleEvidence {
         constraint_id: constraint.id().to_string(),
         cells,
@@ -140,6 +148,34 @@ fn deduction_action(
     }
 }
 
+fn thermo_support(state: &LogicalWorkspace, cells: &[usize]) -> [u16; MAX_CONSTRAINT_CELLS] {
+    let mut supported = [0; MAX_CONSTRAINT_CELLS];
+
+    for (position, mask) in supported.iter_mut().take(cells.len()).enumerate() {
+        let mut minimum = position as i32 + 1;
+        let mut maximum = UNIT_SIZE as i32 - (cells.len() - position - 1) as i32;
+
+        // A strictly increasing path needs at least one digit of change per intervening step.
+        for (index, &other) in cells.iter().enumerate() {
+            let digit = i32::from(state.board.values()[other]);
+            if digit == 0 || index == position {
+                continue;
+            }
+            if index < position {
+                minimum = minimum.max(digit + (position - index) as i32);
+            } else {
+                maximum = maximum.min(digit - (index - position) as i32);
+            }
+        }
+
+        *mask = (1..=UNIT_SIZE as u8)
+            .filter(|&digit| i32::from(digit) >= minimum && i32::from(digit) <= maximum)
+            .fold(0, |bits, digit| bits | mask_of(digit));
+    }
+
+    supported
+}
+
 fn simple_step(
     state: &LogicalWorkspace,
     constraint: &RuleConstraint,
@@ -149,33 +185,14 @@ fn simple_step(
     if technique == Technique::ThermoBound
         && let RuleConstraint::Thermo { .. } = constraint
     {
-        let mut supported = [0; MAX_CONSTRAINT_CELLS];
-        for (position, mask) in supported.iter_mut().take(cells.len()).enumerate() {
-            let mut minimum = position as i32 + 1;
-            let mut maximum = 9 - (cells.len() - position - 1) as i32;
-            for (index, &other) in cells.iter().enumerate() {
-                if state.board.values()[other] == 0 || index == position {
-                    continue;
-                }
-                if index < position {
-                    minimum = minimum
-                        .max(i32::from(state.board.values()[other]) + (position - index) as i32);
-                } else {
-                    maximum = maximum
-                        .min(i32::from(state.board.values()[other]) - (index - position) as i32);
-                }
-            }
-            *mask = (1..=9)
-                .filter(|&digit| i32::from(digit) >= minimum && i32::from(digit) <= maximum)
-                .fold(0, |bits, digit| bits | mask_of(digit));
-        }
+        let supported = thermo_support(state, cells);
+
         let action = deduction_action(state, cells, &supported)?;
         let mut evidence = clue_evidence(state, constraint);
+
         if let RuleEvidenceKind::Thermo { bounds, .. } = &mut evidence.kind {
-            *bounds = cells
-                .iter()
-                .copied()
-                .zip(&supported)
+            let cell_support = cells.iter().copied().zip(&supported);
+            *bounds = cell_support
                 .filter_map(|(cell, &bits)| {
                     if bits == 0 {
                         return None;
@@ -188,24 +205,28 @@ fn simple_step(
                 })
                 .collect();
         }
+
         return Some(LogicalStep {
             technique,
             evidence: Evidence::Rule(evidence),
             action,
         });
     }
+
     if technique == Technique::CageDistinct && matches!(constraint, RuleConstraint::Cage { .. }) {
         let used = cells
             .iter()
             .filter(|&&cell| state.board.values()[cell] != 0)
             .fold(0, |bits, &cell| bits | mask_of(state.board.values()[cell]));
         let action = deduction_action(state, cells, &[!used; MAX_CONSTRAINT_CELLS])?;
+
         return Some(LogicalStep {
             technique,
             evidence: Evidence::Rule(clue_evidence(state, constraint)),
             action,
         });
     }
+
     if (technique == Technique::CageRemainder && matches!(constraint, RuleConstraint::Cage { .. }))
         || (technique == Technique::ArrowEquation
             && matches!(constraint, RuleConstraint::Arrow { .. }))
@@ -226,20 +247,25 @@ fn simple_step(
         let answer = match constraint {
             RuleConstraint::Cage { sum, .. } => i32::from(*sum) - total,
             RuleConstraint::Arrow { .. } => {
-                if cell == cells[0] {
+                let circle = cells[0];
+                if cell == circle {
                     total
                 } else {
-                    // Total includes the circle, so remove it before subtracting the known shaft sum.
-                    let known_shaft_sum = total - i32::from(state.board.values()[cells[0]]);
-                    i32::from(state.board.values()[cells[0]]) - known_shaft_sum
+                    // The total includes the circle as well as the known shaft digits.
+                    let circle_digit = i32::from(state.board.values()[circle]);
+                    let known_shaft_sum = total - circle_digit;
+                    circle_digit - known_shaft_sum
                 }
             }
             RuleConstraint::Thermo { .. } => return None,
         };
-        if !(1..=9).contains(&answer) || state.candidates[cell].bits() & mask_of(answer as u8) == 0
+
+        if !(1..=UNIT_SIZE as i32).contains(&answer)
+            || state.candidates[cell].bits() & mask_of(answer as u8) == 0
         {
             return None;
         }
+
         return Some(LogicalStep {
             technique,
             evidence: Evidence::Rule(clue_evidence(state, constraint)),
@@ -269,9 +295,12 @@ pub fn find_variant_step(
             {
                 continue;
             }
+
+            // Only eligible clues participate in the ordered detector scan.
             if !control.check() {
                 return Bounded::Cancelled;
             }
+
             if let Some(step) = simple_step(state, constraint, technique) {
                 return Bounded::Complete(Some(Box::new(step)));
             }
@@ -295,5 +324,6 @@ pub fn find_variant_step(
             }
         }
     }
+
     Bounded::Complete(None)
 }

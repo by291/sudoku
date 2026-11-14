@@ -8,6 +8,7 @@ mod thermo;
 use super::types::{CompiledVariantRules, PuzzleRules};
 use crate::types::CoreResult;
 
+/// Validate each variant's geometry before it can be compiled.
 pub(super) fn validate(rules: &PuzzleRules) -> CoreResult<()> {
     match rules {
         PuzzleRules::Classic | PuzzleRules::Diagonal => Ok(()),
@@ -18,6 +19,7 @@ pub(super) fn validate(rules: &PuzzleRules) -> CoreResult<()> {
     }
 }
 
+/// Compile validated variant rules into the shared rule primitives.
 pub(super) fn compile(rules: &PuzzleRules) -> CompiledVariantRules {
     match rules {
         PuzzleRules::Classic => classic::compile(),

@@ -2,7 +2,7 @@
 use super::HintResult;
 use crate::control::ExecutionControl;
 use crate::logic::step_shape::{STEP_COUNT_LIMIT, valid_step_shape};
-use crate::logic::step_validation::{ValidationMode, invalid, validate_step_and_apply};
+use crate::logic::step_validation::{StepReplay, ValidationMode, invalid, validate_step_and_apply};
 use crate::logic::types::{Evidence, LogicalAction};
 use crate::logic::workspace::create_workspace;
 use crate::rules::context::compile_rules;
@@ -19,20 +19,23 @@ pub fn validate_hint_shape(hint: &HintResult) -> CoreResult<HintResult> {
         }
         return Ok(parsed);
     };
-    if steps.is_empty()
-        || steps.len() > STEP_COUNT_LIMIT
-        || !steps.iter().all(valid_step_shape)
-        || steps[..steps.len() - 1]
-            .iter()
-            .any(|step| matches!(step.action, LogicalAction::Placement { .. }))
-        || steps.last().is_none_or(|step| {
-            step.action
-                != (LogicalAction::Placement {
-                    cell: placement.cell,
-                    digit: placement.digit,
-                })
-        })
-    {
+
+    let Some((last, preceding)) = steps.split_last() else {
+        return Err(invalid());
+    };
+    if steps.len() > STEP_COUNT_LIMIT || !steps.iter().all(valid_step_shape) {
+        return Err(invalid());
+    }
+
+    // A placement ends the chain, and the summary must identify that same action.
+    let has_early_placement = preceding
+        .iter()
+        .any(|step| matches!(step.action, LogicalAction::Placement { .. }));
+    let terminal_action = LogicalAction::Placement {
+        cell: placement.cell,
+        digit: placement.digit,
+    };
+    if has_early_placement || last.action != terminal_action {
         return Err(invalid());
     }
 
@@ -41,6 +44,7 @@ pub fn validate_hint_shape(hint: &HintResult) -> CoreResult<HintResult> {
             units.get_or_insert_with(Vec::new);
         }
     }
+
     Ok(parsed)
 }
 
@@ -68,8 +72,17 @@ pub fn validate_hint_evidence_with_control(
 
     let context = compile_rules(rules)?;
     let mut state = board.map(|board| create_workspace(board, &context));
+
+    // Each proof sees the domains left by all preceding actions.
     for step in steps {
-        validate_step_and_apply(step, &context, &mut state, control, ValidationMode::Hint)?;
+        validate_step_and_apply(StepReplay {
+            step,
+            context: &context,
+            state: &mut state,
+            control,
+            mode: ValidationMode::Hint,
+        })?;
     }
+
     Ok(parsed)
 }

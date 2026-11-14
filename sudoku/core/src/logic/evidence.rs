@@ -8,24 +8,31 @@ pub(crate) fn unit_identity(unit: &SudokuUnit) -> Unit {
     }
 }
 
-pub(crate) fn unit_evidence(
-    state: &LogicalWorkspace,
-    unit: &SudokuUnit,
-    cells: Vec<usize>,
-    digits: Vec<u8>,
-) -> Evidence {
+pub(crate) struct UnitWitness<'a> {
+    pub state: &'a LogicalWorkspace,
+    pub unit: &'a SudokuUnit,
+    pub cells: Vec<usize>,
+    pub digits: Vec<u8>,
+}
+
+pub(crate) fn unit_evidence(witness: UnitWitness<'_>) -> Evidence {
+    let UnitWitness {
+        state,
+        unit,
+        cells,
+        digits,
+    } = witness;
+
     let units = if matches!(state.rules.rules(), PuzzleRules::Classic) {
         vec![]
     } else {
-        state
-            .rules
-            .context()
-            .units
+        let related_units = &state.rules.context().units;
+        let containing_units = related_units
             .iter()
-            .filter(|candidate| cells.iter().any(|cell| candidate.cells.contains(cell)))
-            .map(unit_identity)
-            .collect()
+            .filter(|candidate| cells.iter().any(|cell| candidate.cells.contains(cell)));
+        containing_units.map(unit_identity).collect()
     };
+
     Evidence::Unit {
         unit: unit_identity(unit),
         cells,

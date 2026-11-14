@@ -11,7 +11,12 @@ use crate::control::ExecutionControl;
 use crate::rules::types::{PuzzleRules, SudokuUnit, UnitKind};
 use crate::types::{ALL_DIGITS_MASK, BOARD_SIZE, Bounded, CandidateMask, UNIT_SIZE};
 
-// Lexicographic combinations preserve the reference's recursive traversal without allocating each choice.
+// Advanced detection is Classic-only, with at most one strong link per full unit.
+const CLASSIC_UNIT_COUNT: usize = UNIT_SIZE * 3;
+const X_WING_SIZE: usize = 2;
+const SWORDFISH_SIZE: usize = 3;
+
+// Lexicographic traversal keeps the first selected witness stable.
 fn combinations<T: Copy, const SIZE: usize>(values: &[T]) -> impl Iterator<Item = [T; SIZE]> + '_ {
     let mut indices: [usize; SIZE] = std::array::from_fn(|index| index);
     let mut finished = SIZE == 0 || SIZE > values.len();
@@ -36,21 +41,30 @@ fn combinations<T: Copy, const SIZE: usize>(values: &[T]) -> impl Iterator<Item 
     })
 }
 
-fn selected_step(
-    state: &LogicalWorkspace,
+struct SelectedStep<'a> {
+    state: &'a LogicalWorkspace,
     technique: Technique,
     action: LogicalAction,
-    cells: &[usize],
+    cells: &'a [usize],
     digits: u16,
     kind: AdvancedEvidenceKind,
-) -> StepOutcome {
+}
+
+fn selected_step(selection: SelectedStep<'_>) -> LogicalStep {
+    let SelectedStep {
+        state,
+        technique,
+        action,
+        cells,
+        digits,
+        kind,
+    } = selection;
     let mut cells = cells.to_vec();
     cells.sort_unstable();
-    // Snapshot ownership begins only after finding an action. Replayed domains still prove premises independently.
-    let domains = state
-        .candidates
-        .iter()
-        .enumerate()
+
+    // Capture the pre-action domains so replay can verify the witness independently.
+    let indexed_candidates = state.candidates.iter().enumerate();
+    let domains = indexed_candidates
         .map(|(cell, &mask)| CandidateDomain {
             cell,
             mask: if state.board.values()[cell] == 0 {
@@ -60,19 +74,18 @@ fn selected_step(
             },
         })
         .collect();
-    Bounded::Complete(Some(Box::new(LogicalStep {
+
+    let digits = CandidateMask::from_computed_bits(digits);
+    LogicalStep {
         technique,
         evidence: Evidence::Advanced(AdvancedEvidence {
             cells,
-            digits: CandidateMask::from_computed_bits(digits)
-                .digits()
-                .map(|digit| digit.value())
-                .collect(),
+            digits: digits.digits().map(|digit| digit.value()).collect(),
             domains,
             kind,
         }),
         action,
-    })))
+    }
 }
 
 fn elimination_action(
@@ -80,11 +93,12 @@ fn elimination_action(
     targets: impl IntoIterator<Item = usize>,
     digits: u16,
 ) -> Option<LogicalAction> {
-    // The previous set explicitly sorted/deduplicated targets; ordered unit/path lists remain untouched.
+    // Visit each removal target once in cell order, independent of witness traversal order.
     let mut selected = [false; BOARD_SIZE];
     for cell in targets {
         selected[cell] = true;
     }
+
     let mut removals = vec![];
     for (cell, &selected) in selected.iter().enumerate() {
         if !selected || state.board.values()[cell] != 0 {
@@ -99,6 +113,7 @@ fn elimination_action(
             });
         }
     }
+
     if removals.is_empty() {
         None
     } else {
@@ -113,21 +128,24 @@ fn find_naked_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) -
         let mut eligible_cells = [0; UNIT_SIZE];
         let mut eligible_count = 0;
         for &cell in &unit.cells {
-            if state.board.values()[cell] == 0 {
-                empty_cells[empty_count] = cell;
-                empty_count += 1;
-                if (2..=3).contains(&state.candidates[cell].count()) {
-                    eligible_cells[eligible_count] = cell;
-                    eligible_count += 1;
-                }
+            if state.board.values()[cell] != 0 {
+                continue;
+            }
+
+            empty_cells[empty_count] = cell;
+            empty_count += 1;
+            if (2..=3).contains(&state.candidates[cell].count()) {
+                eligible_cells[eligible_count] = cell;
+                eligible_count += 1;
             }
         }
 
-        // Charge each lexicographic cell combination, including rejected patterns.
+        // Check cancellation even when no visited combination yields a deduction.
         for cells in combinations::<_, 3>(&eligible_cells[..eligible_count]) {
             if !control.check() {
                 return Bounded::Cancelled;
             }
+
             let digits = cells
                 .iter()
                 .fold(0, |bits, &cell| bits | state.candidates[cell].bits());
@@ -140,17 +158,18 @@ fn find_naked_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) -
                 .copied()
                 .filter(|cell| !cells.contains(cell));
             if let Some(action) = elimination_action(state, targets, digits) {
-                return selected_step(
+                let step = selected_step(SelectedStep {
                     state,
-                    Technique::NakedTriple,
+                    technique: Technique::NakedTriple,
                     action,
-                    &cells,
+                    cells: &cells,
                     digits,
-                    AdvancedEvidenceKind::Subset {
+                    kind: AdvancedEvidenceKind::Subset {
                         unit: unit_identity(unit),
                         hidden: false,
                     },
-                );
+                });
+                return Bounded::Complete(Some(Box::new(step)));
             }
         }
     }
@@ -163,11 +182,13 @@ fn find_hidden_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) 
     for (index, unit) in state.rules.context().units.iter().enumerate() {
         let positions =
             global_positions.map(|positions| positions & state.rules.unit_masks()[index]);
-        // Hidden triples visit all lexicographic digit triples, even in sparse/contradictory states.
+
+        // Keep the same traversal in sparse states so each digit triple remains a checkpoint.
         for selected_digits in combinations::<_, 3>(&all_digits) {
             if !control.check() {
                 return Bounded::Cancelled;
             }
+
             let digits = selected_digits
                 .iter()
                 .fold(0, |bits, &digit| bits | mask_of(digit));
@@ -179,26 +200,158 @@ fn find_hidden_triple(state: &LogicalWorkspace, control: &mut ExecutionControl) 
             {
                 continue;
             }
+
             let cells: [usize; 3] = std::array::from_fn(|_| {
                 let cell = mask.trailing_zeros() as usize;
                 mask &= mask - 1;
                 cell
             });
             if let Some(action) = elimination_action(state, cells, ALL_DIGITS_MASK & !digits) {
-                return selected_step(
+                let step = selected_step(SelectedStep {
                     state,
-                    Technique::HiddenTriple,
+                    technique: Technique::HiddenTriple,
                     action,
-                    &cells,
+                    cells: &cells,
                     digits,
-                    AdvancedEvidenceKind::Subset {
+                    kind: AdvancedEvidenceKind::Subset {
                         unit: unit_identity(unit),
                         hidden: true,
                     },
-                );
+                });
+                return Bounded::Complete(Some(Box::new(step)));
             }
         }
     }
+    Bounded::Complete(None)
+}
+
+struct FishPattern<'a> {
+    digit: u8,
+    cover_kind: UnitKind,
+    bases: &'a [usize],
+}
+
+fn fish_bases<const SIZE: usize>(
+    state: &LogicalWorkspace,
+    kind: UnitKind,
+    digit: u8,
+) -> ([usize; UNIT_SIZE], usize) {
+    let units = &state.rules.context().units;
+    let mut possible = [0; UNIT_SIZE];
+    let mut possible_count = 0;
+    for (index, unit) in units
+        .iter()
+        .enumerate()
+        .filter(|(_, unit)| unit.kind == kind)
+    {
+        if (2..=SIZE).contains(&candidate_position_iter(state, &unit.cells, digit).count()) {
+            possible[possible_count] = index;
+            possible_count += 1;
+        }
+    }
+    (possible, possible_count)
+}
+
+fn fish_step(state: &LogicalWorkspace, pattern: FishPattern<'_>) -> Option<LogicalStep> {
+    let units = &state.rules.context().units;
+    let mut cells = [0; UNIT_SIZE];
+    let mut cell_count = 0;
+    for &index in pattern.bases {
+        for cell in candidate_position_iter(state, &units[index].cells, pattern.digit) {
+            cells[cell_count] = cell;
+            cell_count += 1;
+        }
+    }
+    let cells = &cells[..cell_count];
+
+    let mut covering = [0; UNIT_SIZE];
+    let mut cover_count = 0;
+    for (index, unit) in units
+        .iter()
+        .enumerate()
+        .filter(|(_, unit)| unit.kind == pattern.cover_kind)
+    {
+        if cells.iter().any(|cell| unit.cells.contains(cell)) {
+            covering[cover_count] = index;
+            cover_count += 1;
+        }
+    }
+
+    // Each base needs a distinct cover for the digit, so the fish consumes every cover.
+    if cover_count != pattern.bases.len() {
+        return None;
+    }
+
+    let covering = &covering[..cover_count];
+    let targets = covering
+        .iter()
+        .flat_map(|&index| units[index].cells.iter().copied())
+        .filter(|cell| {
+            !pattern
+                .bases
+                .iter()
+                .any(|&index| units[index].cells.contains(cell))
+        });
+    let digits = mask_of(pattern.digit);
+    let action = elimination_action(state, targets, digits)?;
+
+    let technique = if pattern.bases.len() == X_WING_SIZE {
+        Technique::XWing
+    } else {
+        Technique::Swordfish
+    };
+    let kind = AdvancedEvidenceKind::Fish {
+        bases: pattern
+            .bases
+            .iter()
+            .map(|&index| unit_identity(&units[index]))
+            .collect(),
+        covers: covering
+            .iter()
+            .map(|&index| unit_identity(&units[index]))
+            .collect(),
+    };
+    Some(selected_step(SelectedStep {
+        state,
+        technique,
+        action,
+        cells,
+        digits,
+        kind,
+    }))
+}
+
+fn find_oriented_fish<const SIZE: usize>(
+    state: &LogicalWorkspace,
+    base_kind: UnitKind,
+    control: &mut ExecutionControl,
+) -> StepOutcome {
+    let cover_kind = if base_kind == UnitKind::Row {
+        UnitKind::Column
+    } else {
+        UnitKind::Row
+    };
+
+    for digit in 1..=UNIT_SIZE as u8 {
+        let (possible, possible_count) = fish_bases::<SIZE>(state, base_kind, digit);
+
+        // Keep the checkpoint for every combination, including rejected cover sets.
+        for selected in combinations::<_, SIZE>(&possible[..possible_count]) {
+            if !control.check() {
+                return Bounded::Cancelled;
+            }
+
+            let pattern = FishPattern {
+                digit,
+                cover_kind,
+                bases: &selected,
+            };
+            if let Some(step) = fish_step(state, pattern) {
+                return Bounded::Complete(Some(Box::new(step)));
+            }
+        }
+    }
+
     Bounded::Complete(None)
 }
 
@@ -206,90 +359,14 @@ fn find_fish<const SIZE: usize>(
     state: &LogicalWorkspace,
     control: &mut ExecutionControl,
 ) -> StepOutcome {
-    let units = &state.rules.context().units;
+    // Rows precede columns so the detector selects the same first witness.
     for kind in [UnitKind::Row, UnitKind::Column] {
-        let other_kind = if kind == UnitKind::Row {
-            UnitKind::Column
-        } else {
-            UnitKind::Row
-        };
-        for digit in 1..=9 {
-            let mut possible = [0; UNIT_SIZE];
-            let mut possible_count = 0;
-            for (index, unit) in units
-                .iter()
-                .enumerate()
-                .filter(|(_, unit)| unit.kind == kind)
-            {
-                if (2..=SIZE).contains(&candidate_position_iter(state, &unit.cells, digit).count())
-                {
-                    possible[possible_count] = index;
-                    possible_count += 1;
-                }
-            }
-            for selected in combinations::<_, SIZE>(&possible[..possible_count]) {
-                if !control.check() {
-                    return Bounded::Cancelled;
-                }
-                let mut cells = [0; UNIT_SIZE];
-                let mut cell_count = 0;
-                for &index in &selected {
-                    for cell in candidate_position_iter(state, &units[index].cells, digit) {
-                        cells[cell_count] = cell;
-                        cell_count += 1;
-                    }
-                }
-                let cells = &cells[..cell_count];
-                let mut covering = [0; UNIT_SIZE];
-                let mut cover_count = 0;
-                for (index, unit) in units
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, unit)| unit.kind == other_kind)
-                {
-                    if cells.iter().any(|cell| unit.cells.contains(cell)) {
-                        covering[cover_count] = index;
-                        cover_count += 1;
-                    }
-                }
-                if cover_count != SIZE {
-                    continue;
-                }
-                let covering = &covering[..cover_count];
-                let targets = covering
-                    .iter()
-                    .flat_map(|&index| units[index].cells.iter().copied())
-                    .filter(|cell| {
-                        !selected
-                            .iter()
-                            .any(|&index| units[index].cells.contains(cell))
-                    });
-                if let Some(action) = elimination_action(state, targets, mask_of(digit)) {
-                    return selected_step(
-                        state,
-                        if SIZE == 2 {
-                            Technique::XWing
-                        } else {
-                            Technique::Swordfish
-                        },
-                        action,
-                        cells,
-                        mask_of(digit),
-                        AdvancedEvidenceKind::Fish {
-                            bases: selected
-                                .iter()
-                                .map(|&index| unit_identity(&units[index]))
-                                .collect(),
-                            covers: covering
-                                .iter()
-                                .map(|&index| unit_identity(&units[index]))
-                                .collect(),
-                        },
-                    );
-                }
-            }
+        let outcome = find_oriented_fish::<SIZE>(state, kind, control);
+        if !matches!(outcome, Bounded::Complete(None)) {
+            return outcome;
         }
     }
+
     Bounded::Complete(None)
 }
 
@@ -331,17 +408,22 @@ fn find_xy_wing(state: &LogicalWorkspace, control: &mut ExecutionControl) -> Ste
                 are_classic_peers(first, cell) && are_classic_peers(second, cell) && cell != pivot
             });
             if let Some(action) = elimination_action(state, targets, shared) {
-                return selected_step(
+                let wing_cells = [
+                    // The pivot supplies the two alternatives that force a wing.
+                    pivot, first, second,
+                ];
+                let step = selected_step(SelectedStep {
                     state,
-                    Technique::XYWing,
+                    technique: Technique::XYWing,
                     action,
-                    &[pivot, first, second],
-                    pivot_mask | first_mask | second_mask,
-                    AdvancedEvidenceKind::Wing {
+                    cells: &wing_cells,
+                    digits: pivot_mask | first_mask | second_mask,
+                    kind: AdvancedEvidenceKind::Wing {
                         pivot,
                         wings: [first, second],
                     },
-                );
+                });
+                return Bounded::Complete(Some(Box::new(step)));
             }
         }
     }
@@ -353,9 +435,6 @@ struct StrongLink<'a> {
     unit: &'a SudokuUnit,
     cells: [usize; 2],
 }
-
-// Advanced detection is Classic-only: one strong link at most per each of its 27 units.
-const CLASSIC_UNIT_COUNT: usize = UNIT_SIZE * 3;
 
 struct ColoringGraph<'a> {
     links: [Option<StrongLink<'a>>; CLASSIC_UNIT_COUNT],
@@ -401,19 +480,28 @@ struct ColoringComponent {
     contradictory: bool,
 }
 
-fn color_component(
-    links: &[Option<StrongLink<'_>>],
+struct ColorSearch<'a, 'graph> {
+    links: &'a [Option<StrongLink<'graph>>],
     start: usize,
-    visited: &mut [bool; BOARD_SIZE],
-    control: &mut ExecutionControl,
-) -> Bounded<ColoringComponent> {
+    visited: &'a mut [bool; BOARD_SIZE],
+    control: &'a mut ExecutionControl,
+}
+
+fn color_component(search: ColorSearch<'_, '_>) -> Bounded<ColoringComponent> {
+    let ColorSearch {
+        links,
+        start,
+        visited,
+        control,
+    } = search;
     let mut assignments = [None; BOARD_SIZE];
     assignments[start] = Some(0_usize);
     let mut queue = [0; BOARD_SIZE];
     queue[0] = start;
     let mut queue_count = 1;
-    let mut contradictory = false;
+    let mut has_contradiction = false;
     let mut index = 0;
+
     while index < queue_count {
         let cell = queue[index];
         visited[cell] = true;
@@ -430,14 +518,20 @@ fn color_component(
             } else {
                 link.cells[0]
             };
-            let opposite = if assignments[cell] == Some(0) { 1 } else { 0 };
+
+            // A strong link forces its endpoints to use opposite colors.
+            let opposite = match assignments[cell] {
+                Some(0) => 1,
+                _ => 0,
+            };
             if let Some(existing) = assignments[other] {
-                contradictory |= existing != opposite;
-            } else {
-                assignments[other] = Some(opposite);
-                queue[queue_count] = other;
-                queue_count += 1;
+                has_contradiction |= existing != opposite;
+                continue;
             }
+
+            assignments[other] = Some(opposite);
+            queue[queue_count] = other;
+            queue_count += 1;
         }
         index += 1;
     }
@@ -446,7 +540,10 @@ fn color_component(
     let mut colors = [[0; BOARD_SIZE]; 2];
     let mut color_counts = [0; 2];
     for &cell in queued_cells {
-        let color = if assignments[cell] == Some(0) { 0 } else { 1 };
+        let color = match assignments[cell] {
+            Some(0) => 0,
+            _ => 1,
+        };
         colors[color][color_counts[color]] = cell;
         color_counts[color] += 1;
     }
@@ -460,7 +557,7 @@ fn color_component(
         queue_count,
         colors,
         color_counts,
-        contradictory,
+        contradictory: has_contradiction,
     })
 }
 
@@ -485,11 +582,11 @@ fn coloring_action(
         ColoringMode::Trap
     };
     let action = if mode == ColoringMode::Wrap {
-        elimination_action(
-            state,
-            colors[if conflicts[0] { 0 } else { 1 }].iter().copied(),
-            mask_of(digit),
-        )
+        let conflicting_cells = match conflicts[0] {
+            true => colors[0],
+            false => colors[1],
+        };
+        elimination_action(state, conflicting_cells.iter().copied(), mask_of(digit))
     } else {
         let targets = (0..BOARD_SIZE).filter(|&cell| {
             state.board.values()[cell] == 0
@@ -514,17 +611,16 @@ fn coloring_evidence(
         &component.colors[0][..component.color_counts[0]],
         &component.colors[1][..component.color_counts[1]],
     ];
+    let component_links = links.iter().flatten().filter(|link| {
+        link.cells
+            .iter()
+            .all(|&cell| component.assignments[cell].is_some())
+    });
+
     AdvancedEvidenceKind::Coloring {
         mode,
         colors: colors.map(<[usize]>::to_vec),
-        links: links
-            .iter()
-            .flatten()
-            .filter(|link| {
-                link.cells
-                    .iter()
-                    .all(|&cell| component.assignments[cell].is_some())
-            })
+        links: component_links
             .map(|link| ColoringLink {
                 unit: unit_identity(link.unit),
                 cells: link.cells,
@@ -534,7 +630,7 @@ fn coloring_evidence(
 }
 
 fn find_simple_coloring(state: &LogicalWorkspace, control: &mut ExecutionControl) -> StepOutcome {
-    for digit in 1..=9 {
+    for digit in 1..=UNIT_SIZE as u8 {
         let Bounded::Complete(graph) = build_coloring_graph(state, digit, control) else {
             return Bounded::Cancelled;
         };
@@ -545,25 +641,34 @@ fn find_simple_coloring(state: &LogicalWorkspace, control: &mut ExecutionControl
             if visited[start] {
                 continue;
             }
-            let Bounded::Complete(component) = color_component(links, start, &mut visited, control)
-            else {
+
+            let search = ColorSearch {
+                links,
+                start,
+                visited: &mut visited,
+                control,
+            };
+            let Bounded::Complete(component) = color_component(search) else {
                 return Bounded::Cancelled;
             };
+
             if let Some((mode, action)) = coloring_action(state, digit, &component) {
-                return selected_step(
+                let step = selected_step(SelectedStep {
                     state,
-                    Technique::SimpleColoring,
+                    technique: Technique::SimpleColoring,
                     action,
-                    &component.queue[..component.queue_count],
-                    mask_of(digit),
-                    coloring_evidence(links, &component, mode),
-                );
+                    cells: &component.queue[..component.queue_count],
+                    digits: mask_of(digit),
+                    kind: coloring_evidence(links, &component, mode),
+                });
+                return Bounded::Complete(Some(Box::new(step)));
             }
         }
     }
     Bounded::Complete(None)
 }
 
+/// Search for one Classic advanced deduction, honoring cooperative cancellation.
 pub fn find_advanced_step(
     state: &LogicalWorkspace,
     technique: Technique,
@@ -575,11 +680,12 @@ pub fn find_advanced_step(
     if !matches!(state.rules.rules(), PuzzleRules::Classic) {
         return Bounded::Complete(None);
     }
+
     match technique {
         Technique::NakedTriple => find_naked_triple(state, control),
         Technique::HiddenTriple => find_hidden_triple(state, control),
-        Technique::XWing => find_fish::<2>(state, control),
-        Technique::Swordfish => find_fish::<3>(state, control),
+        Technique::XWing => find_fish::<X_WING_SIZE>(state, control),
+        Technique::Swordfish => find_fish::<SWORDFISH_SIZE>(state, control),
         Technique::XYWing => find_xy_wing(state, control),
         Technique::SimpleColoring => find_simple_coloring(state, control),
         _ => Bounded::Complete(None),

@@ -108,6 +108,7 @@ fn sealed_historical_puzzles_remain_valid_independent_math_fixtures() {
     {
         let puzzle = fixtures::decode_puzzle(&row["expected"]["puzzle"]).unwrap();
         assert!(validate_puzzle(&puzzle).is_ok(), "{}", row["id"]);
+
         let result = count_with_rules(
             &puzzle.givens,
             &puzzle.rules,
@@ -116,7 +117,14 @@ fn sealed_historical_puzzles_remain_valid_independent_math_fixtures() {
         )
         .unwrap();
         assert!(
-            matches!(result, SearchResult::Complete { count: 1, solution: Some(solution), .. } if solution == puzzle.solution),
+            matches!(
+                result,
+                SearchResult::Complete {
+                    count: 1,
+                    solution: Some(solution),
+                    ..
+                } if solution == puzzle.solution
+            ),
             "{}",
             row["id"]
         );
@@ -134,26 +142,35 @@ fn every_supported_variant_and_tier_delivers_unique_matching_puzzles() {
         let (input, limits) = fixture_request(&row);
         let result = generate_puzzle(&input, &limits).unwrap();
         let repeated = generate_puzzle(&input, &limits).unwrap();
+
         assert_eq!(
             generation_projection::project_result(&result),
             generation_projection::project_result(&repeated),
             "{}",
             row["id"]
         );
+
         let GenerationOutcome::Ready { puzzle, assessment } = result.outcome else {
             panic!("Expected delivery for {}", row["id"]);
         };
         let content = &puzzle.content;
-        let expected = content;
 
         assert!(validate_puzzle(content).is_ok());
         assert_eq!(assessment.difficulty, input.difficulty());
         assert_eq!(assessment.variant, input.variant());
+
         let mut control = ExecutionControl::new();
         let counted =
             count_with_rules(&content.givens, &content.rules, &mut control, u64::MAX).unwrap();
         assert!(
-            matches!(counted, SearchResult::Complete { count: 1, solution: Some(solution), .. } if solution == expected.solution),
+            matches!(
+                counted,
+                SearchResult::Complete {
+                    count: 1,
+                    solution: Some(solution),
+                    ..
+                } if solution == content.solution
+            ),
             "{}",
             row["id"]
         );
@@ -161,7 +178,7 @@ fn every_supported_variant_and_tier_delivers_unique_matching_puzzles() {
         if input.variant() != SudokuVariant::Classic {
             let classic = compile_rules(&PuzzleRules::Classic).unwrap();
             // A terminal that violates Classic already establishes regional necessity.
-            if is_complete(&expected.solution, &classic) {
+            if is_complete(&content.solution, &classic) {
                 let mut control = ExecutionControl::new();
                 let classic_count = count_with_rules(
                     &content.givens,
@@ -184,15 +201,15 @@ fn every_supported_variant_and_tier_delivers_unique_matching_puzzles() {
             panic!("Expected standalone assessment for {}", row["id"]);
         };
         assert_eq!(rated.summary, *assessment);
+        // The exact count established that this terminal is the only solution.
         for step in rated.trace {
-            // The exact counter independently checks every generated terminal before trace validation.
             match step.action {
                 LogicalAction::Placement { cell, digit } => {
-                    assert_eq!(digit, expected.solution.values()[cell])
+                    assert_eq!(digit, content.solution.values()[cell])
                 }
                 LogicalAction::Elimination { removals } => {
                     for removal in removals {
-                        assert_ne!(removal.digit, expected.solution.values()[removal.cell]);
+                        assert_ne!(removal.digit, content.solution.values()[removal.cell]);
                     }
                 }
             }
@@ -238,7 +255,10 @@ fn all_supported_requests_exhaust_explicitly_at_each_limit() {
             let repeated = generate_puzzle(&input, &limits).unwrap();
 
             assert!(
-                matches!(result.outcome, GenerationOutcome::Incomplete { cause } if cause == expected_cause),
+                matches!(
+                    result.outcome,
+                    GenerationOutcome::Incomplete { cause } if cause == expected_cause
+                ),
                 "{}: {:?}",
                 row["id"],
                 result.outcome

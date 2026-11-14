@@ -15,15 +15,27 @@ use crate::constraints::computation::prepare_computation;
 use crate::constraints::types::PreparedComputation;
 use crate::control::ExecutionControl;
 use crate::puzzle::Puzzle;
-use crate::rating::assessment::prepare_assessment_with_computation;
+use crate::rating::assessment::{WitnessedTarget, prepare_assessment_with_computation};
 use crate::rating::types::{
     AssessmentIssue, AssessmentLimits, DifficultyAssessment, ExhaustionCause, PreparedAssessment,
     RatedTrial, TargetScreenResult,
 };
 use crate::rules::types::SudokuVariant;
-use crate::search::exact::{count_solutions, count_with_completion};
+use crate::search::exact::{CompletionSearch, count_solutions, count_with_completion};
 use crate::search::types::SearchResult;
 use crate::types::{Board, Bounded, CoreResult, Difficulty};
+
+const EASY_CLUE_TARGET: usize = 36;
+const MEDIUM_CLUE_TARGET: usize = 32;
+const HARD_CLUE_TARGET: usize = 30;
+const EXPERT_CLUE_TARGET: usize = 28;
+
+pub(super) struct GenerationSearch<'a> {
+    pub(super) input: &'a GenerationInput,
+    pub(super) limits: &'a GenerationLimits,
+    pub(super) metrics: &'a mut GenerationMetrics,
+    pub(super) control: &'a mut ExecutionControl,
+}
 
 struct ActiveLayout {
     id: u32,
@@ -75,42 +87,70 @@ enum LayoutPreparation {
     Failed { reason: String },
 }
 
+struct CandidateAcceptance<'a> {
+    layout: &'a ActiveLayout,
+    board: Board,
+    trial: RatedTrial,
+    input: &'a GenerationInput,
+    control: &'a mut ExecutionControl,
+}
+
+struct CandidateWork<'a> {
+    layout: &'a mut ActiveLayout,
+    input: &'a GenerationInput,
+    control: &'a mut ExecutionControl,
+}
+
+struct LayoutAttempt<'a> {
+    id: u32,
+    input: &'a GenerationInput,
+    limits: &'a GenerationLimits,
+    control: &'a mut ExecutionControl,
+}
+
 fn clue_target(difficulty: Difficulty) -> usize {
     match difficulty {
-        Difficulty::Easy => 36,
-        Difficulty::Medium => 32,
-        Difficulty::Hard => 30,
-        Difficulty::Expert => 28,
+        Difficulty::Easy => EASY_CLUE_TARGET,
+        Difficulty::Medium => MEDIUM_CLUE_TARGET,
+        Difficulty::Hard => HARD_CLUE_TARGET,
+        Difficulty::Expert => EXPERT_CLUE_TARGET,
     }
 }
 
-fn screening_first(input: &GenerationInput) -> bool {
+fn should_screen_first(input: &GenerationInput) -> bool {
     input.variant == SudokuVariant::Killer && input.difficulty == Difficulty::Hard
 }
 
 fn meets_clue_policy(input: &GenerationInput, board: &Board) -> bool {
-    input.variant != SudokuVariant::Classic
-        || board.values().iter().filter(|&&digit| digit != 0).count()
-            <= clue_target(input.difficulty)
+    if input.variant != SudokuVariant::Classic {
+        return true;
+    }
+
+    let cells = board.values();
+    let clues = cells.iter().filter(|&&digit| digit != 0).count();
+    clues <= clue_target(input.difficulty)
 }
 
-fn try_accept_candidate(
-    layout: &ActiveLayout,
-    board: Board,
-    trial: RatedTrial,
-    input: &GenerationInput,
-    control: &mut ExecutionControl,
-) -> CoreResult<Acceptance> {
+fn try_accept_candidate(acceptance: CandidateAcceptance<'_>) -> CoreResult<Acceptance> {
+    let CandidateAcceptance {
+        layout,
+        board,
+        trial,
+        input,
+        control,
+    } = acceptance;
+
     if !meets_clue_policy(input, &board) {
         return Ok(Acceptance::Rejected);
     }
-    if layout.computation.rules().rules().variant() != input.variant
-        || board
-            .values()
-            .iter()
-            .zip(layout.terminal.values())
-            .any(|(&digit, &terminal)| digit != 0 && digit != terminal)
-        || !is_complete(&layout.terminal, layout.computation.rules())
+
+    let rules = layout.computation.rules();
+    let mut clue_pairs = board.values().iter().zip(layout.terminal.values());
+    let has_mismatched_clues =
+        clue_pairs.any(|(&digit, &terminal)| digit != 0 && digit != terminal);
+    if rules.rules().variant() != input.variant
+        || has_mismatched_clues
+        || !is_complete(&layout.terminal, rules)
     {
         return Ok(Acceptance::Failed {
             reason: "Invalid constructed puzzle identity or terminal".to_string(),
@@ -133,6 +173,9 @@ fn try_accept_candidate(
     else {
         return Ok(Acceptance::Cancelled);
     };
+
+    // The known completion makes zero solutions or a different unique solution an invariant
+    // failure.
     if count == 0 || (count == 1 && solution.as_ref() != Some(&layout.terminal)) {
         return Ok(Acceptance::Failed {
             reason: "Constructed terminal lost its known solution".to_string(),
@@ -148,6 +191,8 @@ fn try_accept_candidate(
         givens: board,
         difficulty: input.difficulty,
     };
+
+    // Variant rules must affect the puzzle independently of the variant uniqueness check.
     if input.variant != SudokuVariant::Classic {
         let Bounded::Complete(matters) = variant_rules_matter(&content, control)? else {
             return Ok(Acceptance::Cancelled);
@@ -167,21 +212,26 @@ fn try_accept_candidate(
     }))
 }
 
-fn evaluate_candidate(
-    layout: &mut ActiveLayout,
-    mask: GivenMask,
-    input: &GenerationInput,
-    control: &mut ExecutionControl,
-) -> CoreResult<CandidateEvaluation> {
+fn evaluate_candidate(mask: GivenMask, work: CandidateWork<'_>) -> CoreResult<CandidateEvaluation> {
+    let CandidateWork {
+        layout,
+        input,
+        control,
+    } = work;
+
     let board = mask.materialize(&layout.terminal)?;
+
     let mut exact = SolvedExact::Unchecked;
-    if !screening_first(input) {
+    // Killer Hard screens logic first, so retained checkpoints may have unchecked uniqueness.
+    if !should_screen_first(input) {
         let SearchResult::Complete { count, .. } = count_with_completion(
-            &board,
-            &layout.computation,
-            &layout.completion,
+            CompletionSearch {
+                board: &board,
+                computation: &layout.computation,
+                completion: &layout.completion,
+                node_limit: u64::MAX,
+            },
             control,
-            u64::MAX,
         )?
         else {
             return Ok(CandidateEvaluation::Cancelled);
@@ -201,14 +251,16 @@ fn evaluate_candidate(
     }
 
     let trial = layout.assessor.screen_target_with_completion(
-        &board,
-        input.difficulty,
+        WitnessedTarget {
+            board: &board,
+            difficulty: input.difficulty,
+            completion: &layout.completion,
+        },
         control,
-        &layout.completion,
     );
     let (trial, feedback, matching) = match trial {
         TargetScreenResult::Invalid { issues } => {
-            let reason = issues
+            let messages = issues
                 .iter()
                 .map(|issue| match issue {
                     AssessmentIssue::Message(message) => message.clone(),
@@ -216,8 +268,8 @@ fn evaluate_candidate(
                         format!("{}: {:?}", violation.constraint_id, violation.code)
                     }
                 })
-                .collect::<Vec<_>>()
-                .join("; ");
+                .collect::<Vec<_>>();
+            let reason = messages.join("; ");
             return Ok(CandidateEvaluation::Failed { reason });
         }
         TargetScreenResult::Incomplete {
@@ -260,14 +312,21 @@ fn evaluate_candidate(
     })?;
 
     let tier = difficulty.rank();
-    let progress = board.values().iter().filter(|&&digit| digit == 0).count();
+    let cells = board.values();
+    let progress = cells.iter().filter(|&&digit| digit == 0).count();
     if tier > layout.best_tier || (tier == layout.best_tier && progress > layout.best_progress) {
         layout.best_tier = tier;
         layout.best_progress = progress;
     }
 
     if matching && meets_clue_policy(input, &board) {
-        match try_accept_candidate(layout, board, trial, input, control)? {
+        match try_accept_candidate(CandidateAcceptance {
+            layout,
+            board,
+            trial,
+            input,
+            control,
+        })? {
             Acceptance::Accepted(candidate) => return Ok(CandidateEvaluation::Accepted(candidate)),
             Acceptance::Failed { reason } => return Ok(CandidateEvaluation::Failed { reason }),
             Acceptance::Cancelled => return Ok(CandidateEvaluation::Cancelled),
@@ -281,12 +340,14 @@ fn evaluate_candidate(
     })
 }
 
-fn prepare_layout(
-    id: u32,
-    input: &GenerationInput,
-    limits: &GenerationLimits,
-    control: &mut ExecutionControl,
-) -> CoreResult<LayoutPreparation> {
+fn prepare_layout(attempt: LayoutAttempt<'_>) -> CoreResult<LayoutPreparation> {
+    let LayoutAttempt {
+        id,
+        input,
+        limits,
+        control,
+    } = attempt;
+
     let mut terminal_random = for_phase(input, RandomPhase::Terminal, id, 0);
     let mut geometry_random = for_phase(input, RandomPhase::Geometry, id, 0);
     let constructed =
@@ -326,6 +387,7 @@ fn prepare_layout(
             deductions: 0,
         },
     })?;
+
     let assessor = prepare_assessment_with_computation(
         &computation,
         AssessmentLimits {
@@ -333,6 +395,7 @@ fn prepare_layout(
         },
     )?;
     let completion = KnownCompletion::new(&terminal, computation.rules())?;
+
     let layout = ActiveLayout {
         id,
         terminal,
@@ -351,11 +414,15 @@ fn prepare_layout(
 
 // Keep selection and evaluation in the owner's scheduled work, including abandoned edits.
 fn execute_proposal(
-    layout: &mut ActiveLayout,
-    input: &GenerationInput,
+    work: CandidateWork<'_>,
     metrics: &mut GenerationMetrics,
-    control: &mut ExecutionControl,
 ) -> CoreResult<Option<CandidateEvaluation>> {
+    let CandidateWork {
+        layout,
+        input,
+        control,
+    } = work;
+
     let mut random = for_phase(input, RandomPhase::Candidate, layout.id, layout.visits);
     let proposal = layout.frontier.next(&mut random, control);
     let Some(proposal) = proposal else {
@@ -364,17 +431,47 @@ fn execute_proposal(
 
     layout.visits += 1;
     metrics.candidate_visits += 1;
-    let result = evaluate_candidate(layout, proposal.mask, input, control)?;
+    let result = evaluate_candidate(
+        proposal.mask,
+        CandidateWork {
+            layout,
+            input,
+            control,
+        },
+    )?;
 
     Ok(Some(result))
 }
 
-pub(super) fn search_generation(
-    input: &GenerationInput,
-    limits: &GenerationLimits,
-    metrics: &mut GenerationMetrics,
-    control: &mut ExecutionControl,
-) -> CoreResult<GenerationOutcome> {
+fn retire_layout_for_expansion(
+    active: &mut Vec<ActiveLayout>,
+    expansion_requested_by: &mut Option<u32>,
+) {
+    if active.len() < ACTIVE_LAYOUTS {
+        return;
+    }
+
+    active.sort_by(|left, right| {
+        left.best_tier
+            .cmp(&right.best_tier)
+            .then_with(|| left.best_progress.cmp(&right.best_progress))
+            .then_with(|| right.id.cmp(&left.id))
+    });
+    let retired = active.remove(0);
+    if Some(retired.id) == *expansion_requested_by {
+        *expansion_requested_by = None;
+    }
+}
+
+/// Search layouts and their clue frontiers within the request limits.
+pub(super) fn search_generation(search: GenerationSearch<'_>) -> CoreResult<GenerationOutcome> {
+    let GenerationSearch {
+        input,
+        limits,
+        metrics,
+        control,
+    } = search;
+
     let mut active: Vec<ActiveLayout> = vec![];
 
     // Stable owner IDs survive sorting and removal without sharing mutable layout state.
@@ -394,23 +491,17 @@ pub(super) fn search_generation(
             && (active.len() < ACTIVE_LAYOUTS
                 || active.iter().all(|layout| layout.frontier.stagnant()));
         if (active.is_empty() || can_expand) && metrics.layouts < limits.max_layouts {
-            if active.len() >= ACTIVE_LAYOUTS {
-                active.sort_by(|left, right| {
-                    left.best_tier
-                        .cmp(&right.best_tier)
-                        .then_with(|| left.best_progress.cmp(&right.best_progress))
-                        .then_with(|| right.id.cmp(&left.id))
-                });
-                let retired = active.remove(0);
-                if Some(retired.id) == expansion_requested_by {
-                    expansion_requested_by = None;
-                }
-            }
+            retire_layout_for_expansion(&mut active, &mut expansion_requested_by);
 
             // Failed terminal/geometry attempts consume a layout slot; candidate edits do not.
             let id = metrics.layouts;
             metrics.layouts += 1;
-            let layout = match prepare_layout(id, input, limits, control)? {
+            let layout = match prepare_layout(LayoutAttempt {
+                id,
+                input,
+                limits,
+                control,
+            })? {
                 LayoutPreparation::Ready(layout) => *layout,
                 LayoutPreparation::AttemptExhausted => continue,
                 LayoutPreparation::Cancelled => {
@@ -421,12 +512,13 @@ pub(super) fn search_generation(
                     return Ok(GenerationOutcome::Failed { reason });
                 }
             };
+
             metrics.completed_layouts += 1;
-            if let Some(requested) = expansion_requested_by {
-                if let Some(owner) = active.iter_mut().find(|owner| owner.id == requested) {
-                    owner.expanded_at = owner.visits;
-                }
-                expansion_requested_by = None;
+            if let Some(owner) = expansion_requested_by
+                .take()
+                .and_then(|requested| active.iter_mut().find(|owner| owner.id == requested))
+            {
+                owner.expanded_at = owner.visits;
             }
             active.push(layout);
         }
@@ -442,7 +534,12 @@ pub(super) fn search_generation(
                 .then_with(|| left.id.cmp(&right.id))
         });
         let layout = &mut active[0];
-        let Some(result) = execute_proposal(layout, input, metrics, control)? else {
+        let work = CandidateWork {
+            layout,
+            input,
+            control,
+        };
+        let Some(result) = execute_proposal(work, metrics)? else {
             if control.is_cancelled() {
                 break;
             }
@@ -477,7 +574,10 @@ pub(super) fn search_generation(
                 step_limited_screens += 1;
             }
         }
+
         layout.frontier.record_evaluation(improved);
+
+        // A previous expansion must be followed by another full stagnation window.
         if layout.frontier.stagnant()
             && layout.visits - layout.expanded_at >= STAGNATION_LIMIT as u32
         {
@@ -485,6 +585,7 @@ pub(super) fn search_generation(
         }
     }
 
+    // Report the logical budget only when it stopped every executed screen.
     let cause = if cancelled || control.is_cancelled() {
         GenerationExhaustionCause::Cancelled
     } else if step_limited_screens > 0 && step_limited_screens == logical_screens {
@@ -494,5 +595,6 @@ pub(super) fn search_generation(
     } else {
         GenerationExhaustionCause::ExhaustedFrontier
     };
+
     Ok(GenerationOutcome::Incomplete { cause })
 }

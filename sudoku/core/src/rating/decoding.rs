@@ -158,7 +158,7 @@ pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<Difficulty
         return Err(EngineError::invalid("Invalid assessment summary identity"));
     }
 
-    // Keep boundary error precedence: identity, safe counts, applicable techniques, then contradictions.
+    // Preserve error precedence: identity, safe counts, applicable techniques, then contradictions.
     validate_count_bounds(&summary.workload)?;
     let accounting = summarize_technique_counts(summary)?;
     validate_action_accounting(&summary.workload, summary.variant, &accounting)?;
@@ -169,12 +169,13 @@ pub fn validate_summary(summary: &DifficultyAssessment) -> CoreResult<Difficulty
 
 /// Preserve absent, unavailable and rated facts independently of the playable puzzle content.
 pub fn decode_puzzle_assessment(
-    value: Option<&StoredAssessment>,
+    stored_assessment: Option<&StoredAssessment>,
     identity: AssessmentIdentity,
 ) -> Option<PuzzleAssessment> {
-    let value = value?;
+    let stored_assessment = stored_assessment?;
     let unavailable = |reason, issues| Some(PuzzleAssessment::Unavailable { reason, issues });
-    match value {
+
+    match stored_assessment {
         StoredAssessment::Unavailable { reason, issues }
             if issues.iter().all(|issue| !issue.trim().is_empty()) =>
         {
