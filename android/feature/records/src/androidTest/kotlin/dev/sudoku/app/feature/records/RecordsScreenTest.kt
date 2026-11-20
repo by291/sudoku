@@ -285,6 +285,7 @@ class RecordsScreenTest {
         compose.runOnIdle { assertTrue(restored) }
     }
 
+    /** Checks that both lists dispatch their selected identity and preserve the filter. */
     @Test
     fun savesAndHistoryOpenTheSelectedSessionAndKeepTheVariantFilter() {
         val first = session("older", Difficulty.EASY, "2026-10-15T08:00:00Z")
@@ -310,10 +311,16 @@ class RecordsScreenTest {
         capture("saves")
         pageNode("自由游玩 · 困难").assertIsDisplayed()
         pageNode("自由游玩 · 简单").performClick()
-        compose.runOnIdle { assertEquals("older", resumed) }
+        compose.runOnIdle {
+            assertEquals("older", resumed)
+            resumed = null
+        }
         tabNode("完成历史").performClick()
         pageNode("查看记录", substring = true).performClick()
-        compose.runOnIdle { assertEquals("older", resumed) }
+        compose.runOnIdle {
+            assertEquals("older", resumed)
+            resumed = null
+        }
         capture("history")
 
         compose.onNodeWithTag("records-content").performScrollToIndex(0)

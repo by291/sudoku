@@ -6,20 +6,28 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.sudoku.app.model.Assistance
+import dev.sudoku.app.model.BackupPreview
 import dev.sudoku.app.model.Completion
 import dev.sudoku.app.model.DailyStatus
 import dev.sudoku.app.model.DailyTotals
 import dev.sudoku.app.model.Difficulty
+import dev.sudoku.app.model.EditorToken
 import dev.sudoku.app.model.EngineOutcome
 import dev.sudoku.app.model.GameMode
 import dev.sudoku.app.model.GameSession
 import dev.sudoku.app.model.LessonProgress
+import dev.sudoku.app.model.LocalBackup
 import dev.sudoku.app.model.MathematicalValidator
+import dev.sudoku.app.model.PortableCodec
+import dev.sudoku.app.model.PreviousSession
 import dev.sudoku.app.model.Puzzle
 import dev.sudoku.app.model.PuzzleAssessment
 import dev.sudoku.app.model.PuzzleContent
 import dev.sudoku.app.model.PuzzleRules
+import dev.sudoku.app.model.ResultRecord
 import dev.sudoku.app.model.SessionMetadata
+import dev.sudoku.app.model.SessionRecord
+import dev.sudoku.app.model.Settings
 import dev.sudoku.app.model.SettingsUpdate
 import dev.sudoku.app.model.StorageFailureKind
 import dev.sudoku.app.model.StorageOutcome
@@ -33,11 +41,22 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
+private const val ACTIVE_SLOT_OWNER = "active-slot-owner"
+
+private data class ReplacementRejection(
+    val previous: PreviousSession,
+    val editor: EditorToken,
+    val expectedFailure: StorageFailureKind
+)
+
+/** Exercises canonical data and summary transactions in an in-memory Room database. */
 @RunWith(AndroidJUnit4::class)
 class RoomGameRepositoryTest {
     private lateinit var database: SudokuDatabase
@@ -661,6 +680,139 @@ class RoomGameRepositoryTest {
         assertEquals(1L, repository.readDatasetEpoch().value())
     }
 
+    /** Checks that replacing one free-play slot preserves every other variant. */
+    @Test
+    fun activeReplacementSwapsCanonicalAndSummaryRowsInOnlyItsVariant() = runTest {
+        val original = fixture()
+        val otherVariant = thermoSession(original)
+        val replacement = original.copy(id = "replacement", elapsedMs = 2_000)
+        saveActiveSlot(otherVariant)
+        val previous = saveActiveSlot(original)
+        val token = repository.claimEditor(replacement.id, ACTIVE_SLOT_OWNER).value()
+        val otherCanonical = requireNotNull(database.sudokuDao().session(otherVariant.id))
+        val otherProjection = requireNotNull(database.summaryDao().selectSession(otherVariant.id))
+        assertTrue(hasStoredSessionSummary(original.id))
+
+        val installed = repository.replaceActiveSession(replacement, token, previous).value()
+
+        assertEquals(SessionRecord(revision = 1, session = replacement), installed)
+        assertNull(database.sudokuDao().session(original.id))
+        assertFalse(hasStoredSessionSummary(original.id))
+        assertEquals(otherCanonical, database.sudokuDao().session(otherVariant.id))
+        assertEquals(otherProjection, database.summaryDao().selectSession(otherVariant.id))
+        val canonical = requireNotNull(database.sudokuDao().session(replacement.id))
+        val projection = requireNotNull(database.summaryDao().selectSession(replacement.id))
+        assertEquals(1L, canonical.revision)
+        assertEquals(GameMode.FREE.name, canonical.mode)
+        assertEquals(Variant.CLASSIC.wireName, canonical.variant)
+        assertEquals(1L, projection.revision)
+        assertEquals(2_000L, projection.facts.elapsedMs)
+        assertEquals(Variant.CLASSIC.wireName, projection.facts.variant)
+
+        val stored = RoomReadRepository(database, validator).readSession(replacement.id).value()
+        assertEquals(installed, stored)
+    }
+
+    /** Checks that active replacement revalidates both the editor and the observed save. */
+    @Test
+    fun activeReplacementRejectsStaleRevisionOwnerAndEpochWithoutMutation() = runTest {
+        val staleEpoch = repository.readDatasetEpoch().value()
+        repository.clearAll(staleEpoch).value()
+        val original = fixture()
+        val previous = saveActiveSlot(original)
+        val edited = repository.writeSession(
+            original.copy(elapsedMs = 1_000),
+            previous.revision,
+            previous.token
+        ).value()
+        val current = previous.copy(revision = edited.revision)
+        val replacement = original.copy(id = "replacement")
+        val staleEditor = repository.claimEditor(replacement.id, ACTIVE_SLOT_OWNER).value()
+        val editor = repository.claimEditor(replacement.id, ACTIVE_SLOT_OWNER).value()
+        val formerOwner = "former-owner"
+        val rejections = listOf(
+            ReplacementRejection(previous, editor, StorageFailureKind.REVISION_CONFLICT),
+            ReplacementRejection(current, staleEditor, StorageFailureKind.OWNERSHIP_LOST),
+            ReplacementRejection(
+                current,
+                editor.copy(ownerId = formerOwner),
+                StorageFailureKind.OWNERSHIP_LOST
+            ),
+            ReplacementRejection(
+                current,
+                editor.copy(epoch = staleEpoch),
+                StorageFailureKind.REVISION_CONFLICT
+            ),
+            ReplacementRejection(
+                current.copy(token = current.token.copy(ownerId = formerOwner)),
+                editor,
+                StorageFailureKind.REVISION_CONFLICT
+            ),
+            ReplacementRejection(
+                current.copy(token = current.token.copy(epoch = staleEpoch)),
+                editor,
+                StorageFailureKind.REVISION_CONFLICT
+            )
+        )
+        val before = snapshotDatabase()
+
+        for (rejection in rejections) {
+            val failure = repository.replaceActiveSession(
+                replacement,
+                rejection.editor,
+                rejection.previous
+            ) as StorageOutcome.Failure
+
+            assertEquals(rejection.expectedFailure, failure.error.kind)
+            assertEquals(before, snapshotDatabase())
+        }
+    }
+
+    /** Checks that replacement cannot reuse a canonical identity from another slot. */
+    @Test
+    fun activeReplacementRejectsAnExistingIdentityWithoutMutation() = runTest {
+        val original = fixture()
+        val otherVariant = thermoSession(original)
+        saveActiveSlot(otherVariant)
+        val previous = saveActiveSlot(original)
+        val replacement = original.copy(id = otherVariant.id)
+        val token = repository.claimEditor(replacement.id, ACTIVE_SLOT_OWNER).value()
+        val before = snapshotDatabase()
+
+        val failure = repository.replaceActiveSession(
+            replacement,
+            token,
+            previous
+        ) as StorageOutcome.Failure
+
+        assertEquals(StorageFailureKind.REVISION_CONFLICT, failure.error.kind)
+        assertEquals(before, snapshotDatabase())
+    }
+
+    /** Checks that an insertion failure restores the original canonical and summary rows. */
+    @Test
+    fun activeReplacementRollsBackWhenTheNewProjectionInsertFails() = runTest {
+        val original = fixture()
+        val previous = saveActiveSlot(original)
+        val replacement = original.copy(id = "replacement", elapsedMs = 2_000)
+        val token = repository.claimEditor(replacement.id, ACTIVE_SLOT_OWNER).value()
+        val before = snapshotDatabase()
+        val marker = "replacement projection rejected"
+        // The projection insert follows deletion of the old pair and insertion of the new payload.
+        database.openHelper.writableDatabase.execSQL(
+            """
+            CREATE TRIGGER fail_replacement BEFORE INSERT ON session_summaries
+            WHEN NEW.id = 'replacement'
+            BEGIN SELECT RAISE(ABORT, '$marker'); END
+            """.trimIndent()
+        )
+
+        val failure = repository.replaceActiveSession(replacement, token, previous)
+
+        assertSqlFailure(failure, marker)
+        assertEquals(before, snapshotDatabase())
+    }
+
     @Test
     fun lessonCompletionRetryPreservesItsFirstTimestamp() = runTest {
         val epoch = repository.readDatasetEpoch().value()
@@ -752,29 +904,49 @@ class RoomGameRepositoryTest {
         }
     }
 
+    /** Checks that a late restore failure preserves all previously stored facts. */
     @Test
     fun replacementFailureRollsBackEveryCollectionAndEpoch() = runTest {
-        val session = fixture()
-        val token = repository.claimEditor(session.id, "owner").value()
-        repository.writeSession(session, 0, token).value()
+        val original = fixture()
+        val completed = original.copy(
+            entries = original.puzzle.solution,
+            elapsedMs = 500,
+            completion = Completion("2026-10-16T01:02:04.000Z", 500)
+        )
+        val token = repository.claimEditor(original.id, "target-owner").value()
+        val recorded = repository.writeSession(completed, 0, token).value()
+        repository.writeSession(original, recorded.revision, token).value()
+        repository.writeLessonProgress(LessonProgress("rules", original.startedAt), 0).value()
         repository.updateSettings(SettingsUpdate.Theme(ThemePreference.DARK), 0).value()
-        val exported = repository.exportBackup("2026-10-16T01:02:03.000Z").value()
-        val preview = repository.previewBackup(exported.text).value()
+        repository.updateSettings(SettingsUpdate.LessonCursor("rules", 1), 0).value()
+        database.sudokuDao().putQuarantine(
+            QuarantineEntity(
+                id = "target-quarantine",
+                source = "session",
+                payload = "invalid old session payload",
+                reason = "invalid session"
+            )
+        )
+        val preview = restorePreview(completed)
+        val before = snapshotDatabase()
+        for ((table, rows) in before) {
+            assertTrue("Rollback fixture must populate $table", rows.isNotEmpty())
+        }
+
+        val marker = "restore epoch rejected"
+        // The epoch is published after the collections, projections and coverage are written.
         database.openHelper.writableDatabase.execSQL(
-            "CREATE TRIGGER fail_restore BEFORE INSERT ON settings BEGIN SELECT RAISE(ABORT, 'fixture rollback'); END"
+            """
+            CREATE TRIGGER fail_restore BEFORE INSERT ON dataset
+            WHEN NEW.epoch = 1
+            BEGIN SELECT RAISE(ABORT, '$marker'); END
+            """.trimIndent()
         )
 
         val failure = repository.restoreBackup(preview)
 
-        assertTrue(failure is StorageOutcome.Failure)
-        assertEquals(0L, repository.readDatasetEpoch().value())
-        assertEquals(
-            session.id,
-            requireNotNull(
-                RoomReadRepository(database, validator).readSession(session.id).value()
-            ).session.id
-        )
-        assertEquals(ThemePreference.DARK, repository.readSettings().value().theme)
+        assertSqlFailure(failure, marker)
+        assertEquals(before, snapshotDatabase())
     }
 
     @Test
@@ -974,6 +1146,86 @@ class RoomGameRepositoryTest {
                 "sudoku-v11"
             )
         return createSession(puzzle, SessionMetadata.Free, "attempt", "2026-10-16T01:02:03.004Z")
+    }
+
+    private fun thermoSession(original: GameSession): GameSession = original.copy(
+        id = "thermo-attempt",
+        puzzle = original.puzzle.copy(
+            rules = PuzzleRules.Thermo(listOf(listOf(0, 1, 2))),
+            puzzleVersion = "sudoku-variants-v11"
+        )
+    )
+
+    private suspend fun saveActiveSlot(session: GameSession): PreviousSession {
+        val token = repository.claimEditor(session.id, ACTIVE_SLOT_OWNER).value()
+        val stored = repository.writeSession(session, 0, token).value()
+
+        return PreviousSession(session.id, stored.revision, token)
+    }
+
+    private suspend fun restorePreview(completed: GameSession): BackupPreview {
+        val sourceResult = completed.copy(
+            id = "source-attempt",
+            elapsedMs = 1_500,
+            completion = Completion("2026-10-16T01:02:05.000Z", 1_500)
+        )
+        val source = LocalBackup(
+            exportedAt = "2026-10-17T00:00:00.000Z",
+            sessions = listOf(SessionRecord(revision = 5, session = sourceResult)),
+            results = listOf(ResultRecord(session = sourceResult)),
+            lessons = listOf(LessonProgress("source-lesson", "2026-10-16T01:02:05.000Z")),
+            settings = Settings(theme = ThemePreference.LIGHT, showTimer = false)
+        )
+        val text = PortableCodec(validator).encodeBackup(source)
+
+        return repository.previewBackup(text).value()
+    }
+
+    private fun snapshotDatabase(): Map<String, List<List<String?>>> {
+        val tables = listOf(
+            "sessions",
+            "results",
+            "lessons",
+            "settings",
+            "quarantine",
+            "dataset",
+            "session_summaries",
+            "result_summaries",
+            "summary_version"
+        )
+
+        return tables.associateWith(::rowsByIdentity)
+    }
+
+    private fun hasStoredSessionSummary(sessionId: String): Boolean {
+        // The production read filters orphaned projections, so it cannot detect a missed DELETE.
+        val query = SimpleSQLiteQuery(
+            "SELECT 1 FROM session_summaries WHERE id = ?",
+            arrayOf(sessionId)
+        )
+        val sqlite = database.openHelper.readableDatabase
+
+        return sqlite.query(query).use { cursor -> cursor.moveToFirst() }
+    }
+
+    private fun rowsByIdentity(table: String): List<List<String?>> {
+        val sqlite = database.openHelper.readableDatabase
+        val rows = mutableListOf<List<String?>>()
+        sqlite.query("SELECT * FROM $table ORDER BY id").use { cursor ->
+            val columns = 0 until cursor.columnCount
+            while (cursor.moveToNext()) {
+                rows.add(columns.map(cursor::getString))
+            }
+        }
+
+        return rows
+    }
+
+    private fun assertSqlFailure(outcome: StorageOutcome<*>, marker: String) {
+        val failure = (outcome as StorageOutcome.Failure).error
+
+        assertEquals(StorageFailureKind.WRITE_FAILED, failure.kind)
+        assertTrue(failure.message, failure.message.contains(marker))
     }
 
     private fun <T> StorageOutcome<T>.value(): T = when (this) {

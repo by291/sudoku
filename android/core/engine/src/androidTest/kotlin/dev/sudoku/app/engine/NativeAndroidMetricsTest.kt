@@ -15,20 +15,16 @@ import dev.sudoku.app.ffi.GenerationOptionsDto
 import dev.sudoku.app.ffi.GenerationResultDto
 import dev.sudoku.app.ffi.GenerationVersionDto
 import dev.sudoku.app.ffi.NativeException
-import dev.sudoku.app.ffi.PrepareInputDto
 import dev.sudoku.app.ffi.PreparedCountInputDto
 import dev.sudoku.app.ffi.SearchOptionsDto
 import dev.sudoku.app.ffi.SearchResultDto
 import dev.sudoku.app.ffi.generate
-import dev.sudoku.app.ffi.preparePuzzle
-import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.EngineOutcome
-import dev.sudoku.app.model.GenerationRequest
 import dev.sudoku.app.model.Puzzle
-import dev.sudoku.app.model.PuzzleContent
 import dev.sudoku.app.model.PuzzleRules
 import dev.sudoku.app.model.Validation
 import dev.sudoku.app.model.Variant
+import dev.sudoku.app.model.content
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -39,11 +35,11 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -53,15 +49,16 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class NativeAndroidMetricsTest {
     private val measurements = JSONArray()
-    private val json = Json { classDiscriminator = "kind" }
 
+    /** Records device observations when the caller explicitly enables metrics. */
     @Test
     fun recordNativePerformanceWithoutChangingProductionAllowances() = runBlocking<Unit> {
+        val arguments = InstrumentationRegistry.getArguments()
+        val isEnabled = arguments.getString("runNativeMetrics") == "true"
+        assumeTrue("Set runNativeMetrics=true to collect device measurements", isEnabled)
+
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.context
-        val corpus = context.assets.open("native-metrics-corpus.json").bufferedReader().use {
-            JSONObject(it.readText())
-        }
+        val corpus = loadNativeDeviceCorpus()
         val report = JSONObject()
             .put("abi", Build.SUPPORTED_ABIS.first())
             .put("pageSizeBytes", Os.sysconf(OsConstants._SC_PAGESIZE))
@@ -90,44 +87,15 @@ class NativeAndroidMetricsTest {
             repeat(5) {
                 measure("warmNativeInformationCall:$it") { completed(engine.information()) }
             }
-            val daily =
-                completed(
-                    engine.deriveSeed(
-                        "daily:2026-10-16".encodeToByteArray().map {
-                            it.toUByte()
-                        }
-                    )
-                )
-            // Same independent JS BLAKE3 literal as sudoku/core/tests/random.rs; this is reused
-            // evidence.
-            assertEquals(
-                listOf(
-                    192, 49, 10, 214, 144, 151, 78, 22, 90, 7, 85, 25, 27, 44, 188, 244,
-                    236, 111, 36, 156, 67, 77, 166, 174, 12, 194, 22, 62, 194, 26, 8, 89
-                ),
-                daily.value.map { it.toInt() }
-            )
-
             val cases = corpus.getJSONArray("cases")
             assertEquals(19, cases.length())
             for (index in 0 until cases.length()) {
                 val row = cases.getJSONObject(index)
-                val request = row.getJSONObject("input").request()
-                val historical = json.decodeFromString<Puzzle>(
-                    row.getJSONObject("expected").getJSONObject("puzzle").toString()
-                )
+                val request = row.generationRequest()
+                val historical = row.historicalPuzzle()
                 assertEquals(
                     Validation.Valid,
-                    completed(
-                        engine.validatePuzzle(
-                            PuzzleContent(
-                                historical.givens,
-                                historical.solution,
-                                historical.rules,
-                                historical.difficulty
-                            )
-                        )
-                    ).value
+                    completed(engine.validatePuzzle(historical.content())).value
                 )
                 var previous: Puzzle? = null
                 repeat(2) { repetition ->
@@ -157,9 +125,10 @@ class NativeAndroidMetricsTest {
                         )
                 }
             }
-            arithmeticAndNodeLimit(corpus)
+            arithmeticMeasurements(corpus.getJSONObject("arithmetic").nativeBoardFixture())
+            nodeLimitMeasurement(corpus.getJSONObject("nearExhaustion").nativeBoardFixture())
             cancellationSamples(cases)
-            queueDrain(engine, cases)
+            nextPreparationAfterCancellation(engine, cases)
             repeatedHandleHeap(cases)
         } finally {
             report.put("measurements", measurements)
@@ -174,68 +143,32 @@ class NativeAndroidMetricsTest {
         }
     }
 
-    private suspend fun arithmeticAndNodeLimit(corpus: JSONObject) {
-        val arithmetic = corpus.getJSONObject("arithmetic")
-        val input = arithmetic.getJSONObject("input")
-        val rules = json.decodeFromString<PuzzleRules>(input.getJSONObject("rules").toString())
-        val token = CancellationToken()
-        val prepared = preparePuzzle(PrepareInputDto(rules.native()), token)
-        try {
+    private suspend fun arithmeticMeasurements(fixture: NativeBoardFixture) {
+        fixture.withPrepared { prepared, token ->
             val result = measure("hardArithmeticCandidates:independentFixture") {
-                prepared.candidates(
-                    BoardQueryDto(
-                        input.getJSONArray("board").integers().nativeBoard()
-                    ),
-                    token
-                )
+                prepared.candidates(BoardQueryDto(fixture.board), token)
             }
-            val expected = arithmetic.getJSONObject("expected")
-            when (val candidates = result.result) {
-                is CandidateResultDto.Complete -> assertEquals(
-                    expected.getJSONObject("candidates").getJSONArray("candidates").integers(),
-                    candidates.candidates.map { it.toInt() }
-                )
-                CandidateResultDto.Incomplete -> {
-                    throw AssertionError("Independent candidate fixture must complete")
-                }
-            }
+            measurements.getJSONObject(measurements.length() - 1)
+                .put("isComplete", result.result is CandidateResultDto.Complete)
             repeat(25) { measure("ownedMetadataRoundTrip:$it") { prepared.metadata().player() } }
-        } finally {
-            prepared.close()
-            token.close()
         }
+    }
 
-        val near = corpus.getJSONObject("nearExhaustion")
-        val nearInput = near.getJSONObject("input")
-        val nearRules = json.decodeFromString<PuzzleRules>(
-            nearInput.getJSONObject("rules").toString()
-        )
-        val nearToken = CancellationToken()
-        val nearPrepared = preparePuzzle(PrepareInputDto(nearRules.native()), nearToken)
-        try {
+    private suspend fun nodeLimitMeasurement(fixture: NativeBoardFixture) {
+        val input = PreparedCountInputDto(fixture.board, SearchOptionsDto(nodeLimit = 0u))
+        fixture.withPrepared { prepared, token ->
             val response = measure("searchNodeLimit:historicalBoard") {
-                nearPrepared.countSolutions(
-                    PreparedCountInputDto(
-                        nearInput.getJSONArray("board").integers().nativeBoard(),
-                        SearchOptionsDto(0u)
-                    ),
-                    nearToken
-                )
+                prepared.countSolutions(input, token)
             }
-            assertTrue(response.result is SearchResultDto.Incomplete)
             measurements.getJSONObject(measurements.length() - 1)
                 .put("nodeLimit", 0)
-                .put("interpretation", "Explicit algorithm node limit remains inconclusive")
-        } finally {
-            nearPrepared.close()
-            nearToken.close()
+                .put("isIncomplete", response.result is SearchResultDto.Incomplete)
         }
     }
 
     private fun cancellationSamples(cases: JSONArray) {
         val row = hardGenerationCase(cases)
-        val input = row.getJSONObject("input")
-        val request = input.request()
+        val request = row.generationRequest()
         val version = if (request.variant == Variant.CLASSIC) {
             GenerationVersionDto.CLASSIC_V12
         } else {
@@ -298,8 +231,11 @@ class NativeAndroidMetricsTest {
         }
     }
 
-    private suspend fun queueDrain(engine: RustSudokuEngine, cases: JSONArray) = coroutineScope {
-        val request = hardGenerationCase(cases).getJSONObject("input").request()
+    private suspend fun nextPreparationAfterCancellation(
+        engine: RustSudokuEngine,
+        cases: JSONArray
+    ) = coroutineScope {
+        val request = hardGenerationCase(cases).generationRequest()
         val first = async(Dispatchers.Default) { engine.generate(request) }
         val second = async(Dispatchers.Default) { engine.generate(request) }
         delay(5)
@@ -310,11 +246,11 @@ class NativeAndroidMetricsTest {
         val prepared = completed(engine.prepare(PuzzleRules.Classic))
         prepared.value.close()
         measurements.put(
-            JSONObject().put("name", "boundedAnalysisQueueDrain")
+            JSONObject().put("name", "nextPreparationAfterCancellation")
                 .put("facadeCoroutinesPendingAtSignal", activeAtSignal)
                 .put(
                     "sampleInterpretation",
-                    "Includes queued calls; direct samples establish native checkpoints"
+                    "Includes queued calls and ends when one later preparation returns"
                 )
                 .put(
                     "cancelToNextPreparedReturnMs",
@@ -325,9 +261,7 @@ class NativeAndroidMetricsTest {
     }
 
     private suspend fun repeatedHandleHeap(cases: JSONArray) {
-        val rules = json.decodeFromString<Puzzle>(
-            hardGenerationCase(cases).getJSONObject("expected").getJSONObject("puzzle").toString()
-        ).rules
+        val rules = hardGenerationCase(cases).historicalPuzzle().rules
         val engine = RustSudokuEngine()
         val before = Debug.getNativeHeapAllocatedSize()
         measure("repeatedPreparedHandleClose:50") {
@@ -354,14 +288,6 @@ class NativeAndroidMetricsTest {
         val input = it.getJSONObject("input")
         input.getString("variant") == "killer" && input.getString("difficulty") == "hard"
     }
-
-    private fun JSONObject.request(): GenerationRequest = GenerationRequest(
-        Variant.entries.first { it.wireName == getString("variant") },
-        Difficulty.entries.first { it.name.lowercase() == getString("difficulty") },
-        getJSONArray("seed").integers().map { it.toUByte() }
-    )
-
-    private fun JSONArray.integers(): List<Int> = (0 until length()).map { getInt(it) }
 
     private fun <T> completed(outcome: EngineOutcome<T>): EngineOutcome.Completed<T> =
         when (outcome) {

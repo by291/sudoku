@@ -10,17 +10,20 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import dev.sudoku.app.model.ThemePreference
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+/** Checks digit activation across keypad layouts and disabled states. */
 class NumberPadTest {
     @get:Rule val compose = createComposeRule()
 
+    /** Checks that the same digit remains operable after wrapping. */
     @Test
     fun compactKeysStayInOneRowAndNarrowWindowsWrapWithoutLosingDigits() {
         val width = mutableStateOf(320.dp)
-        var chosen = 0
+        var chosen: Int? = null
         compose.setContent {
             SudokuTheme(ThemePreference.LIGHT) {
                 NumberPad(
@@ -38,6 +41,7 @@ class NumberPadTest {
         compose.onNodeWithContentDescription("填入数字9").performClick()
         compose.runOnIdle {
             assertEquals(9, chosen)
+            chosen = null
             width.value = 240.dp
         }
 
@@ -52,10 +56,11 @@ class NumberPadTest {
         compose.runOnIdle { assertEquals(9, chosen) }
     }
 
+    /** Checks that disabling expanded keys suppresses digit callbacks. */
     @Test
     fun zoomOffersLargerTargetsAndDisabledKeysCannotEnterDigits() {
         val enabled = mutableStateOf(true)
-        var chosen = 0
+        var chosen: Int? = null
         compose.setContent {
             SudokuTheme(ThemePreference.DARK) {
                 NumberPad(
@@ -74,9 +79,10 @@ class NumberPadTest {
         compose.onNodeWithContentDescription("笔记数字7").performClick()
         compose.runOnIdle {
             assertEquals(7, chosen)
+            chosen = null
             enabled.value = false
         }
         compose.onNodeWithContentDescription("笔记数字9").assertIsNotEnabled().performClick()
-        compose.runOnIdle { assertEquals(7, chosen) }
+        compose.runOnIdle { assertNull(chosen) }
     }
 }

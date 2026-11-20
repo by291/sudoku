@@ -64,4 +64,14 @@ ANDROID_INTEROP_REIMPORT=1 pnpm exec vitest run --config android/interop/vitest.
 
 Host tests and real device exports are distinct checks. CI performs host interoperability checks but does not run instrumentation. Release assembly, device runtime, accessibility, native-library alignment and physical-device performance are separate gates; a successful Debug build does not establish them.
 
+`NativeAndroidMetricsTest` is opt-in and is skipped by ordinary connected-test runs. Run it alone on a disposable emulator or device, in a fresh instrumentation process:
+
+```sh
+./gradlew :core:engine:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=dev.sudoku.app.engine.NativeAndroidMetricsTest \
+  -Pandroid.testInstrumentationRunnerArguments.runNativeMetrics=true
+```
+
+Its elapsed times, heap observations and cancellation sample validity are measurements rather than functional acceptance thresholds. Normal native contract and JVM ownership tests still verify cancellation classification, executing-handle lifetime, late-result disposal and bounded analysis-lane draining. The timing suite's first-call interpretation requires the isolated process above.
+
 See [architecture](architecture.md), [data loading](data-loading.md), [interface](interface.md) and [Android guidelines](../../android/AGENTS.md) for maintained implementation contracts. Keep generated files and local test output out of documentation.

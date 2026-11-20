@@ -1,10 +1,15 @@
 package dev.sudoku.app.engine
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.sudoku.app.ffi.BoardQueryDto
 import dev.sudoku.app.ffi.CancellationToken
+import dev.sudoku.app.ffi.CandidateResultDto
 import dev.sudoku.app.ffi.NativeException
 import dev.sudoku.app.ffi.PrepareInputDto
+import dev.sudoku.app.ffi.PreparedCountInputDto
 import dev.sudoku.app.ffi.RulesDto
+import dev.sudoku.app.ffi.SearchOptionsDto
+import dev.sudoku.app.ffi.SearchResultDto
 import dev.sudoku.app.ffi.preparePuzzle
 import dev.sudoku.app.model.ArrowClue
 import dev.sudoku.app.model.AssessmentIssue
@@ -20,14 +25,21 @@ import dev.sudoku.app.model.GenerationRequest
 import dev.sudoku.app.model.PreparedPuzzle
 import dev.sudoku.app.model.PuzzleRules
 import dev.sudoku.app.model.RuleViolation
+import dev.sudoku.app.model.Validation
 import dev.sudoku.app.model.Variant
 import dev.sudoku.app.model.ViolationCode
+import dev.sudoku.app.model.content
+import dev.sudoku.app.model.variant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
+private const val HISTORICAL_CLASSIC_CASE = "full:0"
+private const val HISTORICAL_KILLER_CASE = "full:640"
+
+/** Exercises the native contract through the packaged Android bridge. */
 @RunWith(AndroidJUnit4::class)
 class NativeAndroidContractTest {
     @Test
@@ -201,6 +213,120 @@ class NativeAndroidContractTest {
         )
         assertEquals(expected, response.value.puzzle.givens)
         assertEquals(seedHex, response.value.puzzle.seed)
+    }
+
+    /** Checks all bytes of the daily seed against the independent BLAKE3 fixture. */
+    @Test
+    fun packagedSeedMatchesIndependentDailyDigest() = runBlocking<Unit> {
+        val material = "daily:2026-10-16".encodeToByteArray().map { it.toUByte() }
+        // Reuses the independent JavaScript BLAKE3 literal in sudoku/core/tests/random.rs.
+        val expected = listOf(
+            192,
+            49,
+            10,
+            214,
+            144,
+            151,
+            78,
+            22,
+            90,
+            7,
+            85,
+            25,
+            27,
+            44,
+            188,
+            244,
+            236,
+            111,
+            36,
+            156,
+            67,
+            77,
+            166,
+            174,
+            12,
+            194,
+            22,
+            62,
+            194,
+            26,
+            8,
+            89
+        )
+
+        val response = RustSudokuEngine().deriveSeed(material) as EngineOutcome.Completed
+
+        assertEquals(expected, response.value.map { it.toInt() })
+    }
+
+    /** Checks that arithmetic support crosses UniFFI with all sealed candidate masks intact. */
+    @Test
+    fun packagedArithmeticCandidatesMatchTheSealedBoard() = runBlocking<Unit> {
+        val arithmetic = loadNativeDeviceCorpus().getJSONObject("arithmetic")
+        val fixture = arithmetic.nativeBoardFixture()
+        val expectedCandidates = arithmetic.getJSONObject("expected").getJSONObject("candidates")
+        val expectedMasks = expectedCandidates.getJSONArray("candidates").integers()
+
+        val result = fixture.withPrepared { prepared, token ->
+            prepared.candidates(BoardQueryDto(fixture.board), token).result
+        }
+
+        assertTrue(
+            "Sealed arithmetic board must complete, received $result",
+            result is CandidateResultDto.Complete
+        )
+        val masks = (result as CandidateResultDto.Complete).candidates.map { it.toInt() }
+        assertEquals(expectedMasks, masks)
+    }
+
+    /** Checks that a zero-node search returns a typed incomplete result through UniFFI. */
+    @Test
+    fun packagedZeroNodeSearchRemainsIncomplete() = runBlocking<Unit> {
+        val nearExhaustion = loadNativeDeviceCorpus().getJSONObject("nearExhaustion")
+        val fixture = nearExhaustion.nativeBoardFixture()
+        val input = PreparedCountInputDto(fixture.board, SearchOptionsDto(nodeLimit = 0u))
+
+        val result = fixture.withPrepared { prepared, token ->
+            prepared.countSolutions(input, token).result
+        }
+
+        assertEquals(SearchResultDto.Incomplete(nodesVisited = 0u), result)
+    }
+
+    /** Checks that sealed Classic and Killer puzzles remain valid after bridge upgrades. */
+    @Test
+    fun packagedValidationAcceptsHistoricalClassicAndKillerPuzzles() = runBlocking<Unit> {
+        val engine = RustSudokuEngine()
+        val cases = loadNativeDeviceCorpus().getJSONArray("cases")
+
+        for (id in listOf(HISTORICAL_CLASSIC_CASE, HISTORICAL_KILLER_CASE)) {
+            val historical = cases.caseById(id).historicalPuzzle()
+            val result = engine.validatePuzzle(historical.content())
+
+            assertEquals(id, EngineOutcome.Completed(Validation.Valid), result)
+        }
+    }
+
+    /** Checks packaged Killer generation identity and validation from one sealed request seed. */
+    @Test
+    fun packagedVariantGenerationReturnsAPlayableKillerPuzzle() = runBlocking<Unit> {
+        val engine = RustSudokuEngine()
+        val cases = loadNativeDeviceCorpus().getJSONArray("cases")
+        val row = cases.caseById(HISTORICAL_KILLER_CASE)
+        val expectedSeed = row.historicalPuzzle().seed
+
+        val response = engine.generate(row.generationRequest()) as EngineOutcome.Completed
+        val generated = response.value.puzzle
+
+        assertEquals(expectedSeed, generated.seed)
+        assertEquals("sudoku-variants-v12", generated.puzzleVersion)
+        assertEquals(Variant.KILLER, generated.rules.variant)
+        assertEquals(Difficulty.EASY, generated.difficulty)
+        assertEquals(
+            EngineOutcome.Completed(Validation.Valid),
+            engine.validatePuzzle(generated.content())
+        )
     }
 
     @Test

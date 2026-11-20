@@ -7,6 +7,7 @@ import dev.sudoku.app.ffi.GenerationResultDto
 import dev.sudoku.app.ffi.GenerationVersionDto
 import dev.sudoku.app.ffi.NativeException
 import dev.sudoku.app.ffi.VariantDto
+import dev.sudoku.app.ffi.generate
 import dev.sudoku.app.model.ArrowClue
 import dev.sudoku.app.model.AssessmentIssue
 import dev.sudoku.app.model.AssessmentResult
@@ -19,7 +20,6 @@ import dev.sudoku.app.model.Difficulty
 import dev.sudoku.app.model.EditResult
 import dev.sudoku.app.model.EngineInformation
 import dev.sudoku.app.model.EngineOutcome
-import dev.sudoku.app.model.GenerationRequest
 import dev.sudoku.app.model.PreparedPuzzle
 import dev.sudoku.app.model.PuzzleAssessment
 import dev.sudoku.app.model.PuzzleContent
@@ -243,57 +243,26 @@ class RustSudokuEngineTest {
         }
 }
 
+/** Checks that a real cancellation signal crosses the native generation boundary. */
 class NativeCancellationTest {
+    /** Checks that a signalled token produces cancellation and a fresh token can succeed. */
     @Test
-    fun independentTokenStopsAnExecutingNativeGeneration() {
-        val token = CancellationToken()
-        val started = java.util.concurrent.CountDownLatch(1)
-        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
-        try {
-            val future = executor.submit<GenerationResultDto> {
-                started.countDown()
-                dev.sudoku.app.ffi.generate(
-                    ByteArray(32) { 42 },
-                    GenerationOptionsDto(
-                        VariantDto.KILLER,
-                        DifficultyDto.HARD,
-                        GenerationVersionDto.VARIANTS_V12,
-                        null
-                    ),
-                    token
-                )
-            }
-            check(started.await(5, java.util.concurrent.TimeUnit.SECONDS))
-            Thread.sleep(10)
-            token.cancel()
-
-            val error = kotlin.test.assertFailsWith<java.util.concurrent.ExecutionException> {
-                future.get(5, java.util.concurrent.TimeUnit.SECONDS)
-            }
-            assertIs<NativeException.Cancelled>(error.cause)
-        } finally {
-            executor.shutdown()
-            check(executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
-            token.close()
-        }
-    }
-
-    @Test
-    fun requestDeadlineIsDistinctAndTheLaneDrains() = runBlocking<Unit> {
-        val engine = RustSudokuEngine(NativeExecutionLimits(requestDeadlineMs = 1))
-        assertIs<EngineOutcome.Completed<*>>(RustSudokuEngine().information())
-        val result = engine.generate(
-            GenerationRequest(
-                Variant.KILLER,
-                Difficulty.HARD,
-                List(32) { 42.toUByte() }
-            )
+    fun signalledTokenCancelsNativeGenerationAndFreshTokenSucceeds() {
+        val seed = ByteArray(32) { 42 }
+        val options = GenerationOptionsDto(
+            variant = VariantDto.CLASSIC,
+            difficulty = DifficultyDto.EASY,
+            puzzleVersion = GenerationVersionDto.CLASSIC_V12,
+            limits = null
         )
 
-        assertIs<EngineOutcome.TimedOut>(result)
-        val prepared = assertIs<EngineOutcome.Completed<PreparedPuzzle>>(
-            RustSudokuEngine().prepare(PuzzleRules.Classic)
-        ).value
-        prepared.close()
+        // A sticky signal makes the functional check independent of how fast generation runs.
+        CancellationToken().use { token ->
+            token.cancel()
+            assertFailsWith<NativeException.Cancelled> { generate(seed, options, token) }
+        }
+        CancellationToken().use { token ->
+            assertIs<GenerationResultDto.Ready>(generate(seed, options, token))
+        }
     }
 }
