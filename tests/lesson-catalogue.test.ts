@@ -1,13 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { gunzipSync } from 'node:zlib'
+import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import { LESSONS } from './support/lessons'
 import { LESSON_IDS, lessonStageCount } from '@/features/learning/model/lessonIds'
 
-it('shares all stable authored courses and complete stage facts with Android', () => {
-  expect(existsSync('resources/lessons/catalogue.json')).toBe(true)
-
+it('shares stable course identities and stage counts with Android', () => {
   const catalogue = JSON.parse(readFileSync('resources/lessons/catalogue.json', 'utf8'))
+
   expect(catalogue.schemaVersion).toBe(1)
   expect(catalogue.lessons.map((lesson: { id: string }) => lesson.id)).toEqual(LESSON_IDS)
   expect(
@@ -16,19 +14,6 @@ it('shares all stable authored courses and complete stage facts with Android', (
         lesson.exercises.flatMap((exercise) => exercise.stages).length,
     ),
   ).toEqual(LESSON_IDS.map(lessonStageCount))
-
-  // This sealed pre-Rust snapshot checks extraction fidelity; independent course proofs check mathematics.
-  const authored: Record<string, unknown>[] = JSON.parse(
-    gunzipSync(readFileSync('tests/fixtures/teaching-contracts.json.gz')).toString('utf8'),
-  )
-  // The sealed fixture retains the old flattened aliases; compare its owned content contract.
-  for (const lesson of authored) {
-    delete lesson.board
-    delete lesson.candidates
-    delete lesson.rules
-    delete lesson.exercise
-  }
-  expect(JSON.parse(JSON.stringify(LESSONS))).toEqual(authored)
 })
 
 it('loads an owned copy and rejects forged answers, candidates and transfer capabilities', async () => {

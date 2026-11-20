@@ -132,19 +132,20 @@ fn matches_every_independent_advanced_witness() {
         "../../../tests/fixtures/engine-contracts/advanced.json"
     ))
     .unwrap();
-    for row in rows {
+    // Retired work cutoffs contain no mathematical witness.
+    for row in rows
+        .iter()
+        .filter(|row| row["expected"]["result"]["status"] == "complete")
+    {
         let input = serde_json::from_value(row["input"].clone()).unwrap();
 
         let actual = advanced_contracts::evaluate(input).unwrap();
 
-        // Work-only interruption rows contain no mathematical witness; complete sealed witnesses remain exact.
-        if row["expected"]["result"]["status"] == "complete" {
-            assert_eq!(
-                actual,
-                fixtures::without_work(row["expected"].clone()),
-                "{}",
-                row["id"]
-            );
-        }
+        assert_eq!(
+            actual,
+            fixtures::without_work(row["expected"].clone()),
+            "{}",
+            row["id"]
+        );
     }
 }

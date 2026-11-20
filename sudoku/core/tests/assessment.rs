@@ -105,8 +105,14 @@ fn borrowed_continuation_returns_an_independent_trace_snapshot() {
     let rules = compile_rules(&PuzzleRules::Classic).unwrap();
     let mut state = create_workspace(&board, &rules);
     let mut control = ExecutionControl::new();
+
+    // The two separate row gaps are both forced. A one-step limit leaves the second unfilled.
     let mut previous = analyze_workspace(&mut state, &BASIC_TECHNIQUES, 1, &mut control, &[]);
+
     assert_eq!(previous.status, LogicStatus::StepLimit);
+    assert_eq!(previous.steps.len(), 1);
+    assert_eq!(previous.board.values()[0], 1);
+    assert_eq!(previous.board.values()[40], 0);
 
     let resumed = analyze_workspace(
         &mut state,

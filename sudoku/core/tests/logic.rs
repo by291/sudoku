@@ -5,30 +5,64 @@ pub mod fixtures;
 #[path = "support/projection.rs"]
 mod logical_projection;
 
-use sudoku_core::control::ExecutionControl;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
+use sudoku_core::control::{CancellationProbe, ExecutionControl};
 use sudoku_core::logic::solver::{analyze_workspace, find_step};
 use sudoku_core::logic::techniques::Technique;
-use sudoku_core::logic::types::{Evidence, LogicStatus, LogicalAction, LogicalWorkspace, Removal};
+use sudoku_core::logic::types::{
+    Evidence, LogicStatus, LogicalAction, LogicalWorkspace, Removal, StepOutcome,
+};
 use sudoku_core::logic::variant_techniques::find_variant_step;
 use sudoku_core::logic::workspace::{apply_step, create_workspace};
 use sudoku_core::rules::context::compile_rules;
-use sudoku_core::rules::types::{Cage, PuzzleRules, Unit, UnitKind};
-use sudoku_core::types::{Board, Bounded, CandidateMask};
+use sudoku_core::rules::types::{Cage, PreparedRules, PuzzleRules, Unit, UnitKind};
+use sudoku_core::types::{BOARD_SIZE, Board, Bounded, CandidateMask};
 
-fn sum_three_workspace() -> sudoku_core::logic::types::LogicalWorkspace {
+const SUM_THREE_CANDIDATE_BITS: u16 = 0b111;
+const SUM_THREE_SUPPORTED_BITS: u16 = 0b011;
+const FIRST_SUM_THREE_WITNESS_CHECKS: usize = 4;
+
+#[derive(Debug)]
+struct CancelAfterChecks {
+    completed_checks: AtomicUsize,
+    allowed_checks: usize,
+}
+
+impl CancellationProbe for CancelAfterChecks {
+    /// Allows the requested checkpoints before asserting a monotonic cancellation signal.
+    fn is_cancelled(&self) -> bool {
+        self.completed_checks.fetch_add(1, Ordering::Relaxed) >= self.allowed_checks
+    }
+}
+
+fn sum_three_workspace() -> LogicalWorkspace {
     let mut cages = vec![Cage {
         cells: vec![0, 1],
         sum: 3,
     }];
-    cages.extend((2..81).map(|cell| Cage {
+    cages.extend((2..BOARD_SIZE).map(|cell| Cage {
         cells: vec![cell],
         sum: 1,
     }));
     let rules = compile_rules(&PuzzleRules::Killer { cages }).unwrap();
-    let mut candidates = *create_workspace(&Board::EMPTY, &rules).candidates();
-    candidates[0] = CandidateMask::try_from(7).unwrap();
-    candidates[1] = CandidateMask::try_from(7).unwrap();
-    LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, &rules).unwrap()
+    workspace_with_sum_three_candidates(&rules)
+}
+
+fn workspace_with_sum_three_candidates(rules: &PreparedRules) -> LogicalWorkspace {
+    let mut candidates = *create_workspace(&Board::EMPTY, rules).candidates();
+    let cage_domain = CandidateMask::try_from(SUM_THREE_CANDIDATE_BITS).unwrap();
+    candidates[..2].fill(cage_domain);
+    LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, rules).unwrap()
+}
+
+fn find_cage_combination(
+    state: &mut LogicalWorkspace,
+    control: &mut ExecutionControl,
+) -> StepOutcome {
+    find_variant_step(state, &[Technique::CageCombination], control)
 }
 
 #[test]
@@ -69,11 +103,9 @@ fn basic_and_variant_steps_match_ordered_evidence() {
     );
 
     let mut state = sum_three_workspace();
-    let Bounded::Complete(Some(mut first)) = find_variant_step(
-        &mut state,
-        &[Technique::CageCombination],
-        &mut ExecutionControl::new(),
-    ) else {
+    let Bounded::Complete(Some(mut first)) =
+        find_cage_combination(&mut state, &mut ExecutionControl::new())
+    else {
         panic!("Expected distinct sum-three proof");
     };
     assert_eq!(
@@ -87,57 +119,66 @@ fn basic_and_variant_steps_match_ordered_evidence() {
         evidence.cells[0] = 80;
         evidence.digits[0] = 9;
     }
-    let repeated = find_variant_step(
-        &mut state,
-        &[Technique::CageCombination],
-        &mut ExecutionControl::new(),
-    );
+    let repeated = find_cage_combination(&mut state, &mut ExecutionControl::new());
     assert_eq!(repeated, Bounded::Complete(Some(original.clone())));
 
     apply_step(&mut state, &original).unwrap();
-    assert_eq!(state.candidates()[0].bits(), 3);
+    assert_eq!(state.candidates()[0].bits(), SUM_THREE_SUPPORTED_BITS);
     assert_eq!(state.premises().len(), 1);
 }
 
 #[test]
-fn incomplete_support_is_never_memoized() {
+fn cancelled_cage_enumeration_leaves_no_partial_support_for_retry() {
     let mut state = sum_three_workspace();
+    let original_candidates = *state.candidates();
+    // Allow the detector gate, the first digit and the first two attempts for the second digit.
+    // This records (1, 2) before cancellation withholds the reverse witness (2, 1).
+    let probe = CancelAfterChecks {
+        completed_checks: AtomicUsize::new(0),
+        allowed_checks: FIRST_SUM_THREE_WITNESS_CHECKS,
+    };
+    let mut control = ExecutionControl::with_cancellation(Arc::new(probe));
 
     assert_eq!(
-        find_variant_step(
-            &mut state,
-            &[Technique::CageCombination],
-            &mut fixtures::cancelled_control()
-        ),
+        find_cage_combination(&mut state, &mut control),
         Bounded::Cancelled
     );
+    assert_eq!(state.candidates(), &original_candidates);
+    assert!(state.premises().is_empty());
+
+    let Bounded::Complete(Some(step)) =
+        find_cage_combination(&mut state, &mut ExecutionControl::new())
+    else {
+        panic!("Expected a deduction from complete support on retry");
+    };
+
+    // The only distinct pairs totaling three are (1, 2) and (2, 1).
     assert_eq!(
-        find_variant_step(
-            &mut state,
-            &[Technique::CageCombination],
-            &mut fixtures::cancelled_control()
-        ),
-        Bounded::Cancelled
+        step.action,
+        LogicalAction::Elimination {
+            removals: vec![Removal { cell: 0, digit: 3 }, Removal { cell: 1, digit: 3 }]
+        }
     );
-    let Bounded::Complete(Some(step)) = find_variant_step(
-        &mut state,
-        &[Technique::CageCombination],
-        &mut ExecutionControl::new(),
-    ) else {
+}
+
+#[test]
+fn sum_three_deduction_uses_current_candidates() {
+    let mut state = sum_three_workspace();
+    let Bounded::Complete(Some(step)) =
+        find_cage_combination(&mut state, &mut ExecutionControl::new())
+    else {
         panic!("Expected complete support");
     };
-    // The sum-three cage independently excludes 3. Applying one supported removal must
-    // invalidate the memo by its domain key, without discarding prior explained premises.
-    let mut narrowed = (*step).clone();
-    narrowed.action = LogicalAction::Elimination {
+
+    let mut first_removal = *step;
+    first_removal.action = LogicalAction::Elimination {
         removals: vec![Removal { cell: 0, digit: 3 }],
     };
-    apply_step(&mut state, &narrowed).unwrap();
-    let mut control = ExecutionControl::new();
+    apply_step(&mut state, &first_removal).unwrap();
     let Bounded::Complete(Some(step)) =
-        find_variant_step(&mut state, &[Technique::CageCombination], &mut control)
+        find_cage_combination(&mut state, &mut ExecutionControl::new())
     else {
-        panic!("Expected recomputed support");
+        panic!("Expected remaining deduction");
     };
     assert_eq!(
         step.action,
@@ -150,28 +191,16 @@ fn incomplete_support_is_never_memoized() {
 #[test]
 fn new_clue_masks_never_reuse_reduced_domains() {
     let mut first = sum_three_workspace();
-    let Bounded::Complete(Some(step)) = find_variant_step(
-        &mut first,
-        &[Technique::CageCombination],
-        &mut ExecutionControl::new(),
-    ) else {
+    let Bounded::Complete(Some(step)) =
+        find_cage_combination(&mut first, &mut ExecutionControl::new())
+    else {
         panic!("Expected complete support");
     };
     apply_step(&mut first, &step).unwrap();
-    let mut candidates = *create_workspace(&Board::EMPTY, first.rules()).candidates();
-    candidates[0] = CandidateMask::try_from(7).unwrap();
-    candidates[1] = CandidateMask::try_from(7).unwrap();
-
-    let mut second =
-        LogicalWorkspace::from_authored_candidates(&Board::EMPTY, candidates, first.rules())
-            .unwrap();
+    let mut second = workspace_with_sum_three_candidates(first.rules());
 
     assert_eq!(
-        find_variant_step(
-            &mut second,
-            &[Technique::CageCombination],
-            &mut fixtures::cancelled_control()
-        ),
+        find_cage_combination(&mut second, &mut fixtures::cancelled_control()),
         Bounded::Cancelled
     );
     assert!(second.premises().is_empty());

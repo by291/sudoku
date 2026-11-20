@@ -6,7 +6,7 @@ import { LESSONS } from './support/lessons'
 import { testEngine } from './support/semantics'
 import { transformStage } from '@/features/learning/model/exerciseStages'
 
-it('all_32_lesson_identities_and_expected_deductions_are_preserved', () => {
+it('preserves the complete authored courses extracted from the sealed catalogue', () => {
   // Captured from the pre-cutover TS course at commit 6b6807d, before invoking Rust construction.
   const bytes = readFileSync('tests/fixtures/teaching-contracts.json.gz')
   expect(createHash('sha256').update(bytes).digest('hex')).toBe(
@@ -14,7 +14,7 @@ it('all_32_lesson_identities_and_expected_deductions_are_preserved', () => {
   )
   const expected: Record<string, unknown>[] = JSON.parse(gunzipSync(bytes).toString('utf8'))
 
-  // Remove only the retired guided aliases; all sealed authored content remains the oracle.
+  // Retired guided aliases duplicate fields now owned by the guided stage.
   for (const lesson of expected) {
     delete lesson.board
     delete lesson.candidates
@@ -22,7 +22,6 @@ it('all_32_lesson_identities_and_expected_deductions_are_preserved', () => {
     delete lesson.exercise
   }
 
-  expect(LESSONS).toHaveLength(32)
   expect(JSON.parse(JSON.stringify(LESSONS))).toEqual(expected)
 })
 

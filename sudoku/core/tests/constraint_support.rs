@@ -31,10 +31,12 @@ fn compare_support_fixtures(prefix: &str) {
         "../../../tests/fixtures/engine-contracts/support.json"
     ))
     .unwrap();
-    for row in rows
-        .iter()
-        .filter(|row| row["id"].as_str().unwrap().starts_with(prefix))
-    {
+    // Only completed rows preserve support masks. Retired work cutoffs are provenance.
+    let complete_rows = rows.iter().filter(|row| {
+        row["id"].as_str().unwrap().starts_with(prefix)
+            && row["expected"]["result"]["status"] == "complete"
+    });
+    for row in complete_rows {
         let input = &row["input"];
         let rules = fixtures::decode_rules(&input["rules"]).unwrap();
         let context = compile_rules(&rules).unwrap();
@@ -55,17 +57,19 @@ fn compare_support_fixtures(prefix: &str) {
             panic!("Expected complete preparation");
         };
         let mut control = ExecutionControl::new();
-        let result = prepared.get(&board, &domains, 0, &mut control).unwrap();
-        let value = match result {
-            SupportResult::Complete(snapshot) => {
-                serde_json::json!({"status":"complete","cells":snapshot.cells,"supports":snapshot.supports.iter().map(|mask| mask.bits()).collect::<Vec<_>>()})
-            }
-            SupportResult::Cancelled => serde_json::json!({"status":"budget-exhausted"}),
+        let SupportResult::Complete(snapshot) =
+            prepared.get(&board, &domains, 0, &mut control).unwrap()
+        else {
+            panic!("Expected complete support: {}", row["id"]);
         };
 
-        if row["expected"]["result"]["status"] == "complete" {
-            assert_eq!(value, row["expected"]["result"], "{}", row["id"]);
-        }
+        let supports: Vec<u16> = snapshot.supports.iter().map(|mask| mask.bits()).collect();
+        let value = serde_json::json!({
+            "status": "complete",
+            "cells": snapshot.cells,
+            "supports": supports
+        });
+        assert_eq!(value, row["expected"]["result"], "{}", row["id"]);
     }
 }
 

@@ -1,136 +1,176 @@
 #[path = "support/rules.rs"]
 pub mod fixtures;
 
+use serde_json::{Value, json};
 use sudoku_core::constraints::computation::prepare_computation;
+use sudoku_core::constraints::types::PreparedComputation;
 use sudoku_core::control::ExecutionControl;
 use sudoku_core::search::exact::{count_solutions, count_with_rules};
 use sudoku_core::search::types::SearchResult;
 use sudoku_core::types::{Board, Bounded};
 
-#[test]
-fn counts_zero_one_two_and_preserves_first_solution() {
-    let rows: Vec<serde_json::Value> = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/engine-contracts/exact.json"
-    ))
-    .unwrap();
-    for row in &rows {
-        let input = &row["input"];
-        let rules = fixtures::decode_rules(&input["rules"]).unwrap();
-        let values: Vec<u8> = serde_json::from_value(input["board"].clone()).unwrap();
-        let board = Board::try_from(values.as_slice()).unwrap();
-        let mut control = ExecutionControl::new();
+const COMPLETE_NODE_LIMIT: u64 = 1_000_000;
+const LEGACY_AMPLE_WORK_LIMIT: u64 = 4_000_000;
+const ROOT_NODE_LIMIT: u64 = 1;
+const EARLY_BRANCH_NODE_LIMIT: u64 = 2;
+const ARITHMETIC_BRANCH_CASES: [&str; 3] = [
+    "generated:killer-hard:0:0",
+    "generated:thermo-medium:0:0",
+    "authored:arrow-hard:0",
+];
 
-        let result = count_with_rules(
-            &board,
-            &rules,
-            &mut control,
-            input["nodes"].as_u64().unwrap(),
-        )
-        .unwrap();
-
-        let expected = if matches!(result, SearchResult::Complete { .. }) {
-            // Legacy work-only cutoffs now run to completion; use the sealed complete sibling for this board.
-            &rows
-                .iter()
-                .find(|candidate| {
-                    candidate["input"]["board"] == input["board"]
-                        && candidate["input"]["rules"] == input["rules"]
-                        && candidate["expected"]["status"] == "complete"
-                })
-                .expect("Every search case has a sealed complete sibling")["expected"]
-        } else {
-            &row["expected"]
-        };
-        assert_eq!(
-            project_result(result),
-            fixtures::without_work(expected.clone()),
-            "{}",
-            row["id"]
-        );
-    }
-}
-
-#[test]
-fn insertion_order_preserves_solutions_and_nodes() {
-    compare_prepared(false);
-}
-
-#[test]
-fn late_exhaustion_restores_every_branch() {
-    compare_prepared(true);
-}
-
-fn compare_prepared(repeat_after_exhaustion: bool) {
-    let rows: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+fn prepared_rows() -> Vec<Value> {
+    serde_json::from_str(include_str!(
         "../../../tests/fixtures/engine-contracts/exact-prepared.json"
     ))
-    .unwrap();
-    for row in &rows {
-        let input = &row["input"];
-        let rules = fixtures::decode_rules(&input["rules"]).unwrap();
-        let values: Vec<u8> = serde_json::from_value(input["board"].clone()).unwrap();
-        let board = Board::try_from(values.as_slice()).unwrap();
-        let mut setup = ExecutionControl::new();
-        let Bounded::Complete(prepared) = prepare_computation(&rules, &mut setup).unwrap() else {
-            panic!("Expected immutable prepared layout");
-        };
-        let mut control = ExecutionControl::new();
-
-        let result = count_solutions(
-            &board,
-            &prepared,
-            &mut control,
-            input["nodeLimit"].as_u64().unwrap(),
-        );
-
-        match &result {
-            SearchResult::Complete { .. } => {
-                let expected = &rows
-                    .iter()
-                    .find(|candidate| {
-                        candidate["input"]["board"] == input["board"]
-                            && candidate["input"]["rules"] == input["rules"]
-                            && candidate["expected"]["result"]["status"] == "complete"
-                    })
-                    .expect("Every prepared case has a sealed complete sibling")["expected"]["result"];
-                assert_eq!(
-                    project_result(result),
-                    fixtures::without_work(expected.clone()),
-                    "{}",
-                    row["id"]
-                );
-            }
-            SearchResult::Incomplete { nodes_visited } => {
-                assert_eq!(
-                    *nodes_visited,
-                    input["nodeLimit"].as_u64().unwrap(),
-                    "{}",
-                    row["id"]
-                );
-            }
-        }
-        if repeat_after_exhaustion {
-            let mut first = ExecutionControl::new();
-            let mut second = ExecutionControl::new();
-            assert_eq!(
-                count_solutions(&board, &prepared, &mut first, 1000000),
-                count_solutions(&board, &prepared, &mut second, 1000000)
-            );
-        }
-    }
+    .unwrap()
 }
 
-fn project_result(result: SearchResult) -> serde_json::Value {
+fn decode_board(input: &Value) -> Board {
+    let values: Vec<u8> = serde_json::from_value(input["board"].clone()).unwrap();
+    Board::try_from(values.as_slice()).unwrap()
+}
+
+fn prepare_fixture(input: &Value) -> PreparedComputation {
+    let rules = fixtures::decode_rules(&input["rules"]).unwrap();
+    let Bounded::Complete(prepared) =
+        prepare_computation(&rules, &mut ExecutionControl::new()).unwrap()
+    else {
+        panic!("Expected immutable prepared layout");
+    };
+    prepared
+}
+
+fn project_result(result: SearchResult) -> Value {
     match result {
         SearchResult::Complete {
             count,
             solution,
             nodes_visited,
-        } => {
-            serde_json::json!({"status":"complete","count":count,"solution":solution.map(|board|board.values().to_vec()),"nodesVisited":nodes_visited})
-        }
-        SearchResult::Incomplete { nodes_visited } => {
-            serde_json::json!({"status":"budget-exhausted","nodesVisited":nodes_visited})
+        } => json!({
+            "status": "complete",
+            "count": count,
+            "solution": solution.map(|board| board.values().to_vec()),
+            "nodesVisited": nodes_visited
+        }),
+        SearchResult::Incomplete { nodes_visited } => json!({
+            "status": "budget-exhausted",
+            "nodesVisited": nodes_visited
+        }),
+    }
+}
+
+fn assert_sealed_search_result(result: SearchResult, expected: &Value, id: &Value) {
+    assert_eq!(
+        project_result(result),
+        fixtures::without_work(expected.clone()),
+        "{id}"
+    );
+}
+
+#[test]
+fn standalone_search_preserves_counts_first_solution_and_node_limits() {
+    let rows: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/engine-contracts/exact.json"
+    ))
+    .unwrap();
+
+    // With ample legacy work, exhaustion comes from the node limit that the wrapper still forwards.
+    let current_node_cases = rows
+        .iter()
+        .filter(|row| row["input"]["limit"] == LEGACY_AMPLE_WORK_LIMIT);
+    for row in current_node_cases {
+        let input = &row["input"];
+        let rules = fixtures::decode_rules(&input["rules"]).unwrap();
+        let board = decode_board(input);
+        let node_limit = input["nodes"].as_u64().unwrap();
+
+        let result =
+            count_with_rules(&board, &rules, &mut ExecutionControl::new(), node_limit).unwrap();
+
+        assert_sealed_search_result(result, &row["expected"], &row["id"]);
+    }
+}
+
+#[test]
+fn prepared_search_matches_sealed_complete_counts_and_solutions() {
+    let rows = prepared_rows();
+    let complete_rows = rows.iter().filter(|row| {
+        row["input"]["nodeLimit"] == COMPLETE_NODE_LIMIT
+            && row["expected"]["result"]["status"] == "complete"
+    });
+
+    for row in complete_rows {
+        let input = &row["input"];
+        let board = decode_board(input);
+        let prepared = prepare_fixture(input);
+
+        let result = count_solutions(
+            &board,
+            &prepared,
+            &mut ExecutionControl::new(),
+            COMPLETE_NODE_LIMIT,
+        );
+
+        assert_sealed_search_result(result, &row["expected"]["result"], &row["id"]);
+    }
+}
+
+#[test]
+fn prepared_node_budget_distinguishes_exhaustion_from_early_completion() {
+    let rows = prepared_rows();
+    let bounded_rows = rows
+        .iter()
+        .filter(|row| row["input"]["nodeLimit"].as_u64().unwrap() <= ROOT_NODE_LIMIT);
+
+    // With room for at most one node, direct contradictions and root propagation can still finish.
+    for row in bounded_rows {
+        let input = &row["input"];
+        let node_limit = input["nodeLimit"].as_u64().unwrap();
+        let board = decode_board(input);
+        let prepared = prepare_fixture(input);
+
+        let result = count_solutions(&board, &prepared, &mut ExecutionControl::new(), node_limit);
+
+        assert_sealed_search_result(result, &row["expected"]["result"], &row["id"]);
+    }
+}
+
+#[test]
+fn prepared_search_reaches_sealed_solution_after_branch_exhaustion() {
+    let rows = prepared_rows();
+
+    for id in ARITHMETIC_BRANCH_CASES {
+        let row = rows.iter().find(|row| row["id"] == id).unwrap();
+        let input = &row["input"];
+        let board = decode_board(input);
+        let prepared = prepare_fixture(input);
+
+        // These cases have sibling branches, so cutting off after two visits interrupts the search.
+        let incomplete = count_solutions(
+            &board,
+            &prepared,
+            &mut ExecutionControl::new(),
+            EARLY_BRANCH_NODE_LIMIT,
+        );
+        assert_eq!(
+            incomplete,
+            SearchResult::Incomplete {
+                nodes_visited: EARLY_BRANCH_NODE_LIMIT,
+            },
+            "{id}"
+        );
+
+        // Each retry searches the original board again and must complete with the sealed result.
+        for _ in 0..2 {
+            let completed = count_solutions(
+                &board,
+                &prepared,
+                &mut ExecutionControl::new(),
+                COMPLETE_NODE_LIMIT,
+            );
+
+            assert_sealed_search_result(completed, &row["expected"]["result"], &row["id"]);
         }
     }
 }
@@ -192,47 +232,4 @@ fn completed_invalid_arithmetic_is_rejected_without_search() {
             nodes_visited: 0,
         }
     );
-}
-
-#[test]
-fn contradictory_arithmetic_siblings_discard_pending_propagation() {
-    let rows: Vec<serde_json::Value> = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/engine-contracts/exact-prepared.json"
-    ))
-    .unwrap();
-    let cases = [
-        ("generated:killer-hard:0:0", 3),
-        ("generated:thermo-medium:0:0", 7),
-        ("authored:arrow-hard:0", 7),
-    ];
-
-    for (id, nodes_visited) in cases {
-        let row = rows.iter().find(|row| row["id"] == id).unwrap();
-        let input = &row["input"];
-        let rules = fixtures::decode_rules(&input["rules"]).unwrap();
-        let values: Vec<u8> = serde_json::from_value(input["board"].clone()).unwrap();
-        let board = Board::try_from(values.as_slice()).unwrap();
-        let expected_values: Vec<u8> =
-            serde_json::from_value(row["expected"]["result"]["solution"].clone()).unwrap();
-        let expected_solution = Board::try_from(expected_values.as_slice()).unwrap();
-        let mut preparation = ExecutionControl::new();
-        let Bounded::Complete(computation) = prepare_computation(&rules, &mut preparation).unwrap()
-        else {
-            panic!("Expected immutable arithmetic layout");
-        };
-        let mut control = ExecutionControl::new();
-
-        let result = count_solutions(&board, &computation, &mut control, 1_000_000);
-
-        // Sealed independent fixtures pin unique solutions after failed sibling branches, including queue work.
-        assert_eq!(
-            result,
-            SearchResult::Complete {
-                count: 1,
-                solution: Some(expected_solution),
-                nodes_visited,
-            },
-            "{id}"
-        );
-    }
 }
