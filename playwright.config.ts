@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
+  forbidOnly: Boolean(process.env.CI),
   workers: 2,
   timeout: 60000,
   expect: { timeout: 10000 },
@@ -19,14 +20,17 @@ export default defineConfig({
     },
     {
       name: 'mobile',
+      grepInvert: /@corpus/,
       use: { ...devices['Pixel 7'], viewport: { width: 360, height: 800 }, deviceScaleFactor: 1 },
     },
     {
       name: 'firefox',
+      grepInvert: /@corpus/,
       use: { ...devices['Desktop Firefox'], viewport: { width: 1280, height: 900 } },
     },
     {
       name: 'webkit',
+      grepInvert: /@corpus/,
       use: { ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 },
     },
   ],

@@ -1,15 +1,12 @@
-import {
-  test,
-  expect,
-  seedSession,
-  cellName,
-  enterGameDigit,
-  selectGameMenuAction,
-  readSessions,
-} from './support'
+import { test, expect, seedSession, cellName, enterGameDigit, readSessions } from './support'
 import { makeSession } from '../support/gameFixtures'
 import { runWorker, parseWorkerResponse } from './workerHarness'
 import type { PuzzleRules } from '@/sudoku/contracts'
+import type { Page } from '@playwright/test'
+import { REQUEST_TIMEOUT_MILLISECONDS } from '@/worker/deadline'
+
+const PROGRESS_DELAY_MILLISECONDS = 350
+const MENU_SETTLE_MILLISECONDS = 64
 
 const rules: PuzzleRules = {
   kind: 'killer',
@@ -19,6 +16,13 @@ const rules: PuzzleRules = {
   })),
 }
 const empty = Array<0>(81).fill(0)
+
+async function requestNotesWithPausedClock(page: Page) {
+  await page.getByRole('button', { name: '更多操作', exact: true }).click()
+  await page.clock.runFor(MENU_SETTLE_MILLISECONDS)
+  await page.getByRole('menuitem', { name: '生成候选数', exact: true }).click()
+  await page.clock.runFor(PROGRESS_DELAY_MILLISECONDS)
+}
 
 for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
   test(`heavy live jobs complete or time out without partial notes at ${base}`, async ({
@@ -67,7 +71,9 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
   })
 
   test(`heavy player input cancels pending notes at ${base}`, async ({ page }) => {
-    // Delay dispatch past the request deadline to make cancellation and timeout deterministic.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.clock.install({ time: new Date('2026-10-11T00:00:00Z') })
+    // Hold dispatch independently of the client deadline so edits decide cancellation.
     await page.addInitScript(() => {
       const OriginalWorker = Worker
       window.Worker = class extends OriginalWorker {
@@ -78,7 +84,9 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
             'kind' in message &&
             (message.kind === 'conflicts' || message.kind === 'generate-notes')
           ) {
-            setTimeout(() => super.postMessage(message), 4000)
+            window.addEventListener('release-heavy-worker', () => super.postMessage(message), {
+              once: true,
+            })
           } else {
             super.postMessage(message)
           }
@@ -89,12 +97,17 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
       puzzle: { ...makeSession().puzzle, rules, givens: empty },
       notes: Array(81).fill(7),
     })
+    await page.goto(base)
+    await expect(page.getByRole('button', { name: /开始一局数独/ })).toBeEnabled()
+    // Pause before acquiring an editor lease; a large clock jump cannot expire a new owner.
+    await page.clock.pauseAt(new Date('2026-10-11T01:00:00Z'))
     await seedSession(page, session, '/play/free', base)
     await page.getByRole('button', { name: '继续游戏', exact: true }).first().click()
+    await page.clock.runFor(PROGRESS_DELAY_MILLISECONDS)
     await expect(
       page.getByText('正在检查线索，仅显示已确认的冲突。', { exact: true }),
     ).toBeVisible()
-    await selectGameMenuAction(page, '生成候选数')
+    await requestNotesWithPausedClock(page)
     await expect(
       page.getByText('正在生成候选数，修改局面会取消本次计算。', { exact: true }),
     ).toBeVisible()
@@ -104,6 +117,7 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
       'true',
     )
     await page.keyboard.press('Escape')
+    await page.clock.runFor(MENU_SETTLE_MILLISECONDS)
     await page.getByRole('button', { name: cellName(0) }).click()
     await enterGameDigit(page, 5)
     await expect(page.getByRole('button', { name: cellName(0) })).toHaveAccessibleName(/数字5/)
@@ -113,7 +127,8 @@ for (const base of ['/', 'http://127.0.0.1:4174/sudoku/'] as const) {
     await expect
       .poll(async () => (await readSessions(page))[0]?.session.assistance.candidateCount)
       .toBe(0)
-    await selectGameMenuAction(page, '生成候选数')
+    await requestNotesWithPausedClock(page)
+    await page.clock.runFor(REQUEST_TIMEOUT_MILLISECONDS)
     await expect(page.getByText(/候选数暂时无法生成，原有笔记已保留/)).toBeVisible()
     const saved = (await readSessions(page))[0]?.session
     expect(saved?.assistance.candidateCount).toBe(0)

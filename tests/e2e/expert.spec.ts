@@ -7,6 +7,7 @@ import {
   readSessions,
   countResults,
   selectGameMenuAction,
+  reloadSavedGame,
 } from './support'
 import { makeSession, HISTORICAL_CLASSIC_VERSION } from '../support/gameFixtures'
 import { CLASSIC_PUZZLE_FIXTURES } from '../fixtures/classicPuzzles'
@@ -132,17 +133,13 @@ test('preserves Expert notes, hint assistance, history, pause and restart', asyn
   await page.getByRole('button', { name: '暂停', exact: true }).click()
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
   await expect.poll(async () => (await readSessions(page))[0].session.assistance.hintCount).toBe(1)
-  await page.reload()
+  await reloadSavedGame(page)
   await expect(page.getByText(/专家/).first()).toBeVisible()
-  await expect(async () => {
-    await page
-      .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
-      .first()
-      .click()
-    await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible({
-      timeout: 300,
-    })
-  }).toPass({ timeout: 10000 })
+  await page
+    .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
+    .first()
+    .click()
+  await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
   await selectGameMenuAction(page, '重新开始本题')
   await page
     .getByRole('dialog')

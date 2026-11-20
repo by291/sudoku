@@ -11,6 +11,16 @@ import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import { VARIANT_OPTIONS } from '@/features/game/model/variants'
 
+const REPRESENTATIVE_LESSONS = new Set([
+  'rules',
+  'naked-pair',
+  'diagonal-combined',
+  'jigsaw-combined',
+  'killer-combined',
+  'thermo-combined',
+  'arrow-combined',
+])
+
 test('completes the rules exercise using only keyboard navigation', async ({ page }, testInfo) => {
   await page.goto('/#/learn/rules')
   await selectLessonMode(page, '动手练习')
@@ -65,50 +75,55 @@ test('completes the rules exercise using only keyboard navigation', async ({ pag
 
 // Isolate each course so long elimination exercises do not share one suite-wide deadline.
 for (const lesson of LESSONS) {
-  test(`teaches ${lesson.id} with every required stage, retry and durable progress`, async ({
-    page,
-  }) => {
-    await page.goto(`/#/learn/${lesson.id}`)
-    await expect(page.getByRole('heading', { name: lesson.title, exact: true })).toBeVisible()
-    await selectLessonMode(page, '动手练习')
-    const stages = lessonStages(lesson)
+  const tags = REPRESENTATIVE_LESSONS.has(lesson.id) ? [] : ['@corpus']
+  test(
+    `teaches ${lesson.id} with every required stage, retry and durable progress`,
+    {
+      tag: tags,
+    },
+    async ({ page }) => {
+      await page.goto(`/#/learn/${lesson.id}`)
+      await expect(page.getByRole('heading', { name: lesson.title, exact: true })).toBeVisible()
+      await selectLessonMode(page, '动手练习')
+      const stages = lessonStages(lesson)
 
-    for (const [index, stage] of stages.entries()) {
-      const exercise = stageAnswer(stage)
+      for (const [index, stage] of stages.entries()) {
+        const exercise = stageAnswer(stage)
 
-      if (exercise.kind === 'placement') {
-        const { cell, digit } = exercise.expected
-        await page.getByRole('button', { name: cellName(cell) }).click()
-        await enterExerciseDigit(page, digit === 9 ? 8 : 9)
-        await page.getByRole('button', { name: '提交答案', exact: true }).click()
-        await expect(page.getByRole('status')).toContainText('还差一点')
-        await enterExerciseDigit(page, digit)
-        await page.getByRole('button', { name: '提交答案', exact: true }).click()
-      } else {
-        await page.getByRole('button', { name: '提交排除', exact: true }).click()
-        await expect(page.getByRole('status')).toContainText('还差一点')
-        for (const { cell, digit } of exercise.expected) {
+        if (exercise.kind === 'placement') {
+          const { cell, digit } = exercise.expected
           await page.getByRole('button', { name: cellName(cell) }).click()
-          await enterExerciseDigit(page, digit, '排除')
+          await enterExerciseDigit(page, digit === 9 ? 8 : 9)
+          await page.getByRole('button', { name: '提交答案', exact: true }).click()
+          await expect(page.getByRole('status')).toContainText('还差一点')
+          await enterExerciseDigit(page, digit)
+          await page.getByRole('button', { name: '提交答案', exact: true }).click()
+        } else {
+          await page.getByRole('button', { name: '提交排除', exact: true }).click()
+          await expect(page.getByRole('status')).toContainText('还差一点')
+          for (const { cell, digit } of exercise.expected) {
+            await page.getByRole('button', { name: cellName(cell) }).click()
+            await enterExerciseDigit(page, digit, '排除')
+          }
+
+          await page.getByRole('button', { name: '提交排除', exact: true }).click()
         }
 
-        await page.getByRole('button', { name: '提交排除', exact: true }).click()
+        await expect(page.getByRole('status')).toContainText('推理正确')
+        if (index < stages.length - 1) {
+          await page.getByRole('button', { name: '下一阶段', exact: true }).click()
+        }
       }
 
-      await expect(page.getByRole('status')).toContainText('推理正确')
-      if (index < stages.length - 1) {
-        await page.getByRole('button', { name: '下一阶段', exact: true }).click()
-      }
-    }
-
-    await expect(page.getByRole('status')).toContainText('本课全部练习已完成，进度已保存。')
-    await page.getByRole('link', { name: /返回课程列表/ }).click()
-    await expect(page.getByRole('list', { name: '课程路径' })).toBeVisible()
-    await page.reload()
-    await expect(
-      page.getByRole('link').filter({ hasText: lesson.title }).filter({ hasText: '已完成' }),
-    ).toBeVisible()
-  })
+      await expect(page.getByRole('status')).toContainText('本课全部练习已完成，进度已保存。')
+      await page.getByRole('link', { name: /返回课程列表/ }).click()
+      await expect(page.getByRole('list', { name: '课程路径' })).toBeVisible()
+      await page.reload()
+      await expect(
+        page.getByRole('link').filter({ hasText: lesson.title }).filter({ hasText: '已完成' }),
+      ).toBeVisible()
+    },
+  )
 }
 
 test('shows a completed catalogue and review actions for every course type', async ({ page }) => {

@@ -10,6 +10,7 @@ import {
   openGameSettings,
   closeGameSettings,
   useNextGenerationSeed,
+  reloadSavedGame,
 } from './support'
 import { makeSession } from '../support/gameFixtures'
 
@@ -92,19 +93,17 @@ test('unifies notes, keyboard history, hints, confirmation and refresh restorati
     .click()
   await page.getByRole('button', { name: '暂停', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '已保存到本机' })).toBeVisible()
-  await page.reload()
+  await reloadSavedGame(page)
   await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
   await openGameSettings(page)
   await expect(page.getByRole('switch', { name: '显示计时', exact: true })).not.toBeChecked()
   await closeGameSettings(page)
   await expect(page.getByRole('radio', { name: '深色主题' })).toBeChecked()
-  await expect(async () => {
-    await page
-      .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
-      .first()
-      .click()
-    await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
-  }).toPass({ timeout: 15000 })
+  await page
+    .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
+    .first()
+    .click()
+  await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
   await expect(cell).toHaveAccessibleName(/数字4/)
 })
 test('completes once and displays the saved result', async ({ page }) => {

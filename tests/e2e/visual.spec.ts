@@ -93,17 +93,33 @@ for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as con
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     if (variant === 'killer') {
-      const sum = await page.locator('.sudoku-clues .sum').first().boundingBox()
-      const notes = await cell.locator('.notes span').first().boundingBox()
-      if (!sum || !notes) {
-        throw new Error('Missing sum or candidate geometry')
-      }
+      await expect(cell.locator('.notes span').first()).toBeVisible()
+      const clearance = await cell.evaluate(async (element) => {
+        await document.fonts.ready
+        const sum = element.parentElement?.querySelector('.sudoku-clues .sum')
+        const firstNote = element.querySelector('.notes span')
+        const context = document.createElement('canvas').getContext('2d')
+        if (!(sum instanceof SVGTextElement) || !sum.textContent || !firstNote || !context) {
+          throw new Error('Missing sum or candidate geometry')
+        }
 
-      // Firefox rounds SVG text and CSS grid boxes differently at fractional positions.
-      const maximumClueOverlap = 1
-      const geometryRoundingAllowance = 0.05
-      const maximumClueBottom = notes.y + maximumClueOverlap + geometryRoundingAllowance
-      expect(sum.y + sum.height).toBeLessThanOrEqual(maximumClueBottom)
+        const transform = sum.getScreenCTM()
+        if (!transform) {
+          throw new Error('Missing clue transform')
+        }
+
+        // SVG text element bounds include font space outside the painted clue.
+        const style = getComputedStyle(sum)
+        const baseline = sum.getStartPositionOfChar(0).matrixTransform(transform)
+        const fontSize = parseFloat(style.fontSize) * transform.d
+        const strokeRadius = (parseFloat(style.strokeWidth) * transform.d) / 2
+        context.font = `${style.fontWeight} ${fontSize}px ${style.fontFamily}`
+        const descent = context.measureText(sum.textContent).actualBoundingBoxDescent
+
+        return firstNote.getBoundingClientRect().top - (baseline.y + descent + strokeRadius)
+      })
+
+      expect(clearance).toBeGreaterThan(0)
       const lastNote = await cell.locator('.notes span').last().boundingBox()
       const cellBox = await cell.boundingBox()
       if (!lastNote || !cellBox) {

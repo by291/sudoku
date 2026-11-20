@@ -9,6 +9,7 @@ import {
   makeVariantHintSession,
   enterGameDigit,
   selectGameMenuAction,
+  reloadSavedGame,
 } from './support'
 import { makeSession, HISTORICAL_VARIANT_VERSION } from '../support/gameFixtures'
 import type { Page } from '@playwright/test'
@@ -102,16 +103,12 @@ for (const variant of variants) {
     await expect(page.locator('.sudoku-clues')).toHaveCount(0)
     await expect(page.getByRole('button', { name: /已暂停/ })).toHaveCount(81)
     await expect.poll(async () => (await readSessions(page))[0].session.entries[target]).toBe(digit)
-    await page.reload()
-    await expect(async () => {
-      await page
-        .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
-        .first()
-        .click()
-      await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible({
-        timeout: 300,
-      })
-    }).toPass({ timeout: 10000 })
+    await reloadSavedGame(page)
+    await page
+      .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
+      .first()
+      .click()
+    await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
     await expect(cell).toHaveAccessibleName(new RegExp(`数字${digit}`))
 
     expect((await readSessions(page))[0].session.assistance).toMatchObject({
@@ -160,16 +157,12 @@ for (const variant of variants) {
     expect((await readSessions(page))[0].session.puzzle.rules.kind).toBe(variant.kind)
     await page.getByRole('button', { name: '暂停', exact: true }).click()
     await expect(clue).toHaveCount(0)
-    await page.reload()
-    await expect(async () => {
-      await page
-        .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
-        .first()
-        .click()
-      await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible({
-        timeout: 300,
-      })
-    }).toPass({ timeout: 10000 })
+    await reloadSavedGame(page)
+    await page
+      .getByRole('button', { name: /^(继续游戏|尝试接管)$/ })
+      .first()
+      .click()
+    await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible()
     await expect(page.locator('.sudoku-clues')).toBeVisible()
 
     expect(await clue.count()).toBeGreaterThan(0)
@@ -364,24 +357,30 @@ test('restores an explicit saved type even when the query chooses Classic and fi
     '箭头数独 · 自由游玩',
   )
 })
-test('starts the supported practice tier for every course unit', async ({ page }) => {
-  test.setTimeout(180000)
-  for (const lesson of LESSONS) {
-    await page.goto(`/#/learn/${lesson.id}?practice=1`)
-    await page.getByRole('button', { name: '开始游戏', exact: true }).click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog.or(page.getByRole('group', { name: '数独棋盘' }))).toBeVisible()
-    if (await dialog.isVisible()) {
-      await dialog.getByRole('button', { name: '确认开始', exact: true }).click()
+test(
+  'starts the supported practice tier for every course unit',
+  { tag: '@corpus' },
+  async ({ page }) => {
+    test.setTimeout(180000)
+    for (const lesson of LESSONS) {
+      await page.goto(`/#/learn/${lesson.id}?practice=1`)
+      await page.getByRole('button', { name: '开始游戏', exact: true }).click()
+      const dialog = page.getByRole('dialog')
+      await expect(dialog.or(page.getByRole('group', { name: '数独棋盘' }))).toBeVisible()
+      if (await dialog.isVisible()) {
+        await dialog.getByRole('button', { name: '确认开始', exact: true }).click()
+      }
+
+      await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
+      const practice = (await readSessions(page)).find(
+        (record) => record.session.mode === 'learning',
+      )
+
+      expect(practice?.session.puzzle.rules.kind).toBe(lesson.practiceVariant)
+      expect(practice?.session.puzzle.difficulty).toBe(lesson.practiceDifficulty)
     }
-
-    await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
-    const practice = (await readSessions(page)).find((record) => record.session.mode === 'learning')
-
-    expect(practice?.session.puzzle.rules.kind).toBe(lesson.practiceVariant)
-    expect(practice?.session.puzzle.difficulty).toBe(lesson.practiceDifficulty)
-  }
-})
+  },
+)
 test('retains the daily board and selector after a failed save and switches after recovery', async ({
   page,
 }) => {

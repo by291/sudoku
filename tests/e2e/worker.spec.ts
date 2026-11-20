@@ -23,73 +23,62 @@ function expectGeneratedIdentity(puzzle: Puzzle, input: GenerationInput) {
   })
 }
 
-test('verifies current-identity puzzles for historical recovery seeds at both roots', async ({
-  page,
-}) => {
-  for (const base of ['/', '/sudoku/'] as const) {
-    await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
-    for (const { variant, difficulty, seed } of GENERATION_RECOVERY_INPUTS) {
-      const response = parseWorkerResponse(
-        await runWorker(
-          page,
-          {
-            kind: 'generate',
-            requestId: `recovered-${variant}-${base}`,
-            input: generationInput(variant, difficulty, seed),
-          },
-          base,
-        ),
-      )
+test(
+  'preserves fixed type-and-tier regression outcomes at both roots',
+  { tag: '@corpus' },
+  async ({ page }) => {
+    for (const base of ['/', '/sudoku/'] as const) {
+      await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+      for (const input of GENERATION_LATENCY_INPUTS) {
+        const response = parseWorkerResponse(
+          await runWorker(
+            page,
+            {
+              kind: 'generate',
+              requestId: `regression-${input.variant}-${input.difficulty}-${base}`,
+              input: generationInput(input.variant, input.difficulty, input.seed),
+            },
+            base,
+          ),
+        )
 
-      expect(response).toMatchObject({
-        valid: true,
-        value: {
-          kind: 'generate',
-          outcome: {
-            status: 'completed',
-            assessment: { status: 'rated', summary: { variant, difficulty } },
+        expect(response).toMatchObject({
+          valid: true,
+          value: {
+            kind: 'generate',
+            outcome: {
+              status: input.expectedStatus,
+              assessment: {
+                status: 'rated',
+                summary: { variant: input.variant, difficulty: input.difficulty },
+              },
+            },
           },
-        },
-      })
-      if (
-        !response.valid ||
-        response.value.kind !== 'generate' ||
-        response.value.outcome.status !== 'completed'
-      ) {
-        throw new Error('Expected recovered generated puzzle')
+        })
       }
-      const puzzle = response.value.outcome.value
-      expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
-        count: 1,
-        solution: puzzle.solution,
-      })
-      expectGeneratedIdentity(puzzle, generationInput(variant, difficulty, seed))
     }
-  }
-})
+  },
+)
 
-test('keeps historical type-and-tier latency inputs within the current Worker deadline', async ({
-  page,
-}) => {
-  for (const base of ['/', '/sudoku/'] as const) {
-    await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
-    for (const { variant, difficulty, seed, expectedStatus } of GENERATION_LATENCY_INPUTS) {
-      const started = performance.now()
-      const response = parseWorkerResponse(
-        await runWorker(
-          page,
-          {
-            kind: 'generate',
-            requestId: `latency-${variant}-${difficulty}-${base}`,
-            input: generationInput(variant, difficulty, seed),
-          },
-          base,
-        ),
-      )
-      const milliseconds = performance.now() - started
+test(
+  'verifies current-identity puzzles for historical recovery seeds at both roots',
+  { tag: '@corpus' },
+  async ({ page }) => {
+    for (const base of ['/', '/sudoku/'] as const) {
+      await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+      for (const { variant, difficulty, seed } of GENERATION_RECOVERY_INPUTS) {
+        const response = parseWorkerResponse(
+          await runWorker(
+            page,
+            {
+              kind: 'generate',
+              requestId: `recovered-${variant}-${base}`,
+              input: generationInput(variant, difficulty, seed),
+            },
+            base,
+          ),
+        )
 
-      expect(milliseconds, `${variant}/${difficulty}/${base}`).toBeLessThan(3000)
-      if (expectedStatus === 'completed') {
         expect(response).toMatchObject({
           valid: true,
           value: {
@@ -100,17 +89,23 @@ test('keeps historical type-and-tier latency inputs within the current Worker de
             },
           },
         })
-      } else {
-        expect(response).toMatchObject({
-          valid: true,
-          value: { kind: 'generate', outcome: { status: 'incomplete' } },
+        if (
+          !response.valid ||
+          response.value.kind !== 'generate' ||
+          response.value.outcome.status !== 'completed'
+        ) {
+          throw new Error('Expected recovered generated puzzle')
+        }
+        const puzzle = response.value.outcome.value
+        expect(referenceCountSolutions(puzzle.givens, puzzle.rules)).toEqual({
+          count: 1,
+          solution: puzzle.solution,
         })
-        expect(response).not.toHaveProperty('value.outcome.value')
-        expect(response).not.toHaveProperty('value.outcome.assessment')
+        expectGeneratedIdentity(puzzle, generationInput(variant, difficulty, seed))
       }
     }
-  }
-})
+  },
+)
 
 test('delivers a freshly constructed Killer Hard puzzle from the real Worker at both roots', async ({
   page,
@@ -119,7 +114,6 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
   const input = generationInput(variant, difficulty, seed)
   for (const base of ['/', '/sudoku/'] as const) {
     await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
-    const started = performance.now()
     const response = parseWorkerResponse(
       await runWorker(
         page,
@@ -131,7 +125,6 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
         base,
       ),
     )
-    expect(performance.now() - started).toBeLessThan(3000)
     if (
       !response.valid ||
       response.value.kind !== 'generate' ||
@@ -153,92 +146,98 @@ test('delivers a freshly constructed Killer Hard puzzle from the real Worker at 
   }
 })
 
-test('delivers fixed regional regression seeds within the production Worker timeout at both roots', async ({
-  page,
-}) => {
-  for (const base of ['/', '/sudoku/'] as const) {
-    await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
-    for (const [difficulty, seed] of [
-      ['medium', '006'],
-      ['hard', '010'],
-    ] as const) {
-      const response = parseWorkerResponse(
-        await runWorker(
-          page,
-          {
+test(
+  'delivers fixed regional regression seeds through the Worker at both roots',
+  { tag: '@corpus' },
+  async ({ page }) => {
+    for (const base of ['/', '/sudoku/'] as const) {
+      await page.goto(base === '/' ? '/#/' : 'http://127.0.0.1:4174/sudoku/#/')
+      for (const [difficulty, seed] of [
+        ['medium', '006'],
+        ['hard', '010'],
+      ] as const) {
+        const response = parseWorkerResponse(
+          await runWorker(
+            page,
+            {
+              kind: 'generate',
+              requestId: `regional-${seed}-${base}`,
+              input: generationInput('jigsaw', difficulty, `local-product-corpus-v1:seed:${seed}`),
+            },
+            base,
+          ),
+        )
+        expect(response).toMatchObject({
+          valid: true,
+          value: {
             kind: 'generate',
-            requestId: `regional-${seed}-${base}`,
-            input: generationInput('jigsaw', difficulty, `local-product-corpus-v1:seed:${seed}`),
+            outcome: {
+              status: 'completed',
+              assessment: { status: 'rated', summary: { variant: 'jigsaw', difficulty } },
+            },
           },
-          base,
-        ),
-      )
-      expect(response).toMatchObject({
-        valid: true,
-        value: {
-          kind: 'generate',
-          outcome: {
-            status: 'completed',
-            assessment: { status: 'rated', summary: { variant: 'jigsaw', difficulty } },
-          },
-        },
-      })
+        })
+      }
     }
-  }
-})
+  },
+)
 
-test('verifies fixed production-worker seeds and a known logical conclusion', async ({ page }) => {
-  await page.goto('/#/')
+test(
+  'verifies fixed production-worker seeds and a known logical conclusion',
+  { tag: '@corpus' },
+  async ({ page }) => {
+    await page.goto('/#/')
 
-  for (const difficulty of ['easy', 'medium', 'hard', 'expert'] as const) {
-    const input = generationInput('classic', difficulty, 'production-fixed-seed')
-    const response = parseWorkerResponse(
+    for (const difficulty of ['easy', 'medium', 'hard', 'expert'] as const) {
+      const input = generationInput('classic', difficulty, 'production-fixed-seed')
+      const response = parseWorkerResponse(
+        await runWorker(page, {
+          kind: 'generate',
+          requestId: `seed-${difficulty}`,
+          input,
+        }),
+      )
+      if (
+        !response.valid ||
+        response.value.kind !== 'generate' ||
+        response.value.outcome.status !== 'completed'
+      ) {
+        throw new Error('Expected generated puzzle')
+      }
+
+      const puzzle = response.value.outcome.value
+
+      expectGeneratedIdentity(puzzle, input)
+      expect(response.value.outcome.assessment).toMatchObject({
+        status: 'rated',
+        summary: { variant: 'classic', difficulty },
+      })
+
+      expect(countReferenceSolutions(puzzle.givens, 2)).toBe(1)
+    }
+
+    const hint = parseWorkerResponse(
       await runWorker(page, {
-        kind: 'generate',
-        requestId: `seed-${difficulty}`,
-        input,
+        kind: 'hint',
+        requestId: 'known-hint',
+        board: uniqueBoard,
+        solution: solvedBoard,
+        rules: { kind: 'classic' },
       }),
     )
-    if (
-      !response.valid ||
-      response.value.kind !== 'generate' ||
-      response.value.outcome.status !== 'completed'
-    ) {
-      throw new Error('Expected generated puzzle')
-    }
 
-    const puzzle = response.value.outcome.value
-
-    expectGeneratedIdentity(puzzle, input)
-    expect(response.value.outcome.assessment).toMatchObject({
-      status: 'rated',
-      summary: { variant: 'classic', difficulty },
-    })
-
-    expect(countReferenceSolutions(puzzle.givens, 2)).toBe(1)
-  }
-
-  const hint = parseWorkerResponse(
-    await runWorker(page, {
-      kind: 'hint',
-      requestId: 'known-hint',
-      board: uniqueBoard,
-      solution: solvedBoard,
-      rules: { kind: 'classic' },
-    }),
-  )
-
-  expect(hint).toMatchObject({
-    valid: true,
-    value: {
-      kind: 'hint',
-      outcome: {
-        status: 'completed',
-        value: { kind: 'deduction', placement: { cell: 40, digit: 5 } },
+    expect(hint).toMatchObject({
+      valid: true,
+      value: {
+        kind: 'hint',
+        outcome: {
+          status: 'completed',
+          value: { kind: 'deduction', placement: { cell: 40, digit: 5 } },
+        },
       },
-    },
-  })
-})
+    })
+  },
+)
 
 for (const variant of ['diagonal', 'jigsaw', 'killer', 'thermo', 'arrow'] as const) {
   test(`verifies real ${variant} generation and rule evidence at both deployment roots`, async ({

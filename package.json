@@ -20,6 +20,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "build:subpath": "pnpm wasm:build && vite build --base /sudoku/ --outDir dist-subpath",
     "test:e2e": "playwright test",
+    "test:performance": "playwright test --config playwright.performance.config.ts",
     "check": "pnpm test:rust && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm build && pnpm test:e2e",
     "wasm:build": "node scripts/build-sudoku-wasm.mjs"
   },

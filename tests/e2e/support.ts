@@ -5,6 +5,7 @@ import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { GameSession } from '@/features/game/model/session'
 import { projectRecord } from '@/storage/projections'
+import { LEASE_DURATION_MS } from '@/storage/ownership'
 
 import { makeSession, HISTORICAL_VARIANT_VERSION } from '../support/gameFixtures'
 import { VARIANT_FIXTURES } from '../fixtures/variants'
@@ -13,6 +14,19 @@ import { VARIANT_TEMPLATES } from '../fixtures/variantTemplates'
 import type { NewSudokuVariant } from '@/sudoku/contracts'
 
 export { expect }
+
+/** Reload a committed game and expire its abandoned editor lease without waiting on host time. */
+export async function reloadSavedGame(page: Page) {
+  await expect(page.getByRole('status').filter({ hasText: '已保存到本机' })).toBeVisible()
+  await page.clock.install()
+  await page.reload()
+  await expect(page.getByRole('group', { name: '数独棋盘' })).toBeVisible()
+  const takeover = page.getByRole('button', { name: '尝试接管', exact: true }).first()
+  if (await takeover.isVisible()) {
+    // A normally released lease is already writable and must keep its renewal cadence.
+    await page.clock.fastForward(LEASE_DURATION_MS)
+  }
+}
 
 export async function useNextGenerationSeed(page: Page, label: string) {
   const seed = Array.from(seedForTest(label))

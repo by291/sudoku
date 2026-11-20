@@ -25,7 +25,7 @@ The engine fixture manifest records each retained file's SHA-256, size and avail
 - The `hard058:0` regression and the high-work Killer Hard case `full:807`.
 - Exact-work and one-short boundary pairs for all 19 combinations.
 
-Each selected row keeps its original source and ID. Its `input` is unchanged; `expected` is the original `expected.result`, without the redundant standalone assessment trace. Native tests pin puzzle identity, output, assessment summary and work accounting, and also check repeatability, uniqueness, variant necessity, explicit exhaustion and logical conclusions against the sealed solution.
+Each selected row keeps its original source and ID. Its `input` is unchanged; `expected` is the original `expected.result`, without the redundant standalone assessment trace. Ready historical rows supply immutable V11 puzzle/solution pairs for mathematical validation. Current V12 generation tests compare repeat runs and check uniqueness, variant necessity, exhaustion and logical conclusion safety; they do not compare V12 output with the historical generated output or retired work counters. Historical work-only interruption rows remain provenance evidence rather than current execution-budget regressions.
 
 The manifest identifies the historical reference commit, recipe hashes, independent crypto libraries and the archive commit `1de504094cccb62a1034d32321b2d490f62e46eb`. Full historical corpora and their construction scripts are available from that Git revision. Source filenames in the manifest, generation rows and copied Android fixtures are provenance labels, not runtime dependencies. For example:
 
@@ -60,11 +60,17 @@ PLAYWRIGHT_USE_PREBUILT=1 pnpm test:e2e
 
 `pnpm test:rust` runs the native workspace suite and is the first step of `pnpm check`. The package commands rebuild WASM before checking frontend consumers. The normal core dependency tree must remain free of browser bindings, async runtimes and OS entropy dependencies. CI runs native checks first, then Web checks and builds, followed by Chromium desktop/mobile, Firefox and WebKit jobs using the verified build artifacts. Browser jobs retain the WASM contract suite; there is no separate full-engine comparison job.
 
-For setup, browser installation and disposable test output locations, see [development](development.md). For Android checks and the opt-in backup reimport test, see [Android build](android/build.md).
+Desktop Chromium owns browser tests tagged `@corpus`: the complete authored course and practice catalogue, classic generation tiers and historical recovery inputs. Mobile Chromium, Firefox and WebKit retain representative placement, elimination and combined courses for every variant, real per-variant Worker generation, generated-binding contracts, storage, focus, touch and layout coverage. Project filters exclude the corpus tag from those three projects; ordinary `pnpm test:e2e` still runs all four projects. Reload workflows advance the abandoned editing lease with Playwright's clock instead of repeatedly attempting takeover for six seconds.
+
+For setup, browser installation and disposable test output locations, see [development](development.md). For Android checks, opt-in native metrics and backup reimport tests, see [Android build](android/build.md). Native metrics are excluded by assumption from ordinary device runs; functional native cancellation, resource ownership and queue-drain tests remain in the normal gates.
 
 Deadline regressions use controlled clocks or cancellation signals rather than CPU speed assumptions. Keep queueing, initialization, execution, late-result disposal and input atomicity observable. Sealed V11 generation fixtures continue to validate historical puzzle mathematics; V12 generation tests use independent solution/trace checks and deterministic repeat comparisons, without regenerating old expected outputs.
 
+Vitest progress-presentation checks use `tests/support/progressClock.ts` to advance the display delay. IndexedDB tasks and operation completion remain controlled independently, so a fast clock cannot turn unread data into a known-empty result. Successful asynchronous-result fixtures must contain a visible change; rejected or late-result fixtures must differ from the state that must survive.
+
 ## Performance comparisons
+
+Browser latency checks are opt-in through `pnpm test:performance`. Build the root deployment first with `pnpm build`; the Playwright server builds the subpath deployment unless `PLAYWRIGHT_USE_PREBUILT=1` selects two existing builds. The separate configuration runs one Chromium worker and checks historical type/tier latency inputs plus Killer Hard recovery at both roots. Its three-second measurement includes fetching and compiling WASM, Worker initialization, transport and computation. Run it without concurrent builds or test runners on a controlled host. These elapsed-time checks are separate from the default controlled-clock deadline and functional outcome regressions.
 
 Run `cargo run -p sudoku-core --release --locked --example performance -- 16 3` from the repository root. The two arguments select fixed byte-seed count and repetitions. The example covers every supported variant/difficulty pair, measures generation and full assessment separately, and applies a three-second host probe to each operation. It prints JSON lines with totals, median/p95 latency, completion/cancellation counts and a digest of completed generation results and assessment traces.
 
