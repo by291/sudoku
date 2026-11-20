@@ -15,6 +15,10 @@ import { lessonStages } from '@/features/learning/model/lessons'
 import { stageAnswer } from '@/features/learning/model/exerciseStages'
 import * as lessonContent from '@/features/learning/model/lessonContent'
 import { LESSONS } from '../../../../tests/support/lessons'
+import {
+  installProgressClock,
+  revealDelayedProgress,
+} from '../../../../tests/support/progressClock'
 
 const cleanups: (() => void)[] = []
 
@@ -22,6 +26,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) {
     cleanup()
   }
+  vi.useRealTimers()
 })
 
 it('returns keyboard focus to the guide control after retrying failed content', async () => {
@@ -93,6 +98,9 @@ async function setup(visitSaveGate?: Promise<void>, lessonId = 'rules') {
   cleanups.push(test.dispose)
   await router.push(`/learn/${lessonId}`)
   const learning = test.app.runWithContext(() => useLearningStore(test.pinia))
+  if (visitSaveGate) {
+    installProgressClock()
+  }
   const wrapper = mount(LessonView, {
     global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
   })
@@ -300,7 +308,9 @@ it('waits for the last-visited write before accepting a stage answer', async () 
     await flushPromises()
     await submitPlacement(wrapper)
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
-    await vi.waitFor(() => expect(wrapper.text()).toContain('正在准备或保存练习，请稍候…'))
+    await revealDelayedProgress()
+
+    expect(wrapper.text()).toContain('正在准备或保存练习，请稍候…')
     gate.resolve()
     await flushPromises()
     await vi.waitFor(() =>

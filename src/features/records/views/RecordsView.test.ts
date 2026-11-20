@@ -8,8 +8,17 @@ import { useRecordsStore } from '@/features/records/stores/useRecordsStore'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 import { deferred } from '../../../../tests/support/deferred'
+import {
+  installProgressClock,
+  revealDelayedProgress,
+} from '../../../../tests/support/progressClock'
 
 const cleanups: (() => void)[] = []
+
+type SetupOptions = {
+  path: string
+  delayedRead?: 'none' | 'history' | 'overview'
+}
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', () => ({
@@ -24,9 +33,10 @@ afterEach(() => {
     cleanup()
   }
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
-async function setup(path: string, delayRead: boolean | 'overview' = false) {
+async function setup({ path, delayedRead = 'none' }: SetupOptions) {
   const test = await createTestRuntime()
   cleanups.push(test.dispose)
   const records = test.app.runWithContext(() => useRecordsStore(test.pinia))
@@ -39,9 +49,10 @@ async function setup(path: string, delayRead: boolean | 'overview' = false) {
   const pending = deferred<typeof emptyPage>()
   const overviewResponse = await test.runtime.repository.readOverview('classic', '2026-10-11')
   const pendingOverview = deferred<typeof overviewResponse>()
-  if (delayRead === 'overview') {
+  const hasDelayedRead = delayedRead !== 'none'
+  if (delayedRead === 'overview') {
     vi.spyOn(test.runtime.repository, 'readOverview').mockReturnValueOnce(pendingOverview.promise)
-  } else if (delayRead) {
+  } else if (hasDelayedRead) {
     vi.spyOn(test.runtime.repository, 'readSummaryPage').mockReturnValue(pending.promise)
   }
   const router = createRouter({
@@ -52,12 +63,15 @@ async function setup(path: string, delayRead: boolean | 'overview' = false) {
     ],
   })
   await router.push(path)
+  if (hasDelayedRead) {
+    installProgressClock()
+  }
   const wrapper = mount(RouterView, {
     global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
   })
   cleanups.push(() => wrapper.unmount())
   await flushPromises()
-  if (!delayRead) {
+  if (!hasDelayedRead) {
     await vi.waitFor(() => expect(records.loaded).toBe(true))
   }
 
@@ -74,7 +88,7 @@ async function setup(path: string, delayRead: boolean | 'overview' = false) {
 }
 
 it('selects local saves from the URL and retains the tab when changing variant', async () => {
-  const { wrapper, router } = await setup('/records?variant=classic&tab=saves')
+  const { wrapper, router } = await setup({ path: '/records?variant=classic&tab=saves' })
 
   expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('本地存档')
   expect(wrapper.get('a[href*="session=fixture-free-session"]').text()).toContain('继续存档')
@@ -91,7 +105,9 @@ it('selects local saves from the URL and retains the tab when changing variant',
 })
 
 it('shows counts for all variants in every tab and refreshes them after clearing data', async () => {
-  const { wrapper, router, records, database } = await setup('/records?variant=arrow&tab=saves')
+  const { wrapper, router, records, database } = await setup({
+    path: '/records?variant=arrow&tab=saves',
+  })
   const session = makeSession({
     completion: { completedAt: '2026-10-17T01:00:00.000Z', elapsedMs: 0 },
   })
@@ -126,14 +142,20 @@ it('shows counts for all variants in every tab and refreshes them after clearing
 })
 
 it('keeps unread data distinct from empty data and defers transient loading text', async () => {
-  const { wrapper, pending, emptyPage } = await setup('/records?tab=history', true)
+  const { wrapper, records, pending, emptyPage } = await setup({
+    path: '/records?tab=history',
+    delayedRead: 'history',
+  })
 
   expect(wrapper.text()).not.toContain('还没有完成记录')
   expect(wrapper.text()).not.toContain('已完成 0 局')
   expect(wrapper.text()).not.toContain('正在处理本机记录')
-  await vi.waitFor(() => expect(wrapper.text()).toContain('正在处理本机记录'))
+  await revealDelayedProgress()
+
+  expect(wrapper.text()).toContain('正在处理本机记录')
 
   pending.resolve(emptyPage)
+  await vi.waitFor(() => expect(records.loaded).toBe(true))
   await flushPromises()
 
   expect(wrapper.text()).toContain('还没有完成记录')
@@ -141,7 +163,10 @@ it('keeps unread data distinct from empty data and defers transient loading text
 })
 
 it('renders overview cards and table before counts arrive and keeps their nodes during loading', async () => {
-  const { wrapper, pendingOverview, overviewResponse } = await setup('/records', 'overview')
+  const { wrapper, pendingOverview, overviewResponse } = await setup({
+    path: '/records',
+    delayedRead: 'overview',
+  })
   const cards = wrapper.findAll('.stat').map((card) => card.element)
   const table = wrapper.get('table').element
   const feedback = wrapper.get('.loading-slot').element
@@ -150,7 +175,9 @@ it('renders overview cards and table before counts arrive and keeps their nodes 
   expect(wrapper.text()).toContain('已完成 — 局')
   expect(wrapper.text()).not.toContain('已完成 0 局')
   expect(wrapper.find('[aria-busy="true"]').exists()).toBe(true)
-  await vi.waitFor(() => expect(wrapper.text()).toContain('正在处理本机记录'))
+  await revealDelayedProgress()
+
+  expect(wrapper.text()).toContain('正在处理本机记录')
   expect(wrapper.get('.loading-slot').element).toBe(feedback)
 
   pendingOverview.resolve(overviewResponse)

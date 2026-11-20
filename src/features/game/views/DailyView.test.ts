@@ -7,6 +7,10 @@ import { gameRuntimeKey } from '@/runtime'
 import { useGameStore } from '@/features/game/stores/useGameStore'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { deferred } from '../../../../tests/support/deferred'
+import {
+  installProgressClock,
+  revealDelayedProgress,
+} from '../../../../tests/support/progressClock'
 
 const cleanups: (() => void)[] = []
 afterEach(async () => {
@@ -14,6 +18,7 @@ afterEach(async () => {
     cleanup()
   }
   await flushPromises()
+  vi.useRealTimers()
 })
 
 it('renders unknown daily progress and stable controls while a selector waits for summaries', async () => {
@@ -31,6 +36,7 @@ it('renders unknown daily progress and stable controls while a selector waits fo
     routes: [{ path: '/play/daily', component: DailyView }],
   })
   await router.push('/play/daily')
+  installProgressClock()
   const wrapper = mount(RouterView, {
     attachTo: document.body,
     global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
@@ -45,7 +51,9 @@ it('renders unknown daily progress and stable controls while a selector waits fo
   expect(wrapper.text()).not.toContain('今日已完成 0 / 6 种玩法')
   expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBeUndefined()
   expect(wrapper.text()).not.toContain('正在读取每日状态')
-  await vi.waitFor(() => expect(wrapper.text()).toContain('正在读取每日状态'))
+  await revealDelayedProgress()
+
+  expect(wrapper.text()).toContain('正在读取每日状态')
   expect(wrapper.get('.daily-status-slot').element).toBe(loadingSlot)
 
   const choose = wrapper.findAll('button').find((button) => button.text() === '选择今日挑战')

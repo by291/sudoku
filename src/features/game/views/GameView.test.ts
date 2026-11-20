@@ -12,6 +12,10 @@ import type { GenerateOutcome } from '@/worker/protocol'
 import { deferred } from '../../../../tests/support/deferred'
 import { makeSession } from '../../../../tests/support/gameFixtures'
 import { createTestRuntime } from '../../../../tests/support/runtime'
+import {
+  installProgressClock,
+  revealDelayedProgress,
+} from '../../../../tests/support/progressClock'
 
 const cleanups: (() => void | Promise<void>)[] = []
 
@@ -19,6 +23,7 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) {
     await cleanup()
   }
+  vi.useRealTimers()
 })
 
 async function setup(metadata: SessionMetadata, path = '/game') {
@@ -353,7 +358,10 @@ it.each(gameModes)(
     const oldSessionId = game.session?.id
     const oldBoard = [...game.board]
     const response = deferred<GenerateOutcome>()
+    const entered = deferred<void>()
+    installProgressClock()
     runtime.worker.generate = (_input, signal) => {
+      entered.resolve()
       signal?.addEventListener('abort', () => response.resolve({ status: 'cancelled' }), {
         once: true,
       })
@@ -362,12 +370,15 @@ it.each(gameModes)(
     }
 
     const starting = game.startGame(generationInput('classic', 'easy', 'pending'), metadata)
-    await vi.waitFor(() => expect(game.phase).toBe('generating'))
+    await entered.promise
     await flushPromises()
 
+    expect(game.phase).toBe('generating')
     expect(wrapper.text()).not.toContain('正在生成题目…')
     expect(wrapper.get('[aria-label="逻辑提示"]').attributes('disabled')).toBeDefined()
-    await vi.waitFor(() => expect(wrapper.text()).toContain('正在生成题目…'))
+    await revealDelayedProgress()
+
+    expect(wrapper.text()).toContain('正在生成题目…')
 
     const statuses = wrapper
       .findAll('[role="status"]')
@@ -508,13 +519,16 @@ it('disables hints immediately while deferring their visible progress', async ()
   const response = deferred<Awaited<ReturnType<typeof runtime.worker.hint>>>()
   runtime.worker.hint = () => response.promise
   const hintButton = wrapper.get('button[aria-label="逻辑提示"]')
+  installProgressClock()
 
   await hintButton.trigger('click')
 
   expect(hintButton.attributes('disabled')).toBeDefined()
   expect(hintButton.classes()).not.toContain('n-button--loading')
   expect(wrapper.text()).not.toContain('正在寻找逻辑提示')
-  await vi.waitFor(() => expect(wrapper.text()).toContain('正在寻找逻辑提示'))
+  await revealDelayedProgress()
+
+  expect(wrapper.text()).toContain('正在寻找逻辑提示')
   expect(hintButton.classes()).toContain('n-button--loading')
 
   response.resolve({ status: 'failed', message: 'Hint unavailable' })
@@ -545,6 +559,7 @@ it('reserves the same board and controls while a saved session loads', async () 
     routes: [{ path: '/game', component: GameView }],
   })
   await router.push({ path: '/game', query: { session: sessionId } })
+  installProgressClock()
   const wrapper = mount(RouterView, {
     attachTo: document.body,
     global: { plugins: [test.pinia, router], provide: { [gameRuntimeKey]: test.runtime } },
@@ -556,7 +571,9 @@ it('reserves the same board and controls while a saved session loads', async () 
   expect(wrapper.findComponent(SudokuBoard).exists()).toBe(false)
   expect(wrapper.get('button[aria-label="快捷笔记数字5"]').attributes('disabled')).toBeDefined()
   expect(wrapper.text()).not.toContain('正在读取存档…')
-  await vi.waitFor(() => expect(wrapper.text()).toContain('正在读取存档…'))
+  await revealDelayedProgress()
+
+  expect(wrapper.text()).toContain('正在读取存档…')
   expect(wrapper.get('.board-wrap').text()).toContain('正在读取存档…')
 
   response.resolve(saved)

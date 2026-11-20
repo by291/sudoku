@@ -9,14 +9,15 @@ import { makeSession } from '../../../../tests/support/gameFixtures'
 import type { HintResult } from '@/sudoku/contracts'
 import { createTestRuntime } from '../../../../tests/support/runtime'
 import { generationInput } from '../../../../tests/support/generation'
+import { deferred } from '../../../../tests/support/deferred'
 
 const engine = await createTestEngine()
 afterAll(() => engine.dispose())
 
-function setup(heavy = false) {
+function setup({ isHeavy = false } = {}) {
   let time = 0
   let saved = makeSession()
-  if (heavy) {
+  if (isHeavy) {
     saved = {
       ...saved,
       puzzle: {
@@ -333,7 +334,7 @@ it('reuses one prepared layout through moves and releases it when the session is
 })
 
 it('heavy_conflicts_use_preview_and_reject_results_after_a_new_board', async () => {
-  const test = setup(true)
+  const test = setup({ isHeavy: true })
   const replies: Array<(value: Awaited<ReturnType<GameRuntime['worker']['conflicts']>>) => void> =
     []
   const signals: Array<AbortSignal | undefined> = []
@@ -379,7 +380,7 @@ it.each([
   'switch',
   'dispose',
 ] as const)('heavy_notes_discard_late_results_after_%s', async (change) => {
-  const test = setup(true)
+  const test = setup({ isHeavy: true })
   await test.store.restoreSession('fixture-free-session')
   await test.store.resume()
   test.store.dispatch({ kind: 'enter', cell: 0, digit: 1 })
@@ -436,50 +437,96 @@ it.each([
   test.store.dispose()
 })
 
-it('heavy_notes_commit_atomically_with_latest_assistance_and_keep_no_change_policy', async () => {
-  const test = setup(true)
-  await test.store.restoreSession('fixture-free-session')
-  await test.store.resume()
-  let reply:
-    ((value: Awaited<ReturnType<GameRuntime['worker']['generateNotes']>>) => void) | undefined
-  test.runtime.worker.generateNotes = vi.fn<GameRuntime['worker']['generateNotes']>(
-    () =>
-      new Promise((resolve) => {
-        reply = resolve
-      }),
-  )
-  test.store.dispatch({ kind: 'generate-notes' })
-  test.store.dispatch({ kind: 'generate-notes' })
-  test.store.dispatch({ kind: 'check' })
-  test.store.selectCell(2)
-  test.advance(1000)
-  await test.store.periodicSave()
-  expect(test.runtime.worker.generateNotes).toHaveBeenCalledTimes(1)
-  reply?.({
-    status: 'completed',
-    value: {
-      computation: {
-        result: {
-          status: 'complete',
-          entries: Array(81).fill(0),
-          notes: Array(81).fill(0),
-          changed: false,
-          boardComplete: false,
+it.each([{ hasChanges: false }, { hasChanges: true }])(
+  'commits current heavy notes with changed=$hasChanges and preserves concurrent facts',
+  async ({ hasChanges }) => {
+    const fixture = setup({ isHeavy: true })
+    const response = deferred<Awaited<ReturnType<GameRuntime['worker']['generateNotes']>>>()
+    fixture.runtime.worker.generateNotes = vi.fn(() => response.promise)
+
+    try {
+      await fixture.store.restoreSession('fixture-free-session')
+      await fixture.store.resume()
+      fixture.store.dispatch({ kind: 'enter', cell: 0, digit: 1 })
+      const originalEntries = [...fixture.store.board]
+      const previousNotes = Array<number>(81).fill(0)
+      fixture.store.dispatch({ kind: 'generate-notes' })
+      fixture.store.dispatch({ kind: 'generate-notes' })
+      fixture.store.dispatch({ kind: 'check' })
+      fixture.store.selectCell(2)
+      fixture.advance(1000)
+      await fixture.store.periodicSave()
+
+      expect(fixture.runtime.worker.generateNotes).toHaveBeenCalledTimes(1)
+      const notes = Array<number>(81).fill(hasChanges ? 511 : 0)
+      notes[0] = 0
+      response.resolve({
+        status: 'completed',
+        value: {
+          computation: {
+            result: {
+              status: 'complete',
+              entries: originalEntries,
+              notes,
+              changed: hasChanges,
+              boardComplete: false,
+            },
+          },
         },
-      },
-    },
-  })
-  await Promise.resolve()
-  expect(test.store.session?.assistance).toMatchObject({ checkCount: 1, candidateCount: 1 })
-  expect(test.store.session?.undoStack).toHaveLength(0)
-  expect(test.store.session?.elapsedMs).toBe(1000)
-  test.store.dispose()
-})
+      })
+      await response.promise
+      await vi.waitFor(() => {
+        expect(fixture.saved().notes).toEqual(notes)
+        expect(fixture.saved().assistance.candidateCount).toBe(1)
+      })
+
+      expect(fixture.store.session?.entries).toEqual(originalEntries)
+      expect(fixture.store.session?.notes).toEqual(notes)
+      expect(fixture.store.session?.assistance).toMatchObject({
+        checkCount: 1,
+        candidateCount: 1,
+      })
+      expect(fixture.store.session?.elapsedMs).toBe(1000)
+      expect(fixture.saved().notes).toEqual(notes)
+      expect(fixture.saved().assistance).toEqual(fixture.store.session?.assistance)
+      expect(fixture.saved().elapsedMs).toBe(1000)
+      expect(fixture.saved()).toEqual(fixture.store.session)
+
+      if (!hasChanges) {
+        expect(fixture.store.session?.undoStack).toHaveLength(1)
+        return
+      }
+
+      expect(fixture.store.session?.undoStack).toHaveLength(2)
+      expect(fixture.store.session?.redoStack).toHaveLength(0)
+      fixture.store.dispatch({ kind: 'undo' })
+      await vi.waitFor(() => expect(fixture.saved().notes).toEqual(previousNotes))
+
+      expect(fixture.store.session?.entries).toEqual(originalEntries)
+      expect(fixture.store.session?.notes).toEqual(previousNotes)
+      expect(fixture.store.session?.redoStack).toHaveLength(1)
+      expect(fixture.saved()).toEqual(fixture.store.session)
+      fixture.store.dispatch({ kind: 'redo' })
+      await vi.waitFor(() => expect(fixture.saved().notes).toEqual(notes))
+
+      expect(fixture.store.session?.notes).toEqual(notes)
+      expect(fixture.saved().notes).toEqual(notes)
+      expect(fixture.store.session?.undoStack).toHaveLength(2)
+      expect(fixture.saved()).toEqual(fixture.store.session)
+      expect(fixture.store.session?.assistance).toMatchObject({
+        checkCount: 1,
+        candidateCount: 1,
+      })
+    } finally {
+      fixture.store.dispose()
+    }
+  },
+)
 
 it.each(['failed', 'incomplete'] as const)(
   'heavy_notes_preserve_every_layer_and_assistance_on_%s',
   async (status) => {
-    const test = setup(true)
+    const test = setup({ isHeavy: true })
     await test.store.restoreSession('fixture-free-session')
     await test.store.resume()
     test.runtime.worker.generateNotes = async () =>
@@ -503,7 +550,7 @@ it.each(['failed', 'incomplete'] as const)(
 )
 
 it('heavy_conflicts_keep_sound_preview_on_failure_without_clock_or_assistance_restarts', async () => {
-  const test = setup(true)
+  const test = setup({ isHeavy: true })
   test.runtime.worker.conflicts = vi.fn<GameRuntime['worker']['conflicts']>(async () => ({
     status: 'failed',
     message: 'Fixture failure',

@@ -75,8 +75,13 @@ it('blocks a pending legacy slot until maintenance establishes its saved summary
 })
 
 it('does not publish a slow sheet response after the sheet closes', async () => {
-  const { runtime, home } = await setup()
+  const { runtime, database, home } = await setup()
+  const session = makeSession()
+  await database.put('sessions', { formatVersion: 2, revision: 1, session })
+  await database.put('meta', initialSummaryState(false), 'summaries')
+  expect((await runtime.repository.maintainSummaries()).ok).toBe(true)
   const response = await runtime.repository.readSlotSummary('free', 'classic')
+  expect(response).toMatchObject({ ok: true, value: { summary: { id: session.id } } })
   const pending = deferred<typeof response>()
   vi.spyOn(runtime.repository, 'readSlotSummary').mockReturnValueOnce(pending.promise)
 
